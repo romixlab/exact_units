@@ -1,7 +1,7 @@
 # exact_units
 
 ![Crates.io Version](https://img.shields.io/crates/v/exact_units)
-[![CI](https://github.com/vhrdtech/wire_weaver/actions/workflows/ci.yml/badge.svg)](https://github.com/vhrdtech/wire_weaver/actions/workflows/ci.yml)
+[![CI](https://github.com/romixlab/exact_units/actions/workflows/ci.yml/badge.svg)](https://github.com/romixlab/exact_units/actions/workflows/ci.yml)
 
 > Units of measure fixed at compile time and exact: a number with its unit, scale and storage in the type, `no_std`
 > and no alloc.
@@ -38,6 +38,8 @@ assert_eq!((t * 2).to::<Milli, u16>(), Some(Fixed::new(3)));
 |----------------|-------------------------------------------------------------------------------------------------------|
 | none           | everything above as plain Rust types: `Dim` constants, unit markers, `Magnitude`, `Fixed` and its ops |
 | unit groups    | `time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`, `radiation`, `dimensionless`, `information`, `counting`; `quantities` for all |
+| `customary`    | imperial, US customary and other units outside the SI (opt-in only, see [docs/customary.md](docs/customary.md)) |
+| `serde`        | `serde` for `Magnitude`, `Offset` and the owned wire mirrors                                          |
 | `shrink_wrap`  | the wire format: `SerializeShrinkWrap` / `DeserializeShrinkWrap` for every type, `SIExpr`, `Fixed` over `UNib32` / `UVlq*` / `Nibble` |
 | `std`          | every unit group; with `shrink_wrap` the owned wire mirrors `DimOwned`, `CountedOwned`, `SIExprOwned` for hosts |
 | `defmt`        | `defmt::Format`                                                                                       |
@@ -47,5 +49,18 @@ A firmware turns on the unit groups it uses.
 ## Where used
 
 The types go on the wire in [WireWeaver](https://github.com/vhrdtech/wire_weaver) device APIs through its
-`shrink_wrap` format, and [ww_si](https://crates.io/crates/ww_si) builds its run-time quantities (a prefix and number
-type chosen per value) on top of this crate. Docs: https://vhrdtech.github.io/wire_weaver/std_library/exact_units/
+`shrink_wrap` format (feature `shrink_wrap`), and [ww_si](https://crates.io/crates/ww_si) builds its run-time
+quantities (a prefix and number type chosen per value) on top of this crate.
+
+## Docs
+
+- [Imperial and US customary units](docs/customary.md): the catalogue, its sources and the names left out.
+- On the WireWeaver docs site: [overview](https://ww.vhrd.tech/std_library/exact_units/),
+  [exact magnitudes](https://ww.vhrd.tech/std_library/magnitude/), [points and origins](https://ww.vhrd.tech/std_library/points/),
+  [rounding and overflow](https://ww.vhrd.tech/std_library/rounding/),
+  [indices and sequence numbers](https://ww.vhrd.tech/std_library/indices/), and how units show in an API model and
+  its clients ([units in the model](https://ww.vhrd.tech/std_library/units_in_the_model/)).
+
+## License
+
+MIT, see [LICENSE](LICENSE).

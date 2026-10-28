@@ -1,5 +1,13 @@
 ## Unreleased
 
+### 🚀 Features
+
+* A repository of its own (romixlab/exact_units), with its history from wire_weaver: a standalone manifest, MIT
+  license file, CI (fmt, cargo sort, typos, clippy and rustdoc with `-D warnings`, tests, a `thumbv6m` build), a
+  justfile and `docs/customary.md`, the customary units catalogue whose tables the tests check. The `shrink_wrap`
+  feature takes shrink_wrap from the wire_weaver repository by git until shrink_wrap 0.2 is on crates.io. API
+  snapshots of this crate stay with wire_weaver (`wire_weaver_snapshots`).
+
 ### ⚠️ Breaking
 
 * `UnitExpr::Named` has a `provenance: Provenance<'static>` field (STD-72): a `UnitExpr::Named { .. }` written by

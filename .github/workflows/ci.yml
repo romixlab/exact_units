@@ -1,0 +1,101 @@
+name: CI
+
+# clippy and rustdoc use --all-features to cover feature gated code. Tests can't: with `defmt` enabled, host test
+# binaries fail to link, as there is no defmt global logger.
+
+on:
+  merge_group:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          components: rustfmt
+          cache: false
+      - run: cargo fmt --all --check
+
+  cargo-sort:
+    name: cargo sort
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-sort
+      - run: cargo sort --check
+
+  typos:
+    name: typos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: crate-ci/typos@v1
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          components: clippy
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      # without the wire format: plain Rust types only
+      - run: cargo clippy --all-targets --no-default-features --features std -- -D warnings
+
+  doc:
+    name: rustdoc
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - run: cargo doc --no-deps --all-features
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      # the defaults and the customary units (with their docs tables)
+      - run: cargo nextest run --features customary,serde
+      # without shrink_wrap (no wire format, plain Rust types) and with it but without std
+      - run: cargo nextest run --no-default-features --features std
+      - run: cargo nextest run --no-default-features --features shrink_wrap,quantities
+      # nextest does not run doctests
+      - run: cargo test --doc --features customary,serde
+
+  no-std:
+    name: no_std build (thumbv6m)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          target: thumbv6m-none-eabi
+      - run: cargo build --target thumbv6m-none-eabi --no-default-features --features time,electrical,information
+      - run: cargo build --target thumbv6m-none-eabi --no-default-features --features shrink_wrap,defmt,time

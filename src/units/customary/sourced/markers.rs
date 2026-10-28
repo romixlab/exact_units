@@ -171,7 +171,7 @@ fn marker_of(id: &str) -> String {
     }
 }
 
-/// The tables of `docs/std_library/customary.md` made from the catalogue, by the name of their block.
+/// The tables of `docs/customary.md` made from the catalogue, by the name of their block.
 fn docs_blocks() -> Vec<(&'static str, String)> {
     use std::fmt::Write as _;
     let mut ambiguous = String::from("| Name | Symbols | Markers | Why |\n|---|---|---|---|\n");
@@ -234,8 +234,7 @@ fn docs_blocks() -> Vec<(&'static str, String)> {
 /// The docs page's tables are the catalogue's: `CUSTOMARY_DOCS=update` (`just customary-docs`) writes them.
 #[test]
 fn docs_page_tables() {
-    let path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/std_library/customary.md");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/customary.md");
     let page = std::fs::read_to_string(&path).unwrap();
     let mut out = page.clone();
     for (name, table) in docs_blocks() {

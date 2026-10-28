@@ -1,11 +1,15 @@
 [package]
 name = "exact_units"
 version = "0.1.0"
-authors.workspace = true
+authors = ["Roman Isaikin <romix.lab@gmail.com>"]
 description = "Units of measure fixed at compile time: dimensions, exact scales and numbers with their unit in the type, no_std and no alloc"
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/romixlab/exact_units"
+keywords = ["units", "no_std", "embedded", "dimensional-analysis", "fixed-point"]
+categories = ["no-std", "embedded", "science"]
+
+[workspace]
 
 [features]
 default = ["std", "shrink_wrap"]
@@ -58,9 +62,11 @@ customary = []
 counting = []
 
 [dependencies]
-defmt = { workspace = true, optional = true }
-serde = { workspace = true, optional = true, features = ["std"] }
-shrink_wrap = { workspace = true, optional = true }
+defmt = { version = "1.1", optional = true }
+serde = { version = "1.0", default-features = false, features = ["derive", "std"], optional = true }
+# WireWeaver's wire format; from its repository until shrink_wrap 0.2 is on crates.io. wire_weaver itself
+# [patch]es this source to its own shrink_wrap, so there is one shrink_wrap in its builds.
+shrink_wrap = { version = "0.2.0", git = "https://github.com/vhrdtech/wire_weaver", default-features = false, optional = true }
 
 # the wire: SIExpr, Dim and Scale bytes, Series of Fixed fields
 [[test]]
@@ -70,3 +76,14 @@ required-features = ["shrink_wrap"]
 [[test]]
 name = "series"
 required-features = ["shrink_wrap"]
+
+[profile.dev]
+split-debuginfo = "unpacked"
+
+[profile.test]
+split-debuginfo = "unpacked"
+
+# `just install` / `just deploy`
+[profile.deploy]
+inherits = "release"
+incremental = true
