@@ -130,6 +130,10 @@ required-features = ["time"]
 name = "wire"
 required-features = ["shrink_wrap", "time"]
 
+[[example]]
+name = "decibels"
+required-features = ["electrical", "libm"]
+
 [profile.dev]
 split-debuginfo = "unpacked"
 
