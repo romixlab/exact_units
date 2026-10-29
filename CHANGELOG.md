@@ -1,5 +1,12 @@
 ## Unreleased
 
+### ⚠️ Breaking
+
+* `==`, `<` and friends compare two `Fixed` of one unit, scale and storage whatever their bounds: a `Range`-bounded
+  reading against an unbounded `db!()` threshold is the plain integer compare (before, both had to be one type, so
+  firmware compared `.get()`). Comparing against `Fixed::of(..)` (which fits three bounds markers) now needs its type
+  named, `Fixed::new(..)` doesn't. `Eq`, `Ord` and `Hash` stay within one type.
+
 ### 🚀 Features
 
 * Products and quotients of two `Fixed` values (STD-83): `a * b` is a `Fixed<Times<U1, U2>, Product<P1, P2>, T>`,

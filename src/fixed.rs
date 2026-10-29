@@ -514,18 +514,43 @@ where
     }
 }
 
-impl<U, P, T: Storage, B: Bounds<T>> PartialEq for Fixed<U, P, T, B> {
+/// Values of one unit, scale and storage compare as their numbers, whatever the bounds of each: a reading in
+/// `Range<0, 1_000_000>` against an unbounded threshold of [db!](crate::db) is the integer compare. Another scale
+/// or unit compares after [to](Fixed::to) or [convert](Fixed::convert).
+///
+/// ```
+/// # #[cfg(all(feature = "electrical", feature = "std"))] {
+/// use exact_units::{Fixed, Range, db, prefix::Micro, units::{Per, Volt}};
+///
+/// type Gain = Fixed<Per<Volt, Volt>, Micro, u32>;
+/// const THRESHOLD: Gain = db!(-3);
+/// let measured = Fixed::<Per<Volt, Volt>, Micro, u32, Range<0, 1_000_000>>::bounded(800_000);
+/// assert!(measured >= THRESHOLD);
+/// assert!(Gain::new(707_946) == THRESHOLD);
+/// # }
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, prefix::{Micro, Milli}, units::Volt};
+/// // mV and µV: convert first
+/// let _ = Fixed::<Volt, Milli, u32>::new(1) < Fixed::<Volt, Micro, u32>::new(1);
+/// ```
+impl<U, P, T: Storage, B: Bounds<T>, B2: Bounds<T>> PartialEq<Fixed<U, P, T, B2>>
+    for Fixed<U, P, T, B>
+{
     #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, other: &Fixed<U, P, T, B2>) -> bool {
         self.value == other.value
     }
 }
 
 impl<U, P, T: Storage + Eq, B: Bounds<T>> Eq for Fixed<U, P, T, B> {}
 
-impl<U, P, T: Storage, B: Bounds<T>> PartialOrd for Fixed<U, P, T, B> {
+impl<U, P, T: Storage, B: Bounds<T>, B2: Bounds<T>> PartialOrd<Fixed<U, P, T, B2>>
+    for Fixed<U, P, T, B>
+{
     #[inline(always)]
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Fixed<U, P, T, B2>) -> Option<Ordering> {
         self.value.partial_cmp(&other.value)
     }
 }
@@ -1300,6 +1325,28 @@ mod tests {
             Bytes::new(UNib32(7))
         );
         assert!(a < a * 2);
+    }
+
+    #[test]
+    fn compare_across_bounds() {
+        type T = Fixed<Second, Milli, u16, Range<1, 5000>>;
+        let t = T::bounded(300);
+        let limit: Millis<u16> = Fixed::new(250);
+        assert!(t > limit);
+        assert!(limit < t);
+        assert!(t != limit);
+        assert!(t == Millis::<u16>::new(300));
+        assert_eq!(t.partial_cmp(&limit), Some(Ordering::Greater));
+        // and with the overflow policies, which are the same numbers
+        assert!(Fixed::<Second, Milli, u16, Wrapping>::of(300) == t);
+        assert!(Fixed::<Second, Milli, u16, Saturating>::of(299) < t);
+        // floats: NaN is unordered
+        let x = Fixed::<Ratio, One, f32, RangeDec<0, 10, 0>>::try_new(1.0).unwrap();
+        assert!(x < Fixed::<Ratio, One, f32>::new(2.0));
+        assert_eq!(
+            x.partial_cmp(&Fixed::<Ratio, One, f32>::new(f32::NAN)),
+            None
+        );
     }
 
     #[test]

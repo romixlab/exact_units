@@ -295,7 +295,7 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> IndexFrom1<Of, T, B> {
 /// assert_eq!(b.get(), 4);
 /// assert!(a.is_before(b));
 /// assert!(b.is_after(a));
-/// assert_eq!(a.distance(b), Fixed::of(10));
+/// assert_eq!(a.distance(b), Fixed::new(10));
 /// assert_eq!(a.next().get(), 251);
 /// ```
 ///
