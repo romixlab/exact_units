@@ -94,6 +94,22 @@ required-features = ["time", "information"]
 name = "points"
 required-features = ["thermal", "time"]
 
+[[example]]
+name = "kinds"
+required-features = ["electrical", "dimensionless"]
+
+[[example]]
+name = "indices"
+required-features = ["counting"]
+
+[[example]]
+name = "roots"
+required-features = ["electrical", "time"]
+
+[[example]]
+name = "counted_dimensions"
+required-features = ["counting", "time"]
+
 [profile.dev]
 split-debuginfo = "unpacked"
 
