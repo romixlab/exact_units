@@ -122,6 +122,10 @@ required-features = ["electrical", "dimensionless", "angle"]
 name = "customary"
 required-features = ["customary"]
 
+[[example]]
+name = "no_std"
+required-features = ["time"]
+
 [profile.dev]
 split-debuginfo = "unpacked"
 
