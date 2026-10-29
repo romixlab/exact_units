@@ -15,10 +15,12 @@
 //!   1-based, and a wrapping sequence number in serial number order; index − index is an amount, index + index
 //!   doesn't compile.
 //! - `SIExpr` (feature `shrink_wrap`): a unit as a tree on the wire, for a unit only known at run time.
+//! - [decibel]: levels in dB of a gain, 20·lg or 10·lg by its [Kind]: [db!] works the stored value out at compile
+//!   time, exactly; `to_db` / `from_db` at run time in `f64` and `f32` (feature `std` or `libm`).
 //!
 //! `no_std`, no alloc, and no dependencies without features. `shrink_wrap` adds the wire format (`shrink_wrap`'s),
-//! `std` every unit group and with `shrink_wrap` the owned forms of the wire types, `defmt` their `defmt::Format`. Unit
-//! groups are cargo features (`time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`,
+//! `std` every unit group and with `shrink_wrap` the owned forms of the wire types, `defmt` their `defmt::Format`,
+//! `libm` the run-time dB without `std`. Unit groups are cargo features (`time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`,
 //! `radiation`, `dimensionless`, `information`, `counting`, `quantities` for all).
 //!
 //! Run-time quantities (a prefix and a number type chosen per value) are `ww_si`'s `Quantity` and `AnyQuantity`,
@@ -33,6 +35,7 @@ extern crate std;
 #[doc = include_str!("../README.md")]
 struct ReadmeDoctests;
 
+pub mod decibel;
 mod declare;
 mod fixed;
 #[cfg(feature = "counting")]

@@ -99,3 +99,14 @@ jobs:
           target: thumbv6m-none-eabi
       - run: cargo build --target thumbv6m-none-eabi --no-default-features --features time,electrical,information
       - run: cargo build --target thumbv6m-none-eabi --no-default-features --features shrink_wrap,defmt,time
+
+  no-std-libm:
+    name: no_std build with libm (thumbv7em-none-eabihf)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          target: thumbv7em-none-eabihf
+      # levels in dB without std: log10 and 10^x from libm, in f32 on a Cortex-M4F
+      - run: cargo build --target thumbv7em-none-eabihf --no-default-features --features electrical,libm

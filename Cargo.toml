@@ -18,6 +18,9 @@ std = ["shrink_wrap?/std", "quantities"]
 defmt = ["dep:defmt", "shrink_wrap?/defmt"]
 # the wire format: SerializeShrinkWrap / DeserializeShrinkWrap for every type, SIExpr, Fixed over UNib32, UVlq*, Nibble
 shrink_wrap = ["dep:shrink_wrap"]
+# log10 and 10^x from libm (pure Rust) for `Fixed::to_db` / `from_db` and their f32 forms without std; with std
+# too, so every target computes the same bits
+libm = ["dep:libm"]
 # serde for the owned wire mirrors (DimOwned, CountedOwned) and Magnitude: units in RON snapshots of APIs
 serde = ["std", "shrink_wrap", "dep:serde"]
 
@@ -63,10 +66,15 @@ counting = []
 
 [dependencies]
 defmt = { version = "1.1", optional = true }
+libm = { version = "0.2", default-features = false, optional = true }
 serde = { version = "1.0", default-features = false, features = ["derive", "std"], optional = true }
 # WireWeaver's wire format; from its repository until shrink_wrap 0.2 is on crates.io. wire_weaver itself
 # [patch]es this source to its own shrink_wrap, so there is one shrink_wrap in its builds.
 shrink_wrap = { version = "0.2.0", git = "https://github.com/vhrdtech/wire_weaver", default-features = false, optional = true }
+
+[dev-dependencies]
+# the reference the compile-time levels are tested against
+libm = { version = "0.2", default-features = false }
 
 # the wire: SIExpr, Dim and Scale bytes, Series of Fixed fields
 [[test]]

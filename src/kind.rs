@@ -297,64 +297,6 @@ mod ratio {
     }
 }
 
-/// Levels in decibels of a gain, the form (10·lg or 20·lg) from its kind.
-#[cfg(feature = "std")]
-impl<U: crate::Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>>
-    crate::Fixed<U, P, T, B>
-{
-    /// The form a level of `U` takes, or a compile error for a kind without one.
-    const LEVEL_FORM: LevelForm = match U::KIND.level_form() {
-        Some(form) => form,
-        None => panic!(
-            "decibels are for a ratio of powers (W/W) or of root-power quantities (V/V, A/A, Pa/Pa): a plain \
-             Ratio or another kind has no level form"
-        ),
-    };
-
-    /// The gain in dB: 20·lg for a ratio of root-power quantities (V/V, A/A), 10·lg for one of powers (W/W). A
-    /// kind without a level form (a plain [Ratio](crate::units::Ratio), a duty cycle) doesn't compile.
-    ///
-    /// ```
-    /// # #[cfg(feature = "electrical")] {
-    /// use exact_units::{Fixed, prefix::{Milli, One}, units::{Ampere, Per, Volt, Watt}};
-    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f64>::new(10.0).to_db(), 20.0);
-    /// assert_eq!(Fixed::<Per<Ampere, Ampere>, Milli, u32>::new(100).to_db(), -20.0);
-    /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::new(100.0).to_db(), 20.0);
-    /// # }
-    /// ```
-    ///
-    /// ```compile_fail
-    /// use exact_units::{Fixed, prefix::One, units::Ratio};
-    /// let _ = Fixed::<Ratio, One, f64>::new(0.5).to_db();
-    /// ```
-    pub fn to_db(self) -> f64 {
-        let form = const { Self::LEVEL_FORM };
-        let x = match self.get().to_repr() {
-            crate::Repr::Int(i) => i as f64,
-            crate::Repr::Float(x) => x,
-        };
-        let x = x * const { P::SCALE.to_f64() * U::EXPR.factor() };
-        form.db_per_decade() * x.log10()
-    }
-
-    /// The gain of a level in dB, by the form of [to_db](Self::to_db): `None` where it isn't a number of `T` (an
-    /// integer storage takes whole numbers only) or not within `B`.
-    ///
-    /// ```
-    /// # #[cfg(feature = "electrical")] {
-    /// use exact_units::{Fixed, prefix::{Milli, One}, units::{Per, Volt, Watt}};
-    /// assert_eq!(Fixed::<Per<Volt, Volt>, Milli, u32>::from_db(40.0), Some(Fixed::new(100_000)));
-    /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::from_db(30.0), Some(Fixed::new(1000.0)));
-    /// # }
-    /// ```
-    pub fn from_db(db: f64) -> Option<Self> {
-        let form = const { Self::LEVEL_FORM };
-        let x = 10f64.powf(db / form.db_per_decade());
-        let x = x / const { P::SCALE.to_f64() * U::EXPR.factor() };
-        Self::try_new(T::from_float(x)?).ok()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -28,6 +28,7 @@ check:
     cargo check --no-default-features --features=time,information,counting,dimensionless
     cargo check --no-default-features --features=std
     cargo check --no-default-features --features=shrink_wrap,defmt,time
+    cargo check --no-default-features --features=electrical,libm --target thumbv7em-none-eabihf
 
 # A library has nothing to put on PATH: builds it with the deploy profile, as a dependent's release build would
 install:

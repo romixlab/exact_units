@@ -15,6 +15,23 @@
 * Gains in decibels (STD-67, first piece, feature `std`): `Fixed::to_db` / `from_db` take 20·lg for a ratio of
   root-power quantities (V/V, A/A, Pa/Pa, V/m, A/m) and 10·lg for one of powers (W/W, J/J, W/m²) from the unit's
   kind (`Kind::level_form`, `LevelForm`); any other kind, a plain `Ratio` too, doesn't compile.
+* Levels in dB without `std` (STD-67): feature `libm` takes `log10` and `10^x` from the pure-Rust `libm` crate
+  (no C), so `to_db` / `from_db` build on `no_std`; with `std` on too libm is used, so a host and a firmware compute
+  the same bits. CI builds it for `thumbv7em-none-eabihf`. The dB code moved to the new `decibel` module.
+* `Fixed::to_db_f32` / `from_db_f32`: the same in `f32` with no `f64` on the way, the float a Cortex-M4F or M33 has in
+  hardware. On a Cortex-M4F (QEMU `mps2-an386`) `to_db_f32` of a `u16` in mV/V retires 60 instructions at
+  `opt-level = 3` and 72 at `"z"`, `to_db` in `f64` 3,800 to 4,200 (software `f64`). `Storage::to_f32` /
+  `from_f32` (provided methods, so a storage outside the crate keeps compiling) do the conversion without `f64` for
+  the integers and `f32`.
+* Exact dB constants at compile time: `db!(-3.01)` is the `Fixed` its context names, holding the stored value nearest
+  to `10^(dB/20)` (or `/10` for a power gain), ties to even; `Fixed::from_db_const(Decibels)` is the same as a
+  `const fn`, for every integer storage and `f32` / `f64`. Worked out in integers (128-bit binary intervals, the
+  lower end rounded down and the upper up at every step) with no float math at run time and no feature; a level whose
+  interval straddles a rounding boundary is a compile error instead of a guess, as are a kind without a level form, a
+  gain that doesn't fit the storage or its bounds, and a scale that isn't a fraction of integers. Tested against an
+  80-digit reference (every `f64` and `f32` correctly rounded) and against libm, whose `exp10` is up to 3 ulps off on
+  the same levels. A threshold written `db!(-3)` is the same flash as the integer literal; a level costs about 0.07 s
+  of compile time at two decimals, 0.35 s at nine.
 * A repository of its own (romixlab/exact_units), with its history from wire_weaver: a standalone manifest, MIT
   license file, CI (fmt, cargo sort, typos, clippy and rustdoc with `-D warnings`, tests, a `thumbv6m` build), a
   justfile and `docs/customary.md`, the customary units catalogue whose tables the tests check. The `shrink_wrap`

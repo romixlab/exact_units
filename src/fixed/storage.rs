@@ -33,6 +33,20 @@ pub trait Storage: Copy + PartialOrd + 'static {
     fn from_int(x: i128) -> Option<Self>;
     /// `x` if it is a whole number that fits (an integer storage), or `x` rounded to the storage (a float one).
     fn from_float(x: f64) -> Option<Self>;
+    /// The value as an `f32`, without an `f64` on the way where the type has its own conversion (integers and `f32`):
+    /// rounded for integers of more than 24 bits.
+    #[inline(always)]
+    fn to_f32(self) -> f32 {
+        match self.to_repr() {
+            Repr::Int(i) => i as f32,
+            Repr::Float(x) => x as f32,
+        }
+    }
+    /// [from_float](Self::from_float) for an `f32`.
+    #[inline(always)]
+    fn from_f32(x: f32) -> Option<Self> {
+        Self::from_float(x as f64)
+    }
     /// The value as an `i64`: exact for integers of up to 32 bits (the widened multiply of [Fixed::to](super::Fixed::to)),
     /// truncated for floats.
     fn to_i64(self) -> i64;
@@ -71,6 +85,24 @@ pub trait Storage: Copy + PartialOrd + 'static {
 pub trait UnsignedStorage: Storage {
     fn to_u64(self) -> u64;
     fn from_u64(x: u64) -> Option<Self>;
+}
+
+/// `f32` to an integer type if it is whole and in range, in `i64` for types of up to 63 bits (an `i128` conversion
+/// is a library call on a 32-bit MCU).
+#[inline(always)]
+fn whole_f32(x: f32, min: i128, max: i128) -> Option<i128> {
+    if x.is_nan() || x < min as f32 || x > max as f32 {
+        return None;
+    }
+    let i = if max <= i64::MAX as i128 {
+        x as i64 as i128
+    } else {
+        x as i128
+    };
+    if i as f32 != x || i < min || i > max {
+        return None;
+    }
+    Some(i)
 }
 
 /// `f64` to an integer type if it is whole and in range.
@@ -141,6 +173,14 @@ macro_rules! int {
             #[inline]
             fn from_float(x: f64) -> Option<Self> {
                 Some(whole(x, $ty::MIN as i128, $ty::MAX as i128)? as $ty)
+            }
+            #[inline(always)]
+            fn to_f32(self) -> f32 {
+                self as f32
+            }
+            #[inline]
+            fn from_f32(x: f32) -> Option<Self> {
+                Some(whole_f32(x, $ty::MIN as i128, $ty::MAX as i128)? as $ty)
             }
             fn fmt_number(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 fmt::Display::fmt(self, f)
@@ -430,6 +470,14 @@ macro_rules! float {
             }
             #[inline]
             fn from_float(x: f64) -> Option<Self> {
+                Some(x as $ty)
+            }
+            #[inline(always)]
+            fn to_f32(self) -> f32 {
+                self as f32
+            }
+            #[inline(always)]
+            fn from_f32(x: f32) -> Option<Self> {
                 Some(x as $ty)
             }
             fn fmt_number(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

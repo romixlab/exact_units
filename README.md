@@ -59,6 +59,10 @@ crate is about, all of it checked at compile time:
 - **Kinds that share a dimension.** A voltage gain V/V, a current gain A/A, a power gain W/W and a duty cycle are
   all dimension one, and none converts into another; a transimpedance V/A is not a resistance Ω. Crossing is a named
   step (`as_ratio`, `as_resistance`), and a gain's dB is 20·lg or 10·lg by its kind.
+- **Levels in dB, exact at compile time.** `db!(-3.01)` is the stored value nearest to the exact gain, worked out
+  in integers at compile time with an error bound (a level too close to halfway between two stored values doesn't
+  compile), so a firmware threshold in dB is an integer compare. At run time `to_db` / `from_db` in `f64` and
+  `to_db_f32` / `from_db_f32` in `f32`, with `std` or the pure-Rust `libm`.
 - **Roots.** A noise density is `Per<Volt, Sqrt<Hertz>>`, shown `V/√Hz`.
 - **Every scale an MCU uses.** SI prefixes, binary prefixes (KiB), powers of ten and of two, fractions
   (`Rational<1, 65535>`: 65535 is 100 % in a `u16`), and the step of a converter (`FullScale<Rational<33, 10>, 12>`:
@@ -102,6 +106,7 @@ know that a field is in µs, not just a `u32`. A unit known only at run time tra
 | `shrink_wrap` | the wire format: `SerializeShrinkWrap` / `DeserializeShrinkWrap` for every type, `SIExpr`, `Fixed` over `UNib32` / `UVlq*` / `Nibble` |
 | `serde`       | `serde` for `Magnitude`, `Offset` and the owned wire mirrors                                         |
 | `defmt`       | `defmt::Format`                                                                                      |
+| `libm`        | `to_db` / `from_db` and their `f32` forms without `std`, from the pure-Rust `libm` (also with `std`, so every target computes the same bits) |
 
 Default: `std` and `shrink_wrap`.
 
@@ -115,7 +120,21 @@ exact_units = { version = "0.1", default-features = false, features = ["time", "
 ```
 
 A scale is a type parameter and a conversion factor a constant worked out at compile time, so nothing about units
-is stored or decided at run time. CI builds the crate for `thumbv6m-none-eabi` (Cortex-M0) without `std`.
+is stored or decided at run time. CI builds the crate for `thumbv6m-none-eabi` (Cortex-M0) without `std`, and for
+`thumbv7em-none-eabihf` with `libm`.
+
+Levels in dB on a Cortex-M4F (QEMU `mps2-an386`, instructions retired, not cycles): `to_db_f32` of a `u16` in mV/V
+is 60 instructions at `opt-level = 3` and 72 at `"z"` (`log10f` in hardware `f32`), `to_db` in `f64` about 4,000
+(software `f64`); a threshold written `db!(-3)` is the same flash as the integer literal.
+
+```rust
+# #[cfg(feature = "electrical")] {
+use exact_units::{Fixed, db, prefix::Milli, units::{Per, Volt}};
+type Gain = Fixed<Per<Volt, Volt>, Milli, u16>;
+const MINUS_3_DB: Gain = db!(-3); // 708 mV/V, no float at run time
+assert!(Gain::new(690) < MINUS_3_DB);
+# }
+```
 
 ## Compared with
 
@@ -140,7 +159,7 @@ host, uom serves well.
   [rounding and overflow](https://ww.vhrd.tech/std_library/rounding/),
   [indices and sequence numbers](https://ww.vhrd.tech/std_library/indices/), and how units show in an API model and
   its clients ([units in the model](https://ww.vhrd.tech/std_library/units_in_the_model/)).
-- Planned: levels in dB and named sentinel codes next to bounds (WireWeaver STD-67 and STD-66).
+- Planned: named sentinel codes next to bounds (WireWeaver STD-66).
 
 ## License
 
