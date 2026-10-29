@@ -161,6 +161,24 @@ host, uom serves well.
   its clients ([units in the model](https://ww.vhrd.tech/std_library/units_in_the_model/)).
 - Planned: named sentinel codes next to bounds (WireWeaver STD-66).
 
+## Examples
+
+Runnable, each a few dozen lines, each printing what it shows (`cargo run --example NAME --features ...`):
+
+- `conversions` (`time,information`): exact scales, `to`, and what doesn't compile when it isn't exact.
+- `points` (`thermal,time`): a point against an origin, a delta between two, Celsius and Unix time.
+- `kinds` (`electrical,dimensionless`): V/A vs Ω, A/V vs S, V/V and A/A as ratios of different dimensions.
+- `indices` (`counting`): `Index`, `IndexFrom1`, and `Seq`'s RFC 1982 wraparound order.
+- `roots` (`electrical,time`): `Sqrt<Hertz>`, a noise density in V/√Hz, and why a root of a root doesn't compile.
+- `counted_dimensions` (`counting,time`): a user's own counted unit, `units::by_name`, a sample rate.
+- `rounding_overflow` (`electrical`): `to_rounded`'s five policies, `into_rounded`'s compile-time proof,
+  checked/saturating/wrapping arithmetic.
+- `bounds` (`electrical,dimensionless,angle`): `Range`/`RangeU64`/`RangeDec`, `Unbounded`/`Wrapping`/`Saturating`,
+  `Bam16` and `Q15` as concrete bounded types.
+- `customary` (`customary`): imperial/US units as exact fractions, and `Provenance::Conventional` vs `Defined`.
+- `no_std` (`time`): the narrow feature set a firmware links; the example binary itself still links `std`.
+- `wire` (`shrink_wrap,time`): a struct of `Fixed` fields on the wire, byte for byte the same as plain integers.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
