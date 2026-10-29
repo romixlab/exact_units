@@ -85,6 +85,15 @@ required-features = ["shrink_wrap"]
 name = "series"
 required-features = ["shrink_wrap"]
 
+# examples/*.rs: runnable, a few dozen lines each, see the README's Examples section
+[[example]]
+name = "conversions"
+required-features = ["time", "information"]
+
+[[example]]
+name = "points"
+required-features = ["thermal", "time"]
+
 [profile.dev]
 split-debuginfo = "unpacked"
 
