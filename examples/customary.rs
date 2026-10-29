@@ -34,7 +34,7 @@ fn main() {
                 println!("inHg (32 °F) is conventional, from {source} {year}");
                 assert_eq!((source, year), ("NIST SP 811", 2008));
             }
-            Provenance::Defined => unreachable!("inHg (32 °F) is conventional, not defined"),
+            _ => unreachable!("inHg (32 °F) is conventional, not defined"),
         },
         _ => unreachable!("a named unit"),
     }
