@@ -1,5 +1,6 @@
 use super::*;
 use std::string::ToString;
+use std::vec::Vec;
 
 /// The pound, 0.45359237 kg exactly (1959 yard and pound agreement).
 const LB: Magnitude = Magnitude::ratio(45359237, 100_000_000);
