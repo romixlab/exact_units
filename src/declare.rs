@@ -33,6 +33,8 @@
 ///   `pow2 e`, `pi e` in that order, see [Magnitude::new](crate::Magnitude::new)), so every reader computes the same
 ///   value; or `Affine { factor: 1.0, offset: 273.15 }` for a unit with an offset (moves to origins, STD-64). A float
 ///   factor isn't a unit's scale: an exact one is a `Magnitude`, and a factor known only at run time is a value.
+/// - After the dimension, `kind "resistance"` names a kind of quantity of its own ([Kind::Named](crate::Kind)):
+///   such a unit doesn't convert to or from another of its dimension, `Ohm` is no `Per<Volt, Ampere>`.
 /// - After the scale, `conventional("NIST SP 811", 2008)` marks a unit fixed by a physical property (mercury at
 ///   32 °F, a calorie at 15 °C): its scale is the value that source prints, not a definition
 ///   ([Provenance::Conventional](crate::Provenance::Conventional)). Without it the scale is the unit's definition.
@@ -45,14 +47,14 @@ macro_rules! unit {
         @table $(#[$all_attr:meta])* $all_vis:vis static $all:ident;
         $(
             $(#[$($attr:tt)*])*
-            $vis:vis struct $name:ident = $symbol:literal, $dim:tt
+            $vis:vis struct $name:ident = $symbol:literal, $dim:tt $(kind $qkind:literal)?
                 $(, $kind:ident $args:tt $(, conventional($source:literal, $year:literal))?)?;
         )*
     ) => {
         $crate::unit! {
             $(
                 $(#[$($attr)*])*
-                $vis struct $name = $symbol, $dim $(, $kind $args $(, conventional($source, $year))?)?;
+                $vis struct $name = $symbol, $dim $(kind $qkind)? $(, $kind $args $(, conventional($source, $year))?)?;
             )*
         }
 
@@ -68,7 +70,7 @@ macro_rules! unit {
     (
         $(
             $(#[$($attr:tt)*])*
-            $vis:vis struct $name:ident = $symbol:literal, $dim:tt
+            $vis:vis struct $name:ident = $symbol:literal, $dim:tt $(kind $qkind:literal)?
                 $(, $kind:ident $args:tt $(, conventional($source:literal, $year:literal))?)?;
         )*
     ) => {
@@ -81,6 +83,7 @@ macro_rules! unit {
                 [] $(#[$($attr)*])* =>
                 impl $crate::Unit for $name {
                     const DIM: $crate::Dim<'static> = $crate::__unit_dim!($name $dim);
+                    const KIND: $crate::Kind<'static> = $crate::__unit_kind!($($qkind)?);
                     const EXPR: &'static $crate::UnitExpr = &$crate::UnitExpr::Named {
                         name: stringify!($name),
                         symbol: $symbol,
@@ -171,6 +174,18 @@ macro_rules! __unit_dim {
         $(dim.$d = $crate::__dim_exp($e);)*
         dim
     }};
+}
+
+/// The kind of a [unit!] line: `kind "<name>"` after the dimension, else plain.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __unit_kind {
+    () => {
+        $crate::Kind::Plain
+    };
+    ($name:literal) => {
+        $crate::Kind::Named($name)
+    };
 }
 
 /// The scale of a [unit!] line.

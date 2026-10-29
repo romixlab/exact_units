@@ -9,6 +9,7 @@
 //! compiler gets their [Unit] impls from it, and the snapshot of this crate (WireWeaver's walker reads the same
 //! lines) their docs and definitions, so clients know them without a table (INT-13).
 
+use crate::Kind;
 #[cfg(feature = "shrink_wrap")]
 use crate::SIExpr;
 #[allow(unused_imports)] // `Scale` with no quantity group enabled
@@ -59,16 +60,18 @@ crate::unit! {
     pub struct Volt = "V", [kg 1, m 2, s -3, a -1];
 
     /// Resistance, reactance or impedance in ohms, Ω (kg·m²·s⁻³·A⁻², V/A).
+    /// Of the kind `resistance`: a transimpedance `Per<Volt, Ampere>` becomes one only by `as_resistance`.
     #[cfg(feature = "electrical")]
-    pub struct Ohm = "Ω", [kg 1, m 2, s -3, a -2];
+    pub struct Ohm = "Ω", [kg 1, m 2, s -3, a -2] kind "resistance";
 
     /// Capacitance in farads, F (kg⁻¹·m⁻²·s⁴·A², C/V).
     #[cfg(feature = "electrical")]
     pub struct Farad = "F", [kg -1, m -2, s 4, a 2];
 
     /// Admittance, conductance or susceptance in siemens, S (kg⁻¹·m⁻²·s³·A², A/V).
+    /// Of the kind `conductance`: a transconductance `Per<Ampere, Volt>` becomes one only by `as_conductance`.
     #[cfg(feature = "electrical")]
-    pub struct Siemens = "S", [kg -1, m -2, s 3, a 2];
+    pub struct Siemens = "S", [kg -1, m -2, s 3, a 2] kind "conductance";
 
     /// Inductance in henries, H (kg·m²·s⁻²·A⁻², Wb/A).
     #[cfg(feature = "electrical")]
@@ -295,6 +298,9 @@ crate::unit! {
 
 /// `A / B`, a unit outside the named list: `Per<Torque, AngularVelocity>` is N·m/(rad/s). Not normalized,
 /// `Per<Meter, Second>` is not [Speed] (convert with `to_si_f64` / `from_f32`).
+///
+/// A quotient of one dimension keeps it as its [Kind]: `Per<Volt, Volt>` is a voltage gain, which
+/// doesn't convert to `Per<Ampere, Ampere>` or a [Ratio] (`as_ratio` is the step), and has a level in dB (`to_db`).
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Per<A, B> {
     _a: PhantomData<A>,
@@ -318,6 +324,7 @@ pub struct Sqrt<U> {
 
 impl<U: Unit> Unit for Sqrt<U> {
     const DIM: Dim<'static> = U::DIM.sqrt();
+    const KIND: Kind<'static> = U::KIND.sqrt();
     const EXPR: &'static UnitExpr = &UnitExpr::Sqrt(U::EXPR);
     #[cfg(feature = "shrink_wrap")]
     const SI_EXPR: &'static SIExpr<'static> = &SIExpr::Sqrt(RefBox::Ref { value: U::SI_EXPR });
@@ -325,6 +332,7 @@ impl<U: Unit> Unit for Sqrt<U> {
 
 impl<A: Unit, B: Unit> Unit for Per<A, B> {
     const DIM: Dim<'static> = A::DIM.div(B::DIM);
+    const KIND: Kind<'static> = A::KIND.div(A::DIM, B::KIND, B::DIM);
     const EXPR: &'static UnitExpr = &UnitExpr::Div(A::EXPR, B::EXPR);
     #[cfg(feature = "shrink_wrap")]
     const SI_EXPR: &'static SIExpr<'static> = &SIExpr::Div(
@@ -335,6 +343,7 @@ impl<A: Unit, B: Unit> Unit for Per<A, B> {
 
 impl<A: Unit, B: Unit> Unit for Times<A, B> {
     const DIM: Dim<'static> = A::DIM.mul(B::DIM);
+    const KIND: Kind<'static> = A::KIND.mul(A::DIM, B::KIND, B::DIM);
     const EXPR: &'static UnitExpr = &UnitExpr::Mul(A::EXPR, B::EXPR);
     #[cfg(feature = "shrink_wrap")]
     const SI_EXPR: &'static SIExpr<'static> = &SIExpr::Mul(

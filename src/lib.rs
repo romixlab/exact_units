@@ -37,6 +37,7 @@ mod declare;
 mod fixed;
 #[cfg(feature = "counting")]
 mod index;
+pub mod kind;
 mod magnitude;
 pub mod num;
 mod point;
@@ -63,6 +64,7 @@ pub use fixed::{Duty16, Ppb, Q15, Q31, UQ16_16};
 pub use fixed::{Micros, Millis, Nanos};
 #[cfg(feature = "counting")]
 pub use index::{Index, IndexFrom1, Seq};
+pub use kind::{Kind, LevelForm};
 pub use magnitude::{
     Irrational, MAX_FACTORS, Magnitude, MagnitudeError, MagnitudeRest, PrimePower,
 };

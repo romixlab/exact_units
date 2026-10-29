@@ -1,5 +1,6 @@
 //! What a unit is: its dimension, how its values become coherent SI, and how it is written.
 
+use crate::Kind;
 #[cfg(feature = "shrink_wrap")]
 use crate::SIExpr;
 use crate::tree;
@@ -897,6 +898,10 @@ impl fmt::Display for UnitExpr {
 pub trait Unit: Copy + Default + 'static {
     /// The dimension: SI base-unit exponents, angle, information and counted bases.
     const DIM: Dim<'static>;
+    /// The kind of quantity beyond the dimension ([Kind]): plain, unless the `unit!` line names one (`Ohm` is a
+    /// resistance), or what a quotient kept (`Per<Volt, Volt>` is a ratio of voltage). [Fixed::convert](crate::Fixed::convert)
+    /// needs the same dimension and kind.
+    const KIND: Kind<'static> = Kind::Plain;
     /// Name, symbol and scale, or the tree of a compound unit.
     const EXPR: &'static UnitExpr;
     /// The same unit as it goes on the wire in an `ww_si::AnyQuantity`. Made from [EXPR](Self::EXPR)

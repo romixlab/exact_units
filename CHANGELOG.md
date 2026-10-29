@@ -2,6 +2,19 @@
 
 ### 🚀 Features
 
+* Kinds of quantity that share a dimension (STD-68, first piece): `Unit::KIND`, a `Kind` next to `DIM` (`Plain`,
+  `Named("resistance")`, `RatioOf(dim)`), checked by `Fixed::convert` at compile time, nothing at run time. A
+  quotient of one dimension keeps what cancelled: `Per<Volt, Volt>` is a voltage gain, `Per<Ampere, Ampere>` a
+  current gain, `Per<Watt, Watt>` a power gain; a scale still converts within a kind (mV/V to V/V). A dimension-one
+  factor keeps the other side's kind, two gains of one dimension stay one (V/V · V/V), any other product is plain
+  (V/V · V is a plain V). `unit!` takes `kind "<name>"` after the dimension; `Ohm` is `resistance`, `Siemens`
+  `conductance`. Rules after ISO 80000-1's kinds as mp-units has them; the `kind` module documents them.
+* Named steps between kinds, the number unchanged: `as_resistance` / `as_transimpedance` (`Per<Volt, Ampere>` ↔
+  `Ohm`), `as_conductance` / `as_transconductance` (`Per<Ampere, Volt>` ↔ `Siemens`), `as_ratio` / `as_gain::<U>`
+  (`Per<U, U>` ↔ `Ratio`).
+* Gains in decibels (STD-67, first piece, feature `std`): `Fixed::to_db` / `from_db` take 20·lg for a ratio of
+  root-power quantities (V/V, A/A, Pa/Pa, V/m, A/m) and 10·lg for one of powers (W/W, J/J, W/m²) from the unit's
+  kind (`Kind::level_form`, `LevelForm`); any other kind, a plain `Ratio` too, doesn't compile.
 * A repository of its own (romixlab/exact_units), with its history from wire_weaver: a standalone manifest, MIT
   license file, CI (fmt, cargo sort, typos, clippy and rustdoc with `-D warnings`, tests, a `thumbv6m` build), a
   justfile and `docs/customary.md`, the customary units catalogue whose tables the tests check. The `shrink_wrap`
@@ -12,6 +25,9 @@
 
 ### ⚠️ Breaking
 
+* `Fixed::convert` refuses units of different kinds of one dimension, a compile error where it converted before:
+  `Per<Volt, Volt>` to `Per<Ampere, Ampere>`, `Per<Watt, Watt>` or `Ratio` (and back), `Per<Volt, Ampere>` to `Ohm`,
+  `Per<Ampere, Volt>` to `Siemens`. Where that was meant, the named step says so (`as_ratio`, `as_resistance`, ..).
 * `UnitExpr::Named` has a `provenance: Provenance<'static>` field (STD-72): a `UnitExpr::Named { .. }` written by
   hand adds `provenance: Provenance::Defined`; a pattern without `..` adds `..`.
 - `Prefix` (STD-59) gains the binary prefixes `Kibi`, `Mebi`, `Gibi`, `Tebi`, three families of exact scales without a name, each with a one-byte parameter, and a catch-all: `Pow10(Pow10Exp)` (`10⁻⁴`; `-63..=63`, not an SI prefix's exponent), `Pow2(Pow2Exp)` (`2⁻¹⁵`, a Q format or an RTC tick; not a binary prefix's), `FullScale(FullScaleBits)` (`1/(2^n − 1)`, `1/65535` for a 16-bit duty) and `#[future_version] Unknown(u16)` (DER-25), a scale kind from a newer version, read past with the rest of the message intact. No table, in flash or on the wire: a family's scale is computed from its parameter, and equal scales are equal prefixes (a family refuses a named prefix's scale, also when read). Other exact scales (`1/5`, a BAM's `π/2¹⁵`) are no `Prefix`: such a value is a `ww_si::AnyQuantity`. On the wire named prefixes keep their one nibble (the others a byte), a family takes one byte more; scale kinds added later are tag-only, their numbers packed into the `UNib32` tag, so an older reader gets `Unknown(tag)`. In memory `Prefix` is 4 bytes on host, M0, M4F and M33 (`niche`, DER-24; 8 with a plain `#[repr(u32)]`), the size it had, so `ww_si::Volt` stays 12 bytes. A device or host built before this refuses a value in a binary prefix or a family (decode error); every other value has the same bytes. One break for all of it.

@@ -56,6 +56,9 @@ crate is about, all of it checked at compile time:
   (rad/s); a degree is exactly π/180 rad.
 - **Counted things are dimensions.** Items, samples, frames, packets and bits each have a dimension of their own (an
   API declares its own too), so a sample rate is not a frequency and bytes never turn into percent.
+- **Kinds that share a dimension.** A voltage gain V/V, a current gain A/A, a power gain W/W and a duty cycle are
+  all dimension one, and none converts into another; a transimpedance V/A is not a resistance Ω. Crossing is a named
+  step (`as_ratio`, `as_resistance`), and a gain's dB is 20·lg or 10·lg by its kind.
 - **Roots.** A noise density is `Per<Volt, Sqrt<Hertz>>`, shown `V/√Hz`.
 - **Every scale an MCU uses.** SI prefixes, binary prefixes (KiB), powers of ten and of two, fractions
   (`Rational<1, 65535>`: 65535 is 100 % in a `u16`), and the step of a converter (`FullScale<Rational<33, 10>, 12>`:

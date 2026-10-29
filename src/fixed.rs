@@ -362,7 +362,8 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// # }
     /// ```
     ///
-    /// Units of different dimensions don't convert, a pound of force is not a pound of mass:
+    /// Units of different dimensions don't convert, a pound of force is not a pound of mass; nor do units of
+    /// different [kinds](crate::Kind) of one dimension (V/V and a ratio, V/A and Ω):
     ///
     /// ```compile_fail
     /// use exact_units::{Fixed, prefix::One, units::{PoundAvdp, PoundForce}};
@@ -725,6 +726,11 @@ impl Conversion {
         assert!(
             U::DIM.same(U2::DIM),
             "a Fixed converts only between units of the same dimension (a pound-force is not a pound)"
+        );
+        assert!(
+            U::KIND.same(U2::KIND),
+            "a Fixed converts only between units of the same kind: V/V is not A/A or a Ratio, V/A is not an Ohm \
+             (cross kinds with a named step: as_ratio, as_resistance, ..)"
         );
         assert!(
             !U::EXPR.has_offset() && !U2::EXPR.has_offset(),
