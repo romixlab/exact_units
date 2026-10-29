@@ -26,14 +26,10 @@ fn main() {
     println!("a gain of {gain} is {duty} as a plain ratio");
     assert_eq!(duty.as_gain::<Volt>(), gain);
 
-    // a gain times a voltage is a plain voltage again: the ratio's kind cancels in the product (see kind.rs).
-    // There is no `Fixed * Fixed` yet (no `Mul` impl between two `Fixed`s, only `Fixed * T` — filed as a task):
-    // the product below is computed by hand, from `.get()`, not through an API this crate doesn't have yet.
+    // a gain times a voltage is a plain voltage again: `gain * v` keeps the written form V/V·V (one `f32`
+    // multiply), and `convert` reaches the volt because the ratio's kind cancels in the product (see kind.rs)
     let v = Fixed::<Volt, One, f32>::new(12.0);
-    let scaled = Fixed::<exact_units::units::Times<Per<Volt, Volt>, Volt>, One, f32>::new(
-        gain.get() * v.get(),
-    );
-    let as_volts: Option<Fixed<Volt, One, f32>> = scaled.convert();
+    let as_volts: Option<Fixed<Volt, One, f32>> = (gain * v).convert();
     println!("{gain} of {v} is {as_volts:?}");
 
     // a voltage gain is not a current gain, nor a plain ratio, nor a resistance — all three built for real, not

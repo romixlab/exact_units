@@ -20,13 +20,13 @@ fn main() {
     let measured = Gain::new(800_000);
     println!(
         "{measured:#} is {} the -3 dB threshold",
-        if measured.get() >= THRESHOLD.get() {
+        if measured >= THRESHOLD {
             "above"
         } else {
             "below"
         }
     );
-    assert!(measured.get() > THRESHOLD.get());
+    assert!(measured > THRESHOLD);
 
     // to_db / from_db: the form by the unit's kind — V/V and A/A are root-power (20·lg), W/W is power (10·lg)
     let voltage_gain = Fixed::<Per<Volt, Volt>, One, f64>::new(10.0);
