@@ -114,6 +114,10 @@ required-features = ["counting", "time"]
 name = "rounding_overflow"
 required-features = ["electrical"]
 
+[[example]]
+name = "bounds"
+required-features = ["electrical", "dimensionless", "angle"]
+
 [profile.dev]
 split-debuginfo = "unpacked"
 
