@@ -178,6 +178,8 @@ Runnable, each a few dozen lines, each printing what it shows (`cargo run --exam
 - `customary` (`customary`): imperial/US units as exact fractions, and `Provenance::Conventional` vs `Defined`.
 - `no_std` (`time`): the narrow feature set a firmware links; the example binary itself still links `std`.
 - `wire` (`shrink_wrap,time`): a struct of `Fixed` fields on the wire, byte for byte the same as plain integers.
+- `decibels` (`electrical,libm`): `db!` as a compile-time integer threshold, `to_db`/`from_db` by kind, `libm`
+  for the `no_std` path.
 
 ## License
 

@@ -41,9 +41,9 @@
   and a comparison with uom, dimensioned and Numbat; its examples, including what doesn't compile, run as doctests.
 * `examples/*.rs`, runnable with `cargo run --example <name>`: exact conversions and scales, points vs deltas
   (temperatures, timestamps), kinds (V/V vs A/A, V/A vs Ohm), indices, roots, counted dimensions, rounding and
-  overflow, bounds, customary units (feature `customary`), `no_std` use, and the wire format (feature
-  `shrink_wrap`), each `required-features`-gated so `cargo test` builds every one it can. Listed in the README's
-  new Examples section.
+  overflow, bounds, customary units (feature `customary`), `no_std` use, the wire format (feature `shrink_wrap`),
+  and decibels (`db!`, `to_db`/`from_db` by kind, feature `libm`), each `required-features`-gated so `cargo test`
+  builds every one it can. Listed in the README's new Examples section.
 
 ### ⚠️ Breaking
 
