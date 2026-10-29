@@ -63,6 +63,9 @@ crate is about, all of it checked at compile time:
   in integers at compile time with an error bound (a level too close to halfway between two stored values doesn't
   compile), so a firmware threshold in dB is an integer compare. At run time `to_db` / `from_db` in `f64` and
   `to_db_f32` / `from_db_f32` in `f32`, with `std` or the pure-Rust `libm`.
+- **Products keep their unit and scale.** mV times mA is a `Fixed` in mV·mA with the exact scale 10⁻⁶ as a type,
+  one integer multiply on the device, and `convert` takes it to a watt; V/V times V is a volt, a gain times a gain is
+  still a gain. Rounding into another scale (`times_into`, a Q15 multiply) is named, never a float.
 - **Roots.** A noise density is `Per<Volt, Sqrt<Hertz>>`, shown `V/√Hz`.
 - **Every scale an MCU uses.** SI prefixes, binary prefixes (KiB), powers of ten and of two, fractions
   (`Rational<1, 65535>`: 65535 is 100 % in a `u16`), and the step of a converter (`FullScale<Rational<33, 10>, 12>`:

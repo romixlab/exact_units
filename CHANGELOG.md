@@ -2,6 +2,19 @@
 
 ### 🚀 Features
 
+* Products and quotients of two `Fixed` values (STD-83): `a * b` is a `Fixed<Times<U1, U2>, Product<P1, P2>, T>`,
+  `a / b` a `Fixed<Per<U1, U2>, Quotient<P1, P2>, T>`, one multiply or division of `T`. The written form is kept and
+  `convert` reaches the named unit: V · A to `Watt`, V/V · V to `Volt` (the gain's kind cancels), V/A · A to `Volt`,
+  while V/V · V/V stays a voltage gain. `prefix::Product` / `prefix::Quotient` are the exact scale of the result as a
+  type, its `Magnitude` worked out at compile time (`Product<Milli, Milli>` is `Micro`, `Product<Pow2<-15>,
+  Pow2<-15>>` is `Pow2<-30>`, fractions, full scales and π too). Overflow by the operands' policy (`Unbounded`,
+  `Wrapping`, `Saturating`; mixing two doesn't compile); two `Range`s multiply with `*` when their corners prove the
+  product fits `T`. `checked_times` / `saturating_times` / `wrapping_times` and the `_per` twins for operands of any
+  bounds. `times_into` / `per_into` (and `times_requantize` / `per_requantize` with an `Overflow`) give the result in
+  another scale and storage, rounded once and with no float for integers: mV · mA into mW, Q15 · Q15 back into Q15, 3
+  V / 2 A as 1500 mV/A. Mixed storages, a `Point` and a unit with an offset don't multiply. On a Cortex-M3 the product
+  and a Q15 multiply are the plain code's instructions (`qemu_icount`, `opt-level` `z` and `3`); the module docs have
+  the table.
 * Kinds of quantity that share a dimension (STD-68, first piece): `Unit::KIND`, a `Kind` next to `DIM` (`Plain`,
   `Named("resistance")`, `RatioOf(dim)`), checked by `Fixed::convert` at compile time, nothing at run time. A
   quotient of one dimension keeps what cancelled: `Per<Volt, Volt>` is a voltage gain, `Per<Ampere, Ampere>` a

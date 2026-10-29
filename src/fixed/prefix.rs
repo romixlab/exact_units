@@ -2,8 +2,9 @@
 //! u32>`), never sent themselves. The decimal SI prefixes `Quecto` to `Quetta` with [One] for none, the binary `Kibi`
 //! to `Tebi` (2¹⁰ to 2⁴⁰), which exist only as markers (the run-time [Prefix] of a `ww_si::Quantity` is
 //! decimal), and exact factors without a name: [Pow10], [Pow2], [Rational] and the full-scale fractions [FullScale]
-//! and [FullScaleMax]. Every marker's scale is a [Magnitude], so markers of the same factor are the same scale
-//! however spelled (`Milli`, `Pow10<-3>`, `Rational<1, 1000>`): conversions between them are free.
+//! and [FullScaleMax], and the scales of a product or quotient of two values, [Product] and [Quotient]. Every
+//! marker's scale is a [Magnitude], so markers of the same factor are the same scale however spelled (`Milli`,
+//! `Pow10<-3>`, `Rational<1, 1000>`, `Product<Milli, One>`): conversions between them are free.
 //!
 //! The named markers are declared with [scale!](crate::scale), like the unit markers with [unit!](crate::unit): the
 //! snapshot of this crate holds them with their docs and factors (INT-13).
@@ -102,6 +103,40 @@ const fn bits(b: u8) -> i8 {
 /// `2^BITS - 1`.
 const fn max_code(b: u8) -> u64 {
     (1u64 << bits(b)) - 1
+}
+
+/// `A · B`, the scale of a product of two [Fixed](crate::Fixed) values: mV times mA is a `Product<Milli, Milli>`,
+/// whose scale is 10⁻⁶ exactly (the same as [Micro], so `to::<Micro, _>()` is free). Its [Magnitude] is worked out
+/// at compile time; a product that needs more than [MAX_FACTORS](crate::MAX_FACTORS) primes doesn't compile. A
+/// scale for arithmetic: an API field names its scale (`to` it first), WireWeaver doesn't take a `Product`.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Product<A, B>(core::marker::PhantomData<(A, B)>);
+
+/// `A / B`, the scale of a quotient of two [Fixed](crate::Fixed) values: mV per mA is a `Quotient<Milli, Milli>`,
+/// a scale of 1. As [Product], a scale for arithmetic.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Quotient<A, B>(core::marker::PhantomData<(A, B)>);
+
+/// The run-time prefix of a scale, if it is a decimal SI one.
+const fn runtime_of(m: Magnitude) -> Option<Prefix> {
+    match m.as_pow10() {
+        Some(e) => Prefix::si_from_pow10(e),
+        None => None,
+    }
+}
+
+impl<A: FixedScale, B: FixedScale> FixedScale for Product<A, B> {
+    const SCALE: Magnitude = A::SCALE.mul(B::SCALE);
+    const SYMBOL: &'static str = "";
+    const NAME: &'static str = "Product";
+    const RUNTIME: Option<Prefix> = runtime_of(Self::SCALE);
+}
+
+impl<A: FixedScale, B: FixedScale> FixedScale for Quotient<A, B> {
+    const SCALE: Magnitude = A::SCALE.div(B::SCALE);
+    const SYMBOL: &'static str = "";
+    const NAME: &'static str = "Quotient";
+    const RUNTIME: Option<Prefix> = runtime_of(Self::SCALE);
 }
 
 impl<const NUM: u64, const DEN: u64> FixedScale for Rational<NUM, DEN> {

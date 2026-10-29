@@ -19,6 +19,7 @@ pub use storage::{Repr, Storage, UnsignedStorage};
 
 mod bounds;
 pub mod prefix;
+mod product;
 mod rounding;
 mod storage;
 
