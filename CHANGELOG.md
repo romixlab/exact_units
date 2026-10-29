@@ -39,22 +39,6 @@
   snapshots of this crate stay with wire_weaver (`wire_weaver_snapshots`).
 * README: what the crate covers that other unit crates leave out, zero cost, the wire side, features, no_std notes
   and a comparison with uom, dimensioned and Numbat; its examples, including what doesn't compile, run as doctests.
-
-### ⚠️ Breaking
-
-* `Fixed::convert` refuses units of different kinds of one dimension, a compile error where it converted before:
-  `Per<Volt, Volt>` to `Per<Ampere, Ampere>`, `Per<Watt, Watt>` or `Ratio` (and back), `Per<Volt, Ampere>` to `Ohm`,
-  `Per<Ampere, Volt>` to `Siemens`. Where that was meant, the named step says so (`as_ratio`, `as_resistance`, ..).
-* `UnitExpr::Named` has a `provenance: Provenance<'static>` field (STD-72): a `UnitExpr::Named { .. }` written by
-  hand adds `provenance: Provenance::Defined`; a pattern without `..` adds `..`.
-- `Prefix` (STD-59) gains the binary prefixes `Kibi`, `Mebi`, `Gibi`, `Tebi`, three families of exact scales without a name, each with a one-byte parameter, and a catch-all: `Pow10(Pow10Exp)` (`10⁻⁴`; `-63..=63`, not an SI prefix's exponent), `Pow2(Pow2Exp)` (`2⁻¹⁵`, a Q format or an RTC tick; not a binary prefix's), `FullScale(FullScaleBits)` (`1/(2^n − 1)`, `1/65535` for a 16-bit duty) and `#[future_version] Unknown(u16)` (DER-25), a scale kind from a newer version, read past with the rest of the message intact. No table, in flash or on the wire: a family's scale is computed from its parameter, and equal scales are equal prefixes (a family refuses a named prefix's scale, also when read). Other exact scales (`1/5`, a BAM's `π/2¹⁵`) are no `Prefix`: such a value is a `ww_si::AnyQuantity`. On the wire named prefixes keep their one nibble (the others a byte), a family takes one byte more; scale kinds added later are tag-only, their numbers packed into the `UNib32` tag, so an older reader gets `Unknown(tag)`. In memory `Prefix` is 4 bytes on host, M0, M4F and M33 (`niche`, DER-24; 8 with a plain `#[repr(u32)]`), the size it had, so `ww_si::Volt` stays 12 bytes. A device or host built before this refuses a value in a binary prefix or a family (decode error); every other value has the same bytes. One break for all of it.
-  - `From<Prefix> for i8` and `TryFrom<i8> for Prefix` are removed (no answer for a binary prefix): use `pow10() -> Option<i8>` (also `Some` for `Pow10`), the const `si_pow10()` (SI prefixes only, the fast path), `si_from_pow10(e)` (const, SI only), `from_pow10(e)` (SI, else `Pow10`) or `from_pow2(e)`, and `magnitude() -> Option<Magnitude>` for the exact scale (`None` for `Unknown`).
-  - New: `Pow10Exp`, `Pow2Exp`, `FullScaleBits` (`new` refuses a named prefix's scale, `get`; each with `magnitude`), `Prefix::from_magnitude` (the prefix of an exact scale, if one stands for it) / `named_of` / `is_named` / `param` / `name` / `from_name`, `Prefix::ALL` has the binary ones. `Display` writes `Ki`, a family as `·10⁻⁴`, `·2⁻¹⁵`, `·1/65535`, and `Unknown` as `·<scale N>`; `scale_f64` / `scale_f32` are exact for every prefix (`NaN` for `Unknown`).
-  - A `Series` store and observe cells keep a `Prefix` as one code (hand-written `SeriesStore` / `SeriesCells`; rows of one named prefix are written column-wise, as before); an `Unknown` comes back from the store as `Unknown(u16::MAX)`, its tag isn't kept.
-  - `Prefix::MAX_SIZE` is 20 bits (was 8): `Series::<ww_si::Volt>::max_bytes(100)` is 2254 B (was 1946 B), a buffer sized by it grows that much. The bytes of a named prefix don't change.
-
-### 🚀 Features
-
 - `Magnitude`, `MagnitudeRest`, `Irrational` and `PrimePower` are `self_describing` instead of `final_structure` (STD-59): the same bytes (every field ends by itself; the `stdlib.si.magnitude.*` conformance cases unchanged), and a magnitude can now be the field of a `self_describing` enum's variant. Never released as `final_structure`.
 * Feature `serde` (INT-13): `DimOwned`, `CountedOwned` and `Magnitude` are `serde::Serialize` / `Deserialize`, for API snapshots in RON (`ww_self::UnitDef`). A `Magnitude` is written as its parts, exponents doubled (`(pow10: -6)`, `(pow10: 0, pi: 2, primes: [(3, -2)])`), and read back through `Magnitude::from_parts_x2`, so a file can't hold a non-canonical one.
 * `Offset::checked_add`, `None` where `add` panics (offsets read from an API model); `Offset` is `serde::Serialize` / `Deserialize` with feature `serde` (a negative zero is refused).
@@ -90,7 +74,6 @@
 * `Scale::Factor(f64)` is gone: every factor of a unit is exact (`Scale::Exact`), and a free `f64` factor would make
   readers compute different values. On the wire `Affine` is now nibble `2` and `Exact` `3` (were `3` and `4`): a
   `SIExpr` with °C from a device built with `ww_si` before this reads wrong (no published release had it).
-
 * `Point<O, F>` and origins (STD-64): a position against an origin, its number a `Fixed` (`transparent`, on the wire
   exactly the number). Point ± vector = point, point − point = vector (`PointDiff`, signed for an origin that wraps),
   point + point and point · x don't compile; `checked_add`, `checked_sub`, `checked_diff`, `try_from_raw`, `Display`
@@ -117,7 +100,6 @@
   storage (`StorageKind`) known at run time give the typed result bit for bit (conformance `requantize.*`).
   On Cortex-M M0 and M4F a typed conversion costs what the same conversion written by hand costs (measured, table
   on the docs page).
-
 * `Index<Of, T, B>`, `IndexFrom1<Of, T, B>` and `Seq<Of, T>` (STD-58, feature `counting`, docs
   `std_library/indices.md`): positions in a table of `Of` and wrapping sequence numbers, the point side of counted
   things, `transparent` (the bytes of `T`).
@@ -129,16 +111,13 @@
   * `Seq`: `next`, `wrapping_add`, `wrapping_sub`, ± an amount, `distance` (a `Fixed<Of, One, T, Wrapping>`), RFC 1982
     `is_before`, `is_after`, `serial_cmp` within half the range; no `Ord`, no `Seq + Seq`.
   * `Display` is the number, `Debug` names the table (`Index<Sample>(3 u32)`), `defmt::Format`.
-
 First release (STD-61): the compile-time core of `ww_si`, as a crate of its own, so code that only needs units in its
 types doesn't depend on `ww_si`'s run-time quantities and `ww_numeric`. `ww_si` re-exports everything here at the
 same paths as before.
-
 No dependencies without features: the wire format is the feature `shrink_wrap` (on by default), every derive sits
 behind `cfg_attr(feature = "shrink_wrap", ..)`, and the types are plain Rust otherwise (`Dim`'s exponents `i8`,
 `Magnitude`'s primes `u32`, written as `I4` / `UNib32` through shrink_wrap's `#[wire(..)]`, DER-19). A
 firmware that only needs units in its types builds without it; the bytes don't depend on the feature.
-
 * `Fixed<U, P, T, B = Unbounded>` (STD-55): a number whose unit, scale and storage are fixed at compile time, on the
   wire exactly the number (`transparent`, `#[repr(transparent)]`).
   * Storage (`Storage`, `UnsignedStorage`): `u8`..`u64`, `i8`..`i64`, `f32`, `f64`, `UNib32`, `UVlq32`, `UVlq64`,
@@ -183,3 +162,17 @@ firmware that only needs units in its types builds without it; the bytes don't d
   behind every unit `Display` and name), `Prefix`.
 * `num`: `const` helpers for scales, `pow10_f64`, `powi_f64`, `scale_f64`, `scale_f32`, and `sqrt_f64`, a `const`
   square root rounded exactly like `f64::sqrt`.
+
+### ⚠️ Breaking
+
+* `Fixed::convert` refuses units of different kinds of one dimension, a compile error where it converted before:
+  `Per<Volt, Volt>` to `Per<Ampere, Ampere>`, `Per<Watt, Watt>` or `Ratio` (and back), `Per<Volt, Ampere>` to `Ohm`,
+  `Per<Ampere, Volt>` to `Siemens`. Where that was meant, the named step says so (`as_ratio`, `as_resistance`, ..).
+* `UnitExpr::Named` has a `provenance: Provenance<'static>` field (STD-72): a `UnitExpr::Named { .. }` written by
+  hand adds `provenance: Provenance::Defined`; a pattern without `..` adds `..`.
+- `Prefix` (STD-59) gains the binary prefixes `Kibi`, `Mebi`, `Gibi`, `Tebi`, three families of exact scales without a name, each with a one-byte parameter, and a catch-all: `Pow10(Pow10Exp)` (`10⁻⁴`; `-63..=63`, not an SI prefix's exponent), `Pow2(Pow2Exp)` (`2⁻¹⁵`, a Q format or an RTC tick; not a binary prefix's), `FullScale(FullScaleBits)` (`1/(2^n − 1)`, `1/65535` for a 16-bit duty) and `#[future_version] Unknown(u16)` (DER-25), a scale kind from a newer version, read past with the rest of the message intact. No table, in flash or on the wire: a family's scale is computed from its parameter, and equal scales are equal prefixes (a family refuses a named prefix's scale, also when read). Other exact scales (`1/5`, a BAM's `π/2¹⁵`) are no `Prefix`: such a value is a `ww_si::AnyQuantity`. On the wire named prefixes keep their one nibble (the others a byte), a family takes one byte more; scale kinds added later are tag-only, their numbers packed into the `UNib32` tag, so an older reader gets `Unknown(tag)`. In memory `Prefix` is 4 bytes on host, M0, M4F and M33 (`niche`, DER-24; 8 with a plain `#[repr(u32)]`), the size it had, so `ww_si::Volt` stays 12 bytes. A device or host built before this refuses a value in a binary prefix or a family (decode error); every other value has the same bytes. One break for all of it.
+  - `From<Prefix> for i8` and `TryFrom<i8> for Prefix` are removed (no answer for a binary prefix): use `pow10() -> Option<i8>` (also `Some` for `Pow10`), the const `si_pow10()` (SI prefixes only, the fast path), `si_from_pow10(e)` (const, SI only), `from_pow10(e)` (SI, else `Pow10`) or `from_pow2(e)`, and `magnitude() -> Option<Magnitude>` for the exact scale (`None` for `Unknown`).
+  - New: `Pow10Exp`, `Pow2Exp`, `FullScaleBits` (`new` refuses a named prefix's scale, `get`; each with `magnitude`), `Prefix::from_magnitude` (the prefix of an exact scale, if one stands for it) / `named_of` / `is_named` / `param` / `name` / `from_name`, `Prefix::ALL` has the binary ones. `Display` writes `Ki`, a family as `·10⁻⁴`, `·2⁻¹⁵`, `·1/65535`, and `Unknown` as `·<scale N>`; `scale_f64` / `scale_f32` are exact for every prefix (`NaN` for `Unknown`).
+  - A `Series` store and observe cells keep a `Prefix` as one code (hand-written `SeriesStore` / `SeriesCells`; rows of one named prefix are written column-wise, as before); an `Unknown` comes back from the store as `Unknown(u16::MAX)`, its tag isn't kept.
+  - `Prefix::MAX_SIZE` is 20 bits (was 8): `Series::<ww_si::Volt>::max_bytes(100)` is 2254 B (was 1946 B), a buffer sized by it grows that much. The bytes of a named prefix don't change.
+
