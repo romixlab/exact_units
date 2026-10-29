@@ -21,8 +21,8 @@ fn main() {
     // times √Hz, a noise density is back to volts: the root cancels like any other exponent
     assert_eq!(dim.mul(<Hertz as Unit>::DIM.sqrt()), <Volt as Unit>::DIM);
 
-    // a fourth root isn't a Dim (only halves are tracked): a second Sqrt doesn't compile, a real error from
-    // `cargo check`, not just a claim —
+    // a fourth root isn't a Dim (only halves are tracked): a second Sqrt doesn't compile, a real error, built
+    // for real, not just a claim —
     //
     // error[E0080]: evaluation panicked: square root of a dimension that is already a root
     //   --> src/units.rs:326:31: `const DIM: Dim<'static> = U::DIM.sqrt();`

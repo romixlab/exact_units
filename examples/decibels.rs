@@ -20,14 +20,22 @@ fn main() {
     let measured = Gain::new(800_000);
     println!(
         "{measured:#} is {} the -3 dB threshold",
-        if measured.get() >= THRESHOLD.get() { "above" } else { "below" }
+        if measured.get() >= THRESHOLD.get() {
+            "above"
+        } else {
+            "below"
+        }
     );
     assert!(measured.get() > THRESHOLD.get());
 
     // to_db / from_db: the form by the unit's kind — V/V and A/A are root-power (20·lg), W/W is power (10·lg)
     let voltage_gain = Fixed::<Per<Volt, Volt>, One, f64>::new(10.0);
     let power_gain = Fixed::<Per<Watt, Watt>, One, f64>::new(100.0);
-    println!("{voltage_gain} is {} dB, {power_gain} is {} dB", voltage_gain.to_db(), power_gain.to_db());
+    println!(
+        "{voltage_gain} is {} dB, {power_gain} is {} dB",
+        voltage_gain.to_db(),
+        power_gain.to_db()
+    );
     assert_eq!(voltage_gain.to_db(), 20.0);
     assert_eq!(power_gain.to_db(), 20.0); // same dB figure, half the exponent for the same ratio
 

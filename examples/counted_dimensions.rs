@@ -39,7 +39,8 @@ fn main() {
     // a count of samples is not a count of bytes: different dimensions don't convert, checked for real
     // (`cargo build`, which this doesn't need `unsafe` or runtime input to hit):
     //
-    // error[E0080]: evaluation panicked: a Fixed converts only between units of the same dimension
+    // error[E0080]: evaluation panicked: a Fixed converts only between units of the same dimension (a
+    // pound-force is not a pound)
     //   --> src/fixed.rs:374: `let c = const { Conversion::between::<U, P, U2, P2, T, T2>() };`
     //
     // let _: Option<Fixed<units::Byte, One, u32>> = Fixed::<Sample, One, u32>::new(1).convert();

@@ -26,7 +26,9 @@ fn main() {
     println!("a gain of {gain} is {duty} as a plain ratio");
     assert_eq!(duty.as_gain::<Volt>(), gain);
 
-    // a gain times a voltage is a plain voltage again: the ratio's kind cancels in the product (see kind.rs)
+    // a gain times a voltage is a plain voltage again: the ratio's kind cancels in the product (see kind.rs).
+    // There is no `Fixed * Fixed` yet (no `Mul` impl between two `Fixed`s, only `Fixed * T` — filed as a task):
+    // the product below is computed by hand, from `.get()`, not through an API this crate doesn't have yet.
     let v = Fixed::<Volt, One, f32>::new(12.0);
     let scaled = Fixed::<exact_units::units::Times<Per<Volt, Volt>, Volt>, One, f32>::new(
         gain.get() * v.get(),
@@ -34,8 +36,12 @@ fn main() {
     let as_volts: Option<Fixed<Volt, One, f32>> = scaled.convert();
     println!("{gain} of {v} is {as_volts:?}");
 
-    // a voltage gain is not a current gain, nor a plain ratio, nor a resistance (see the compile_fail doctests on
-    // `convert` in src/kind.rs, right above `KindsInConversions`, checked by `cargo test --doc`)
+    // a voltage gain is not a current gain, nor a plain ratio, nor a resistance — all three built for real, not
+    // just claimed, and all three the same real message:
+    //
+    // error[E0080]: evaluation panicked: a Fixed converts only between units of the same kind: V/V is not A/A
+    // or a Ratio, V/A is not an Ohm (cross kinds with a named step: as_ratio, as_resistance, ..)
+    //
     // let _ = gain.convert::<Per<Ampere, Ampere>, One, f32>();
     // let _ = gain.convert::<Ratio, One, f32>();
     // let _ = transimpedance.convert::<Ohm, One, u16>();

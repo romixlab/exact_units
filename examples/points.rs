@@ -40,7 +40,16 @@ fn main() {
     let later = now + Fixed::new(2_500_000);
     println!("now: {now} s, later: {later} s, elapsed: {:#}", later - now);
 
-    // two points don't add, nor does a point scale (see the compile_fail doctests on Point in src/point.rs)
+    // two points don't add (only a point and a vector), built for real, not just claimed:
+    //
+    // error[E0308]: mismatched types
+    //   expected `Fixed<Kelvin, Centi, i16>`, found `Point<Celsius, _>`
+    //
     // let _ = DegC::from_raw(2000) + DegC::from_raw(500);
+
+    // nor does a point scale:
+    //
+    // error[E0369]: cannot multiply `Point<Celsius, Fixed<Kelvin, Centi, i16>>` by `{integer}`
+    //
     // let _ = DegC::from_raw(2000) * 2;
 }

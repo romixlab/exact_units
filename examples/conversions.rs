@@ -36,8 +36,14 @@ fn main() {
     let back = Millis::<u32>::try_from(Duration::from_millis(250)).unwrap();
     println!("250 ms from a Duration: {back}");
 
-    // the factor itself must fit the conversion's widened multiply, checked at compile time, not refused at run
-    // time: 10⁴⁰ next to u32::MAX doesn't fit 64 bits (see the compile_fail doctest on Fixed::to in src/fixed.rs)
+    // the factor itself is checked at compile time, not refused at run time: 10⁴⁰ isn't a fraction of integers
+    // (built for real, not just claimed):
+    //
+    // error[E0080]: evaluation panicked: an integer Fixed converts by a fraction of integers only: this factor
+    // has a power of π, ln 2 or ln 10 or a half exponent (convert through a float storage, or round with
+    // to_rounded)
+    //   --> src/fixed.rs:756, inside `Fixed::<Second, Pow10<20>, u32>::to::<Pow10<-20>, u32>`
+    //
     // let _ = Fixed::<exact_units::units::Second, exact_units::prefix::Pow10<20>, u32>::new(1)
     //     .to::<exact_units::prefix::Pow10<-20>, u32>();
 }

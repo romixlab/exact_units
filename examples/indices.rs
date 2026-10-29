@@ -38,9 +38,23 @@ fn main() {
     assert_eq!(b.get(), 4); // wrapped past 255
     assert!(a.is_before(b) && b.is_after(a));
 
-    // two positions in different tables, or two sequence numbers, never add or compare by `<` (see the compile_fail
-    // doctests on Index and Seq in src/index.rs)
+    // two positions never add (only a position and an amount), built for real, not just claimed:
+    //
+    // error[E0308]: mismatched types
+    //   expected `Fixed<Sample, One, u32>`, found `Index<Sample, u32>`
+    //
     // let _ = Index::<Sample, u32>::new(1) + Index::<Sample, u32>::new(2);
+
+    // nor does a position scale:
+    //
+    // error[E0369]: cannot multiply `exact_units::Index<Sample, u32>` by `{integer}`
+    //
     // let _ = Index::<Sample, u32>::new(1) * 2;
+
+    // a sequence number compares only by `is_before`/`is_after` (RFC 1982), never `<` (plain order breaks at the
+    // wrap):
+    //
+    // error[E0369]: binary operation `<` cannot be applied to type `Seq<Frame, u8>`
+    //
     // let _ = Seq::<Frame, u8>::new(1) < Seq::<Frame, u8>::new(2);
 }
