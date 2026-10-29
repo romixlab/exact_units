@@ -19,6 +19,9 @@
 
 ### 🚀 Features
 
+* `units::Nibble` (4 bit), `units::Halfword` (16 bit) and `units::Doubleword` (64 bit), exact scales of `Bit` next to
+  `Byte` and `Word` (feature `information`): with `Word`, Arm's byte, halfword, word and doubleword, for register,
+  flash program and DMA widths. `units::Nibble` is the unit, not shrink_wrap's 4-bit storage `Nibble`.
 * Products and quotients of two `Fixed` values (STD-83): `a * b` is a `Fixed<Times<U1, U2>, Product<P1, P2>, T>`,
   `a / b` a `Fixed<Per<U1, U2>, Quotient<P1, P2>, T>`, one multiply or division of `T`. The written form is kept and
   `convert` reaches the named unit: V · A to `Watt`, V/V · V to `Volt` (the gain's kind cancels), V/A · A to `Volt`,

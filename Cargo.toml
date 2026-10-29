@@ -56,7 +56,7 @@ photometric = []
 radiation = []
 # Ratio (duty, probability, scale): used next to any other group, so a group of its own
 dimensionless = []
-# Bit, Byte (8 Bit), Word (4 Byte): information, a base dimension of its own
+# Bit, Nibble (4 Bit), Byte (8 Bit), Halfword (2 Byte), Word (4 Byte), Doubleword (8 Byte): information, a base dimension of its own
 information = []
 # imperial, US customary and other units outside the SI: inch, pound, psi, gallon (US and imperial), Btu, hp, ...
 # Opt-in only, not in `quantities` or `std`: an API without them pays nothing for them

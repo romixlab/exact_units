@@ -241,13 +241,27 @@ crate::unit! {
     #[cfg(feature = "information")]
     pub struct Bit = "bit", [bit 1];
 
+    /// Information in nibbles, nibble (4 [Bit]): a hex digit, a BCD digit, a 4-bit field. Not to be confused with
+    /// shrink_wrap's `Nibble`, the 4-bit storage a `Fixed` may hold its number in.
+    #[cfg(feature = "information")]
+    pub struct Nibble = "nibble", [bit 1], Exact(4 / 1);
+
     /// Information in bytes, B (8 [Bit]): a data size, a buffer's capacity, an offset. A rate is `Per<Byte, Second>`.
     #[cfg(feature = "information")]
     pub struct Byte = "B", [bit 1], Exact(8 / 1);
 
+    /// Information in 16-bit halfwords, halfword (2 [Byte]): Arm's halfword, a 16-bit register, bus or DMA transfer.
+    #[cfg(feature = "information")]
+    pub struct Halfword = "halfword", [bit 1], Exact(16 / 1);
+
     /// Information in 32-bit words, word (4 [Byte]): flash and RAM sizes of a 32-bit MCU.
     #[cfg(feature = "information")]
     pub struct Word = "word", [bit 1], Exact(32 / 1);
+
+    /// Information in 64-bit doublewords, doubleword (8 [Byte]): Arm's doubleword, the program width of an STM32G0's
+    /// or L4's flash, a 64-bit DMA or bus transfer.
+    #[cfg(feature = "information")]
+    pub struct Doubleword = "doubleword", [bit 1], Exact(64 / 1);
 
     // Counting: each marker is a base dimension of its own (a counted base, named by its crate and marker name), so
     // samples don't add to bytes, and become bytes only through a `Per<Byte, Sample>`. An API that counts something else

@@ -16,7 +16,11 @@ fn angle_information_counting() {
     assert!(!byte.same(<units::Ratio as Unit>::DIM));
     assert!(!byte.same(<units::Radian as Unit>::DIM));
     assert_eq!(<units::Byte as Unit>::EXPR.factor(), 8.0);
+    assert_eq!(<units::Nibble as Unit>::EXPR.factor(), 4.0);
+    assert_eq!(<units::Halfword as Unit>::EXPR.factor(), 16.0);
     assert_eq!(<units::Word as Unit>::EXPR.factor(), 32.0);
+    assert_eq!(<units::Doubleword as Unit>::EXPR.factor(), 64.0);
+    assert_eq!(<units::Doubleword as Unit>::DIM, byte);
     assert!(!<units::AngularVelocity as Unit>::DIM.same(<units::Hertz as Unit>::DIM));
     assert!(
         <units::AngularVelocity as Unit>::DIM
