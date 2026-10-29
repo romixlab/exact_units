@@ -21,7 +21,10 @@ fn main() {
     assert_eq!(bucket, Dim::counted(env!("CARGO_CRATE_NAME"), "Bucket"));
 
     // a dynamic client that only knows a unit by its name looks it up with `by_name`
-    assert_eq!(units::by_name("Sample").map(|e| e.to_string()), Some("sample".to_string()));
+    assert_eq!(
+        units::by_name("Sample").map(|e| e.to_string()),
+        Some("sample".to_string())
+    );
     assert_eq!(units::by_name("NoSuchUnit"), None);
 
     // a sample rate: samples per second, not a Hertz (the ADC's rate, not a clock's)

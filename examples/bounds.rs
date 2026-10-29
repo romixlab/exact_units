@@ -42,13 +42,19 @@ fn main() {
     // Bam16: a binary angle, u16 wrapping over Turn, 65536 steps per turn — half a turn plus a step wraps
     let half_turn = Bam16::of(32768);
     let one_step = Bam16::of(1);
-    println!("{half_turn:#} + {one_step:#} wraps to {:#}", half_turn.wrapping_add(one_step));
+    println!(
+        "{half_turn:#} + {one_step:#} wraps to {:#}",
+        half_turn.wrapping_add(one_step)
+    );
     assert_eq!(half_turn.wrapping_add(one_step).get(), 32769);
 
     // Q15: CMSIS-DSP's q15_t, i16 saturating over Ratio, steps of 2⁻¹⁵ — adding past 1.0 clamps, never wraps
     let near_one = Q15::<Ratio>::of(32760);
     let bit = Q15::<Ratio>::of(10);
-    println!("{near_one:#} + {bit:#} saturates to {:#}", near_one.saturating_add(bit));
+    println!(
+        "{near_one:#} + {bit:#} saturates to {:#}",
+        near_one.saturating_add(bit)
+    );
     assert_eq!(near_one.saturating_add(bit).get(), i16::MAX);
 
     // Turn's own symbol, for the Bam16 line above, through its EXPR

@@ -29,7 +29,12 @@ fn main() {
     // integers, so the order holds across the wrap
     let a = Seq::<Frame, u8>::new(250);
     let b = a.wrapping_add(10);
-    println!("frame {a} then {b}: {} is before {} = {}", a, b, a.is_before(b));
+    println!(
+        "frame {a} then {b}: {} is before {} = {}",
+        a,
+        b,
+        a.is_before(b)
+    );
     assert_eq!(b.get(), 4); // wrapped past 255
     assert!(a.is_before(b) && b.is_after(a));
 

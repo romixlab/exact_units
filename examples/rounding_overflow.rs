@@ -3,7 +3,11 @@
 //!
 //! `cargo run --example rounding_overflow --features electrical`
 
-use exact_units::{Fixed, Range, Rounding, prefix::{Deci, Milli, One}, units::Volt};
+use exact_units::{
+    Fixed, Range, Rounding,
+    prefix::{Deci, Milli, One},
+    units::Volt,
+};
 
 fn main() {
     // -2.5 V in millivolts is not a whole number of volts: `to` (exact only) refuses, `to_rounded` picks

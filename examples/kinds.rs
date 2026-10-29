@@ -15,7 +15,8 @@ fn main() {
     assert_eq!(r.as_transimpedance(), transimpedance);
 
     // the same the other way: a transconductance A/V and a conductance S
-    let g: Fixed<Siemens, One, u16> = Fixed::<Per<Ampere, Volt>, One, u16>::new(20).as_conductance();
+    let g: Fixed<Siemens, One, u16> =
+        Fixed::<Per<Ampere, Volt>, One, u16>::new(20).as_conductance();
     println!("20 A/V is {g}");
 
     // V/V and A/A are both ratios of one dimension (`Kind::RatioOf`), but of different dimensions: a voltage gain
@@ -27,7 +28,9 @@ fn main() {
 
     // a gain times a voltage is a plain voltage again: the ratio's kind cancels in the product (see kind.rs)
     let v = Fixed::<Volt, One, f32>::new(12.0);
-    let scaled = Fixed::<exact_units::units::Times<Per<Volt, Volt>, Volt>, One, f32>::new(gain.get() * v.get());
+    let scaled = Fixed::<exact_units::units::Times<Per<Volt, Volt>, Volt>, One, f32>::new(
+        gain.get() * v.get(),
+    );
     let as_volts: Option<Fixed<Volt, One, f32>> = scaled.convert();
     println!("{gain} of {v} is {as_volts:?}");
 
