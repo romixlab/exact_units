@@ -197,3 +197,4 @@ firmware that only needs units in its types builds without it; the bytes don't d
   behind every unit `Display` and name), `Prefix`.
 * `num`: `const` helpers for scales, `pow10_f64`, `powi_f64`, `scale_f64`, `scale_f32`, and `sqrt_f64`, a `const`
   square root rounded exactly like `f64::sqrt`.
+
