@@ -7,6 +7,8 @@
   justfile and `docs/customary.md`, the customary units catalogue whose tables the tests check. The `shrink_wrap`
   feature takes shrink_wrap from the wire_weaver repository by git until shrink_wrap 0.2 is on crates.io. API
   snapshots of this crate stay with wire_weaver (`wire_weaver_snapshots`).
+* README: what the crate covers that other unit crates leave out, zero cost, the wire side, features, no_std notes
+  and a comparison with uom, dimensioned and Numbat; its examples, including what doesn't compile, run as doctests.
 
 ### ⚠️ Breaking
 

@@ -28,6 +28,11 @@
 #[cfg(all(test, not(feature = "std")))]
 extern crate std;
 
+// the README's examples run as doctests, so what it claims is checked
+#[cfg(all(doctest, feature = "std"))]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 mod declare;
 mod fixed;
 #[cfg(feature = "counting")]
