@@ -85,54 +85,66 @@ required-features = ["shrink_wrap"]
 name = "series"
 required-features = ["shrink_wrap"]
 
-# examples/*.rs: runnable, a few dozen lines each, see the README's Examples section
+# examples/NN_*.rs: one story each, in reading order; the README's Examples section lists them
 [[example]]
-name = "conversions"
-required-features = ["time", "information"]
-
-[[example]]
-name = "points"
-required-features = ["thermal", "time"]
-
-[[example]]
-name = "kinds"
-required-features = ["electrical", "dimensionless"]
-
-[[example]]
-name = "indices"
-required-features = ["counting"]
-
-[[example]]
-name = "roots"
-required-features = ["electrical", "time"]
-
-[[example]]
-name = "counted_dimensions"
-required-features = ["counting", "time"]
-
-[[example]]
-name = "rounding_overflow"
-required-features = ["electrical"]
-
-[[example]]
-name = "bounds"
-required-features = ["electrical", "dimensionless", "angle"]
-
-[[example]]
-name = "customary"
-required-features = ["customary"]
-
-[[example]]
-name = "no_std"
+# the unit and scale in the type: µs and ms don't mix, a conversion is exact or refused, and no_std
+name = "01_timer"
 required-features = ["time"]
 
 [[example]]
-name = "wire"
-required-features = ["shrink_wrap", "time"]
+# °C and °F setpoints: a temperature is a point, a difference of two is an amount
+name = "02_thermostat"
+required-features = ["thermal"]
 
 [[example]]
-name = "decibels"
+# bounded readings: a cell's range, a broken wire refused, a saturating charge counter
+name = "03_battery"
+required-features = ["electrical", "dimensionless", "time"]
+
+[[example]]
+# shunt current and power: product and quotient scales, overflow proven or checked
+name = "04_motor_power"
+required-features = ["electrical"]
+
+[[example]]
+# kinds: V/V is a gain, not a duty; V/A is a transimpedance, not a resistance
+name = "05_light_sensor"
+required-features = ["electrical", "dimensionless"]
+
+[[example]]
+# decibels: power or amplitude, levels at compile time, compare across bounds
+name = "06_audio_limiter"
 required-features = ["electrical", "libm"]
+
+[[example]]
+# overflow policies: a phase that wraps, a mix that saturates
+name = "07_tone_generator"
+required-features = ["dimensionless", "angle"]
+
+[[example]]
+# indices, sequence numbers and timestamps since boot
+name = "08_data_logger"
+required-features = ["counting", "time"]
+
+[[example]]
+# counted dimensions: samples, bytes and cycles; KiB and kB
+name = "09_capture_buffer"
+required-features = ["counting", "time", "information"]
+
+[[example]]
+# a unit with a root: nV/√Hz times √Hz
+name = "10_adc_noise"
+required-features = ["electrical", "time"]
+
+[[example]]
+# psi and gallons, exact and named: US or imperial, defined or measured
+name = "11_us_customer"
+required-features = ["customary"]
+
+[[example]]
+# the same bytes as the plain struct, read back typed
+name = "12_wire"
+required-features = ["shrink_wrap", "time", "electrical"]
 
 [profile.dev]
 split-debuginfo = "unpacked"

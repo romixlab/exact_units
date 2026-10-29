@@ -69,11 +69,13 @@
   snapshots of this crate stay with wire_weaver (`wire_weaver_snapshots`).
 * README: what the crate covers that other unit crates leave out, zero cost, the wire side, features, no_std notes
   and a comparison with uom, dimensioned and Numbat; its examples, including what doesn't compile, run as doctests.
-* `examples/*.rs`, runnable with `cargo run --example <name>`: exact conversions and scales, points vs deltas
-  (temperatures, timestamps), kinds (V/V vs A/A, V/A vs Ohm), indices, roots, counted dimensions, rounding and
-  overflow, bounds, customary units (feature `customary`), `no_std` use, the wire format (feature `shrink_wrap`),
-  and decibels (`db!`, `to_db`/`from_db` by kind, feature `libm`), each `required-features`-gated so `cargo test`
-  builds every one it can. Listed in the README's new Examples section.
+* `examples/01_timer.rs` .. `12_wire.rs`: twelve short stories in reading order, from a debounce timeout to a
+  reading sent to a PC tool (a thermostat in °C and °F, a battery monitor, a motor's shunt current and power, a
+  light sensor's kinds, an audio limiter in dB, a tone generator's wrapping phase, a data logger's indices and
+  timestamps, a capture buffer's samples and bytes, an amplifier's nV/√Hz noise, a US customer's psi and gallons).
+  Each says what is built, the bug a plain `u32` or `f32` lets through there, how the type stops it and what it
+  costs at run time; each runs (`required-features`-gated, so `cargo test` builds every one it can) and shows what
+  doesn't compile with the compiler's real message. Listed in the README's Examples section.
 - `Magnitude`, `MagnitudeRest`, `Irrational` and `PrimePower` are `self_describing` instead of `final_structure` (STD-59): the same bytes (every field ends by itself; the `stdlib.si.magnitude.*` conformance cases unchanged), and a magnitude can now be the field of a `self_describing` enum's variant. Never released as `final_structure`.
 * Feature `serde` (INT-13): `DimOwned`, `CountedOwned` and `Magnitude` are `serde::Serialize` / `Deserialize`, for API snapshots in RON (`ww_self::UnitDef`). A `Magnitude` is written as its parts, exponents doubled (`(pow10: -6)`, `(pow10: 0, pi: 2, primes: [(3, -2)])`), and read back through `Magnitude::from_parts_x2`, so a file can't hold a non-canonical one.
 * `Offset::checked_add`, `None` where `add` panics (offsets read from an API model); `Offset` is `serde::Serialize` / `Deserialize` with feature `serde` (a negative zero is refused).

@@ -166,23 +166,34 @@ host, uom serves well.
 
 ## Examples
 
-Runnable, each a few dozen lines, each printing what it shows (`cargo run --example NAME --features ...`):
+Twelve short stories, in reading order: each is a small device or tool, the bug a plain `u32` or `f32` lets through
+there, how the type stops it, and what it costs at run time. Each runs and prints its story (`cargo run --example
+NAME --features ...`, the line is at the top of each file); the lines that don't compile are shown with the compiler's
+real message.
 
-- `conversions` (`time,information`): exact scales, `to`, and what doesn't compile when it isn't exact.
-- `points` (`thermal,time`): a point against an origin, a delta between two, Celsius and Unix time.
-- `kinds` (`electrical,dimensionless`): V/A vs Ω, A/V vs S, V/V and A/A as ratios of different dimensions.
-- `indices` (`counting`): `Index`, `IndexFrom1`, and `Seq`'s RFC 1982 wraparound order.
-- `roots` (`electrical,time`): `Sqrt<Hertz>`, a noise density in V/√Hz, and why a root of a root doesn't compile.
-- `counted_dimensions` (`counting,time`): a user's own counted unit, `units::by_name`, a sample rate.
-- `rounding_overflow` (`electrical`): `to_rounded`'s five policies, `into_rounded`'s compile-time proof,
-  checked/saturating/wrapping arithmetic.
-- `bounds` (`electrical,dimensionless,angle`): `Range`/`RangeU64`/`RangeDec`, `Unbounded`/`Wrapping`/`Saturating`,
-  `Bam16` and `Q15` as concrete bounded types.
-- `customary` (`customary`): imperial/US units as exact fractions, and `Provenance::Conventional` vs `Defined`.
-- `no_std` (`time`): the narrow feature set a firmware links; the example binary itself still links `std`.
-- `wire` (`shrink_wrap,time`): a struct of `Fixed` fields on the wire, byte for byte the same as plain integers.
-- `decibels` (`electrical,libm`): `db!` as a compile-time integer threshold, `to_db`/`from_db` by kind, `libm`
-  for the `no_std` path.
+1. `01_timer` (`time`): a debounce timeout set in ms and armed in µs; the unit in the type, exact conversions, and a
+   `Fixed` that *is* its `u32` (the `no_std` feature set a firmware links).
+2. `02_thermostat` (`thermal`): °C and °F setpoints; a temperature is a point, a hysteresis is an amount, and 1 °F of
+   hysteresis is not −17.2 °C.
+3. `03_battery` (`electrical,dimensionless,time`): a cell monitor with bounded readings; a broken wire's 65535
+   refused, a threshold compared across bounds, a charge counter that saturates.
+4. `04_motor_power` (`electrical`): phase current through a shunt and the power it draws; mV/mΩ is A, not mA, and
+   mV·mA is µW, with overflow proven at compile time or checked.
+5. `05_light_sensor` (`electrical,dimensionless`): kinds; an amplifier's V/V gain is not a PWM duty, a TIA's V/A is
+   not a resistor.
+6. `06_audio_limiter` (`electrical,libm`): a limiter threshold in dB; power or amplitude decibels, `db!` levels worked
+   out at compile time.
+7. `07_tone_generator` (`dimensionless,angle`): a phase that wraps (`Bam16`) and a mix that saturates (`Q15`), where a
+   plain `i16` clicks.
+8. `08_data_logger` (`counting,time`): channel numbers from 1, ring slots from 0, packet sequence numbers that wrap,
+   and timestamps since boot.
+9. `09_capture_buffer` (`counting,time,information`): samples, bytes and clock cycles as dimensions; a buffer sized in
+   samples is not one in bytes, KiB is not kB.
+10. `10_adc_noise` (`electrical,time`): an amplifier's nV/√Hz noise over a bandwidth; a unit with a root in it.
+11. `11_us_customer` (`customary`): setpoints in psi and gallons; exact definitions, US or imperial named, and where
+    a unit's value comes from.
+12. `12_wire` (`shrink_wrap,time,electrical`): a sensor reading sent to a PC tool; the same bytes as plain integers,
+    read back with its unit.
 
 ## License
 
