@@ -126,6 +126,10 @@ required-features = ["customary"]
 name = "no_std"
 required-features = ["time"]
 
+[[example]]
+name = "wire"
+required-features = ["shrink_wrap", "time"]
+
 [profile.dev]
 split-debuginfo = "unpacked"
 
