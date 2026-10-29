@@ -118,6 +118,10 @@ required-features = ["electrical"]
 name = "bounds"
 required-features = ["electrical", "dimensionless", "angle"]
 
+[[example]]
+name = "customary"
+required-features = ["customary"]
+
 [profile.dev]
 split-debuginfo = "unpacked"
 
