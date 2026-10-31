@@ -61,10 +61,10 @@ pub use fixed::{
     Repr, Requantizer, Rounding, Saturating, Storage, StorageKind, Unbounded, Unlimited,
     UnsignedStorage, Wrapping, prefix, requantize,
 };
+#[cfg(feature = "time")]
+pub use fixed::{Days, Hours, Micros, Millis, Minutes, Nanos, Secs};
 #[cfg(feature = "dimensionless")]
 pub use fixed::{Duty16, Ppb, Q15, Q31, UQ16_16};
-#[cfg(feature = "time")]
-pub use fixed::{Micros, Millis, Nanos};
 #[cfg(feature = "counting")]
 pub use index::{Index, IndexFrom1, Seq};
 pub use kind::{Kind, LevelForm};

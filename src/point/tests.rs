@@ -22,6 +22,46 @@ fn offsets() {
     assert_eq!(Offset::int(9).mul(Magnitude::ratio(5, 9)), Offset::int(5));
 }
 
+#[cfg(feature = "time")]
+mod time {
+    use super::*;
+    use crate::origins::{UnixEpoch, UnixMicros, UnixMillis, UnixNanos, UnixSecs};
+    use crate::units::{Hour, Second};
+    use crate::{Hours, Micros, Millis};
+
+    #[test]
+    fn unix_epoch() {
+        assert_eq!(UnixEpoch::OFFSET, Offset::ZERO);
+        // 2023-11-14 22:13:20 UTC
+        let t = UnixMillis::from_raw(1_700_000_000_123);
+        assert_eq!(t.to_string(), "1700000000.123 s UTC");
+        assert_eq!(
+            t.to::<UnixEpoch, Micro, u64>(),
+            Some(UnixMicros::from_raw(1_700_000_000_123_000))
+        );
+        assert_eq!(
+            t.to::<UnixEpoch, Nano, u64>(),
+            Some(UnixNanos::from_raw(1_700_000_000_123_000_000))
+        );
+        // not a whole second
+        assert_eq!(t.to::<UnixEpoch, One, u64>(), None);
+        assert_eq!(
+            UnixSecs::from_raw(1_700_000_000).to::<UnixEpoch, Milli, u64>(),
+            Some(UnixMillis::from_raw(1_700_000_000_000))
+        );
+        // point + amount = point, point - point = amount
+        let later = t + Millis::new(2_000);
+        assert_eq!(later - t, Millis::new(2_000));
+        let hour = Hours::new(1u64).convert::<Second, Milli, u64>().unwrap();
+        assert_eq!((t + hour) - t, Millis::new(3_600_000));
+        assert_eq!(
+            ((t + hour) - t).convert::<Hour, One, u64>(),
+            Some(Hours::new(1))
+        );
+        let _: Point<UnixEpoch, Micros<i64>> = Point::from_raw(-1);
+    }
+}
+
 #[cfg(feature = "thermal")]
 mod thermal {
     use super::*;

@@ -36,6 +36,24 @@ crate::unit! {
     #[cfg(feature = "time")]
     pub struct Second = "s", [s 1];
 
+    /// Time in minutes, min (60 [Second]), a unit accepted for use with the SI (SI Brochure table 8).
+    #[cfg(feature = "time")]
+    pub struct Minute = "min", [s 1], Exact(60 / 1);
+
+    /// Time in hours, h (3600 [Second]), a unit accepted for use with the SI (SI Brochure table 8).
+    #[cfg(feature = "time")]
+    pub struct Hour = "h", [s 1], Exact(3600 / 1);
+
+    /// Time in days, d (86400 [Second]), a unit accepted for use with the SI (SI Brochure table 8): always 86400 s,
+    /// also across a leap second, so a UTC calendar day with one is 1 d + 1 s.
+    #[cfg(feature = "time")]
+    pub struct Day = "d", [s 1], Exact(86400 / 1);
+
+    /// Time in weeks, wk (7 [Day], 604800 [Second]): a retention or a report period. Not in the SI Brochure and without a
+    /// standard symbol: `wk` is the common one.
+    #[cfg(feature = "time")]
+    pub struct Week = "wk", [s 1], Exact(604800 / 1);
+
     /// Frequency in hertz, Hz (s⁻¹).
     #[cfg(feature = "time")]
     pub struct Hertz = "Hz", [s -1];

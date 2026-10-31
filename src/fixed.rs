@@ -94,6 +94,22 @@ pub type Millis<T> = Fixed<crate::units::Second, prefix::Milli, T>;
 #[cfg(feature = "time")]
 pub type Nanos<T> = Fixed<crate::units::Second, prefix::Nano, T>;
 
+/// Time in whole seconds, `Fixed<Second, One, T>`.
+#[cfg(feature = "time")]
+pub type Secs<T> = Fixed<crate::units::Second, prefix::One, T>;
+
+/// Time in whole minutes, `Fixed<Minute, One, T>`.
+#[cfg(feature = "time")]
+pub type Minutes<T> = Fixed<crate::units::Minute, prefix::One, T>;
+
+/// Time in whole hours, `Fixed<Hour, One, T>`.
+#[cfg(feature = "time")]
+pub type Hours<T> = Fixed<crate::units::Hour, prefix::One, T>;
+
+/// Time in whole days of 86400 s, `Fixed<Day, One, T>`.
+#[cfg(feature = "time")]
+pub type Days<T> = Fixed<crate::units::Day, prefix::One, T>;
+
 /// A size or a count of bytes, `Fixed<Byte, One, T>`.
 #[cfg(feature = "information")]
 pub type Bytes<T> = Fixed<crate::units::Byte, prefix::One, T>;

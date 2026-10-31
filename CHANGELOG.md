@@ -19,6 +19,13 @@
 
 ### 🚀 Features
 
+* `units::Minute` (60 s), `units::Hour` (3600 s), `units::Day` (86400 s) and `units::Week` (604800 s), exact scales
+  of `Second` (feature `time`), with the aliases `Secs`, `Minutes`, `Hours` and `Days` (`Fixed<.., One, T>`): a
+  retention in days, an uptime in hours, converted to and from seconds exactly.
+* `origins::UnixEpoch` (feature `time`), 1970-01-01 00:00:00 UTC: a `Point` from it is a moment in POSIX time, UTC
+  with leap seconds not counted, as `CLOCK_REALTIME` and journald count it, shown as `1700000000.123 s UTC`. Aliases
+  `origins::UnixSecs`, `UnixMillis`, `UnixMicros`, `UnixNanos` (`u64` unless named). TAI, GPS and UTC with its
+  leap-second table are clocks of their own, coming with WireWeaver's STD-65; this origin stays POSIX time.
 * `units::Nibble` (4 bit), `units::Halfword` (16 bit) and `units::Doubleword` (64 bit), exact scales of `Bit` next to
   `Byte` and `Word` (feature `information`): with `Word`, Arm's byte, halfword, word and doubleword, for register,
   flash program and DMA widths. `units::Nibble` is the unit, not shrink_wrap's 4-bit storage `Nibble`.

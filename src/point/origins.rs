@@ -1,9 +1,44 @@
 //! The origins of this crate: temperature scales (K, °C, °F, °R), absolute and gauge pressure, angles that wrap at a
-//! turn. Each is a zero-size marker declared with [origin!](crate::origin); a user crate declares its own the same
+//! turn, the Unix epoch. Each is a zero-size marker declared with [origin!](crate::origin); a user crate declares its own the same
 //! way (a register formula, a vehicle bus' offset).
 
 #[allow(unused_imports)]
 use crate::{Magnitude, Offset, Origin};
+
+#[cfg(feature = "time")]
+mod time {
+    use super::*;
+    use crate::units::Second;
+    use crate::{Micros, Millis, Nanos, Point, Secs};
+
+    crate::origin! {
+        /// The Unix epoch, 1970-01-01 00:00:00 UTC: a point from it is a moment in POSIX time, UTC with leap seconds
+        /// not counted, as `CLOCK_REALTIME`, `time_t`, journald's `__REALTIME_TIMESTAMP` and most log formats count
+        /// it. Every day is 86400 s on this scale: a leap second repeats one (or the clock smears it), so the
+        /// difference of two such points is the elapsed time only up to the leap seconds between them (27 from 1972
+        /// to 2017).
+        ///
+        /// Clocks that count every SI second (TAI, GPS = TAI − 19 s) and UTC with its leap-second table come with
+        /// WireWeaver's STD-65 as clocks of their own; this origin stays POSIX time, and a conversion to them goes
+        /// through the table, never at compile time.
+        pub struct UnixEpoch { unit: Second, symbol: "s UTC", offset: Offset::ZERO }
+    }
+
+    /// A moment in POSIX time in whole seconds since the [UnixEpoch]: `time_t`, the bytes of a `T`.
+    pub type UnixSecs<T = u64> = Point<UnixEpoch, Secs<T>>;
+
+    /// A moment in POSIX time in ms since the [UnixEpoch], the bytes of a `T`.
+    pub type UnixMillis<T = u64> = Point<UnixEpoch, Millis<T>>;
+
+    /// A moment in POSIX time in µs since the [UnixEpoch] (journald's `__REALTIME_TIMESTAMP`), the bytes of a `T`.
+    pub type UnixMicros<T = u64> = Point<UnixEpoch, Micros<T>>;
+
+    /// A moment in POSIX time in ns since the [UnixEpoch], the bytes of a `T`; a `u64` holds them until 2554.
+    pub type UnixNanos<T = u64> = Point<UnixEpoch, Nanos<T>>;
+}
+
+#[cfg(feature = "time")]
+pub use time::*;
 
 #[cfg(feature = "thermal")]
 mod thermal {

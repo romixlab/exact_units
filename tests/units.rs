@@ -121,3 +121,40 @@ fn kinds_of_markers() {
         .get();
     assert!(db(back, 10f64.powf(-0.3)));
 }
+
+/// Minutes, hours, days and weeks are exact scales of the second: they convert both ways where the count is whole.
+#[test]
+fn time_units() {
+    use exact_units::prefix::{Milli, One};
+    use exact_units::{Days, Fixed, Hours, Minutes, Secs};
+
+    let s = <units::Second as Unit>::DIM;
+    assert_eq!(<units::Minute as Unit>::DIM, s);
+    assert_eq!(<units::Week as Unit>::DIM, s);
+    assert_eq!(<units::Minute as Unit>::EXPR.factor(), 60.0);
+    assert_eq!(<units::Hour as Unit>::EXPR.factor(), 3600.0);
+    assert_eq!(<units::Day as Unit>::EXPR.factor(), 86_400.0);
+    assert_eq!(<units::Week as Unit>::EXPR.factor(), 604_800.0);
+    assert!(units::by_name("Hour").is_some());
+
+    assert_eq!(
+        Hours::new(2u32).convert::<units::Second, One, u32>(),
+        Some(Secs::new(7200))
+    );
+    assert_eq!(
+        Days::new(1u32).convert::<units::Second, Milli, u32>(),
+        Some(Fixed::new(86_400_000))
+    );
+    assert_eq!(
+        Fixed::<units::Week, One, u8>::new(2).convert::<units::Day, One, u8>(),
+        Some(Days::new(14))
+    );
+    assert_eq!(
+        Secs::new(5400u32).convert::<units::Minute, One, u16>(),
+        Some(Minutes::new(90))
+    );
+    // 90 min is not a whole number of hours
+    assert_eq!(Minutes::new(90u16).convert::<units::Hour, One, u16>(), None);
+    assert_eq!(Hours::new(36u16).to_string(), "36 h");
+    assert_eq!(Minutes::new(5u8).to_string(), "5 min");
+}

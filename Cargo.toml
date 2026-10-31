@@ -38,7 +38,7 @@ quantities = [
     "information",
     "counting",
 ]
-# Second, Hertz, HertzPerSecond, Baud
+# Second, Minute, Hour, Day, Week, Hertz, HertzPerSecond, Baud; the UnixEpoch origin
 time = []
 # Ampere, Volt, Ohm, Farad, Siemens, Henry, Coulomb, Watt, Weber, Tesla
 electrical = []
