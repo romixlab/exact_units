@@ -164,7 +164,7 @@ use crate::units::{Per, Times};
 use core::ops::{Div, Mul};
 
 /// What every product and quotient checks at compile time: no unit with an offset, and an exact scale.
-const fn check<U1: Unit, U2: Unit, P1: FixedScale, P2: FixedScale>(per: bool) {
+pub(crate) const fn check<U1: Unit, U2: Unit, P1: FixedScale, P2: FixedScale>(per: bool) {
     assert!(
         !U1::EXPR.has_offset() && !U2::EXPR.has_offset(),
         "a unit with an offset scale (°C) doesn't multiply or divide: take its difference in kelvin"
@@ -432,7 +432,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
 /// The factor of a rounding product or quotient into another scale and storage, worked out at compile time:
 /// `a · b · num / den` or `a · num / (b · den)`.
 #[derive(Copy, Clone)]
-struct Requant {
+pub(crate) struct Requant {
     num: u128,
     den: u128,
     /// Integers whose largest product fits `i64`: the work is in 64 bits.
@@ -455,6 +455,16 @@ const fn mul_or_max(a: u128, b: u128) -> u128 {
 
 impl Requant {
     const fn of<T: Storage, T3: Storage>(m: Magnitude, per: bool) -> Self {
+        Self::of_terms::<T, T3>(m, per, 1)
+    }
+
+    /// The factor for a sum of `terms` products (`a·b − c·d` of a complex multiply is 2), whose widened sum must
+    /// fit too.
+    pub(crate) const fn of_terms<T: Storage, T3: Storage>(
+        m: Magnitude,
+        per: bool,
+        terms: u128,
+    ) -> Self {
         let float = T::IS_FLOAT || T3::IS_FLOAT;
         let ratio = m.to_ratio();
         let (num, den) = match ratio {
@@ -476,7 +486,10 @@ impl Requant {
             let (top, bottom) = if per {
                 (mul_or_max(max, num), mul_or_max(max, den))
             } else {
-                (mul_or_max(mul_or_max(max, max), num), den)
+                (
+                    mul_or_max(mul_or_max(mul_or_max(max, max), num), terms),
+                    den,
+                )
             };
             assert!(
                 top <= i128::MAX as u128 && bottom <= i128::MAX as u128,
@@ -516,6 +529,48 @@ impl Requant {
         };
         // fits i128, checked at compile time
         let p = a * b * self.num as i128;
+        let y = if self.den == 1 {
+            p
+        } else {
+            rounding::div_i128(p, self.den as i128, r)
+        };
+        rounding::settle(y, o)
+    }
+
+    /// `a · b + c · d` (`d` negated by the caller where it is a difference), scaled and rounded once into `T3`.
+    #[inline(always)]
+    pub(crate) fn sum2<T: Storage, T3: Storage>(
+        self,
+        (a, b): (T, T),
+        (c, d): (T, T),
+        neg: bool,
+        r: Rounding,
+        o: Overflow,
+    ) -> Option<T3> {
+        if self.float {
+            let cd = to_f64(c) * to_f64(d);
+            let x = to_f64(a) * to_f64(b) + if neg { -cd } else { cd };
+            return self.finish_f64(x, r, o);
+        }
+        if self.narrow {
+            // |a · b ± c · d| · num fits i64, checked at compile time
+            let cd = c.to_i64() * d.to_i64();
+            let p = (a.to_i64() * b.to_i64() + if neg { -cd } else { cd }) * self.num as i64;
+            let y = if self.den == 1 {
+                p
+            } else {
+                rounding::div_i64(p, self.den as i64, r)
+            };
+            return settle_narrow(y, o);
+        }
+        let (Repr::Int(a), Repr::Int(b), Repr::Int(c), Repr::Int(d)) =
+            (a.to_repr(), b.to_repr(), c.to_repr(), d.to_repr())
+        else {
+            return None;
+        };
+        // fits i128, checked at compile time
+        let cd = c * d;
+        let p = (a * b + if neg { -cd } else { cd }) * self.num as i128;
         let y = if self.den == 1 {
             p
         } else {

@@ -20,6 +20,7 @@ pub use storage::{Repr, Storage, UnsignedStorage};
 mod bounds;
 pub mod prefix;
 mod product;
+pub(crate) use product::{Requant, check as check_product};
 mod rounding;
 mod storage;
 
@@ -1045,19 +1046,27 @@ fn rescale<T: Storage>(x: Repr, scale: Magnitude) -> Option<T> {
 impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> fmt::Display for Fixed<U, P, T, B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
-            match self.value.to_repr() {
-                Repr::Int(x) => match (P::SCALE.apply_int(x), P::SCALE.as_pow10()) {
-                    (Some(x), _) => write!(f, "{x}")?,
-                    (None, Some(e)) => write_decimal(x, e, f)?,
-                    (None, None) => write!(f, "{}", P::SCALE.apply_f64(x as f64))?,
-                },
-                Repr::Float(x) => write!(f, "{}", P::SCALE.apply_f64(x))?,
-            }
+            write_si_value::<P, T>(self.value, f)?;
             write_unit(Prefix::Unit, &U::EXPR, f)
         } else {
             self.value.fmt_number(f)?;
             write_prefix_unit::<P>(U::EXPR, f)
         }
+    }
+}
+
+/// `v` steps of `P` as a number of the unit itself: exact for a power of ten, else as a float.
+pub(crate) fn write_si_value<P: FixedScale, T: Storage>(
+    v: T,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    match v.to_repr() {
+        Repr::Int(x) => match (P::SCALE.apply_int(x), P::SCALE.as_pow10()) {
+            (Some(x), _) => write!(f, "{x}"),
+            (None, Some(e)) => write_decimal(x, e, f),
+            (None, None) => write!(f, "{}", P::SCALE.apply_f64(x as f64)),
+        },
+        Repr::Float(x) => write!(f, "{}", P::SCALE.apply_f64(x)),
     }
 }
 
@@ -1079,7 +1088,10 @@ pub(crate) fn write_decimal(x: i128, e: i8, f: &mut fmt::Formatter<'_>) -> fmt::
     write!(f, "{sign}{int}.{frac:0width$}")
 }
 
-fn write_prefix_unit<P: FixedScale>(unit: &UnitExpr, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+pub(crate) fn write_prefix_unit<P: FixedScale>(
+    unit: &UnitExpr,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
     if let Some(prefix) = P::SCALE.as_pow10().and_then(Prefix::si_from_pow10) {
         return write_unit(prefix, &unit, f);
     }
