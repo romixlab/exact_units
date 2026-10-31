@@ -35,6 +35,7 @@ extern crate std;
 #[doc = include_str!("../README.md")]
 struct ReadmeDoctests;
 
+pub mod cordic;
 pub mod decibel;
 mod declare;
 mod fixed;

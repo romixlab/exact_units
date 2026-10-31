@@ -99,6 +99,7 @@ jobs:
           target: thumbv6m-none-eabi
       - run: cargo build --target thumbv6m-none-eabi --no-default-features --features time,electrical,information
       - run: cargo build --target thumbv6m-none-eabi --no-default-features --features shrink_wrap,defmt,time
+      - run: cargo build --target thumbv6m-none-eabi --no-default-features --features angle,dimensionless
 
   no-std-libm:
     name: no_std build with libm (thumbv7em-none-eabihf)

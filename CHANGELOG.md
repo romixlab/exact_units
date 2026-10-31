@@ -27,6 +27,14 @@
   the encoder's angle. Aliases `PhaseBam16` and `PhaseBam32` (feature `angle`), binary phase angles that wrap.
 * √W, the dimension of power waves, is a root-power dimension: a ratio `b/a` of power waves
   (`Per<Sqrt<Watt>, Sqrt<Watt>>`, an S-parameter as a scalar) has a level of 20·lg, as V/V has.
+* `cordic` (STD-89): angles and square roots in integers only, `const fn`s with `const` iteration tables, for a
+  Cortex-M0 as much as a host. `atan2_16(y, x)` of `i16` into a `Bam16` and `atan2_32` of `i32` into a `Bam32` (24
+  and 40 CORDIC steps in `i32` / `i64`, the inputs normalised first so short vectors are as exact as long ones),
+  `sin_cos_16` of a `Bam16` into two `Q15` and `sin_cos_32` of a `Bam32` into two `Q31` (the gain undone in fixed
+  point; `cos 0` saturates to the largest Q value). Each is within 0.51 of a step of the exact value (tested against
+  libm over dense grids, every `Bam16`, the axes, the corners and ±full scale), the axes and the eighths of a turn
+  exact. `isqrt_u32` / `isqrt_u64` / `isqrt_u128` round √x by a `Rounding`, exactly. The results are plain
+  `Bam16` / `Bam32`; `PhaseBam16` / `PhaseBam32` and the arg of a complex number (STD-90) come on top of these.
 * `Count<Of, T>` (`Fixed<Of, One, T>`, a count of `Of`s in the bytes of a `T`), `Percent<T>` and `Permille<T>`
   (`Fixed<Ratio, Centi | Milli, T>`, feature `dimensionless`, shown as `50 %`, `5 ‰`), `Kibibytes<T>`,
   `Mebibytes<T>`, `Gibibytes<T>` beside `Bytes<T>` (feature `information`) and `Hz<T>` (`Fixed<Hertz, One, T>`,

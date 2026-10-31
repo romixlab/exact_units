@@ -20,7 +20,7 @@ lint:
     cargo clippy --all-targets --no-default-features --features std -- -D warnings
     RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
 
-# cargo check the feature sets a firmware and a host use: no unit group, defmt, a few groups, without and with the wire format
+# cargo check the feature sets a firmware and a host use: no unit group, defmt, a few groups, without and with the wire format, CORDIC on an M0
 check:
     cargo check --all-features
     cargo check --no-default-features
@@ -29,6 +29,7 @@ check:
     cargo check --no-default-features --features=std
     cargo check --no-default-features --features=shrink_wrap,defmt,time
     cargo check --no-default-features --features=electrical,libm --target thumbv7em-none-eabihf
+    cargo check --no-default-features --features=angle,dimensionless --target thumbv6m-none-eabi
 
 # A library has nothing to put on PATH: builds it with the deploy profile, as a dependent's release build would
 install:

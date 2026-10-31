@@ -67,6 +67,9 @@ crate is about, all of it checked at compile time:
   one integer multiply on the device, and `convert` takes it to a watt; V/V times V is a volt, a gain times a gain is
   still a gain. Rounding into another scale (`times_into`, a Q15 multiply) is named, never a float.
 - **Roots.** A noise density is `Per<Volt, Sqrt<Hertz>>`, shown `V/√Hz`.
+- **Angles and roots in integers.** `cordic::atan2_16` / `atan2_32` turn an `(x, y)` pair into a `Bam16` / `Bam32`,
+  `sin_cos_16` / `sin_cos_32` a binary angle into Q15 / Q31, within 0.51 of a step of the exact value, and `isqrt_u32`
+  / `u64` / `u128` round a square root by a named `Rounding`: no float, `const`, the same on a Cortex-M0.
 - **Every scale an MCU uses.** SI prefixes, binary prefixes (KiB), powers of ten and of two, fractions
   (`Rational<1, 65535>`: 65535 is 100 % in a `u16`), and the step of a converter (`FullScale<Rational<33, 10>, 12>`:
   a 12-bit ADC over 3.3 V).
