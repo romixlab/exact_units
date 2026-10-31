@@ -301,6 +301,22 @@ crate::unit! {
     #[cfg(feature = "counting")]
     pub struct Packet = "packet", counted;
 
+    /// A count of lines, line: of a text, a file, a log.
+    #[cfg(feature = "counting")]
+    pub struct Line = "line", counted;
+
+    /// A count of rows, row: of a table, a grid, a report.
+    #[cfg(feature = "counting")]
+    pub struct Row = "row", counted;
+
+    /// A count of records, record: of a store, a file format, a ring buffer.
+    #[cfg(feature = "counting")]
+    pub struct Record = "record", counted;
+
+    /// A count of entries, entry: of a log, a list, a directory, a table of contents.
+    #[cfg(feature = "counting")]
+    pub struct Entry = "entry", counted;
+
     /// A count of cycles, cycle: clock cycles, time quanta; time only with a clock (`Per<Cycle, Second>`).
     #[cfg(feature = "counting")]
     pub struct Cycle = "cycle", counted;

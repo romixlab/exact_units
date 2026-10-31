@@ -19,6 +19,13 @@
 
 ### 🚀 Features
 
+* `Count<Of, T>` (`Fixed<Of, One, T>`, a count of `Of`s in the bytes of a `T`), `Percent<T>` and `Permille<T>`
+  (`Fixed<Ratio, Centi | Milli, T>`, feature `dimensionless`, shown as `50 %`, `5 ‰`), `Kibibytes<T>`,
+  `Mebibytes<T>`, `Gibibytes<T>` beside `Bytes<T>` (feature `information`) and `Hz<T>` (`Fixed<Hertz, One, T>`,
+  feature `time`): aliases that cat_stack's APIs declared for themselves, now one set for every crate.
+* Counted units `units::Line` (a line of a text, a file, a log), `units::Row` (a row of a table), `units::Record`
+  and `units::Entry` (an entry of a log or a list), beside `Item`, `Sample`, `Frame` and `Packet` (feature
+  `counting`); each is a base dimension of its own, symbols `line`, `row`, `record`, `entry`.
 * `units::Minute` (60 s), `units::Hour` (3600 s), `units::Day` (86400 s) and `units::Week` (604800 s), exact scales
   of `Second` (feature `time`), with the aliases `Secs`, `Minutes`, `Hours` and `Days` (`Fixed<.., One, T>`): a
   retention in days, an uptime in hours, converted to and from seconds exactly.

@@ -82,6 +82,10 @@ pub struct Fixed<U, P, T: Storage, B: Bounds<T> = Unbounded> {
     _bounds: PhantomData<B>,
 }
 
+/// A count of `Of`s in a `T`, `Fixed<Of, One, T>`: `Count<Line, u32>` lines, `Count<Packet, u16>` packets. The
+/// bytes of the plain `T`.
+pub type Count<Of, T> = Fixed<Of, prefix::One, T>;
+
 /// Time in µs, `Fixed<Second, Micro, T>`.
 #[cfg(feature = "time")]
 pub type Micros<T> = Fixed<crate::units::Second, prefix::Micro, T>;
@@ -110,9 +114,25 @@ pub type Hours<T> = Fixed<crate::units::Hour, prefix::One, T>;
 #[cfg(feature = "time")]
 pub type Days<T> = Fixed<crate::units::Day, prefix::One, T>;
 
+/// A frequency in whole hertz, `Fixed<Hertz, One, T>`.
+#[cfg(feature = "time")]
+pub type Hz<T> = Fixed<crate::units::Hertz, prefix::One, T>;
+
 /// A size or a count of bytes, `Fixed<Byte, One, T>`.
 #[cfg(feature = "information")]
 pub type Bytes<T> = Fixed<crate::units::Byte, prefix::One, T>;
+
+/// A size in KiB (1024 bytes), `Fixed<Byte, Kibi, T>`.
+#[cfg(feature = "information")]
+pub type Kibibytes<T> = Fixed<crate::units::Byte, prefix::Kibi, T>;
+
+/// A size in MiB (2²⁰ bytes), `Fixed<Byte, Mebi, T>`.
+#[cfg(feature = "information")]
+pub type Mebibytes<T> = Fixed<crate::units::Byte, prefix::Mebi, T>;
+
+/// A size in GiB (2³⁰ bytes), `Fixed<Byte, Gibi, T>`.
+#[cfg(feature = "information")]
+pub type Gibibytes<T> = Fixed<crate::units::Byte, prefix::Gibi, T>;
 
 /// A 16-bit duty or fraction where 65535 is 1 (100 %): `Fixed<Ratio, Rational<1, 65535>, u16>`, the PWM duty of
 /// many timers.
@@ -144,6 +164,14 @@ pub type Bam32 = Fixed<crate::units::Turn, prefix::Pow2<-32>, u32, Wrapping>;
 /// A fraction in parts per billion (a clock's rate error), `Fixed<Ratio, Nano, T>`.
 #[cfg(feature = "dimensionless")]
 pub type Ppb<T> = Fixed<crate::units::Ratio, prefix::Nano, T>;
+
+/// A fraction in percent (100 is all of it), `Fixed<Ratio, Centi, T>`.
+#[cfg(feature = "dimensionless")]
+pub type Percent<T> = Fixed<crate::units::Ratio, prefix::Centi, T>;
+
+/// A fraction in per mille, ‰ (1000 is all of it), `Fixed<Ratio, Milli, T>`.
+#[cfg(feature = "dimensionless")]
+pub type Permille<T> = Fixed<crate::units::Ratio, prefix::Milli, T>;
 
 impl<U, P, T: Storage> Fixed<U, P, T> {
     /// `value` in units of `P`.
@@ -1261,6 +1289,38 @@ mod tests {
             Fixed::<Byte, One, UVlq64>::new(UVlq64(2048)).to::<Kibi, Nibble>(),
             Some(Fixed::new(Nibble::new(2).unwrap()))
         );
+    }
+
+    #[test]
+    fn general_aliases() {
+        use crate::units::{Hertz, Line, Packet};
+        let lines: Count<Line, u32> = Count::new(12);
+        assert_eq!(format!("{}", lines), "12 line");
+        assert_eq!(size_of::<Count<Packet, u16>>(), 2);
+        assert_eq!(format!("{}", Percent::new(50u8)), "50 %");
+        assert_eq!(format!("{}", Permille::new(5u16)), "5 ‰");
+        assert_eq!(
+            Percent::new(50u8).to::<Milli, u16>(),
+            Some(Permille::new(500))
+        );
+        assert_eq!(
+            Permille::new(250u16).to::<Centi, u8>(),
+            Some(Percent::new(25))
+        );
+        assert_eq!(
+            Kibibytes::new(2048u32).to::<Mebi, u8>(),
+            Some(Mebibytes::new(2))
+        );
+        assert_eq!(
+            Gibibytes::new(1u8).to::<Kibi, u32>(),
+            Some(Kibibytes::new(1 << 20))
+        );
+        assert_eq!(
+            Mebibytes::new(3u16).to::<One, u32>(),
+            Some(Bytes::new(3 << 20))
+        );
+        let hz: Hz<u32> = Fixed::<Hertz, Kilo, u16>::new(48).to().unwrap();
+        assert_eq!(hz.get(), 48_000);
     }
 
     #[test]

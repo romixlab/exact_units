@@ -61,7 +61,7 @@ information = []
 # imperial, US customary and other units outside the SI: inch, pound, psi, gallon (US and imperial), Btu, hp, ...
 # Opt-in only, not in `quantities` or `std`: an API without them pays nothing for them
 customary = []
-# Item, Sample, Frame, Packet, Cycle, Block, Sector, Chunk, Char, Code: counted bases, each a dimension of its own
+# Item, Sample, Frame, Packet, Line, Row, Record, Entry, Cycle, Block, Sector, Chunk, Char, Code: counted bases, each a dimension of its own
 counting = []
 
 [dependencies]

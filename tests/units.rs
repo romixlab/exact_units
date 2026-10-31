@@ -35,6 +35,13 @@ fn angle_information_counting() {
     assert!(!<units::Torque as Unit>::DIM.same(<units::Joule as Unit>::DIM));
     assert_eq!(<units::AngularVelocity as Unit>::DIM.to_string(), "s⁻¹·rad");
     assert!(!<units::Sample as Unit>::DIM.same(<units::Packet as Unit>::DIM));
+    for (a, b) in [
+        (<units::Line as Unit>::DIM, <units::Row as Unit>::DIM),
+        (<units::Record as Unit>::DIM, <units::Entry as Unit>::DIM),
+        (<units::Line as Unit>::DIM, <units::Item as Unit>::DIM),
+    ] {
+        assert!(!a.same(b));
+    }
     assert!(!<units::Sample as Unit>::DIM.is_one());
     let per_sample = <Per<units::Byte, units::Sample> as Unit>::DIM;
     assert_eq!(per_sample.to_string(), "bit·Sample⁻¹");
