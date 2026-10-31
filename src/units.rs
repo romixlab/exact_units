@@ -378,6 +378,56 @@ impl<U: Unit> Unit for Sqrt<U> {
     const SI_EXPR: &'static SIExpr<'static> = &SIExpr::Sqrt(RefBox::Ref { value: U::SI_EXPR });
 }
 
+/// A unit of plane angle (rad¹ and no kind of its own): [Radian], [Degree], [Turn], or an API's own angle unit. What
+/// [Phase] wraps, and what the named steps `as_phase` and `electrical` start from.
+pub trait PlaneAngle: Unit {}
+
+#[cfg(feature = "angle")]
+impl PlaneAngle for Radian {}
+#[cfg(feature = "angle")]
+impl PlaneAngle for Degree {}
+#[cfg(feature = "angle")]
+impl PlaneAngle for Turn {}
+
+/// A phase angle in the angle unit `A`: the argument of a phasor, an NCO's phase, a motor's electrical angle. Same
+/// dimension, scale and symbol as `A`, but of the kind `phase angle` ([Kind::Named]), so it isn't a mechanical
+/// angle: `Phase<Turn>` converts to `Phase<Degree>`, not to [Turn]. The steps between them are named: `as_phase` and
+/// `as_plane_angle` (the same number), and `electrical(pole_pairs)` from a motor's mechanical angle to its electrical
+/// angle, the phase a field-oriented control's Park transform takes.
+///
+/// ```
+/// # #[cfg(feature = "angle")] {
+/// use exact_units::{Bam16, Fixed, PhaseBam16, prefix::One, units::{Degree, Phase, Turn}};
+///
+/// let half = Fixed::<Phase<Turn>, One, f32>::new(0.5);
+/// assert_eq!(half.convert::<Phase<Degree>, One, f32>(), Some(Fixed::new(180.0)));
+/// // a rotor at 0.3 turn with 7 pole pairs is at 2.1 turns electrical, 0.1 turn of phase
+/// let mechanical: Bam16 = Fixed::of(19661);
+/// let phase: PhaseBam16 = mechanical.electrical(7);
+/// assert_eq!(phase.get(), 19661u16.wrapping_mul(7));
+/// # }
+/// ```
+///
+/// On the wire and in a unit's [UnitExpr] it is `A`: the kind is in the type, as for [Ohm].
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Phase<A> {
+    _a: PhantomData<A>,
+}
+
+impl<A: PlaneAngle> Unit for Phase<A> {
+    const DIM: Dim<'static> = {
+        assert!(
+            A::DIM.same(Dim::ONE.with_rad(1)) && A::KIND.same(Kind::Plain),
+            "Phase wraps a plane angle (rad, °, rev) of no kind of its own"
+        );
+        A::DIM
+    };
+    const KIND: Kind<'static> = Kind::Named("phase angle");
+    const EXPR: &'static UnitExpr = A::EXPR;
+    #[cfg(feature = "shrink_wrap")]
+    const SI_EXPR: &'static SIExpr<'static> = A::SI_EXPR;
+}
+
 impl<A: Unit, B: Unit> Unit for Per<A, B> {
     const DIM: Dim<'static> = A::DIM.div(B::DIM);
     const KIND: Kind<'static> = A::KIND.div(A::DIM, B::KIND, B::DIM);

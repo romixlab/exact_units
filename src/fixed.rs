@@ -161,6 +161,17 @@ pub type Bam16 = Fixed<crate::units::Turn, prefix::Pow2<-16>, u16, Wrapping>;
 #[cfg(feature = "angle")]
 pub type Bam32 = Fixed<crate::units::Turn, prefix::Pow2<-32>, u32, Wrapping>;
 
+/// A 16-bit binary phase angle: a [Bam16] of the kind `phase angle` ([Phase](crate::units::Phase)), an NCO's phase
+/// accumulator or a motor's electrical angle. Wrapping; `as_plane_angle` gives the [Bam16].
+#[cfg(feature = "angle")]
+pub type PhaseBam16 =
+    Fixed<crate::units::Phase<crate::units::Turn>, prefix::Pow2<-16>, u16, Wrapping>;
+
+/// A 32-bit binary phase angle: a [Bam32] of the kind `phase angle`, wrapping.
+#[cfg(feature = "angle")]
+pub type PhaseBam32 =
+    Fixed<crate::units::Phase<crate::units::Turn>, prefix::Pow2<-32>, u32, Wrapping>;
+
 /// A fraction in parts per billion (a clock's rate error), `Fixed<Ratio, Nano, T>`.
 #[cfg(feature = "dimensionless")]
 pub type Ppb<T> = Fixed<crate::units::Ratio, prefix::Nano, T>;
@@ -800,7 +811,7 @@ impl Conversion {
         assert!(
             U::KIND.same(U2::KIND),
             "a Fixed converts only between units of the same kind: V/V is not A/A or a Ratio, V/A is not an Ohm \
-             (cross kinds with a named step: as_ratio, as_resistance, ..)"
+             (cross kinds with a named step: as_ratio, as_resistance, as_phase, ..)"
         );
         assert!(
             !U::EXPR.has_offset() && !U2::EXPR.has_offset(),

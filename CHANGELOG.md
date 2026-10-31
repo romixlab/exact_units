@@ -19,6 +19,14 @@
 
 ### 🚀 Features
 
+* `units::Phase<A>` (STD-88): a phase angle in the angle unit `A` (`Radian`, `Degree`, `Turn`, or an API's own unit
+  that implements the new `units::PlaneAngle`), with `A`'s dimension, scale and symbol but the kind `phase angle`.
+  `Phase<Turn>` converts to `Phase<Degree>`; to or from a plane angle is a compile error, crossed by the named steps
+  `as_phase` and `as_plane_angle`. `electrical(pole_pairs)` takes a motor's mechanical angle to its electrical angle,
+  a phase, by the overflow policy (a `Bam16` wraps at a turn), so a field-oriented control that takes a phase refuses
+  the encoder's angle. Aliases `PhaseBam16` and `PhaseBam32` (feature `angle`), binary phase angles that wrap.
+* √W, the dimension of power waves, is a root-power dimension: a ratio `b/a` of power waves
+  (`Per<Sqrt<Watt>, Sqrt<Watt>>`, an S-parameter as a scalar) has a level of 20·lg, as V/V has.
 * `Count<Of, T>` (`Fixed<Of, One, T>`, a count of `Of`s in the bytes of a `T`), `Percent<T>` and `Permille<T>`
   (`Fixed<Ratio, Centi | Milli, T>`, feature `dimensionless`, shown as `50 %`, `5 ‰`), `Kibibytes<T>`,
   `Mebibytes<T>`, `Gibibytes<T>` beside `Bytes<T>` (feature `information`) and `Hz<T>` (`Fixed<Hertz, One, T>`,

@@ -63,13 +63,14 @@ const POWER: [Dim<'static>; 3] = [
     Dim::new(-3, 0, 1, 0, 0, 0, 0),
 ];
 
-/// Dimensions of root-power quantities: V, A, Pa, V/m, A/m.
-const ROOT_POWER: [Dim<'static>; 5] = [
+/// Dimensions of root-power quantities: V, A, Pa, V/m, A/m, and √W of power waves (an S-parameter `b/a`).
+const ROOT_POWER: [Dim<'static>; 6] = [
     Dim::new(-3, 2, 1, -1, 0, 0, 0),
     Dim::new(0, 0, 0, 1, 0, 0, 0),
     Dim::new(-2, -1, 1, 0, 0, 0, 0),
     Dim::new(-3, 1, 1, -1, 0, 0, 0),
     Dim::new(0, -1, 0, 1, 0, 0, 0),
+    Dim::new(-3, 2, 1, 0, 0, 0, 0).sqrt(),
 ];
 
 const fn any_same(dims: &[Dim<'static>], d: Dim<'_>) -> bool {
@@ -240,6 +241,96 @@ impl fmt::Display for Kind<'_> {
 #[allow(dead_code)]
 struct KindsInConversions;
 
+/// A phase angle is not a mechanical (plane) angle: [Phase](crate::units::Phase) converts within its kind, a plane
+/// angle becomes one only by a named step.
+///
+/// ```
+/// # #[cfg(feature = "angle")] {
+/// use exact_units::{Bam16, Fixed, PhaseBam16, prefix::{Milli, One}, units::{Degree, Phase, Radian, Turn}};
+///
+/// // a phase in turns is a phase in degrees or radians
+/// let p = Fixed::<Phase<Turn>, Milli, u32>::new(250);
+/// assert_eq!(p.convert::<Phase<Degree>, One, u32>(), Some(Fixed::new(90)));
+/// let _: Option<Fixed<Phase<Radian>, One, f64>> = p.convert();
+/// // the named steps, the same number
+/// let mechanical: Bam16 = Fixed::of(16384);
+/// let phase: PhaseBam16 = mechanical.as_phase();
+/// assert_eq!(phase.as_plane_angle(), mechanical);
+/// // electrical angle = pole pairs · mechanical angle, wrapping at a turn
+/// assert_eq!(mechanical.electrical(3), PhaseBam16::of(49152));
+/// # }
+/// ```
+///
+/// A phase in turns is not a plane angle in turns:
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, prefix::One, units::{Phase, Turn}};
+/// let _ = Fixed::<Phase<Turn>, One, f32>::new(0.5).convert::<Turn, One, f32>();
+/// ```
+///
+/// nor in degrees, nor a plane angle a phase:
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, prefix::One, units::{Degree, Phase, Turn}};
+/// let _ = Fixed::<Phase<Turn>, One, f32>::new(0.5).convert::<Degree, One, f32>();
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, prefix::One, units::{Phase, Radian}};
+/// let _ = Fixed::<Radian, One, f32>::new(1.0).convert::<Phase<Radian>, One, f32>();
+/// ```
+///
+/// A field-oriented control that takes the electrical angle doesn't take the encoder's mechanical one, the classic
+/// bug of a motor with more than one pole pair:
+///
+/// ```compile_fail
+/// use exact_units::{Bam16, Fixed, PhaseBam16};
+/// fn park(theta: PhaseBam16) {}
+/// let encoder: Bam16 = Fixed::of(1000);
+/// park(encoder);
+/// ```
+///
+/// and a phase is of a plane angle only:
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, prefix::One, units::{Phase, Watt}};
+/// let _ = Fixed::<Phase<Watt>, One, f32>::new(1.0).convert::<Phase<Watt>, One, f32>();
+/// ```
+#[cfg(feature = "angle")]
+#[allow(dead_code)]
+struct PhaseKinds;
+
+mod phase {
+    use crate::units::{Phase, PlaneAngle};
+    use crate::{Bounds, Fixed, Storage};
+    use core::ops::Mul;
+
+    /// A mechanical angle becomes a phase angle only by a named step.
+    impl<A: PlaneAngle, P, T: Storage, B: Bounds<T>> Fixed<A, P, T, B> {
+        /// The same number as a phase angle.
+        pub fn as_phase(self) -> Fixed<Phase<A>, P, T, B> {
+            Fixed::new_unchecked(self.get())
+        }
+
+        /// The electrical angle of a motor with `pole_pairs` pole pairs at this mechanical (rotor) angle:
+        /// `pole_pairs · self`, multiplied by the overflow policy of `B` (a [Bam16](crate::Bam16) wraps at a turn, as
+        /// an electrical angle does). Feed this, not the encoder's angle, to a field-oriented control.
+        pub fn electrical(self, pole_pairs: T) -> Fixed<Phase<A>, P, T, B>
+        where
+            Self: Mul<T, Output = Self>,
+        {
+            (self * pole_pairs).as_phase()
+        }
+    }
+
+    impl<A: PlaneAngle, P, T: Storage, B: Bounds<T>> Fixed<Phase<A>, P, T, B> {
+        /// The same number as a plane angle: what made it a phase is gone.
+        pub fn as_plane_angle(self) -> Fixed<A, P, T, B> {
+            Fixed::new_unchecked(self.get())
+        }
+    }
+}
+
 #[cfg(feature = "electrical")]
 mod electrical {
     use crate::units::{Ampere, Ohm, Per, Siemens, Volt};
@@ -345,7 +436,63 @@ mod tests {
         assert_eq!(Kind::RatioOf(A).level_form(), Some(LevelForm::RootPower));
         assert_eq!(Kind::RatioOf(W).level_form(), Some(LevelForm::Power));
         assert_eq!(Kind::RatioOf(OHM).level_form(), None);
+        // b/a of power waves in √W
+        assert_eq!(
+            Kind::Plain
+                .div(W.sqrt(), Kind::Plain, W.sqrt())
+                .level_form(),
+            Some(LevelForm::RootPower)
+        );
         assert_eq!(Kind::Plain.level_form(), None);
+    }
+
+    #[cfg(all(feature = "electrical", any(feature = "std", feature = "libm")))]
+    #[test]
+    fn power_waves_take_20_lg() {
+        use crate::Fixed;
+        use crate::prefix::One;
+        use crate::units::{Per, Sqrt, Watt};
+        // |S21| = |b2/a1| of 0.1 is -20 dB, not -10
+        let s21 = Fixed::<Per<Sqrt<Watt>, Sqrt<Watt>>, One, f64>::new(0.1);
+        assert!((s21.to_db() + 20.0).abs() < 1e-12);
+    }
+
+    #[cfg(feature = "angle")]
+    #[test]
+    fn phase_angles() {
+        use crate::prefix::{Milli, One};
+        use crate::units::{Degree, Phase, Radian, Turn};
+        use crate::{Bam32, Fixed, PhaseBam16, PhaseBam32, Saturating, Unit};
+
+        assert_eq!(<Phase<Turn>>::DIM, Turn::DIM);
+        assert_eq!(<Phase<Degree>>::KIND, Kind::Named("phase angle"));
+        assert_eq!(<Phase<Radian>>::EXPR, Radian::EXPR);
+        // Phase<Turn> to Phase<Degree>, exactly
+        let p = Fixed::<Phase<Turn>, Milli, i32>::new(-125);
+        assert_eq!(
+            p.convert::<Phase<Degree>, One, i32>(),
+            Some(Fixed::new(-45))
+        );
+        assert_eq!(
+            std::format!("{}", p),
+            std::format!("{}", p.as_plane_angle())
+        );
+        // the electrical angle wraps at a turn: 0.75 turn · 2 pole pairs is 0.5 turn of phase
+        let rotor: Bam32 = Fixed::of(3 << 30);
+        assert_eq!(rotor.electrical(2), PhaseBam32::of(1 << 31));
+        // a phase BAM wraps like a BAM
+        assert_eq!(
+            PhaseBam16::of(49152) + PhaseBam16::of(32768),
+            PhaseBam16::of(16384)
+        );
+        // the policy of B decides: a saturating angle saturates
+        let s = Fixed::<Degree, One, i16, Saturating>::of(20000);
+        assert_eq!(s.electrical(4).get(), i16::MAX);
+        // an unbounded one multiplies as `*` does
+        assert_eq!(
+            Fixed::<Radian, One, f32>::new(0.5).electrical(4.0),
+            Fixed::new(2.0)
+        );
     }
 
     #[test]

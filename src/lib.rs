@@ -53,7 +53,7 @@ mod unit;
 pub mod units;
 
 #[cfg(feature = "angle")]
-pub use fixed::{Bam16, Bam32};
+pub use fixed::{Bam16, Bam32, PhaseBam16, PhaseBam32};
 pub use fixed::{
     Bounds, Count, DecimalPrefix, Fixed, FixedScale, OutOfBounds, Overflow, Range, RangeDec,
     RangeU64, Repr, Requantizer, Rounding, Saturating, Storage, StorageKind, Unbounded, Unlimited,
