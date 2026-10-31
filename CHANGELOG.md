@@ -19,6 +19,15 @@
 
 ### 🚀 Features
 
+* Complex power with its kinds (STD-92): `units::VoltAmpere` (`"VA"`, kind `apparent power`) and `units::Var`
+  (`"var"`, kind `reactive power`), the watt's dimension (kg·m²·s⁻³) under a kind of their own, `Watt` staying
+  plain; a product table check at compile time (`VoltAmpere` and `Var` against `Watt`, `VoltAmpere` against
+  `Volt * Ampere`). `Complex<Volt, ..>::apparent_power(i)` gives `S = V · I*` of RMS voltage and current phasors
+  (ISO 80000-6) as `Complex<VoltAmpere, ..>`; its named steps `active()` (`Re(S)` in `Watt`), `reactive()`
+  (`Im(S)` in `Var`), `apparent()` (`|S|` in VA, `None` where the root doesn't fit `T`) and `power_factor()`
+  (`P / S` as a plain `Ratio`). A reactive or apparent power never converts to a plain watt by `convert` (feature
+  `electrical` and `dimensionless`).
+
 * `Complex<U, P, T, B = Unbounded>` (STD-84): a complex quantity, `re` then `im` in unit `U` and scale `P`, both
   stored as a signed `T` (`ComplexStorage`: `i8`..`i64`, `f32`, `f64`), with an overflow policy `B` (`Unbounded`,
   `Wrapping`, `Saturating`). `#[repr(C)]`, the common interleaved layout of complex samples; on the wire a

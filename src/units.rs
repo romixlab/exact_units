@@ -99,9 +99,21 @@ crate::unit! {
     #[cfg(feature = "electrical")]
     pub struct Coulomb = "C", [s 1, a 1];
 
-    /// Power in watts, W (kg·m²·s⁻³, J/s, V·A).
+    /// Power in watts, W (kg·m²·s⁻³, J/s, V·A): active power, P, of ISO 80000-6 (stays plain, next to the kinds
+    /// below).
     #[cfg(feature = "electrical")]
     pub struct Watt = "W", [kg 1, m 2, s -3];
+
+    /// Apparent power in volt-amperes, VA (kg·m²·s⁻³, like [Watt]): |S|, ISO 80000-6's S, of the complex power
+    /// S = V·I*. Of the kind `apparent power`: a product `Times<Volt, Ampere>` becomes one only through
+    /// [Complex::apparent_power](crate::Complex::apparent_power), never a plain `convert`.
+    #[cfg(feature = "electrical")]
+    pub struct VoltAmpere = "VA", [kg 1, m 2, s -3] kind "apparent power";
+
+    /// Reactive power in volt-amperes reactive, var (kg·m²·s⁻³, like [Watt]): Im(S), ISO 80000-6's Q, of the
+    /// complex power S = V·I*. Of the kind `reactive power`: never a plain [Watt] by `convert`.
+    #[cfg(feature = "electrical")]
+    pub struct Var = "var", [kg 1, m 2, s -3] kind "reactive power";
 
     /// Magnetic flux in webers, Wb (kg·m²·s⁻²·A⁻¹, V·s).
     #[cfg(feature = "electrical")]

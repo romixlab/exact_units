@@ -681,5 +681,8 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage + defmt::Format, B: Unlimited<T>>
     }
 }
 
+#[cfg(all(feature = "electrical", feature = "dimensionless"))]
+mod power;
+
 #[cfg(test)]
 mod tests;
