@@ -383,3 +383,29 @@ fn from_parts_refuses_an_exponent_sum_past_i32() {
         Err(MagnitudeError::ExponentRange)
     );
 }
+
+/// A prime to the power 0 is a factor of 1, dropped: from its parts (serde, a hand-edited file) the magnitude is the
+/// canonical one, equal to the same without it. It was kept as a slot of exponent 0, unequal to `ONE` and refused by
+/// the wire's check (found by tests/props/wire.rs).
+#[test]
+fn a_prime_to_the_power_0_is_dropped() {
+    let none = Irrational {
+        pi: 0,
+        ln2: 0,
+        ln10: 0,
+    };
+    let zero = PrimePower { prime: 3, exp: 0 };
+    assert_eq!(
+        Magnitude::from_parts_x2(0, 0, none, [zero]),
+        Ok(Magnitude::ONE)
+    );
+    let seven = PrimePower { prime: 7, exp: 2 };
+    assert_eq!(
+        Magnitude::from_parts_x2(-6, 0, none, [zero, seven]),
+        Magnitude::from_parts_x2(-6, 0, none, [seven])
+    );
+    assert_eq!(
+        Magnitude::from_parts_x2(0, 0, none, [zero]).map(|m| m.primes().count()),
+        Ok(0)
+    );
+}

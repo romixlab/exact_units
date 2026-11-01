@@ -538,6 +538,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
 
 ### 🐛 Fixes
 
+* `Magnitude::from_parts_x2`, and so a `Magnitude` or `Offset` read with serde, drops a prime to the power 0: `primes: [(3, 0)]` gave a magnitude with an empty slot, unequal to `Magnitude::ONE` and refused by the wire's own check when sent on. Found by the wire-format property tests.
 * `Decimal::parse` (and so `fixed!`) reads an exponent of any length: one of six digits or more was refused as "not a decimal number" even where the digits after the point bring it into range (`0.` and 67233 decimals, `e100000`), and one past `i16` is now refused as out of range. Found by the property tests of untrusted text.
 * `Storage::div_whole` documents that an integer storage panics for a zero `d`, as integer division does.
 * `Storage::div_rounded` of an integer storage by a zero `d` panics with "division by zero" in every build, as integer division does, and says so in its docs; it panicked by subtract overflow in debug and returned a wrong number in release.

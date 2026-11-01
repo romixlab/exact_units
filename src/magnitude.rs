@@ -213,6 +213,10 @@ impl Work {
         reason = "indices stay below self.len <= WORK, len below WORK before += 1 and at least 1 before -= 1; exponent sums fit i32 from add_int (±2, at most 64 times a prime for num and for den), mul (i8 + i8) and recip_of_primes (the sum of one prime's exponents is checked: from_parts_x2 takes any number of entries)"
     )]
     const fn add_prime(&mut self, prime: u64, exp2: i32) -> Result<(), MagnitudeError> {
+        if exp2 == 0 {
+            // a factor of 1: a new slot of exponent 0 would not be canonical
+            return Ok(());
+        }
         if prime == 2 {
             self.pow2 += exp2;
             return Ok(());
