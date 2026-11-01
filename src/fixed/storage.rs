@@ -65,6 +65,7 @@ pub trait Storage: Copy + PartialOrd + 'static {
     /// `x` if it fits.
     fn from_i64(x: i64) -> Option<Self>;
     /// `self / d` in the type's own width when that is exact (`None` when `d` doesn't divide it); `self` for floats.
+    /// Panics for a zero `d` (integers), as integer division does.
     fn div_whole(self, d: u128) -> Option<Self>;
     /// `self / d` in the type's own width, rounded by `r`; `self` for floats. Panics for a zero `d` (integers), as
     /// integer division does, in every build.
@@ -229,8 +230,8 @@ macro_rules! int {
             )]
             #[expect(
                 clippy::arithmetic_side_effects,
-                reason = "d is 2 to MAX where it divides (the crate's callers pass a positive den), so neither % nor / \
-                          overflows; a d of 0 panics as division by 0 does"
+                reason = "d is 1 to MAX where it divides, so neither % nor / overflows; a d of 0 panics as division \
+                          by 0 does, as documented"
             )]
             fn div_whole(self, d: u128) -> Option<Self> {
                 if d == 1 {
@@ -808,7 +809,14 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "divisor of zero")]
+    fn div_whole_by_zero_panics() {
+        let _ = Storage::div_whole(6u16, 0);
+    }
+
+    #[test]
     fn div_by_zero_of_a_float_is_itself() {
         assert_eq!(Storage::div_rounded(1.5f32, 0, crate::Rounding::Floor), 1.5);
+        assert_eq!(Storage::div_whole(1.5f64, 0), Some(1.5));
     }
 }

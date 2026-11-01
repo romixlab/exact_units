@@ -278,6 +278,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
 
 ### 🐛 Fixes
 
+* `Storage::div_whole` documents that an integer storage panics for a zero `d`, as integer division does.
 * `Storage::div_rounded` of an integer storage by a zero `d` panics with "division by zero" in every build, as integer division does, and says so in its docs; it panicked by subtract overflow in debug and returned a wrong number in release.
 * `requantize` and `Requantizer::apply` give `None` for a hand-built `StorageKind::Int` whose `bits` isn't 1 to 64 (`Requantizer::new` checks it); such a kind panicked by shift overflow in debug and gave a wrong number in release.
 * `Decibels::parse` (and so `db!`) refuses a level with more than 255 decimals with its "up to 9 decimals" panic; the count wrapped, so `0.` and 256 zeros and a `1` parsed as 0.1 dB in release (an overflow panic in debug).
