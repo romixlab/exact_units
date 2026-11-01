@@ -363,3 +363,19 @@ fn wire() {
         &mut buf,
     );
 }
+
+#[test]
+fn from_parts_refuses_an_exponent_sum_past_i32() {
+    // 2³²/127 + 1 entries of 3¹²⁷ᐟ²: the sum of exponents passes i32 (and wraps back into range in release)
+    let none = Irrational {
+        pi: 0,
+        ln2: 0,
+        ln10: 0,
+    };
+    let three = PrimePower { prime: 3, exp: 127 };
+    let n = (1usize << 32) / 127 + 1;
+    assert_eq!(
+        Magnitude::from_parts_x2(0, 0, none, core::iter::repeat_n(three, n)),
+        Err(MagnitudeError::ExponentRange)
+    );
+}

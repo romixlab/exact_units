@@ -277,6 +277,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
 
 ### 🐛 Fixes
 
+* `Magnitude::from_parts_x2` (and so a `Magnitude` read with serde) refuses entries of one prime whose exponents sum past `i32` with `ExponentRange`; it panicked in debug and returned a wrong magnitude in release (2³²/127 + 1 entries of `3¹²⁷ᐟ²` gave `3¹¹¹ᐟ²`).
 * `Magnitude`'s `Display` of a factor whose square roots multiply past `u128` (five primes near 2³² under one `√`) writes the prime powers; it panicked in debug and printed a wrong root in release.
 * A product or quotient of `Ratio`s (`Ratio · Ratio`, a `CQ15` squared) prints no unit, as `Ratio` does; it printed a stray ` ·`.
 * `Storage::from_f32` for `i64` refuses 2^63 (it returned `Some(i64::MAX)`: `i64::MAX as f32` rounds up to 2^63 and the

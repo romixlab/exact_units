@@ -210,7 +210,7 @@ impl Work {
     )]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "indices stay below self.len <= WORK, len below WORK before += 1 and at least 1 before -= 1; exponent sums fit i32 from add_int (±2, at most 64 times a prime for num and for den), mul (i8 + i8) and recip_of_primes, but from_parts_x2 can overflow with over 2^24 entries of one prime"
+        reason = "indices stay below self.len <= WORK, len below WORK before += 1 and at least 1 before -= 1; exponent sums fit i32 from add_int (±2, at most 64 times a prime for num and for den), mul (i8 + i8) and recip_of_primes (the sum of one prime's exponents is checked: from_parts_x2 takes any number of entries)"
     )]
     const fn add_prime(&mut self, prime: u64, exp2: i32) -> Result<(), MagnitudeError> {
         if prime == 2 {
@@ -236,7 +236,11 @@ impl Work {
             i += 1;
         }
         if i < self.len && self.primes[i] == prime {
-            self.exps[i] += exp2;
+            // from_parts_x2 takes any number of entries of one prime: their sum can pass i32
+            self.exps[i] = match self.exps[i].checked_add(exp2) {
+                Some(e) => e,
+                None => return Err(MagnitudeError::ExponentRange),
+            };
             if self.exps[i] == 0 {
                 // drop the slot
                 while i + 1 < self.len {
