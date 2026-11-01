@@ -61,7 +61,7 @@ impl Decibels {
     )]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "i < b.len(), the loop bound; b[i] is a digit, so b[i] - b'0' is 0..=9; num is built non-negative, so -num fits; digits counts bytes of s"
+        reason = "i < b.len(), the loop bound; b[i] is a digit, so b[i] - b'0' is 0..=9; num is built non-negative, so -num fits; digits counts bytes of s, an i32 that fits for any s below 2^31 bytes: past that it wraps, a known, accepted limit for a level (not a TODO)"
     )]
     pub const fn parse(s: &str) -> Decibels {
         let b = s.as_bytes();

@@ -60,7 +60,7 @@ impl Decimal {
     )]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "i < b.len(), the loop bounds; b[i] is a digit there, so b[i] - b'0' is 0..=9; e < 10_000 before e * 10 + 9; num is built non-negative, so -num fits; digits, edigits and exp move by one per byte of s (exp by up to 99_999 more for the e part), so they fit i32 for any s below 2^31 - 10^5 bytes"
+        reason = "i < b.len(), the loop bounds; b[i] is a digit there, so b[i] - b'0' is 0..=9; e < 10_000 before e * 10 + 9; num is built non-negative, so -num fits; digits, edigits and exp move by one per byte of s (exp by up to 99_999 more for the e part), so they fit i32 for any s below 2^31 - 10^5 bytes: past that they wrap, a known, accepted limit for a literal (not a TODO)"
     )]
     pub const fn parse(s: &str) -> Decimal {
         const FORM: &str = "a literal is a decimal number: 0.1, -3, 2.5e-3";

@@ -549,7 +549,7 @@ const fn gcd64(mut a: u64, mut b: u64) -> u64 {
 /// A factor of the odd composite `n` other than 1 and `n` (Pollard's rho with Brent's cycle finding).
 #[expect(
     clippy::arithmetic_side_effects,
-    reason = "mul_mod(..) < n, so + c overflows only for n > 2^64 - c, c the retry count: the composites without a factor below 2^16 nearest u64::MAX (2^64 - 39, - 113, ..) take c = 1, but no bound is proven"
+    reason = "mul_mod(..) < n, so + c overflows only for n > 2^64 - c, c the retry count; the composites without a factor below 2^16 nearest u64::MAX (2^64 - 39, - 113, ..) take c = 1. No bound on c is proven: a known, accepted limit (a retry count near 2^64 - n is far out of reach), not a TODO"
 )]
 const fn rho(n: u64) -> u64 {
     let mut c = 1;
