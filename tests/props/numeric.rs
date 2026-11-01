@@ -212,16 +212,17 @@ type PowerQ30<T> = Fixed<Times<Ratio, Ratio>, Product<Pow2<-15>, Pow2<-15>>, T>;
 /// for an integer `t`, `⌊Σ re / n⌋ ≥ t`; `false` for `n = 0`. Thresholds in `i32`, `u32` and `i64`.
 pub(crate) fn mean_at_least(products: &[(i16, i16, i16, i16)], t: i64, n: u32) {
     let mut acc = PowerMac::new();
-    let mut re = 0i128;
+    // at most 2³¹ a product: an i64 holds the sum of any slice a test makes
+    let mut re = 0i64;
     for &(a, b, c, d) in products {
         acc.mac_conj(
             Complex::<Ratio, Pow2<-15>, i16>::new(a, b),
             Complex::new(c, d),
         );
-        re += i128::from(a) * i128::from(c) + i128::from(b) * i128::from(d);
+        re += i64::from(a) * i64::from(c) + i64::from(b) * i64::from(d);
     }
     let n_usize = usize::try_from(n).unwrap_or(usize::MAX);
-    let want = |t: i128| n != 0 && re.div_euclid(i128::from(n)) >= t;
+    let want = |t: i128| n != 0 && i128::from(re.div_euclid(i64::from(n))) >= t;
     assert_eq!(
         acc.mean_at_least(PowerQ30::<i64>::new(t), n_usize),
         want(t.into()),
@@ -473,17 +474,12 @@ mod proofs {
         super::mac_part_16(kani::any(), kani::any(), kani::any(), kani::any());
     }
 
-    /// Two products of any i16, any threshold and count.
+    /// A product of any four i16, any i16 threshold, a count of up to 8. The 128-bit multiply and divide of a wider
+    /// threshold or count, or of two products, run past 40 minutes; the proptest covers those.
     #[kani::proof]
     fn mean_at_least() {
-        let p = [
-            (kani::any(), kani::any(), kani::any(), kani::any()),
-            (kani::any(), kani::any(), kani::any(), kani::any()),
-        ];
-        super::mean_at_least(
-            &p,
-            i64::from(kani::any::<i32>()),
-            u32::from(kani::any::<u8>()),
-        );
+        let p = [(kani::any(), kani::any(), kani::any(), kani::any())];
+        let n: u8 = kani::any_where(|n| *n <= 8);
+        super::mean_at_least(&p, i64::from(kani::any::<i16>()), u32::from(n));
     }
 }

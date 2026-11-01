@@ -15,7 +15,7 @@ test *flags:
     uv run --group dev pytest -q docs_ext
 
 # The Kani proofs in tests/props: the properties the proptests draw inputs for, proved for every input. Needs Kani
-# (`cargo install --locked kani-verifier && cargo kani setup`); takes minutes, so it isn't part of `just test`
+# (`cargo install --locked kani-verifier && cargo kani setup`); takes minutes, so it isn't part of `just test`. `serde`: the tests/serde.rs target requires it, and Kani refuses a target whose features are off
 verify:
     cargo kani --tests --features serde
 
