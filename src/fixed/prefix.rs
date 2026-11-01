@@ -18,10 +18,13 @@ use crate::{Magnitude, Prefix};
 pub trait FixedScale: Copy + Default + 'static {
     /// `10⁻⁶` for [Micro], `2¹⁰` for [Kibi], `1/65535` for `Rational<1, 65535>`.
     const SCALE: Magnitude;
+
     /// As written before a unit's symbol: `µ`, `Ki`; empty for [One] and for a scale that isn't a prefix.
     const SYMBOL: &'static str;
+
     /// The marker's name: `"Micro"`, `"Pow10"`.
     const NAME: &'static str;
+
     /// The run-time prefix of the same scale, `None` for a binary prefix and other factors.
     const RUNTIME: Option<Prefix>;
 }
@@ -108,29 +111,41 @@ pub struct FullScaleMax<V, const BITS: u8>(core::marker::PhantomData<V>);
 
 impl<const E: i8> FixedScale for Pow10<E> {
     const SCALE: Magnitude = Magnitude::pow10(E);
+
     const SYMBOL: &'static str = "";
+
     const NAME: &'static str = "Pow10";
+
     const RUNTIME: Option<Prefix> = None;
 }
 
 impl<const E: i8> FixedScale for Pow2<E> {
     const SCALE: Magnitude = Magnitude::pow2(E);
+
     const SYMBOL: &'static str = "";
+
     const NAME: &'static str = "Pow2";
+
     const RUNTIME: Option<Prefix> = None;
 }
 
 impl<V: FixedScale, const BITS: u8> FixedScale for FullScale<V, BITS> {
     const SCALE: Magnitude = V::SCALE.div(Magnitude::pow2(bits(BITS)));
+
     const SYMBOL: &'static str = "";
+
     const NAME: &'static str = "FullScale";
+
     const RUNTIME: Option<Prefix> = None;
 }
 
 impl<V: FixedScale, const BITS: u8> FixedScale for FullScaleMax<V, BITS> {
     const SCALE: Magnitude = V::SCALE.div(Magnitude::ratio(max_code(BITS), 1));
+
     const SYMBOL: &'static str = "";
+
     const NAME: &'static str = "FullScaleMax";
+
     const RUNTIME: Option<Prefix> = None;
 }
 
@@ -179,22 +194,31 @@ const fn runtime_of(m: Magnitude) -> Option<Prefix> {
 
 impl<A: FixedScale, B: FixedScale> FixedScale for Product<A, B> {
     const SCALE: Magnitude = A::SCALE.mul(B::SCALE);
+
     const SYMBOL: &'static str = "";
+
     const NAME: &'static str = "Product";
+
     const RUNTIME: Option<Prefix> = runtime_of(Self::SCALE);
 }
 
 impl<A: FixedScale, B: FixedScale> FixedScale for Quotient<A, B> {
     const SCALE: Magnitude = A::SCALE.div(B::SCALE);
+
     const SYMBOL: &'static str = "";
+
     const NAME: &'static str = "Quotient";
+
     const RUNTIME: Option<Prefix> = runtime_of(Self::SCALE);
 }
 
 impl<const NUM: u64, const DEN: u64> FixedScale for Rational<NUM, DEN> {
     const SCALE: Magnitude = Magnitude::ratio(NUM, DEN);
+
     const SYMBOL: &'static str = "";
+
     const NAME: &'static str = "Rational";
+
     const RUNTIME: Option<Prefix> = None;
 }
 

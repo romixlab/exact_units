@@ -1256,5 +1256,6 @@ fn write_exp_x2(f: &mut core::fmt::Formatter<'_>, e2: i32) -> core::fmt::Result 
 }
 
 mod approx;
+
 #[cfg(test)]
 mod tests;

@@ -763,6 +763,7 @@ mod series_store {
         reason = "a const item: From is not const on stable"
     )]
     const FAMILY_CODE: u16 = (Prefix::ALL.len() as u16) << 8;
+
     /// The code of any `Unknown`, above every other: its high byte is no discriminant of this version.
     const UNKNOWN_CODE: u16 = u16::MAX;
 

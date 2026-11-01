@@ -133,10 +133,15 @@ mod angle {
                 type Unit = $unit;
                 type Reference = UnitZero;
                 type Modulus = Modulo<$turn>;
+
                 const OFFSET: Offset = Offset::ZERO;
+
                 const NAME: &'static str = "Angle";
+
                 const SYMBOL: &'static str = $symbol;
+
                 const STEP: Magnitude = Magnitude::ONE;
+
                 const SHOWN: Offset = Offset::ZERO;
             }
         )*};

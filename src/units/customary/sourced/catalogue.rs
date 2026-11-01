@@ -24,52 +24,74 @@ const ANGLE: Dim = dim(0, 0, 0, 0, 1);
 // The defining relations.
 /// 1959: 1 yd = 0.9144 m.
 pub(super) const YD: Mag = Mag::dec(9144, -4);
+
 pub(super) const FT: Mag = YD.over(3);
 pub(super) const IN: Mag = YD.over(36);
 pub(super) const MI: Mag = FT.times(5280);
 pub(super) const THOU: Mag = IN.mul(Mag::dec(1, -3));
+
 /// 1959 (and 1893 before it): the US survey foot, 1200/3937 m.
 pub(super) const SFT: Mag = Mag::ratio(1200, 3937);
+
 /// 1959: 1 lb = 0.45359237 kg.
 pub(super) const LB: Mag = Mag::dec(45359237, -8);
+
 pub(super) const GR: Mag = LB.over(7000);
 pub(super) const OZ: Mag = LB.over(16);
 pub(super) const OZ_T: Mag = GR.times(480);
+
 /// 3rd CGPM 1901: g_n = 980.665 cm/s².
 pub(super) const GN: Mag = Mag::dec(980665, -5);
+
 pub(super) const LBF: Mag = LB.mul(GN);
+
 /// lb · ft/s²
 pub(super) const PDL: Mag = LB.mul(FT);
+
 pub(super) const IN2: Mag = IN.powi(2);
 pub(super) const FT2: Mag = FT.powi(2);
 pub(super) const YD2: Mag = YD.powi(2);
 pub(super) const IN3: Mag = IN.powi(3);
 pub(super) const FT3: Mag = FT.powi(3);
 pub(super) const SFT2: Mag = SFT.powi(2);
+
 /// HB 44: 1 gal = 231 in³.
 pub(super) const GAL_US: Mag = IN3.times(231);
+
 pub(super) const PT_US: Mag = GAL_US.over(8);
 pub(super) const FLOZ_US: Mag = PT_US.over(16);
+
 /// HB 44: 1 bu = 2150.42 in³.
 pub(super) const BU_US: Mag = IN3.mul(Mag::dec(215042, -2));
+
 /// WMA 1985: 1 gallon = 4.54609 dm³.
 pub(super) const GAL_IMP: Mag = Mag::dec(454609, -8);
+
 pub(super) const PT_IMP: Mag = GAL_IMP.over(8);
 pub(super) const FLOZ_IMP: Mag = PT_IMP.over(20);
+
 /// 1 mL
 pub(super) const ML: Mag = Mag::dec(1, -6);
+
 /// 5th International Conference on the Properties of Steam, 1956: cal_IT = 4.1868 J.
 pub(super) const CAL_IT: Mag = Mag::dec(41868, -4);
+
 pub(super) const CAL_TH: Mag = Mag::dec(4184, -3);
+
 /// 1 °F (interval) = 5/9 K.
 pub(super) const DEG_F: Mag = Mag::ratio(5, 9);
+
 /// cal/(g·°C) · lb · °F: the heat for one pound of water by one degree Fahrenheit.
 pub(super) const BTU_IT: Mag = CAL_IT.times(1000).mul(LB).mul(DEG_F);
+
 pub(super) const BTU_TH: Mag = CAL_TH.times(1000).mul(LB).mul(DEG_F);
+
 /// Conventional mercury density, 13 595.1 kg/m³ (ISO 80000-4, not fetched).
 pub(super) const HG: Mag = Mag::dec(135951, -1);
+
 /// Conventional water density, 1000 kg/m³ (SP 811 B.8 prints mmH2O conventional = 9.80665 Pa, bold).
 pub(super) const WATER: Mag = Mag::int(1000);
+
 pub(super) const HOUR: Mag = Mag::int(3600);
 pub(super) const HP_MECH: Mag = FT.mul(LBF).times(550);
 pub(super) const DEG: Mag = Mag::PI.over(180);

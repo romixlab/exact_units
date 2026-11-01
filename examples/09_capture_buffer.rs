@@ -33,6 +33,7 @@ exact_units::unit! {
 }
 
 type Rate = Fixed<Per<Sample, Second>, One, u32>;
+
 type Samples = Fixed<Sample, One, u32>;
 
 fn main() {

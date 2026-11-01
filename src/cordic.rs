@@ -95,6 +95,7 @@ const ATAN_T48: [i64; 47] = [
 /// Iterations of the 16-bit forms: the angle left after them is below atan(2⁻²³), 0.0013 of a step of 2⁻¹⁶ turn.
 #[cfg(feature = "angle")]
 const N16: usize = 24;
+
 /// Iterations of the 32-bit forms: the angle left is below atan(2⁻³⁹), 0.0013 of a step of 2⁻³² turn.
 #[cfg(feature = "angle")]
 const N32: usize = 40;
@@ -128,6 +129,7 @@ const ATAN_T32: [i32; N16] = {
 /// rotation of [sin_cos_16] starts, so it ends on the unit circle.
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
 const K16_Q30: i32 = 0x26dd_3b6a;
+
 /// The same for [N32] steps in Q60, for [sin_cos_32].
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
 const K32_Q60: i64 = 0x09b7_4eda_8435_e5a6;
@@ -135,6 +137,7 @@ const K32_Q60: i64 = 0x09b7_4eda_8435_e5a6;
 /// A quarter turn in steps of 2⁻³² and 2⁻⁴⁸ turn.
 #[cfg(feature = "angle")]
 const QUARTER_T32: u32 = 1 << 30;
+
 #[cfg(feature = "angle")]
 const QUARTER_T48: u64 = 1 << 46;
 

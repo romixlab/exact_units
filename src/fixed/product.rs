@@ -185,6 +185,7 @@ macro_rules! policy {
             for Fixed<U1, P1, T, $b>
         {
             type Output = Fixed<Times<U1, U2>, Product<P1, P2>, T, $b>;
+
             #[inline(always)]
             fn mul(self, rhs: Fixed<U2, P2, T, $b>) -> Self::Output {
                 const { check::<U1, U2, P1, P2>(false) };
@@ -197,6 +198,7 @@ macro_rules! policy {
             for Fixed<U1, P1, T, $b>
         {
             type Output = Fixed<Per<U1, U2>, Quotient<P1, P2>, T, $b>;
+
             #[inline(always)]
             fn div(self, rhs: Fixed<U2, P2, T, $b>) -> Self::Output {
                 const { check::<U1, U2, P1, P2>(true) };

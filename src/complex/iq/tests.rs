@@ -66,6 +66,7 @@ const CORNERS_16: [i16; 9] = [
     i16::MAX - 1,
     i16::MAX,
 ];
+
 const CORNERS_32: [i32; 9] = [
     i32::MIN,
     i32::MIN + 1,

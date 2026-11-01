@@ -29,10 +29,13 @@ use exact_units::{Fixed, Point, Rounding};
 
 /// What the sensor reports: 0.01 °C.
 type Sensor = Point<Celsius, Fixed<Kelvin, Centi, i32>>;
+
 /// What the US display takes: 0.1 °F, a step of 1/18 K.
 type DisplayF = Point<Fahrenheit, Fixed<Kelvin, Rational<1, 18>, i32>>;
+
 /// The controller's own grid, 1/900 K: both 0.01 °C and 0.1 °F are whole numbers of it, so both convert exactly.
 type Grid = Point<Celsius, Fixed<Kelvin, Rational<1, 900>, i32>>;
+
 type GridStep = Fixed<Kelvin, Rational<1, 900>, i32>;
 
 fn main() {

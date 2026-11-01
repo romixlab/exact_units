@@ -90,12 +90,15 @@ pub trait ComplexStorage: Storage {
     /// `-self`, panicking on overflow (`MIN`) in debug builds as the operator does.
     #[must_use]
     fn neg(self) -> Self;
+
     /// `-self`, `MIN` for `MIN`.
     #[must_use]
     fn wrapping_neg(self) -> Self;
+
     /// `-self`, `MAX` for `MIN`.
     #[must_use]
     fn saturating_neg(self) -> Self;
+
     /// `-self`, `None` for `MIN`.
     fn checked_neg(self) -> Option<Self>;
 }
@@ -109,8 +112,11 @@ macro_rules! complex_int {
                 reason = "-MIN panics in debug and wraps in release, as `T`'s `-` does; documented on the trait"
             )]
             fn neg(self) -> Self { -self }
+
             #[inline(always)] fn wrapping_neg(self) -> Self { $ty::wrapping_neg(self) }
+
             #[inline(always)] fn saturating_neg(self) -> Self { $ty::saturating_neg(self) }
+
             #[inline(always)] fn checked_neg(self) -> Option<Self> { $ty::checked_neg(self) }
         }
     )*};
@@ -122,8 +128,11 @@ macro_rules! complex_float {
     ($($ty:ident)*) => {$(
         impl ComplexStorage for $ty {
             #[inline(always)] fn neg(self) -> Self { -self }
+
             #[inline(always)] fn wrapping_neg(self) -> Self { -self }
+
             #[inline(always)] fn saturating_neg(self) -> Self { -self }
+
             #[inline(always)] fn checked_neg(self) -> Option<Self> { Some(-self) }
         }
     )*};
@@ -137,6 +146,7 @@ complex_float!(f32 f64);
 pub trait NormStorage: ComplexStorage {
     /// The type |z|² is stored as.
     type Norm: Storage;
+
     /// `re² + im²`, exact for integers.
     fn norm_sqr(re: Self, im: Self) -> Self::Norm;
 }
@@ -145,6 +155,7 @@ macro_rules! norm_int {
     ($($ty:ident $wide:ident)*) => {$(
         impl NormStorage for $ty {
             type Norm = $wide;
+
             #[inline(always)]
             #[expect(
                 clippy::arithmetic_side_effects,
@@ -162,6 +173,7 @@ norm_int!(i8 u16 i16 u32 i32 u64);
 
 impl NormStorage for f32 {
     type Norm = f32;
+
     #[inline(always)]
     fn norm_sqr(re: f32, im: f32) -> f32 {
         re * re + im * im
@@ -170,6 +182,7 @@ impl NormStorage for f32 {
 
 impl NormStorage for f64 {
     type Norm = f64;
+
     #[inline(always)]
     fn norm_sqr(re: f64, im: f64) -> f64 {
         re * re + im * im
@@ -295,9 +308,13 @@ impl<U, P, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T, B> {
 /// The operations whose overflow follows `B`, one impl per policy.
 trait Policy<T: ComplexStorage> {
     fn add(a: T, b: T) -> T;
+
     fn sub(a: T, b: T) -> T;
+
     fn mul(a: T, b: T) -> T;
+
     fn div(a: T, b: T) -> T;
+
     fn neg(a: T) -> T;
 }
 
@@ -305,9 +322,13 @@ macro_rules! policy {
     ($($b:ident $add:ident $sub:ident $mul:ident $div:ident $neg:ident;)*) => {$(
         impl<T: ComplexStorage> Policy<T> for $b {
             #[inline(always)] fn add(a: T, b: T) -> T { a.$add(b) }
+
             #[inline(always)] fn sub(a: T, b: T) -> T { a.$sub(b) }
+
             #[inline(always)] fn mul(a: T, b: T) -> T { a.$mul(b) }
+
             #[inline(always)] fn div(a: T, b: T) -> T { a.$div(b) }
+
             #[inline(always)] fn neg(a: T) -> T { ComplexStorage::$neg(a) }
         }
     )*};
@@ -593,6 +614,7 @@ mod arith {
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Add for Complex<U, P, T, B> {
         type Output = Self;
+
         #[inline(always)]
         fn add(self, rhs: Self) -> Self {
             Self::of(B::add(self.re, rhs.re), B::add(self.im, rhs.im))
@@ -601,6 +623,7 @@ mod arith {
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Sub for Complex<U, P, T, B> {
         type Output = Self;
+
         #[inline(always)]
         fn sub(self, rhs: Self) -> Self {
             Self::of(B::sub(self.re, rhs.re), B::sub(self.im, rhs.im))
@@ -609,6 +632,7 @@ mod arith {
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Neg for Complex<U, P, T, B> {
         type Output = Self;
+
         #[inline(always)]
         fn neg(self) -> Self {
             Self::of(B::neg(self.re), B::neg(self.im))
@@ -617,6 +641,7 @@ mod arith {
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Mul<T> for Complex<U, P, T, B> {
         type Output = Self;
+
         #[inline(always)]
         fn mul(self, n: T) -> Self {
             Self::of(B::mul(self.re, n), B::mul(self.im, n))
@@ -626,6 +651,7 @@ mod arith {
     /// Division by 0 panics as for `T`.
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Div<T> for Complex<U, P, T, B> {
         type Output = Self;
+
         #[inline(always)]
         fn div(self, n: T) -> Self {
             Self::of(B::div(self.re, n), B::div(self.im, n))
@@ -694,6 +720,7 @@ mod arith {
         B: Unlimited<T> + Policy<T>,
     {
         type Output = Complex<Times<U, U2>, Product<P, P2>, T, B>;
+
         #[inline(always)]
         fn mul(self, rhs: Fixed<U2, P2, T, B>) -> Self::Output {
             const { check_product::<U, U2, P, P2>(false) };
@@ -710,6 +737,7 @@ mod arith {
         B: Unlimited<T> + Policy<T>,
     {
         type Output = Complex<Per<U, U2>, Quotient<P, P2>, T, B>;
+
         #[inline(always)]
         fn div(self, rhs: Fixed<U2, P2, T, B>) -> Self::Output {
             const { check_product::<U, U2, P, P2>(true) };
@@ -725,6 +753,7 @@ mod arith {
         B: Unlimited<T> + Policy<T>,
     {
         type Output = Complex<Times<U, U2>, Product<P, P2>, T, B>;
+
         #[inline(always)]
         fn mul(self, rhs: Complex<U2, P2, T, B>) -> Self::Output {
             const { check_product::<U, U2, P, P2>(false) };
@@ -744,6 +773,7 @@ mod arith {
                 for Complex<U, P, $ty>
             {
                 type Output = Complex<Per<U, U2>, Quotient<P, P2>, $ty>;
+
                 #[inline(always)]
                 fn div(self, rhs: Complex<U2, P2, $ty>) -> Self::Output {
                     const { check_product::<U, U2, P, P2>(true) };
@@ -808,6 +838,7 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage + defmt::Format, B: Unlimited<T>>
 }
 
 mod iq;
+
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
 pub use iq::Nco;
 #[cfg(feature = "dimensionless")]

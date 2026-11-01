@@ -20,6 +20,7 @@ struct Wide {
     reason = "a const item: From is not const on stable"
 )]
 const LOW: u128 = u64::MAX as u128;
+
 const TOP: u128 = 1 << 127;
 
 /// The 256-bit product `a · b` as `(high, low)` halves.
@@ -42,15 +43,18 @@ const fn mul_256(a: u128, b: u128) -> (u128, u128) {
 
 impl Wide {
     const ONE: Wide = Wide { m: TOP, e: -127 };
+
     /// π, ln 2 and ln 10 rounded to 128 bits.
     const PI: Wide = Wide {
         m: 0xc90fdaa22168c234c4c6628b80dc1cd1,
         e: -126,
     };
+
     const LN2: Wide = Wide {
         m: 0xb17217f7d1cf79abc9e3b39803f2f6af,
         e: -128,
     };
+
     const LN10: Wide = Wide {
         m: 0x935d8dddaaa8ac16ea56d62b82d30a29,
         e: -126,

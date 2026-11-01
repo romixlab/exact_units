@@ -38,6 +38,7 @@ const fn checked(v: Option<u128>) -> u128 {
 
 impl Mag {
     pub(crate) const ONE: Mag = Mag::int(1);
+
     pub(crate) const PI: Mag = Mag {
         num: 1,
         den: 1,

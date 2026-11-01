@@ -20,24 +20,32 @@ pub enum Repr {
 pub trait Storage: Copy + PartialOrd + 'static {
     /// The type's name: `"u32"`, `"UNib32"`.
     const NAME: &'static str;
+
     /// `f32` and `f64`.
     const IS_FLOAT: bool;
+
     /// 0.
     const ZERO: Self;
+
     /// Width in bits: what [Fixed::to](super::Fixed::to) picks its widened multiply by (64-bit up to 32 bits, else
     /// 128-bit).
     const BITS: u32;
+
     /// The smallest and largest value as integers (0 for floats).
     const MIN_INT: i128;
+
     /// See [MIN_INT](Self::MIN_INT).
     const MAX_INT: i128;
 
     /// The value as an exact integer or a float.
     fn to_repr(self) -> Repr;
+
     /// `x` if it fits; a float storage takes the nearest float.
     fn from_int(x: i128) -> Option<Self>;
+
     /// `x` if it is a whole number that fits (an integer storage), or `x` rounded to the storage (a float one).
     fn from_float(x: f64) -> Option<Self>;
+
     /// The value as an `f32`, without an `f64` on the way where the type has its own conversion (integers and `f32`):
     /// rounded for integers of more than 24 bits.
     #[inline(always)]
@@ -53,71 +61,93 @@ pub trait Storage: Copy + PartialOrd + 'static {
             Repr::Float(x) => x as f32,
         }
     }
+
     /// [from_float](Self::from_float) for an `f32`.
     #[inline(always)]
     #[must_use]
     fn from_f32(x: f32) -> Option<Self> {
         Self::from_float(f64::from(x))
     }
+
     /// The value as an `i64`: exact for integers of up to 32 bits (the widened multiply of [Fixed::to](super::Fixed::to)),
     /// truncated for floats.
     fn to_i64(self) -> i64;
+
     /// `x` if it fits.
     fn from_i64(x: i64) -> Option<Self>;
+
     /// `self / d` in the type's own width when that is exact (`None` when `d` doesn't divide it); `self` for floats.
     /// Panics for a zero `d` (integers), as integer division does.
     fn div_whole(self, d: u128) -> Option<Self>;
+
     /// `self / d` in the type's own width, rounded by `r`; `self` for floats. Panics for a zero `d` (integers), as
     /// integer division does, in every build.
     #[must_use]
     fn div_rounded(self, d: u128, r: Rounding) -> Self;
+
     /// The low bits of `x` that fit (Rust's `as`, two's complement; `Nibble` the low 4); the nearest float for
     /// floats.
     fn from_int_wrapping(x: i128) -> Self;
+
     /// The number as stored: integers exactly, `f32` as `f32`.
     fn fmt_number(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
     /// `self + rhs`, `None` on overflow.
     fn checked_add(self, rhs: Self) -> Option<Self>;
+
     /// `self - rhs`, `None` on overflow.
     fn checked_sub(self, rhs: Self) -> Option<Self>;
+
     /// `self · rhs`, `None` on overflow.
     fn checked_mul(self, rhs: Self) -> Option<Self>;
+
     /// `self / rhs`, `None` on overflow and for a zero `rhs` (integers).
     fn checked_div(self, rhs: Self) -> Option<Self>;
+
     /// `self + rhs`, wrapping on overflow.
     #[must_use]
     fn wrapping_add(self, rhs: Self) -> Self;
+
     /// `self - rhs`, wrapping on overflow.
     #[must_use]
     fn wrapping_sub(self, rhs: Self) -> Self;
+
     /// `self · rhs`, wrapping on overflow.
     #[must_use]
     fn wrapping_mul(self, rhs: Self) -> Self;
+
     /// `self / rhs`, wrapping on overflow (`MIN / -1`); panics for a zero `rhs` (integers).
     #[must_use]
     fn wrapping_div(self, rhs: Self) -> Self;
+
     /// `self + rhs`, saturating at the type's ends.
     #[must_use]
     fn saturating_add(self, rhs: Self) -> Self;
+
     /// `self - rhs`, saturating at the type's ends.
     #[must_use]
     fn saturating_sub(self, rhs: Self) -> Self;
+
     /// `self · rhs`, saturating at the type's ends.
     #[must_use]
     fn saturating_mul(self, rhs: Self) -> Self;
+
     /// `self / rhs`, saturating at the type's ends; panics for a zero `rhs` (integers).
     #[must_use]
     fn saturating_div(self, rhs: Self) -> Self;
+
     /// `+` as the type's own operator: panics on overflow in debug builds.
     #[must_use]
     fn add(self, rhs: Self) -> Self;
+
     /// `-` as the type's own operator: panics on overflow in debug builds.
     #[must_use]
     fn sub(self, rhs: Self) -> Self;
+
     /// `*` as the type's own operator: panics on overflow in debug builds.
     #[must_use]
     fn mul(self, rhs: Self) -> Self;
+
     /// `/` as the type's own operator: panics for a zero `rhs` (integers) and on overflow in debug builds.
     #[must_use]
     fn div(self, rhs: Self) -> Self;
@@ -127,6 +157,7 @@ pub trait Storage: Copy + PartialOrd + 'static {
 pub trait UnsignedStorage: Storage {
     /// The value as a `u64`, exactly.
     fn to_u64(self) -> u64;
+
     /// `x` if it fits.
     fn from_u64(x: u64) -> Option<Self>;
 }
@@ -200,15 +231,22 @@ macro_rules! int {
         )]
         impl Storage for $ty {
             const NAME: &'static str = stringify!($ty);
+
             const IS_FLOAT: bool = false;
+
             const ZERO: Self = 0;
+
             const BITS: u32 = $ty::BITS;
+
             const MIN_INT: i128 = $ty::MIN as i128;
+
             const MAX_INT: i128 = $ty::MAX as i128;
+
             #[inline(always)]
             fn to_repr(self) -> Repr {
                 Repr::Int(i128::from(self))
             }
+
             #[inline(always)]
             #[allow(
                 clippy::cast_lossless,
@@ -218,10 +256,12 @@ macro_rules! int {
             fn to_i64(self) -> i64 {
                 self as i64
             }
+
             #[inline(always)]
             fn from_i64(x: i64) -> Option<Self> {
                 $ty::try_from(x).ok()
             }
+
             #[inline(always)]
             #[allow(
                 clippy::cast_lossless,
@@ -244,6 +284,7 @@ macro_rules! int {
                     (self % d == 0).then(|| self / d)
                 }
             }
+
             #[inline(always)]
             #[allow(
                 clippy::cast_lossless,
@@ -263,6 +304,7 @@ macro_rules! int {
                     rounding::$div(self, d as $ty, r)
                 }
             }
+
             #[inline(always)]
             #[allow(
                 clippy::cast_possible_truncation,
@@ -272,10 +314,12 @@ macro_rules! int {
             fn from_int_wrapping(x: i128) -> Self {
                 x as $ty
             }
+
             #[inline]
             fn from_int(x: i128) -> Option<Self> {
                 $ty::try_from(x).ok()
             }
+
             #[inline]
             #[allow(
                 clippy::cast_possible_truncation,
@@ -285,6 +329,7 @@ macro_rules! int {
             fn from_float(x: f64) -> Option<Self> {
                 Some(whole(x, Self::MIN_INT, Self::MAX_INT)? as $ty)
             }
+
             #[inline(always)]
             #[allow(
                 clippy::cast_lossless,
@@ -294,6 +339,7 @@ macro_rules! int {
             fn to_f32(self) -> f32 {
                 self as f32
             }
+
             #[inline]
             #[allow(
                 clippy::cast_possible_truncation,
@@ -303,39 +349,56 @@ macro_rules! int {
             fn from_f32(x: f32) -> Option<Self> {
                 Some(whole_f32(x, Self::MIN_INT, Self::MAX_INT)? as $ty)
             }
+
             fn fmt_number(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 fmt::Display::fmt(self, f)
             }
+
             #[inline(always)] fn checked_add(self, rhs: Self) -> Option<Self> { $ty::checked_add(self, rhs) }
+
             #[inline(always)] fn checked_sub(self, rhs: Self) -> Option<Self> { $ty::checked_sub(self, rhs) }
+
             #[inline(always)] fn checked_mul(self, rhs: Self) -> Option<Self> { $ty::checked_mul(self, rhs) }
+
             #[inline(always)] fn checked_div(self, rhs: Self) -> Option<Self> { $ty::checked_div(self, rhs) }
+
             #[inline(always)] fn wrapping_add(self, rhs: Self) -> Self { $ty::wrapping_add(self, rhs) }
+
             #[inline(always)] fn wrapping_sub(self, rhs: Self) -> Self { $ty::wrapping_sub(self, rhs) }
+
             #[inline(always)] fn wrapping_mul(self, rhs: Self) -> Self { $ty::wrapping_mul(self, rhs) }
+
             #[inline(always)] fn wrapping_div(self, rhs: Self) -> Self { $ty::wrapping_div(self, rhs) }
+
             #[inline(always)] fn saturating_add(self, rhs: Self) -> Self { $ty::saturating_add(self, rhs) }
+
             #[inline(always)] fn saturating_sub(self, rhs: Self) -> Self { $ty::saturating_sub(self, rhs) }
+
             #[inline(always)] fn saturating_mul(self, rhs: Self) -> Self { $ty::saturating_mul(self, rhs) }
+
             #[inline(always)] fn saturating_div(self, rhs: Self) -> Self { $ty::saturating_div(self, rhs) }
+
             #[expect(
                 clippy::arithmetic_side_effects,
                 reason = "the type's own operator, as Storage documents: overflow panics in debug builds and wraps \
                           in release"
             )]
             #[inline(always)] fn add(self, rhs: Self) -> Self { self + rhs }
+
             #[expect(
                 clippy::arithmetic_side_effects,
                 reason = "the type's own operator, as Storage documents: overflow panics in debug builds and wraps \
                           in release"
             )]
             #[inline(always)] fn sub(self, rhs: Self) -> Self { self - rhs }
+
             #[expect(
                 clippy::arithmetic_side_effects,
                 reason = "the type's own operator, as Storage documents: overflow panics in debug builds and wraps \
                           in release"
             )]
             #[inline(always)] fn mul(self, rhs: Self) -> Self { self * rhs }
+
             #[expect(
                 clippy::arithmetic_side_effects,
                 reason = "the type's own operator, as Storage documents: panics for a zero rhs, and MIN / -1 panics in \
@@ -355,6 +418,7 @@ macro_rules! unsigned {
             fn to_u64(self) -> u64 {
                 u64::from(self)
             }
+
             #[inline(always)]
             fn from_u64(x: u64) -> Option<Self> {
                 $ty::try_from(x).ok()
@@ -380,15 +444,22 @@ macro_rules! newtype {
         )]
         impl Storage for $ty {
             const NAME: &'static str = stringify!($ty);
+
             const IS_FLOAT: bool = false;
+
             const ZERO: Self = $ty(0);
+
             const BITS: u32 = $inner::BITS;
+
             const MIN_INT: i128 = 0;
+
             const MAX_INT: i128 = $inner::MAX as i128;
+
             #[inline(always)]
             fn to_repr(self) -> Repr {
                 Repr::Int(i128::from(self.0))
             }
+
             #[inline(always)]
             #[allow(
                 clippy::cast_lossless,
@@ -398,18 +469,22 @@ macro_rules! newtype {
             fn to_i64(self) -> i64 {
                 self.0 as i64
             }
+
             #[inline(always)]
             fn from_i64(x: i64) -> Option<Self> {
                 $inner::try_from(x).ok().map($ty)
             }
+
             #[inline(always)]
             fn div_whole(self, d: u128) -> Option<Self> {
                 Storage::div_whole(self.0, d).map($ty)
             }
+
             #[inline(always)]
             fn div_rounded(self, d: u128, r: Rounding) -> Self {
                 $ty(Storage::div_rounded(self.0, d, r))
             }
+
             #[inline(always)]
             #[expect(
                 clippy::cast_possible_truncation,
@@ -419,55 +494,74 @@ macro_rules! newtype {
             fn from_int_wrapping(x: i128) -> Self {
                 $ty(x as $inner)
             }
+
             #[inline]
             fn from_int(x: i128) -> Option<Self> {
                 $inner::from_int(x).map($ty)
             }
+
             #[inline]
             fn from_float(x: f64) -> Option<Self> {
                 $inner::from_float(x).map($ty)
             }
+
             fn fmt_number(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 fmt::Display::fmt(&self.0, f)
             }
+
             #[inline(always)] fn checked_add(self, rhs: Self) -> Option<Self> { self.0.checked_add(rhs.0).map($ty) }
+
             #[inline(always)] fn checked_sub(self, rhs: Self) -> Option<Self> { self.0.checked_sub(rhs.0).map($ty) }
+
             #[inline(always)] fn checked_mul(self, rhs: Self) -> Option<Self> { self.0.checked_mul(rhs.0).map($ty) }
+
             #[inline(always)] fn checked_div(self, rhs: Self) -> Option<Self> { self.0.checked_div(rhs.0).map($ty) }
+
             #[inline(always)] fn wrapping_add(self, rhs: Self) -> Self { $ty(self.0.wrapping_add(rhs.0)) }
+
             #[inline(always)] fn wrapping_sub(self, rhs: Self) -> Self { $ty(self.0.wrapping_sub(rhs.0)) }
+
             #[inline(always)] fn wrapping_mul(self, rhs: Self) -> Self { $ty(self.0.wrapping_mul(rhs.0)) }
+
             #[expect(
                 clippy::arithmetic_side_effects,
                 reason = "unsigned division, as Storage documents: panics for a zero rhs, never overflows"
             )]
             #[inline(always)] fn wrapping_div(self, rhs: Self) -> Self { $ty(self.0 / rhs.0) }
+
             #[inline(always)] fn saturating_add(self, rhs: Self) -> Self { $ty(self.0.saturating_add(rhs.0)) }
+
             #[inline(always)] fn saturating_sub(self, rhs: Self) -> Self { $ty(self.0.saturating_sub(rhs.0)) }
+
             #[inline(always)] fn saturating_mul(self, rhs: Self) -> Self { $ty(self.0.saturating_mul(rhs.0)) }
+
             #[expect(
                 clippy::arithmetic_side_effects,
                 reason = "unsigned division, as Storage documents: panics for a zero rhs, never overflows"
             )]
             #[inline(always)] fn saturating_div(self, rhs: Self) -> Self { $ty(self.0 / rhs.0) }
+
             #[expect(
                 clippy::arithmetic_side_effects,
                 reason = "the inner integer's own operator, as Storage documents: overflow panics in debug builds \
                           and wraps in release"
             )]
             #[inline(always)] fn add(self, rhs: Self) -> Self { $ty(self.0 + rhs.0) }
+
             #[expect(
                 clippy::arithmetic_side_effects,
                 reason = "the inner integer's own operator, as Storage documents: overflow panics in debug builds \
                           and wraps in release"
             )]
             #[inline(always)] fn sub(self, rhs: Self) -> Self { $ty(self.0 - rhs.0) }
+
             #[expect(
                 clippy::arithmetic_side_effects,
                 reason = "the inner integer's own operator, as Storage documents: overflow panics in debug builds \
                           and wraps in release"
             )]
             #[inline(always)] fn mul(self, rhs: Self) -> Self { $ty(self.0 * rhs.0) }
+
             #[expect(
                 clippy::arithmetic_side_effects,
                 reason = "unsigned division, as Storage documents: panics for a zero rhs, never overflows"
@@ -480,6 +574,7 @@ macro_rules! newtype {
             fn to_u64(self) -> u64 {
                 u64::from(self.0)
             }
+
             #[inline(always)]
             fn from_u64(x: u64) -> Option<Self> {
                 $inner::try_from(x).ok().map($ty)
@@ -495,47 +590,62 @@ newtype!(UNib32(u32) UVlq32(u32) UVlq64(u64));
 #[cfg(feature = "shrink_wrap")]
 impl Storage for Nibble {
     const NAME: &'static str = "Nibble";
+
     const IS_FLOAT: bool = false;
+
     const ZERO: Self = Nibble::zero();
+
     const BITS: u32 = 4;
+
     const MIN_INT: i128 = 0;
+
     const MAX_INT: i128 = 15;
+
     #[inline(always)]
     fn to_repr(self) -> Repr {
         Repr::Int(i128::from(self.value()))
     }
+
     #[inline(always)]
     fn to_i64(self) -> i64 {
         i64::from(self.value())
     }
+
     #[inline(always)]
     fn from_i64(x: i64) -> Option<Self> {
         Nibble::new(u8::try_from(x).ok()?)
     }
+
     #[inline(always)]
     fn div_whole(self, d: u128) -> Option<Self> {
         Nibble::new(Storage::div_whole(self.value(), d)?)
     }
+
     #[inline(always)]
     fn div_rounded(self, d: u128, r: Rounding) -> Self {
         Nibble::new_masked(Storage::div_rounded(self.value(), d, r))
     }
+
     #[inline(always)]
     fn from_int_wrapping(x: i128) -> Self {
         // the low 4 bits of x, two's complement: 0..=15 whatever its sign, a u8 always
         Nibble::new_masked(u8::try_from(x & 0xf).unwrap_or(0))
     }
+
     #[inline]
     fn from_int(x: i128) -> Option<Self> {
         Nibble::new(u8::try_from(x).ok()?)
     }
+
     #[inline]
     fn from_float(x: f64) -> Option<Self> {
         Nibble::new(u8::from_float(x)?)
     }
+
     fn fmt_number(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.value(), f)
     }
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -544,10 +654,12 @@ impl Storage for Nibble {
     fn checked_add(self, rhs: Self) -> Option<Self> {
         Nibble::new(self.value() + rhs.value())
     }
+
     #[inline(always)]
     fn checked_sub(self, rhs: Self) -> Option<Self> {
         Nibble::new(self.value().checked_sub(rhs.value())?)
     }
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -556,10 +668,12 @@ impl Storage for Nibble {
     fn checked_mul(self, rhs: Self) -> Option<Self> {
         Nibble::new(self.value() * rhs.value())
     }
+
     #[inline(always)]
     fn checked_div(self, rhs: Self) -> Option<Self> {
         Nibble::new(self.value().checked_div(rhs.value())?)
     }
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -568,10 +682,12 @@ impl Storage for Nibble {
     fn wrapping_add(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value() + rhs.value())
     }
+
     #[inline(always)]
     fn wrapping_sub(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value().wrapping_sub(rhs.value()))
     }
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -580,6 +696,7 @@ impl Storage for Nibble {
     fn wrapping_mul(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value() * rhs.value())
     }
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -588,6 +705,7 @@ impl Storage for Nibble {
     fn wrapping_div(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value() / rhs.value())
     }
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -596,10 +714,12 @@ impl Storage for Nibble {
     fn saturating_add(self, rhs: Self) -> Self {
         Nibble::new(self.value() + rhs.value()).unwrap_or(Nibble::max())
     }
+
     #[inline(always)]
     fn saturating_sub(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value().saturating_sub(rhs.value()))
     }
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -608,6 +728,7 @@ impl Storage for Nibble {
     fn saturating_mul(self, rhs: Self) -> Self {
         Nibble::new(self.value() * rhs.value()).unwrap_or(Nibble::max())
     }
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -616,6 +737,7 @@ impl Storage for Nibble {
     fn saturating_div(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value() / rhs.value())
     }
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -626,6 +748,7 @@ impl Storage for Nibble {
         debug_assert!(x <= 15, "attempt to add with overflow");
         Nibble::new_masked(x)
     }
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -634,6 +757,7 @@ impl Storage for Nibble {
     fn sub(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value() - rhs.value())
     }
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -644,6 +768,7 @@ impl Storage for Nibble {
         debug_assert!(x <= 15, "attempt to multiply with overflow");
         Nibble::new_masked(x)
     }
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -660,6 +785,7 @@ impl UnsignedStorage for Nibble {
     fn to_u64(self) -> u64 {
         u64::from(self.value())
     }
+
     #[inline(always)]
     fn from_u64(x: u64) -> Option<Self> {
         Nibble::new(u8::try_from(x).ok()?)
@@ -678,76 +804,108 @@ macro_rules! float {
         )]
         impl Storage for $ty {
             const NAME: &'static str = stringify!($ty);
+
             const IS_FLOAT: bool = true;
+
             const ZERO: Self = 0.0;
+
             #[expect(clippy::cast_possible_truncation, reason = "a float is 4 or 8 bytes")]
             const BITS: u32 = core::mem::size_of::<$ty>() as u32 * 8;
+
             const MIN_INT: i128 = 0;
+
             const MAX_INT: i128 = 0;
+
             #[inline(always)]
             fn to_repr(self) -> Repr {
                 Repr::Float(f64::from(self))
             }
+
             #[inline(always)]
             #[expect(clippy::cast_possible_truncation, reason = "truncated toward zero and saturating, as documented")]
             fn to_i64(self) -> i64 {
                 self as i64
             }
+
             #[inline(always)]
             #[expect(clippy::cast_precision_loss, reason = "the nearest float, a float storage's own rounding")]
             fn from_i64(x: i64) -> Option<Self> {
                 Some(x as $ty)
             }
+
             #[inline(always)]
             fn div_whole(self, _d: u128) -> Option<Self> {
                 Some(self)
             }
+
             #[inline(always)]
             fn div_rounded(self, _d: u128, _r: Rounding) -> Self {
                 self
             }
+
             #[inline(always)]
             #[expect(clippy::cast_precision_loss, reason = "the nearest float, as documented")]
             fn from_int_wrapping(x: i128) -> Self {
                 x as $ty
             }
+
             #[inline]
             #[expect(clippy::cast_precision_loss, reason = "the nearest float, as documented")]
             fn from_int(x: i128) -> Option<Self> {
                 Some(x as $ty)
             }
+
             #[inline]
             #[allow(clippy::cast_possible_truncation, reason = "x rounded to the storage, as documented")]
             fn from_float(x: f64) -> Option<Self> {
                 Some(x as $ty)
             }
+
             #[inline(always)]
             #[allow(clippy::cast_possible_truncation, reason = "the nearest f32, as documented")]
             fn to_f32(self) -> f32 {
                 self as f32
             }
+
             #[inline(always)]
             fn from_f32(x: f32) -> Option<Self> {
                 Some($ty::from(x))
             }
+
             fn fmt_number(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 fmt::Display::fmt(self, f)
             }
+
             #[inline(always)] fn checked_add(self, rhs: Self) -> Option<Self> { Some(self + rhs).filter(|x| x.is_finite()) }
+
             #[inline(always)] fn checked_sub(self, rhs: Self) -> Option<Self> { Some(self - rhs).filter(|x| x.is_finite()) }
+
             #[inline(always)] fn checked_mul(self, rhs: Self) -> Option<Self> { Some(self * rhs).filter(|x| x.is_finite()) }
+
             #[inline(always)] fn checked_div(self, rhs: Self) -> Option<Self> { Some(self / rhs).filter(|x| x.is_finite()) }
+
             #[inline(always)] fn wrapping_add(self, rhs: Self) -> Self { self + rhs }
+
             #[inline(always)] fn wrapping_sub(self, rhs: Self) -> Self { self - rhs }
+
             #[inline(always)] fn wrapping_mul(self, rhs: Self) -> Self { self * rhs }
+
             #[inline(always)] fn wrapping_div(self, rhs: Self) -> Self { self / rhs }
+
             #[inline(always)] fn saturating_add(self, rhs: Self) -> Self { self + rhs }
+
             #[inline(always)] fn saturating_sub(self, rhs: Self) -> Self { self - rhs }
+
             #[inline(always)] fn saturating_mul(self, rhs: Self) -> Self { self * rhs }
+
             #[inline(always)] fn saturating_div(self, rhs: Self) -> Self { self / rhs }
+
             #[inline(always)] fn add(self, rhs: Self) -> Self { self + rhs }
+
             #[inline(always)] fn sub(self, rhs: Self) -> Self { self - rhs }
+
             #[inline(always)] fn mul(self, rhs: Self) -> Self { self * rhs }
+
             #[inline(always)] fn div(self, rhs: Self) -> Self { self / rhs }
         }
     )*};

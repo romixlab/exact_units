@@ -30,12 +30,15 @@ use exact_units::{Fixed, Range, Rounding};
 
 /// The ADC's code: one step is 3.3 V / 4096, exactly (`FullScale` is the converter's step as a scale).
 type AdcCode = Fixed<Volt, FullScale<Rational<33, 10>, 12>, i32>;
+
 type MilliVolts = Fixed<Volt, Milli, i32>;
 type MilliAmps = Fixed<Ampere, Milli, i32>;
 
 const AMP_GAIN: i32 = 20;
+
 /// The shunt: 1 mΩ.
 const SHUNT: Fixed<Ohm, Milli, i32> = Fixed::new(1);
+
 /// The amplifier's output at zero current: half the ADC's range, so the current can be negative.
 const BIAS: MilliVolts = Fixed::new(1650);
 

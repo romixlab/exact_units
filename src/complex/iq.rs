@@ -28,7 +28,9 @@ pub type CQ31<U = Ratio> = Complex<U, Pow2<-31>, i32, Saturating>;
 
 mod sealed {
     pub trait Sealed {}
+
     impl Sealed for i16 {}
+
     impl Sealed for i32 {}
 }
 
@@ -37,16 +39,21 @@ mod sealed {
 pub trait IqStorage: ComplexStorage + sealed::Sealed {
     /// The Q format whose full scale is ±1: `Pow2<-15>` for `i16`, `Pow2<-31>` for `i32`.
     type Q: FixedScale;
+
     /// The accumulator: `i64` for `i16`, `i128` for `i32`.
     type Acc: Copy + Default + Eq + fmt::Debug;
+
     /// The number of complex products a [Mac] holds exactly, whatever their values: 2³² − 1 for `i16`, 2⁶⁴ − 1 for
     /// `i32` (see [Mac] for the proof).
     const HEADROOM: u64;
+
     /// `acc + (a·b ± c·d)`, exact in the widened type and added modulo 2^bits of the accumulator.
     #[doc(hidden)]
     fn mac(acc: Self::Acc, ab: (Self, Self), cd: (Self, Self), neg: bool) -> Self::Acc;
+
     #[doc(hidden)]
     fn acc_to_i128(acc: Self::Acc) -> i128;
+
     /// `(cos a, sin a)` in [Q](Self::Q), by [CORDIC](crate::cordic).
     #[cfg(all(feature = "angle", feature = "dimensionless"))]
     #[doc(hidden)]
@@ -56,11 +63,13 @@ pub trait IqStorage: ComplexStorage + sealed::Sealed {
 impl IqStorage for i16 {
     type Q = Pow2<-15>;
     type Acc = i64;
+
     #[expect(
         clippy::as_conversions,
         reason = "a const item: From is not const on stable"
     )]
     const HEADROOM: u64 = u32::MAX as u64;
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -71,10 +80,12 @@ impl IqStorage for i16 {
         let (ab, cd) = (i64::from(a) * i64::from(b), i64::from(c) * i64::from(d));
         acc.wrapping_add(if neg { ab - cd } else { ab + cd })
     }
+
     #[inline(always)]
     fn acc_to_i128(acc: i64) -> i128 {
         i128::from(acc)
     }
+
     #[cfg(all(feature = "angle", feature = "dimensionless"))]
     #[inline(always)]
     fn unit_phasor(a: Bam32) -> (i16, i16) {
@@ -86,7 +97,9 @@ impl IqStorage for i16 {
 impl IqStorage for i32 {
     type Q = Pow2<-31>;
     type Acc = i128;
+
     const HEADROOM: u64 = u64::MAX;
+
     #[inline(always)]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -100,10 +113,12 @@ impl IqStorage for i32 {
         );
         acc.wrapping_add(if neg { ab - cd } else { ab + cd })
     }
+
     #[inline(always)]
     fn acc_to_i128(acc: i128) -> i128 {
         acc
     }
+
     #[cfg(all(feature = "angle", feature = "dimensionless"))]
     #[inline(always)]
     fn unit_phasor(a: Bam32) -> (i32, i32) {
@@ -518,10 +533,12 @@ impl<U, P, T: ComplexStorage, B: Unlimited<T>> Clone for Interleaved<'_, U, P, T
 
 impl<U, P, T: ComplexStorage, B: Unlimited<T>> Iterator for Interleaved<'_, U, P, T, B> {
     type Item = Complex<U, P, T, B>;
+
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         self.pairs.next().map(|&[re, im]| Complex::of(re, im))
     }
+
     #[inline(always)]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.pairs.size_hint()

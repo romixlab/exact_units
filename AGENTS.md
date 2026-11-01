@@ -51,6 +51,8 @@ numbers), `saturating_*` for the `Saturating` bound, `checked_*` where the API r
 may add work on Cortex-M where the old operation could not overflow. Tests, test modules and examples carry one
 file-level `#![expect]` per lint clippy.toml can't exempt for tests.
 
+Items in an `impl` or `trait` block are separated by one blank line (associated types may be grouped together).
+
 ## Properties and proofs
 
 `tests/props` (one test crate, root `main.rs`) holds properties, each checked against an exact reference in

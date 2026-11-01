@@ -443,6 +443,7 @@ mod angle {
 
     #[derive(Copy, Clone, Default)]
     struct Index;
+
     impl crate::Reference for Index {
         const NAME: &'static str = "encoder index";
     }

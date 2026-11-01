@@ -98,21 +98,29 @@ pub trait Origin: Copy + Default + 'static {
     /// The unit of the points' numbers and of the offset: [Kelvin](crate::units::Kelvin) for every temperature
     /// scale, °F too (its numbers are in steps of 5/9 K).
     type Unit: Unit;
+
     /// What [OFFSET](Self::OFFSET) is measured from.
     type Reference: Reference;
+
     /// [Linear] or [Modulo].
     type Modulus: Modulus;
+
     /// Where the origin lies, from the reference's zero, in [Unit](Self::Unit): °C is 273.15 K.
     const OFFSET: Offset;
+
     /// The marker's name: `"Celsius"`.
     const NAME: &'static str;
+
     /// The symbol a point is shown with, after the number: `"°C"`.
     const SYMBOL: &'static str;
+
     /// The step that the shown number counts, in [Unit](Self::Unit): 1 for °C, 5/9 for °F.
     const STEP: Magnitude;
+
     /// Where the shown number's zero lies, from the reference's zero: the [OFFSET](Self::OFFSET) itself, or that of
     /// the scale it is read on (a register formula `raw / 256 + 25 °C` is shown in °C, from 273.15 K).
     const SHOWN: Offset;
+
     /// All of it as data, for introspection and the API model.
     const DEF: OriginDef = OriginDef {
         name: Self::NAME,
@@ -191,12 +199,19 @@ macro_rules! origin {
 
         impl $crate::Origin for $name {
             type Unit = $unit;
+
             type Reference = $crate::origin!(@or $($reference)? ; $crate::UnitZero);
+
             type Modulus = $crate::origin!(@or $($modulus)? ; $crate::Linear);
+
             const OFFSET: $crate::Offset = $offset;
+
             const NAME: &'static str = stringify!($name);
+
             const SYMBOL: &'static str = $symbol;
+
             const STEP: $crate::Magnitude = $crate::origin!(@or_expr $($step)? ; $crate::Magnitude::ONE);
+
             const SHOWN: $crate::Offset = $offset;
         }
     };
@@ -216,10 +231,15 @@ macro_rules! origin {
             type Unit = <$parent as $crate::Origin>::Unit;
             type Reference = <$parent as $crate::Origin>::Reference;
             type Modulus = <$parent as $crate::Origin>::Modulus;
+
             const OFFSET: $crate::Offset = <$parent as $crate::Origin>::OFFSET.add($offset);
+
             const NAME: &'static str = stringify!($name);
+
             const SYMBOL: &'static str = <$parent as $crate::Origin>::SYMBOL;
+
             const STEP: $crate::Magnitude = <$parent as $crate::Origin>::STEP;
+
             const SHOWN: $crate::Offset = <$parent as $crate::Origin>::SHOWN;
         }
     };
@@ -290,42 +310,54 @@ pub type PointDiff<O, P, T> =
 pub trait PointArith<P, T: Storage>: Modulus {
     /// The storage of point − point: `T` for [Linear], the signed type of the same width for [Modulo] (`u16` → `i16`).
     type Diff: Storage;
+
     /// The number of `p` moved by `v`: panics on overflow in debug builds for [Linear], like `T`'s `+`.
     fn add(p: T, v: T) -> T;
+
     /// [add](Self::add), `None` on overflow.
     fn checked_add(p: T, v: T) -> Option<T>;
+
     /// The number of `p` moved back by `v`.
     fn sub(p: T, v: T) -> T;
+
     /// [sub](Self::sub), `None` on overflow.
     fn checked_sub(p: T, v: T) -> Option<T>;
+
     /// The vector from `b` to `a`.
     fn diff(a: T, b: T) -> Self::Diff;
+
     /// [diff](Self::diff), `None` on overflow.
     fn checked_diff(a: T, b: T) -> Option<Self::Diff>;
 }
 
 impl<P, T: Storage> PointArith<P, T> for Linear {
     type Diff = T;
+
     #[inline(always)]
     fn add(p: T, v: T) -> T {
         p.add(v)
     }
+
     #[inline(always)]
     fn checked_add(p: T, v: T) -> Option<T> {
         p.checked_add(v)
     }
+
     #[inline(always)]
     fn sub(p: T, v: T) -> T {
         p.sub(v)
     }
+
     #[inline(always)]
     fn checked_sub(p: T, v: T) -> Option<T> {
         p.checked_sub(v)
     }
+
     #[inline(always)]
     fn diff(a: T, b: T) -> T {
         a.sub(b)
     }
+
     #[inline(always)]
     fn checked_diff(a: T, b: T) -> Option<T> {
         a.checked_sub(b)
@@ -387,10 +419,12 @@ macro_rules! modulo_int {
                     canonical::<$t, $wide>(p as $wide + v as $wide, m as $wide) as $t
                 }
             }
+
             #[inline(always)]
             fn checked_add(p: $t, v: $t) -> Option<$t> {
                 Some(<Self as PointArith<P, $t>>::add(p, v))
             }
+
             #[inline(always)]
             #[allow(
                 clippy::cast_possible_truncation,
@@ -407,10 +441,12 @@ macro_rules! modulo_int {
                     canonical::<$t, $wide>(p as $wide - v as $wide, m as $wide) as $t
                 }
             }
+
             #[inline(always)]
             fn checked_sub(p: $t, v: $t) -> Option<$t> {
                 Some(<Self as PointArith<P, $t>>::sub(p, v))
             }
+
             #[inline(always)]
             #[allow(
                 clippy::cast_possible_truncation,
@@ -432,6 +468,7 @@ macro_rules! modulo_int {
                     (if d >= m - m / 2 { d - m } else { d }) as $signed
                 }
             }
+
             #[inline(always)]
             fn checked_diff(a: $t, b: $t) -> Option<$signed> {
                 Some(<Self as PointArith<P, $t>>::diff(a, b))
@@ -476,6 +513,7 @@ macro_rules! wide {
             fn rem_euclid(self, m: Self) -> Self {
                 <$t>::rem_euclid(self, m)
             }
+
             #[inline(always)]
             #[expect(
                 clippy::arithmetic_side_effects,
@@ -484,6 +522,7 @@ macro_rules! wide {
             fn minus(self, rhs: Self) -> Self {
                 self - rhs
             }
+
             #[inline(always)]
             fn half(self) -> Self {
                 self / 2
@@ -508,19 +547,23 @@ macro_rules! modulo_float {
             fn add(p: $t, v: $t) -> $t {
                 wrap_float(p + v, const { S::SCALE.div(P::SCALE).to_f64() } as $t)
             }
+
             #[inline(always)]
             fn checked_add(p: $t, v: $t) -> Option<$t> {
                 Some(<Self as PointArith<P, $t>>::add(p, v)).filter(|x| x.is_finite())
             }
+
             #[inline(always)]
             #[allow(clippy::cast_possible_truncation, reason = "the period rounded to the storage's float once, as any f32 value is")]
             fn sub(p: $t, v: $t) -> $t {
                 wrap_float(p - v, const { S::SCALE.div(P::SCALE).to_f64() } as $t)
             }
+
             #[inline(always)]
             fn checked_sub(p: $t, v: $t) -> Option<$t> {
                 Some(<Self as PointArith<P, $t>>::sub(p, v)).filter(|x| x.is_finite())
             }
+
             #[inline(always)]
             #[allow(clippy::cast_possible_truncation, reason = "the period rounded to the storage's float once, as any f32 value is")]
             fn diff(a: $t, b: $t) -> $t {
@@ -531,6 +574,7 @@ macro_rules! modulo_float {
                 }
                 if d >= m / 2.0 { d - m } else { d }
             }
+
             #[inline(always)]
             fn checked_diff(a: $t, b: $t) -> Option<$t> {
                 Some(<Self as PointArith<P, $t>>::diff(a, b)).filter(|x| x.is_finite())
@@ -727,6 +771,7 @@ mod arith {
         B: Bounds<T>,
     {
         type Output = Self;
+
         #[inline(always)]
         fn add(self, v: Fixed<U, P, T>) -> Self {
             in_bounds(<O::Modulus as PointArith<P, T>>::add(self.raw(), v.get()))
@@ -741,6 +786,7 @@ mod arith {
         B: Bounds<T>,
     {
         type Output = Self;
+
         #[inline(always)]
         fn sub(self, v: Fixed<U, P, T>) -> Self {
             in_bounds(<O::Modulus as PointArith<P, T>>::sub(self.raw(), v.get()))
@@ -755,6 +801,7 @@ mod arith {
         B: Bounds<T>,
     {
         type Output = PointDiff<O, P, T>;
+
         #[inline(always)]
         fn sub(self, rhs: Self) -> Self::Output {
             Fixed::new(<O::Modulus as PointArith<P, T>>::diff(

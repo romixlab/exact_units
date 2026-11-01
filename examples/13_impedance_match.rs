@@ -25,11 +25,13 @@ use exact_units::{Admittance, Complex, Fixed, Impedance, Saturating, db};
 
 /// Γ from the reflectometer: b/a in Q15, saturating at the ends.
 type GammaQ15 = Complex<Per<Volt, Volt>, Pow2<-15>, i16, Saturating>;
+
 /// |Γ|² of it, exact in 2⁻³⁰ steps of a `u32`.
 type GammaSqr = Fixed<Times<Per<Volt, Volt>, Per<Volt, Volt>>, Product<Pow2<-15>, Pow2<-15>>, u32>;
 
 /// |Γ| ≤ −15 dB as a threshold on |Γ|²: 10^(−1.5) · 2³⁰, nearest.
 const MATCHED: GammaSqr = db!(norm_sqr - 15);
+
 /// The slip: −15 dB read as a voltage-ratio level of |Γ|² itself, 10^(−0.75) · 2³⁰.
 const SLIP: GammaSqr = db!(-15);
 

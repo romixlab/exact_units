@@ -311,6 +311,7 @@ macro_rules! from_db_const {
 }
 
 from_db_const!(int u8 u16 u32 u64 i8 i16 i32 i64);
+
 from_db_const!(float f32 to_f32 f64 to_f64);
 
 #[cfg(any(feature = "std", feature = "libm"))]

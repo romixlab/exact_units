@@ -182,6 +182,7 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> Index<Of, T, B> {
 /// `index + n`: panics past the end of `T` in debug builds, like `T`'s `+`. Only without bounds.
 impl<Of, T: UnsignedStorage> Add<Fixed<Of, One, T>> for Index<Of, T> {
     type Output = Self;
+
     #[inline(always)]
     fn add(self, n: Fixed<Of, One, T>) -> Self {
         Self::new(self.get().add(n.get()))
@@ -202,6 +203,7 @@ impl<Of, T: UnsignedStorage> AddAssign<Fixed<Of, One, T>> for Index<Of, T> {
 /// `index - n`: panics before 0 in debug builds. Only without bounds.
 impl<Of, T: UnsignedStorage> Sub<Fixed<Of, One, T>> for Index<Of, T> {
     type Output = Self;
+
     #[inline(always)]
     fn sub(self, n: Fixed<Of, One, T>) -> Self {
         Self::new(self.get().sub(n.get()))
@@ -223,6 +225,7 @@ impl<Of, T: UnsignedStorage> SubAssign<Fixed<Of, One, T>> for Index<Of, T> {
 /// is before `earlier` ([checked_distance](Index::checked_distance) doesn't).
 impl<Of, T: UnsignedStorage, B: Bounds<T>> Sub for Index<Of, T, B> {
     type Output = Fixed<Of, One, T>;
+
     #[inline(always)]
     fn sub(self, earlier: Self) -> Fixed<Of, One, T> {
         Fixed::new(self.get().sub(earlier.get()))
@@ -424,6 +427,7 @@ impl<Of, T: UnsignedStorage> Seq<Of, T> {
 /// `seq + n`, wrapping.
 impl<Of, T: UnsignedStorage, B: Unlimited<T>> Add<Fixed<Of, One, T, B>> for Seq<Of, T> {
     type Output = Self;
+
     #[inline(always)]
     fn add(self, n: Fixed<Of, One, T, B>) -> Self {
         self.wrapping_add(n.get())
@@ -444,6 +448,7 @@ impl<Of, T: UnsignedStorage, B: Unlimited<T>> AddAssign<Fixed<Of, One, T, B>> fo
 /// `seq - n`, wrapping.
 impl<Of, T: UnsignedStorage, B: Unlimited<T>> Sub<Fixed<Of, One, T, B>> for Seq<Of, T> {
     type Output = Self;
+
     #[inline(always)]
     fn sub(self, n: Fixed<Of, One, T, B>) -> Self {
         self.wrapping_sub(n.get())

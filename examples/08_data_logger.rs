@@ -38,8 +38,10 @@ origin! {
 
 /// CH1..CH4, as printed on the board and the datasheet.
 type Channel = IndexFrom1<Item, u8, Range<1, 4>>;
+
 /// One of the eight slots of the ring buffer.
 type Slot = Index<Item, u8, Range<0, 7>>;
+
 type Uptime = Point<SinceBoot, Millis<u64>>;
 
 fn main() {

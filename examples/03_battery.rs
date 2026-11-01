@@ -27,6 +27,7 @@ use exact_units::{Fixed, Range, RangeDec, Rounding};
 
 /// A cell as the monitor reports it: 2.0 to 4.3 V in mV, anything else is a fault, not a voltage.
 type Cell = Fixed<Volt, Milli, u16, Range<2000, 4300>>;
+
 /// A threshold: the same unit, scale and storage, no bounds of its own.
 type Threshold = Fixed<Volt, Milli, u16>;
 

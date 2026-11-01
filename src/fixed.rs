@@ -650,6 +650,7 @@ mod arith {
         ($($b:ident $add:ident $sub:ident $mul:ident $div:ident;)*) => {$(
             impl<U, P, T: Storage> Add for Fixed<U, P, T, $b> {
                 type Output = Self;
+
                 #[inline(always)]
                 fn add(self, rhs: Self) -> Self {
                     Self::of(self.value.$add(rhs.value))
@@ -658,6 +659,7 @@ mod arith {
 
             impl<U, P, T: Storage> Sub for Fixed<U, P, T, $b> {
                 type Output = Self;
+
                 #[inline(always)]
                 fn sub(self, rhs: Self) -> Self {
                     Self::of(self.value.$sub(rhs.value))
@@ -666,6 +668,7 @@ mod arith {
 
             impl<U, P, T: Storage> Mul<T> for Fixed<U, P, T, $b> {
                 type Output = Self;
+
                 #[inline(always)]
                 fn mul(self, n: T) -> Self {
                     Self::of(self.value.$mul(n))
@@ -675,6 +678,7 @@ mod arith {
             /// Division by 0 panics as for `T`; only `MIN / -1` of a signed `T` overflows.
             impl<U, P, T: Storage> Div<T> for Fixed<U, P, T, $b> {
                 type Output = Self;
+
                 #[inline(always)]
                 fn div(self, n: T) -> Self {
                     Self::of(self.value.$div(n))

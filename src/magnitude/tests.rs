@@ -5,12 +5,16 @@ use std::vec::Vec;
 
 /// The pound, 0.45359237 kg exactly (1959 yard and pound agreement).
 const LB: Magnitude = Magnitude::ratio(45359237, 100_000_000);
+
 /// Standard gravity, 9.80665 m/s² (CGPM 1901).
 const GN: Magnitude = Magnitude::ratio(980665, 100_000);
+
 /// Pound-force: lb · g_n.
 const LBF: Magnitude = LB.mul(GN);
+
 /// The inch, 0.0254 m.
 const IN: Magnitude = Magnitude::ratio(254, 10_000);
+
 /// psi = lbf / in².
 const PSI: Magnitude = LBF.div(IN.powi(2));
 

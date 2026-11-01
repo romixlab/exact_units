@@ -14,8 +14,10 @@ use shrink_wrap::{Nibble, UNib32, UVlq32, UVlq64};
 pub trait Bounds<T: Storage>: Copy + Default + 'static {
     /// The lowest value allowed, `None` for no limit.
     const MIN: Option<T>;
+
     /// The highest value allowed, `None` for no limit.
     const MAX: Option<T>;
+
     /// `MIN ..= MAX` as integers, for `const` code: what [into_rounded](super::Fixed::into_rounded) proves its result
     /// range from. `None` (the default) proves from the whole range of `T`, which is never narrower.
     const INT_RANGE: Option<(i128, i128)> = None;
@@ -77,7 +79,9 @@ pub struct Saturating;
 pub trait Unlimited<T: Storage>: Bounds<T> {}
 
 impl<T: Storage> Unlimited<T> for Unbounded {}
+
 impl<T: Storage> Unlimited<T> for Wrapping {}
+
 impl<T: Storage> Unlimited<T> for Saturating {}
 
 /// `MIN ..= MAX` for an integer storage up to 64 bits (`u8`..`u64`, `i8`..`i64`, `UNib32`, `UVlq32`, `UVlq64`,
@@ -96,16 +100,19 @@ pub struct RangeDec<const MIN: i64, const MAX: i64, const EXP: i8>;
 
 impl<T: Storage> Bounds<T> for Unbounded {
     const MIN: Option<T> = None;
+
     const MAX: Option<T> = None;
 }
 
 impl<T: Storage> Bounds<T> for Wrapping {
     const MIN: Option<T> = None;
+
     const MAX: Option<T> = None;
 }
 
 impl<T: Storage> Bounds<T> for Saturating {
     const MIN: Option<T> = None;
+
     const MAX: Option<T> = None;
 }
 
@@ -137,6 +144,7 @@ macro_rules! range {
                 let $x = fits(MIN as i128, $min as i128, $max as i128);
                 Some($wrap)
             };
+
             #[allow(
                 clippy::cast_possible_truncation,
                 clippy::cast_sign_loss,
@@ -146,6 +154,7 @@ macro_rules! range {
                 let $x = fits(MAX as i128, $min as i128, $max as i128);
                 Some($wrap)
             };
+
             const INT_RANGE: Option<(i128, i128)> = Some((MIN as i128, MAX as i128));
         }
     )*};

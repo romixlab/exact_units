@@ -396,6 +396,7 @@ macro_rules! from_decimal {
 }
 
 from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+
 from_decimal!(float f32 to_f32 f64 to_f64);
 
 /// A [Complex] of two literals, each part as [Fixed::from_decimal] has it.

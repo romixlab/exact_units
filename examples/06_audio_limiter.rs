@@ -25,6 +25,7 @@ use exact_units::{Fixed, Range, Rounding, db};
 
 /// The peak detector's output: amplitude as a fraction of full scale, 0 to 1000 mV/V.
 type Peak = Fixed<Per<Volt, Volt>, Milli, u16, Range<0, 1000>>;
+
 /// A level to compare against: same unit, scale and storage, no bounds.
 type Level = Fixed<Per<Volt, Volt>, Milli, u16>;
 
