@@ -59,7 +59,7 @@ Every result is within 0.51 of a step of the exact value: half a step from the o
 
 <figure class="eu-figure" markdown="0">
 --8<-- "plots/cordic_error.svg"
-<figcaption>The largest and smallest error of each 1/512 turn, in Q15 steps. The dashed lines are ±½ step, the error of a correctly rounded sine. Computed by <code>tools/book_plots</code> with <code>cordic::sin_cos_16</code>.</figcaption>
+<figcaption>The largest error in each 1/512 of a turn, in Q15 steps: half a step from the final rounding, and a hair more where the exact sine lies near a tie. Computed by <code>tools/book_plots</code> with <code>cordic::sin_cos_16</code>.</figcaption>
 </figure>
 
 - The axes and the multiples of an eighth of a turn are exact.

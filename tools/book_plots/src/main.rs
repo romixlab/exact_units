@@ -159,19 +159,19 @@ fn saturate_wrap() -> String {
     s.finish()
 }
 
-/// The error of `sin_cos_16`'s sine against the exact sine, in steps of 2⁻¹⁵, for every angle of a turn; the largest
-/// error of each 1/512 turn is drawn.
+/// The largest error of `sin_cos_16`'s sine against the exact sine in each 1/512 turn, in steps of 2⁻¹⁵: a
+/// correctly rounded sine is within ½ step, CORDIC's within 0.51.
 fn cordic_error() -> String {
     let (w, h) = (640.0, 260.0);
     let mut s = Svg::new(
         w,
         h,
-        "The error of the CORDIC sine over a turn, within half a step",
+        "The largest error of the CORDIC sine over a turn, at most 0.51 of a step",
     );
     let p = Panel {
         area: (60.0, 30.0, 550.0, 180.0),
         x: (0.0, 1.0),
-        y: (-0.6, 0.6),
+        y: (0.44, 0.52),
     };
     s.axes(
         &p,
@@ -182,32 +182,24 @@ fn cordic_error() -> String {
             (0.75, "¾"),
             (1.0, "1 turn"),
         ],
-        &[(-0.5, "−½"), (0.0, "0"), (0.5, "½")],
+        &[(0.45, "0.45"), (0.5, "0.50"), (0.51, "0.51")],
         "angle (Bam16)",
-        "sin error in Q15 steps",
+        "largest |error| in Q15 steps",
     );
-    let mut hi = Vec::new();
-    let mut lo = Vec::new();
+    let mut worst = Vec::new();
     for bin in 0u32..512 {
-        let (mut max, mut min) = (f64::MIN, f64::MAX);
+        let mut max = 0.0f64;
         for k in 0..128u32 {
             let Ok(raw) = u16::try_from(bin * 128 + k) else {
                 continue;
             };
             let (sin, _) = cordic::sin_cos_16(Bam16::of(raw));
             let exact = (f64::from(raw) / 65536.0 * core::f64::consts::TAU).sin() * 32768.0;
-            let err = f64::from(sin.get()) - exact.min(32767.0);
-            max = max.max(err);
-            min = min.min(err);
+            max = max.max((f64::from(sin.get()) - exact.min(32767.0)).abs());
         }
-        let x = (f64::from(bin) + 0.5) / 512.0;
-        hi.push((x, max));
-        lo.push((x, min));
+        worst.push(((f64::from(bin) + 0.5) / 512.0, max.max(0.44)));
     }
-    s.path(&p, &[(0.0, 0.5), (1.0, 0.5)], "thin dash");
-    s.path(&p, &[(0.0, -0.5), (1.0, -0.5)], "thin dash");
-    s.path(&p, &hi, "accent-line");
-    s.path(&p, &lo, "accent-line");
+    s.path(&p, &worst, "accent-line");
     s.finish()
 }
 
@@ -223,8 +215,8 @@ fn db_step() -> String {
     );
     let p = Panel {
         area: (60.0, 30.0, 550.0, 190.0),
-        x: (-60.0, 30.0),
-        y: (-3.0, 1.0),
+        x: (-60.0, 40.0),
+        y: (-3.5, 1.0),
     };
     s.axes(
         &p,
@@ -233,7 +225,8 @@ fn db_step() -> String {
             (-40.0, "−40"),
             (-20.0, "−20"),
             (0.0, "0"),
-            (20.0, "20 dB"),
+            (20.0, "20"),
+            (40.0, "40 dB"),
         ],
         &[
             (-3.0, "0.001"),
@@ -253,7 +246,7 @@ fn db_step() -> String {
         }
         let level = Gain::new(n).to_db();
         let step = Gain::new(n + 1).to_db() - level;
-        if level >= -60.0 {
+        if level >= -60.0 && step.log10() >= -3.5 {
             pts.push((level, step.log10()));
         }
     }
