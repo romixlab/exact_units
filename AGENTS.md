@@ -34,6 +34,7 @@ just cov             # test coverage as CI computes it, lcov.info plus a printed
 just customary-docs  # regenerate docs/customary.md's tables from the catalogue
 just logo            # export the logo from assets/logo/logo.typ (typst and the Audiowide font installed)
 just verify          # the Kani proofs of tests/props (minutes; needs cargo-kani, not in CI)
+just fuzz T SECS     # one cargo-fuzz target of fuzz/ for SECS seconds (nightly and cargo-fuzz; not in CI)
 ```
 
 CI (`.github/workflows/ci.yml`) fails on any warning and also builds for `thumbv6m-none-eabi`. Run `just lint` and
@@ -71,6 +72,15 @@ Kani proofs use storages of 16 bits or less: a proof over an `i32` or a pair of 
 (SAT on 64-bit products), one over `i16` in seconds. A proof with a loop sets `#[kani::unwind(n)]`. proptest is a
 dev-dependency only where `cfg(not(kani))`; proptest writes failing seeds to `tests/proptest-regressions/`, commit
 those of a real bug with its fix.
+
+Input from outside (text, wire bytes, serde) is strings and bytes, which Kani can't reason about: those properties
+are also called from the cargo-fuzz targets of `fuzz/`, a crate of its own that compiles the `tests/props` modules in
+by `#[path]` (`fuzz_targets/props.rs`). `cargo fuzz` sets `cfg(fuzzing)`: a module's proptest block is
+`#[cfg(not(any(kani, fuzzing)))]`, and a structured input derives `arbitrary::Arbitrary` under `cfg_attr(fuzzing,
+..)`. A `cfg(feature = ..)` in such a module sees the fuzz crate's features, which forward to this crate's. A refusal
+by panic (a malformed literal) is caught with `panics::outcome`, which works under libFuzzer's aborting hook. Seeds are
+hand-written, in `fuzz/seeds/TARGET`; the corpus and crashes a run makes are ignored. A crash becomes a unit test and
+a fix in its own commit.
 
 ## Changelog, commits, landing
 
