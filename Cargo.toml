@@ -146,6 +146,11 @@ required-features = ["customary"]
 name = "12_wire"
 required-features = ["shrink_wrap", "time", "electrical"]
 
+[[example]]
+# Q15 IQ: an NCO mixer, a complex multiply that saturates, an exact power sum
+name = "14_iq_downconvert"
+required-features = ["angle", "dimensionless", "electrical"]
+
 [profile.dev]
 split-debuginfo = "unpacked"
 

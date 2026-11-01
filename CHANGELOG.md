@@ -19,6 +19,16 @@
 
 ### 🚀 Features
 
+* IQ fixed-point DSP (STD-91): `CQ15<U = Ratio>` and `CQ31<U = Ratio>`, saturating Q15 and Q31 IQ samples.
+  `mul_round` and `mul_conj_round` multiply two complex values into their own scale and storage, each part summed
+  exactly in the wide type, rounded once and saturated: (−1 − j)² is `0 + j·(1 − 2⁻¹⁵)`. `mix` and `mix_conj`
+  multiply by a plain-ratio phasor and keep the unit. `times_conj_into` and `times_conj_requantize` are the general
+  conjugate multiply, the conjugate never formed in `T`. `Mac` sums products (`mac`, `mac_conj`, `dot`, `dot_conj`)
+  exactly in `i64` for Q15 and `i128` for Q31, with a headroom of 2³² − 1 and 2⁶⁴ − 1 products, and rounds once in
+  `result`. `Complex::from_interleaved`, `write_interleaved` and `map_interleaved` read and write interleaved
+  `[re, im, ..]` buffers without `unsafe`. `Nco` is a `Bam32` phase accumulator whose unit phasor comes from
+  CORDIC, with `mix_down` and `mix_up`. `cordic::sin_cos_32_q15` gives a Q15 sin and cos from all 32 bits of a
+  phase. Example `14_iq_downconvert`.
 * Complex power with its kinds (STD-92): `units::VoltAmpere` (`"VA"`, kind `apparent power`) and `units::Var`
   (`"var"`, kind `reactive power`), the watt's dimension (kg·m²·s⁻³) under a kind of their own, `Watt` staying
   plain; a product table check at compile time (`VoltAmpere` and `Var` against `Watt`, `VoltAmpere` against

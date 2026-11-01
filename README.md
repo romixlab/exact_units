@@ -169,7 +169,7 @@ host, uom serves well.
 
 ## Examples
 
-Twelve short stories, in reading order: each is a small device or tool, the bug a plain `u32` or `f32` lets through
+Short stories, in reading order: each is a small device or tool, the bug a plain `u32` or `f32` lets through
 there, how the type stops it, and what it costs at run time. Each runs and prints its story (`cargo run --example
 NAME --features ...`, the line is at the top of each file); the lines that don't compile are shown with the compiler's
 real message.
@@ -197,6 +197,8 @@ real message.
     a unit's value comes from.
 12. `12_wire` (`shrink_wrap,time,electrical`): a sensor reading sent to a PC tool; the same bytes as plain integers,
     read back with its unit.
+14. `14_iq_downconvert` (`angle,dimensionless,electrical`): Q15 IQ samples mixed down by an NCO on a Cortex-M0; a
+    complex multiply that saturates at (−1 − j)² where plain `int32_t` products wrap to 0, and an exact power sum.
 
 ## License
 
