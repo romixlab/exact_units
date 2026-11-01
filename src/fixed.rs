@@ -1274,17 +1274,19 @@ impl<P: prefix::SubSecond, T: UnsignedStorage, B: Bounds<T>>
     #[inline]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "per_s is a SubSecond's PER_SECOND, 1 to 10⁹ and a divisor of 10⁹: the nanoseconds stay below 10⁹"
+        reason = "ns_per_step checks at compile time that PER_SECOND is 1 to 10⁹ and divides 10⁹: per_s isn't 0, and \
+                  (v % per_s) · ns_per is below per_s · ns_per = 10⁹"
     )]
     fn from(t: Fixed<crate::units::Second, P, T, B>) -> Self {
         let v = t.value.to_u64();
+        let ns_per = prefix::ns_per_step::<P>();
         let per_s = P::PER_SECOND;
         #[expect(
             clippy::as_conversions,
             clippy::cast_possible_truncation,
             reason = "the nanoseconds of a second, below 10⁹"
         )]
-        core::time::Duration::new(v / per_s, ((v % per_s) * (1_000_000_000 / per_s)) as u32)
+        core::time::Duration::new(v / per_s, ((v % per_s) * ns_per) as u32)
     }
 }
 
@@ -1296,12 +1298,8 @@ impl<P: prefix::SubSecond, T: UnsignedStorage, B: Bounds<T>> TryFrom<core::time:
     type Error = OutOfBounds;
 
     fn try_from(d: core::time::Duration) -> Result<Self, OutOfBounds> {
+        let ns_per = prefix::ns_per_step::<P>();
         let per_s = P::PER_SECOND;
-        #[expect(
-            clippy::arithmetic_side_effects,
-            reason = "per_s is a SubSecond's PER_SECOND, 1 to 10⁹ and a divisor of 10⁹"
-        )]
-        let ns_per = 1_000_000_000 / per_s;
         let nanos = u64::from(d.subsec_nanos());
         if !nanos.is_multiple_of(ns_per) {
             return Err(OutOfBounds);
@@ -1312,7 +1310,7 @@ impl<P: prefix::SubSecond, T: UnsignedStorage, B: Bounds<T>> TryFrom<core::time:
             .and_then(|s| {
                 #[expect(
                     clippy::arithmetic_side_effects,
-                    reason = "ns_per is 10⁹ / PER_SECOND, at least 1"
+                    reason = "ns_per is 10⁹ / PER_SECOND, at least 1 (ns_per_step checks PER_SECOND at compile time)"
                 )]
                 let whole = nanos / ns_per;
                 s.checked_add(whole)

@@ -16,6 +16,7 @@
   - New: `Pow10Exp`, `Pow2Exp`, `FullScaleBits` (`new` refuses a named prefix's scale, `get`; each with `magnitude`), `Prefix::from_magnitude` (the prefix of an exact scale, if one stands for it) / `named_of` / `is_named` / `param` / `name` / `from_name`, `Prefix::ALL` has the binary ones. `Display` writes `Ki`, a family as `·10⁻⁴`, `·2⁻¹⁵`, `·1/65535`, and `Unknown` as `·<scale N>`; `scale_f64` / `scale_f32` are exact for every prefix (`NaN` for `Unknown`).
   - A `Series` store and observe cells keep a `Prefix` as one code (hand-written `SeriesStore` / `SeriesCells`; rows of one named prefix are written column-wise, as before); an `Unknown` comes back from the store as `Unknown(u16::MAX)`, its tag isn't kept.
   - `Prefix::MAX_SIZE` is 20 bits (was 8): `Series::<ww_si::Volt>::max_bytes(100)` is 2254 B (was 1946 B), a buffer sized by it grows that much. The bytes of a named prefix don't change.
+* **Breaking:** a `SubSecond` impl whose `PER_SECOND` isn't 1 to 10⁹ and a divisor of 10⁹ doesn't compile where a `Duration` conversion (`Duration::from`, `Fixed::try_from(Duration)`) uses it. Before, `PER_SECOND` 0 panicked by division by zero, one past 10⁹ gave 0 ns per step, and one that doesn't divide 10⁹ (3) truncated the nanoseconds. The crate's own prefixes (s, ds, cs, ms, µs, ns) are unchanged; only an impl that was already wrong breaks.
 
 ### 🚀 Features
 

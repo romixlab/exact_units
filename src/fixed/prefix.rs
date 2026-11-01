@@ -33,9 +33,49 @@ pub trait DecimalPrefix: FixedScale {
 }
 
 /// A prefix that a [core::time::Duration] holds exactly: s, ds, cs, ms, µs, ns.
+///
+/// `PER_SECOND` is 1 to 10⁹ and divides 10⁹, so a step is a whole number of nanoseconds. An impl outside that
+/// doesn't compile where a `Duration` conversion uses it:
+///
+/// ```compile_fail
+/// # use exact_units::{Fixed, Magnitude, Prefix, units::Second};
+/// # use exact_units::prefix::{DecimalPrefix, FixedScale, SubSecond};
+/// // thirds of a second: 10⁹ / 3 nanoseconds isn't whole
+/// #[derive(Copy, Clone, Default)]
+/// struct Third;
+/// impl FixedScale for Third {
+///     const SCALE: Magnitude = Magnitude::ONE;
+///     const SYMBOL: &'static str = "";
+///     const NAME: &'static str = "Third";
+///     const RUNTIME: Option<Prefix> = None;
+/// }
+/// impl DecimalPrefix for Third {
+///     const PREFIX: Prefix = Prefix::Unit;
+/// }
+/// impl SubSecond for Third {
+///     const PER_SECOND: u64 = 3;
+/// }
+/// let d = core::time::Duration::from(Fixed::<Second, Third, u32>::new(1));
+/// ```
 pub trait SubSecond: DecimalPrefix {
-    /// How many of it make a second.
+    /// How many of it make a second: 1 to 10⁹, a divisor of 10⁹.
     const PER_SECOND: u64;
+}
+
+/// Nanoseconds in one step of `P`, at least 1; a `P` whose `PER_SECOND` isn't 1 to 10⁹ and a divisor of 10⁹ doesn't
+/// compile.
+#[cfg(feature = "time")]
+#[inline(always)]
+pub(crate) const fn ns_per_step<P: SubSecond>() -> u64 {
+    const {
+        assert!(
+            P::PER_SECOND >= 1
+                && P::PER_SECOND <= 1_000_000_000
+                && 1_000_000_000 % P::PER_SECOND == 0,
+            "SubSecond::PER_SECOND must be 1 to 10⁹ and divide 10⁹: a step is a whole number of nanoseconds"
+        );
+        1_000_000_000 / P::PER_SECOND
+    }
 }
 
 /// `10^E` for a decimal step without a prefix of its own: tenths of a millisecond are `Fixed<Second, Pow10<-4>, u32>`.
