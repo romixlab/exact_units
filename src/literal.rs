@@ -1,0 +1,361 @@
+//! Decimal literals as stored values, worked out at compile time: `fixed!(0.1)` is the [Fixed] its context names,
+//! holding the stored value nearest to 0.1 of its unit, so a constant in Q30, in steps of 2⁻¹⁵ or in mV is written as
+//! the number it means, never as `107_374_182 // 0.1 · 2³⁰`.
+//!
+//! - Any scale that is a fraction of integers: `Pow2`, `Pow10`, `Rational`, the SI prefixes and their products. A
+//!   scale with π or a root in it is a compile error: its stored values aren't decimals.
+//! - Integer storages take the nearest integer, ties to even, from the exact fraction: nothing is rounded on the way.
+//!   Float storages take the nearest float, ties to even.
+//! - A value that doesn't fit the storage or is outside the bounds `B` is a compile error, as is a negative value of
+//!   an unsigned storage.
+//! - The literal is in units of `U`: `fixed!(0.25)` of a `Fixed<Volt, Milli, u16>` is 0.25 V, stored as 250.
+//!   A decimal exponent works too: `fixed!(2.5e-3)`.
+//! - `fixed!(0.5, -0.25)` is a [Complex] of two such parts.
+//!
+//! It is an associated const ([AtLiteral]), so nothing of it runs at run time; [Fixed::from_decimal] is the same as
+//! a `const fn`, for a value that isn't a literal.
+//!
+//! ```
+//! use exact_units::{Fixed, fixed, prefix::{Milli, Pow2, Rational}, units::Ratio};
+//! const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1);
+//! assert_eq!(BUSY.get(), 107_374_182); // 0.1 · 2³⁰ = 107374182.4
+//! const HALF: Fixed<Ratio, Pow2<-15>, i16> = fixed!(-0.5);
+//! assert_eq!(HALF.get(), -16384);
+//! let third: Fixed<Ratio, Rational<1, 3>, u8> = fixed!(2.5); // 7.5 thirds, ties to even
+//! assert_eq!(third.get(), 8);
+//! let x: Fixed<Ratio, Milli, f32> = fixed!(1.5e-3);
+//! assert_eq!(x.get(), 1.5);
+//! ```
+
+use crate::complex::Complex;
+use crate::decibel::exact::Interval;
+use crate::{Bounds, Fixed, FixedScale, Unlimited};
+
+/// A decimal number, `num · 10^exp`: what [fixed!](crate::fixed) parses its literal into.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Decimal {
+    num: i64,
+    exp: i16,
+}
+
+impl Decimal {
+    /// `num · 10^exp`: `Decimal::new(25, -3)` is 0.025.
+    pub const fn new(num: i64, exp: i16) -> Decimal {
+        Decimal { num, exp }
+    }
+
+    /// A decimal number as written: `"0.1"`, `"-3"`, `"+2.5e-3"`, `"1_000"`. Panics (a compile error in `const`
+    /// code) on anything else, a type suffix (`0.1f32`) included: the storage comes from the context.
+    pub const fn parse(s: &str) -> Decimal {
+        const FORM: &str = "a literal is a decimal number: 0.1, -3, 2.5e-3";
+        let b = s.as_bytes();
+        let mut i = 0;
+        let mut neg = false;
+        if i < b.len() && (b[i] == b'-' || b[i] == b'+') {
+            neg = b[i] == b'-';
+            i += 1;
+        }
+        // stringify! of a negative literal may keep a space after the sign
+        while i < b.len() && b[i] == b' ' {
+            i += 1;
+        }
+        let mut num: i64 = 0;
+        let mut exp: i32 = 0;
+        let mut digits = 0;
+        let mut point = false;
+        while i < b.len() {
+            match b[i] {
+                b'0'..=b'9' => {
+                    num = match num.checked_mul(10) {
+                        Some(n) => match n.checked_add((b[i] - b'0') as i64) {
+                            Some(n) => n,
+                            None => panic!("a literal of more than 18 digits"),
+                        },
+                        None => panic!("a literal of more than 18 digits"),
+                    };
+                    digits += 1;
+                    if point {
+                        exp -= 1;
+                    }
+                }
+                b'.' if !point => point = true,
+                b'_' => {}
+                b'e' | b'E' => break,
+                _ => panic!("{}", FORM),
+            }
+            i += 1;
+        }
+        assert!(digits > 0, "{}", FORM);
+        if i < b.len() {
+            // the exponent after e
+            i += 1;
+            let mut eneg = false;
+            if i < b.len() && (b[i] == b'-' || b[i] == b'+') {
+                eneg = b[i] == b'-';
+                i += 1;
+            }
+            let mut e: i32 = 0;
+            let mut edigits = 0;
+            while i < b.len() {
+                match b[i] {
+                    b'0'..=b'9' if e < 10_000 => e = e * 10 + (b[i] - b'0') as i32,
+                    b'_' => {}
+                    _ => panic!("{}", FORM),
+                }
+                if b[i] != b'_' {
+                    edigits += 1;
+                }
+                i += 1;
+            }
+            assert!(edigits > 0, "{}", FORM);
+            exp += if eneg { -e } else { e };
+        }
+        assert!(
+            exp >= i16::MIN as i32 && exp <= i16::MAX as i32,
+            "a literal's exponent is out of range"
+        );
+        Decimal::new(if neg { -num } else { num }, exp as i16)
+    }
+
+    /// The digits, `25` for 0.025.
+    pub const fn num(self) -> i64 {
+        self.num
+    }
+
+    /// The power of ten, `-3` for 0.025.
+    pub const fn exp(self) -> i16 {
+        self.exp
+    }
+
+    /// `|self| / scale` as a reduced fraction `(p, q)`, or a compile error for a scale that isn't a fraction of
+    /// integers or a fraction too large for `u128`.
+    const fn over<P: FixedScale>(self) -> (u128, u128) {
+        let (snum, sden) = match P::SCALE.to_ratio() {
+            Some(r) => r,
+            None => panic!(
+                "a literal needs a scale that is a fraction of integers: the stored values of a scale with π or a \
+                 root in it aren't decimals"
+            ),
+        };
+        let ten = match 10u128.checked_pow(self.exp.unsigned_abs() as u32) {
+            Some(t) => t,
+            None => panic!("a literal's exponent is out of range"),
+        };
+        let (mut p, mut q) = (self.num.unsigned_abs() as u128, 1u128);
+        if self.exp >= 0 {
+            p = mul(p, ten);
+        } else {
+            q = ten;
+        }
+        let g = gcd(p, q);
+        (p, q) = (p / g, q / g);
+        // p · sden / (q · snum), each product reduced against the other side first
+        let g = gcd(sden, q);
+        let (sden, q) = (sden / g, q / g);
+        let g = gcd(p, snum);
+        let (p, snum) = (p / g, snum / g);
+        (mul(p, sden), mul(q, snum))
+    }
+
+    /// The stored value nearest to `self` in units of `P`, ties to even, as an `i128`.
+    const fn to_int<P: FixedScale>(self) -> i128 {
+        if self.num == 0 {
+            return 0;
+        }
+        let (p, q) = self.over::<P>();
+        let (int, rem) = (p / q, p % q);
+        // rem > q/2, or rem == q/2 and int is odd; q - rem can't overflow where 2 · rem could
+        let up = rem > q - rem || (rem == q - rem && int & 1 == 1);
+        let x = int + up as u128;
+        if x > i128::MAX as u128 {
+            panic!("this literal is too large for its storage");
+        }
+        if self.num < 0 {
+            -(x as i128)
+        } else {
+            x as i128
+        }
+    }
+
+    /// The exact `|self|` in units of `P` as an interval, for the nearest float; `None` for zero.
+    const fn to_interval<P: FixedScale>(self) -> Option<Interval> {
+        if self.num == 0 {
+            return None;
+        }
+        let (p, q) = self.over::<P>();
+        Some(Interval::ratio(p, q))
+    }
+}
+
+/// `a · b`, or a compile error: the scale and the literal together need more than 128 bits.
+const fn mul(a: u128, b: u128) -> u128 {
+    match a.checked_mul(b) {
+        Some(x) => x,
+        None => panic!(
+            "a literal too long for its scale: the exact stored value needs more than 128 bits"
+        ),
+    }
+}
+
+const fn gcd(mut a: u128, mut b: u128) -> u128 {
+    while b != 0 {
+        let t = a % b;
+        a = b;
+        b = t;
+    }
+    a
+}
+
+/// A decimal literal as a type, `NUM · 10^EXP`: what [fixed!](crate::fixed) names, so the scale and storage of the
+/// [Fixed] can come from the context. A pair of them is a [Complex]'s.
+pub struct Literal<const NUM: i64, const EXP: i16>;
+
+/// The stored value of literal `L` as an associated const, worked out at compile time ([Fixed::from_decimal]): what
+/// [fixed!](crate::fixed) reads, for every [Fixed] with an integer or float storage and every [Complex].
+pub trait AtLiteral<L>: Sized {
+    const AT: Self;
+}
+
+/// A constant of the [Fixed] (or, of two literals, the [Complex]) the context names, from a decimal literal in units
+/// of its unit, rounded to the nearest stored value at compile time: see the [module](crate::literal).
+///
+/// ```
+/// use exact_units::{CQ15, Fixed, fixed, prefix::Pow2, units::Ratio};
+/// const GAIN: Fixed<Ratio, Pow2<-15>, i16> = fixed!(0.7071); // 23170.25..
+/// assert_eq!(GAIN.get(), 23170);
+/// const Z: CQ15 = fixed!(0.5, -0.25);
+/// assert_eq!(Z.get(), (16384, -8192));
+/// ```
+///
+/// A value that doesn't fit its storage doesn't compile, nor does a negative one of an unsigned storage, one outside
+/// the bounds or one of a scale that isn't a fraction of integers:
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, fixed, prefix::Pow2, units::Ratio};
+/// const ONE: Fixed<Ratio, Pow2<-15>, i16> = fixed!(1.0); // 32768 is one past i16::MAX
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, fixed, prefix::Milli, units::Ratio};
+/// const X: Fixed<Ratio, Milli, u16> = fixed!(-0.001);
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, Range, fixed, prefix::One, units::Ratio};
+/// const X: Fixed<Ratio, One, i8, Range<0, 10>> = fixed!(11);
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
+/// const X: Fixed<Ratio, One, f32> = fixed!(0.5f32); // the storage comes from the context
+/// ```
+///
+/// ```compile_fail
+/// exact_units::scale! { struct PiQ15 = "", Exact(1 / 32768, pi 1); }
+/// use exact_units::{Fixed, fixed, units::Ratio};
+/// const X: Fixed<Ratio, PiQ15, i16> = fixed!(0.5);
+/// ```
+#[macro_export]
+macro_rules! fixed {
+    ($re:literal, $im:literal $(,)?) => {
+        <_ as $crate::literal::AtLiteral<(
+            $crate::literal::Literal<
+                { $crate::literal::Decimal::parse(stringify!($re)).num() },
+                { $crate::literal::Decimal::parse(stringify!($re)).exp() },
+            >,
+            $crate::literal::Literal<
+                { $crate::literal::Decimal::parse(stringify!($im)).num() },
+                { $crate::literal::Decimal::parse(stringify!($im)).exp() },
+            >,
+        )>>::AT
+    };
+    ($value:literal) => {
+        <_ as $crate::literal::AtLiteral<
+            $crate::literal::Literal<
+                { $crate::literal::Decimal::parse(stringify!($value)).num() },
+                { $crate::literal::Decimal::parse(stringify!($value)).exp() },
+            >,
+        >>::AT
+    };
+}
+
+/// `from_decimal` per storage: the integers through `bounded`, the floats checked against `B` here.
+macro_rules! from_decimal {
+    (int $($ty:ident)*) => {$(
+        impl<U, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
+            /// The stored value nearest to `x` in units of `U`, ties to even, at compile time: see the
+            /// [module](crate::literal). A compile error in `const` code (a panic at run time) for a value that
+            /// doesn't fit `T` or `B`, or a scale that isn't a fraction of integers.
+            pub const fn from_decimal(x: Decimal) -> Self {
+                let v = x.to_int::<P>();
+                if v < $ty::MIN as i128 {
+                    panic!("this literal is below the range of its storage");
+                }
+                if v > $ty::MAX as i128 {
+                    panic!("this literal is too large for its storage");
+                }
+                Self::bounded(v as $ty)
+            }
+        }
+
+        impl<U, P: FixedScale, B: Bounds<$ty>, const N: i64, const E: i16> AtLiteral<Literal<N, E>>
+            for Fixed<U, P, $ty, B>
+        {
+            const AT: Self = Self::from_decimal(Decimal::new(N, E));
+        }
+    )*};
+    (float $($ty:ident $to:ident)*) => {$(
+        impl<U, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
+            /// The float nearest to `x` in units of `U`, ties to even, at compile time: see the
+            /// [module](crate::literal). A compile error in `const` code (a panic at run time) for a value outside
+            /// `B` or the float's normal range, or a scale that isn't a fraction of integers.
+            pub const fn from_decimal(x: Decimal) -> Self {
+                let v = match x.to_interval::<P>() {
+                    Some(i) => i.$to(),
+                    None => 0.0,
+                };
+                let v = if x.num() < 0 { -v } else { v };
+                if let Some(min) = B::MIN
+                    && v < min
+                {
+                    panic!("value below its bound");
+                }
+                if let Some(max) = B::MAX
+                    && v > max
+                {
+                    panic!("value above its bound");
+                }
+                Self::new_unchecked(v)
+            }
+        }
+
+        impl<U, P: FixedScale, B: Bounds<$ty>, const N: i64, const E: i16> AtLiteral<Literal<N, E>>
+            for Fixed<U, P, $ty, B>
+        {
+            const AT: Self = Self::from_decimal(Decimal::new(N, E));
+        }
+    )*};
+}
+
+from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+from_decimal!(float f32 to_f32 f64 to_f64);
+
+/// A [Complex] of two literals, each part as [Fixed::from_decimal] has it.
+macro_rules! complex_literal {
+    ($($ty:ident)*) => {$(
+        impl<U, P: FixedScale, B: Unlimited<$ty>, const N1: i64, const E1: i16, const N2: i64, const E2: i16>
+            AtLiteral<(Literal<N1, E1>, Literal<N2, E2>)> for Complex<U, P, $ty, B>
+        {
+            const AT: Self = Complex::of(
+                Fixed::<U, P, $ty>::from_decimal(Decimal::new(N1, E1)).get(),
+                Fixed::<U, P, $ty>::from_decimal(Decimal::new(N2, E2)).get(),
+            );
+        }
+    )*};
+}
+
+complex_literal!(i8 i16 i32 i64 f32 f64);
+
+#[cfg(test)]
+mod tests;

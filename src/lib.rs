@@ -21,6 +21,8 @@
 //! - `SIExpr` (feature `shrink_wrap`): a unit as a tree on the wire, for a unit only known at run time.
 //! - [decibel]: levels in dB of a gain, 20·lg or 10·lg by its [Kind]: [db!] works the stored value out at compile
 //!   time, exactly; `to_db` / `from_db` at run time in `f64` and `f32` (feature `std` or `libm`).
+//! - [literal]: [fixed!] turns a decimal literal into the stored value of the [Fixed] or [Complex] its context names
+//!   at compile time, exactly rounded: `fixed!(0.1)` in Q30, no hand-computed `107_374_182`.
 //!
 //! `no_std`, no alloc, and no dependencies without features. `shrink_wrap` adds the wire format (`shrink_wrap`'s),
 //! `std` every unit group and with `shrink_wrap` the owned forms of the wire types, `defmt` their `defmt::Format`,
@@ -47,6 +49,7 @@ mod fixed;
 #[cfg(feature = "counting")]
 mod index;
 pub mod kind;
+pub mod literal;
 mod magnitude;
 pub mod num;
 mod point;

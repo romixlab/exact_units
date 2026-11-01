@@ -230,6 +230,11 @@ impl Interval {
         }
     }
 
+    /// `p / q`, both above 0.
+    pub(crate) const fn ratio(p: u128, q: u128) -> Interval {
+        Interval::exact(p).div(Interval::exact(q))
+    }
+
     /// `10^(n/d) · den / num`, `d > 0`.
     pub(crate) const fn level(n: i64, d: u64, num: u128, den: u128) -> Interval {
         // n/d = k + r/d with 0 <= r < d
@@ -284,10 +289,10 @@ impl Interval {
             (Some(a), Some(b)) if a.0 == b.0 && a.1 == b.1 => a,
             (Some(_), Some(_)) => {
                 panic!(
-                    "this level is too close to halfway between two floats to round at compile time"
+                    "this value is too close to halfway between two floats to round at compile time"
                 )
             }
-            _ => panic!("this level is outside the normal range of its float storage"),
+            _ => panic!("this value is outside the normal range of its float storage"),
         }
     }
 }
