@@ -244,6 +244,15 @@ pub(crate) enum Expr {
 }
 
 impl Expr {
+    /// The nodes on the longest path from the root to a named unit.
+    fn depth(&self) -> usize {
+        match self {
+            Expr::Known(_) | Expr::Own(..) => 1,
+            Expr::Mul(a, b) | Expr::Div(a, b) => 1 + a.depth().max(b.depth()),
+            Expr::Pow(a, _) | Expr::Sqrt(a) => 1 + a.depth(),
+        }
+    }
+
     /// The unit as an owned `SIExpr`.
     fn build(&self) -> SIExprOwned {
         match self {
@@ -280,18 +289,33 @@ impl Expr {
     }
 }
 
+/// The most nodes on a path an owned unit tree decodes with: shrink_wrap's reader stops at
+/// `BufReader::DEFAULT_MAX_DEPTH` (128) nested values, so a recursive type from untrusted data can't overflow the
+/// stack. Far past `MAX_UNIT_DEPTH` (32), the depth the crate follows.
+const DECODED_DEPTH: usize = 127;
+
 /// A unit tree round-trips, owned and borrowed, and every walk over it (symbol, name, dimension, factor, magnitude,
-/// known unit) ends without a panic, also past `MAX_UNIT_DEPTH`.
+/// known unit) ends without a panic, also past `MAX_UNIT_DEPTH`. The owned form decodes up to [DECODED_DEPTH] nodes
+/// deep and is refused as too deeply nested past it; the borrowed one reads its top node only.
 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
 pub(crate) fn si_expr(e: &Expr) {
     let owned = e.build();
     let bytes = owned.to_ww_bytes_owned().expect("encodes");
-    let back = SIExprOwned::from_ww_bytes_owned(&bytes).expect("decodes");
-    assert_eq!(back, owned);
+    match SIExprOwned::from_ww_bytes_owned(&bytes) {
+        Ok(back) => {
+            assert!(e.depth() <= DECODED_DEPTH, "{} deep, decodes", e.depth());
+            assert_eq!(back, owned);
+            assert_eq!(back.to_ww_bytes_owned().expect("encodes"), bytes);
+        }
+        Err(err) => assert!(
+            err == shrink_wrap::Error::NestingTooDeep && e.depth() > DECODED_DEPTH,
+            "{} deep: {err:?}",
+            e.depth()
+        ),
+    }
     let borrowed = SIExpr::from_ww_bytes(&bytes).expect("decodes");
     walk(&borrowed);
     walk_owned(&owned);
-    assert_eq!(back.to_ww_bytes_owned().expect("encodes"), bytes);
 }
 
 /// Every walk of a decoded unit.
@@ -408,6 +432,22 @@ mod tests {
             -9i8..=9,
         ));
         [slot.clone(), slot.clone(), slot.clone(), slot]
+    }
+
+    /// Chains at the reader's depth limit and past it.
+    #[test]
+    fn deep_units() {
+        for depth in [32, 33, 126, 127, 128, 200] {
+            let mut e = Expr::Known(0);
+            for k in 1..depth {
+                e = if k % 2 == 0 {
+                    Expr::Sqrt(Box::new(e))
+                } else {
+                    Expr::Mul(Box::new(e), Box::new(Expr::Known(1)))
+                };
+            }
+            super::si_expr(&e);
+        }
     }
 
     proptest! {
