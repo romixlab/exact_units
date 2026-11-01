@@ -1,6 +1,10 @@
 //! Levels in dB (STD-67): the gains `from_db_const` works out at compile time against an 80-digit reference and
 //! libm's `exp10`, and the run-time `to_db` / `from_db` in `f64` and `f32`.
 #![cfg(feature = "electrical")]
+#![expect(
+    clippy::as_conversions,
+    reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"
+)]
 
 use exact_units::decibel::Decibels;
 use exact_units::prefix::{Micro, Milli, Nano, One, Rational};

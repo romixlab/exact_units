@@ -38,6 +38,10 @@ pub const fn powi_f64(x: f64, n: i8) -> f64 {
     clippy::cast_sign_loss,
     reason = "the biased exponent of a normal number is in 1..=2046 and r is below 2^53"
 )]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 pub const fn sqrt_f64(x: f64) -> f64 {
     const MANT: u64 = (1 << 52) - 1;
     if x.is_nan() || x < 0.0 {
@@ -85,10 +89,6 @@ pub const fn sqrt_f64(x: f64) -> f64 {
 
 /// `x * 10^exp`, for the powers prefixes have (-60..=60 between two of them).
 #[must_use]
-#[expect(
-    clippy::cast_sign_loss,
-    reason = "the loops leave exp within the table and the branch takes its absolute value"
-)]
 pub fn scale_f64(x: f64, exp: i8) -> f64 {
     let mut x = x;
     let mut exp = i32::from(exp);
@@ -100,11 +100,12 @@ pub fn scale_f64(x: f64, exp: i8) -> f64 {
         x /= 1e30;
         exp += 30;
     }
-    if exp >= 0 {
-        x * POW10_F64[exp as usize]
-    } else {
-        x / POW10_F64[(-exp) as usize]
-    }
+    // the loops leave |exp| within the table
+    let p = usize::try_from(exp.unsigned_abs())
+        .ok()
+        .and_then(|i| POW10_F64.get(i))
+        .map_or(f64::INFINITY, |p| *p);
+    if exp >= 0 { x * p } else { x / p }
 }
 
 /// Powers of ten that `f32` holds exactly (up to 10^10).
@@ -113,10 +114,6 @@ const POW10_F32: [f32; 11] = [1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 
 /// `x * 10^exp` in `f32`, without `powi` (not in `core`): one multiplication or division by an exact power of ten for
 /// the usual prefixes, so 2 m· is 0.002 rounded once, not three times.
 #[must_use]
-#[expect(
-    clippy::cast_sign_loss,
-    reason = "the loops leave exp within the table and the branch takes its absolute value"
-)]
 pub fn scale_f32(x: f32, exp: i8) -> f32 {
     let mut x = x;
     let mut exp = i32::from(exp);
@@ -128,11 +125,12 @@ pub fn scale_f32(x: f32, exp: i8) -> f32 {
         x /= 1e10;
         exp += 10;
     }
-    if exp >= 0 {
-        x * POW10_F32[exp as usize]
-    } else {
-        x / POW10_F32[(-exp) as usize]
-    }
+    // the loops leave |exp| within the table
+    let p = usize::try_from(exp.unsigned_abs())
+        .ok()
+        .and_then(|i| POW10_F32.get(i))
+        .map_or(f32::INFINITY, |p| *p);
+    if exp >= 0 { x * p } else { x / p }
 }
 
 /// The float functions `core` lacks: from libm when it is on, so every target computes the same bits, else from

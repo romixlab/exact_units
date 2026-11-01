@@ -1,3 +1,7 @@
+#![expect(
+    clippy::as_conversions,
+    reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"
+)]
 use super::Decimal;
 use crate::prefix::{Kilo, Micro, Milli, One, Pow2, Rational};
 use crate::units::Ratio;

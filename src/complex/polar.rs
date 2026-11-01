@@ -141,6 +141,7 @@ macro_rules! int_abs {
             /// |z| rounded by `r`: [Rounding::Floor] for the largest magnitude not above |z|, [Rounding::Ceil] for
             /// the smallest not below.
             #[inline(always)]
+            #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
             pub const fn abs_rounded(self, r: Rounding) -> Fixed<U, P, $uns> {
                 let (re, im) = (self.re.unsigned_abs() as $wide, self.im.unsigned_abs() as $wide);
                 // at most 2·(2^(bits-1))² = 2^(2·bits-1): fits, and so does its root in `$uns`
@@ -153,6 +154,7 @@ macro_rules! int_abs {
                 stringify!($ty), "::MAX`.")]
             #[inline(always)]
             #[expect(clippy::cast_possible_wrap, reason = "checked against the signed MAX first")]
+            #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
             pub const fn abs_saturating(self) -> Fixed<U, P, $ty> {
                 let a = self.abs().get();
                 Fixed::new(if a > $ty::MAX as $uns { $ty::MAX } else { a as $ty })
@@ -171,6 +173,10 @@ int_abs! {
 /// `x · s` for a sine or cosine `s` in Q31, rounded to nearest (a tie away from zero, so the conjugate angle gives the
 /// conjugate value): `x` below 2³², so the product fits.
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 const fn times_q31(x: u32, s: i32) -> i64 {
     let p = x as u64 * s.unsigned_abs() as u64;
     #[expect(
@@ -190,6 +196,7 @@ macro_rules! int_polar {
                 "] in [0, 1) turn by [CORDIC](crate::cordic::", stringify!($atan2), "): within 0.51 of a step of ",
                 "the exact angle; 0 for 0. The phase of `a` against `b` is `arg(a · conj b)`.")]
             #[inline(always)]
+            #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
             pub const fn arg(self) -> $bam {
                 Fixed::of(cordic::$atan2(self.im as $wide, self.re as $wide).get())
             }
@@ -208,6 +215,7 @@ macro_rules! int_polar {
                 stringify!($ty), "` (|z| above `", stringify!($ty), "::MAX` off the diagonals). The error is in the ",
                 "[module](crate::complex::polar)'s table.")]
             #[inline(always)]
+            #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
             pub const fn from_polar(abs: Fixed<U, P, $uns>, arg: $bam) -> Option<Self> {
                 // the angle in steps of 2⁻³² turn
                 let (s, c) = cordic::sin_cos_32(Fixed::of((arg.get() as u32) << $shift));
@@ -272,7 +280,7 @@ macro_rules! float_polar {
                 abs: Fixed<U, P, $ty>,
                 arg: Fixed<Phase<A>, PA, $ty, BP>,
             ) -> Self {
-                #[allow(clippy::cast_possible_truncation, reason = "the factor to radians rounded to the storage's float")]
+                #[allow(clippy::as_conversions, clippy::cast_possible_truncation, reason = "the factor to radians rounded to the storage's float (no From)")]
                 let rad = arg.get() * const { (PA::SCALE.to_f64() * <Phase<A>>::EXPR.factor()) as $ty };
                 let (s, c) = math::$sincos(rad);
                 Self::of(abs.get() * c, abs.get() * s)

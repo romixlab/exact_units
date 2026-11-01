@@ -45,7 +45,7 @@ fn main() {
     println!(
         "CH{ch} reads regs[{}] = {}",
         ch.to_index(),
-        gains[ch.to_index().get() as usize]
+        gains[usize::from(ch.to_index().get())]
     );
     assert!(Channel::try_new(0).is_err()); // there is no CH0
     assert!(Channel::try_new(5).is_err());

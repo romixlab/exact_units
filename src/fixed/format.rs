@@ -18,6 +18,7 @@ impl Number {
     pub(crate) fn of<T: Storage>(v: T, scale: Magnitude) -> Number {
         match v.to_repr() {
             #[expect(
+                clippy::as_conversions,
                 clippy::cast_precision_loss,
                 reason = "no exact form (not a fraction of integers, or past u128): written as the nearest float"
             )]
@@ -34,6 +35,7 @@ impl Number {
 
     /// `±m / d`, `d > 0`; a float when `d` is too large to take a digit at a time.
     #[expect(
+        clippy::as_conversions,
         clippy::cast_precision_loss,
         reason = "a d too large for the digits is shown as the nearest float"
     )]
@@ -69,6 +71,7 @@ impl Number {
         let Some(prec) = prec else {
             if !ends(d) {
                 #[expect(
+                    clippy::as_conversions,
                     clippy::cast_precision_loss,
                     reason = "a decimal that doesn't end is shown as the float's shortest form"
                 )]
@@ -91,11 +94,10 @@ impl Number {
         let (mut nines, mut n) = (0usize, 0usize);
         while n < prec && r != 0 {
             r *= 10;
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "r was below d, so 10·r / d is a digit"
-            )]
-            let digit = (r / d) as u8;
+            // r was below d, so 10·r / d is a digit
+            let Ok(digit) = u8::try_from(r / d) else {
+                return Err(fmt::Error);
+            };
             r %= d;
             n += 1;
             if digit == 9 {

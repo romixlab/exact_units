@@ -1,3 +1,7 @@
+#![expect(
+    clippy::as_conversions,
+    reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"
+)]
 use super::*;
 use core::f64::consts::TAU;
 use std::vec::Vec;

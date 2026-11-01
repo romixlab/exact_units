@@ -54,11 +54,16 @@ const fn norm_sqr_gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) ->
 /// `norm_sqr_at` for each storage: the integers' |z|² rounded to nearest, the floats' to the nearest float.
 macro_rules! norm_sqr_at {
     ($($ty:ident $norm:ident $round:ident;)*) => {$(
+        #[expect(
+            clippy::allow_attributes,
+            reason = "only the integer storages cast: an #[expect] is unfulfilled for the floats"
+        )]
         impl<U: Unit, P: FixedScale, B: Unlimited<$ty>> Complex<U, P, $ty, B> {
             /// The |z|² of a value at level `db`, worked out at compile time as [Fixed::from_db_const] does, for one
             /// compare with [norm_sqr](Self::norm_sqr). `db!(norm_sqr -15)` is the same as a constant. A compile
             /// error in `const` code (a panic at run time) for a kind without a level form or a level whose |z|²
             /// doesn't fit; see the [module](crate::complex::level).
+            #[allow(clippy::as_conversions, reason = "const fn: From is not const on stable")]
             pub const fn norm_sqr_at(db: Decibels) -> Fixed<Times<U, U>, Product<P, P>, $norm> {
                 let form = Fixed::<U, P, $ty>::LEVEL_FORM;
                 norm_sqr_at!(@$round norm_sqr_gain::<U, P>(db, form), $norm)
@@ -115,6 +120,7 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
         let form = const { Fixed::<U, P, T>::LEVEL_FORM };
         let n = match T::norm_sqr(self.re, self.im).to_repr() {
             #[expect(
+                clippy::as_conversions,
                 clippy::cast_precision_loss,
                 reason = "a level in dB is an f64, rounded"
             )]
@@ -138,12 +144,17 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
     /// # }
     /// ```
     pub fn to_db_f32(self) -> f32 {
-        #[expect(clippy::cast_possible_truncation, reason = "5 or 10, exact in f32")]
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            reason = "5 or 10, exact in f32"
+        )]
         let half = const { (Fixed::<U, P, T>::LEVEL_FORM.db_per_decade() / 2.0) as f32 };
         let n = T::norm_sqr(self.re, self.im).to_f32();
         #[expect(
+            clippy::as_conversions,
             clippy::cast_possible_truncation,
-            reason = "the squared scale rounded to f32, the float this works in"
+            reason = "the squared scale rounded to f32, the float this works in (no From)"
         )]
         let s = const {
             let s = P::SCALE.to_f64() * U::EXPR.factor();

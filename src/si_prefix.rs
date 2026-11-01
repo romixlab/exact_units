@@ -176,6 +176,10 @@ impl FullScaleBits {
 
     /// `1/(2^n − 1)`, built from the primes of `2^n − 1` (no trial division).
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn magnitude(self) -> Magnitude {
         let b = (self.0 - 2) as usize;
         let start = if b == 0 { 0 } else { FULL_ENDS[b - 1] as usize };
@@ -188,12 +192,11 @@ impl FullScaleBits {
     #[must_use]
     pub fn of(m: &Magnitude) -> Option<Self> {
         match m.to_ratio() {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "a trailing-zero count of a u64 is at most 64"
-            )]
             Some((1, den)) if (den + 1).is_power_of_two() => {
-                FullScaleBits::new((den + 1).trailing_zeros() as u8)
+                // a trailing-zero count of a u128, at most 128
+                u8::try_from((den + 1).trailing_zeros())
+                    .ok()
+                    .and_then(FullScaleBits::new)
             }
             _ => None,
         }
@@ -489,6 +492,10 @@ impl Prefix {
     /// [FullScale](Prefix::FullScale); `None` for a named prefix. With [name](Self::name), the prefix as a dynamic
     /// client sees it (`{"Pow10": -4}`).
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn param(&self) -> Option<i8> {
         match *self {
             Prefix::Pow10(e) => Some(e.get()),
@@ -563,6 +570,7 @@ impl Prefix {
         match self.si_pow10() {
             Some(e) => crate::num::scale_f32(x, e),
             #[expect(
+                clippy::as_conversions,
                 clippy::cast_possible_truncation,
                 reason = "rounding the f64 result to the f32 asked for"
             )]
@@ -738,28 +746,30 @@ mod series_store {
 
     /// The first code of a family: named prefixes are below it.
     #[expect(clippy::cast_possible_truncation, reason = "29 named prefixes")]
+    #[expect(
+        clippy::as_conversions,
+        reason = "a const item: From is not const on stable"
+    )]
     const FAMILY_CODE: u16 = (Prefix::ALL.len() as u16) << 8;
     /// The code of any `Unknown`, above every other: its high byte is no discriminant of this version.
     const UNKNOWN_CODE: u16 = u16::MAX;
 
     impl Prefix {
         #[inline(always)]
-        #[expect(
-            clippy::cast_sign_loss,
-            clippy::cast_possible_truncation,
-            reason = "an exponent's two's-complement byte, read back by from_code; discriminants are below 32"
-        )]
         fn code(self) -> u16 {
             if let Prefix::Unknown(_) = self {
                 return UNKNOWN_CODE;
             }
             let param = match self {
-                Prefix::Pow10(e) => e.get() as u8,
-                Prefix::Pow2(e) => e.get() as u8,
+                // an exponent's two's-complement byte, read back by from_code
+                Prefix::Pow10(e) => e.get().cast_unsigned(),
+                Prefix::Pow2(e) => e.get().cast_unsigned(),
                 Prefix::FullScale(n) => n.get(),
                 _ => 0,
             };
-            ((self.discriminant() as u16) << 8) | u16::from(param)
+            // discriminants are below 32
+            let tag = u8::try_from(self.discriminant()).unwrap_or(u8::MAX);
+            u16::from_le_bytes([param, tag])
         }
 
         #[inline(always)]
@@ -767,18 +777,11 @@ mod series_store {
             if code == UNKNOWN_CODE {
                 return Prefix::Unknown(u16::MAX);
             }
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "the low byte holds the parameter"
-            )]
-            let param = code as u8;
-            #[expect(
-                clippy::cast_possible_wrap,
-                reason = "an exponent's two's-complement byte, as code wrote it"
-            )]
-            let family = match (code >> 8) as usize {
-                29 => Pow10Exp::new(param as i8).map(Prefix::Pow10),
-                30 => Pow2Exp::new(param as i8).map(Prefix::Pow2),
+            // the low byte holds the parameter (an exponent's two's-complement byte, as code wrote it)
+            let [param, tag] = code.to_le_bytes();
+            let family = match usize::from(tag) {
+                29 => Pow10Exp::new(param.cast_signed()).map(Prefix::Pow10),
+                30 => Pow2Exp::new(param.cast_signed()).map(Prefix::Pow2),
                 31 => FullScaleBits::new(param).map(Prefix::FullScale),
                 tag => Prefix::ALL.get(tag).copied(),
             };

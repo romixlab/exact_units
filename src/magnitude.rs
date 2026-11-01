@@ -5,6 +5,8 @@
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
 
+use crate::unit::write_superscript;
+
 /// How many primes other than 2 and 5 a [Magnitude] holds. Every imperial and US customary unit takes at most 7 of
 /// them (the slug: 3, 7, 11, 97, 127, 6073, 28019), any product or quotient of two of them at most 10.
 pub const MAX_FACTORS: usize = 12;
@@ -160,6 +162,10 @@ impl Work {
         len: 0,
     };
 
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn of(m: &Magnitude) -> Work {
         let mut w = Work::ONE;
         w.pow10 = m.pow10 as i32;
@@ -182,6 +188,10 @@ impl Work {
     }
 
     /// `prime^(exp2 / 2)` multiplied in, `prime` a prime.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn add_prime(&mut self, prime: u64, exp2: i32) -> Result<(), MagnitudeError> {
         if prime == 2 {
             self.pow2 += exp2;
@@ -263,6 +273,10 @@ impl Work {
     }
 
     /// `n` with no prime factor below 2¹⁶: a prime, or a product of up to three larger ones.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn add_large(&mut self, n: u64, exp2: i32) -> Result<(), MagnitudeError> {
         if n <= u32::MAX as u64 || is_prime(n) {
             return self.add_prime(n, exp2);
@@ -274,6 +288,10 @@ impl Work {
         self.add_large(n / f, exp2)
     }
 
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn mul(mut self, rhs: &Work, sign: i32) -> Result<Work, MagnitudeError> {
         self.pow10 += sign * rhs.pow10;
         self.pow2 += sign * rhs.pow2;
@@ -369,6 +387,10 @@ impl Work {
     clippy::cast_possible_truncation,
     reason = "checked against the i8 range first"
 )]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 const fn exp(e: i32) -> Result<i8, MagnitudeError> {
     if e < i8::MIN as i32 || e > i8::MAX as i32 {
         Err(MagnitudeError::ExponentRange)
@@ -381,6 +403,10 @@ const fn exp(e: i32) -> Result<i8, MagnitudeError> {
 #[expect(
     clippy::cast_possible_truncation,
     reason = "a remainder mod a u64 fits a u64"
+)]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
 )]
 const fn mul_mod(a: u64, b: u64, m: u64) -> u64 {
     ((a as u128 * b as u128) % m as u128) as u64
@@ -506,6 +532,10 @@ impl Magnitude {
 
     /// `10^e`, `None` for `|e| > 63`.
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn checked_pow10(e: i8) -> Option<Self> {
         match exp(2 * e as i32) {
             Ok(pow10) => Some(Magnitude { pow10, rest: None }),
@@ -515,6 +545,10 @@ impl Magnitude {
 
     /// `2^e`: a binary prefix, a Q format. Panics (at compile time in a `const`) for `|e| > 63`.
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn pow2(e: i8) -> Self {
         let mut w = Work::ONE;
         w.pow2 = 2 * e as i32;
@@ -553,6 +587,10 @@ impl Magnitude {
 
     /// One over the product of `primes` (each a prime, repeated for a power), without factoring: how
     /// [FullScaleBits](crate::FullScaleBits) builds `1/(2^n - 1)` from a short table instead of trial division.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub(crate) const fn recip_of_primes(primes: &[u32]) -> Self {
         let mut w = Work::ONE;
         let mut i = 0;
@@ -601,6 +639,10 @@ impl Magnitude {
 
     /// `self^n`. Panics (at compile time in a `const`) when an exponent leaves ±63½.
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn powi(self, n: i8) -> Self {
         unwrap(Work::of(&self).scale(n as i32).pack())
     }
@@ -645,6 +687,10 @@ impl Magnitude {
     #[expect(
         clippy::cast_possible_truncation,
         reason = "the stored exponents are i8, so a sum of two fits i16"
+    )]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
     )]
     pub const fn exp_x2(&self, prime: u32) -> i16 {
         let w = Work::of(self);
@@ -714,6 +760,10 @@ impl Magnitude {
 
     /// `(num, den)` without a common factor, if the magnitude is a fraction of integers that both fit a `u128`.
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn to_ratio(&self) -> Option<(u128, u128)> {
         let w = Work::of(self);
         if w.irr[0] != 0 || w.irr[1] != 0 || w.irr[2] != 0 {
@@ -760,6 +810,10 @@ impl Magnitude {
 
     /// The factor as an `f64` (rounded, unlike the magnitude itself).
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn to_f64(&self) -> f64 {
         use core::f64::consts::{LN_2, LN_10, PI};
         let w = Work::of(self);
@@ -794,6 +848,7 @@ impl Magnitude {
         match self.to_ratio() {
             // exact factors through the integers, so 0.3 · 10 is 3.0 and not 3.0000000000000004
             #[expect(
+                clippy::as_conversions,
                 clippy::cast_precision_loss,
                 reason = "both at most 2^53, exact in f64"
             )]
@@ -918,6 +973,10 @@ const fn unwrap(m: Result<Magnitude, MagnitudeError>) -> Magnitude {
 #[expect(
     clippy::cast_possible_truncation,
     reason = "e2 is a stored i8 exponent (Work::of), so its half fits i8"
+)]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
 )]
 const fn pow_half(x: f64, e2: i32) -> f64 {
     let whole = crate::num::powi_f64(x, (e2 / 2) as i8);
@@ -1076,27 +1135,6 @@ fn write_exp_x2(f: &mut core::fmt::Formatter<'_>, e2: i32) -> core::fmt::Result 
         write_superscript(f, e2)?;
         f.write_str("ᐟ²")
     }
-}
-
-fn write_superscript(f: &mut core::fmt::Formatter<'_>, e: i32) -> core::fmt::Result {
-    const DIGITS: [&str; 10] = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
-    if e < 0 {
-        f.write_str("⁻")?;
-    }
-    let mut digits = [0u8; 10];
-    let (mut e, mut n) = (e.unsigned_abs(), 0);
-    loop {
-        digits[n] = (e % 10) as u8;
-        n += 1;
-        e /= 10;
-        if e == 0 {
-            break;
-        }
-    }
-    for d in digits[..n].iter().rev() {
-        f.write_str(DIGITS[*d as usize])?;
-    }
-    Ok(())
 }
 
 mod approx;

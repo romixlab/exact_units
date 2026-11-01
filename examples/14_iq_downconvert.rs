@@ -110,8 +110,9 @@ fn main() {
     assert_eq!(dsp::BUSY.get(), point_one.get());
     assert_eq!(dsp::BUSY.get(), 107_374_182);
     #[expect(
+        clippy::as_conversions,
         clippy::cast_precision_loss,
-        reason = "a mean for printing: f64's 53 bits are plenty"
+        reason = "a mean for printing: f64's 53 bits are plenty (an i64 has no From into f64)"
     )]
     let mean = power.get().0 as f64 / N as f64 / (1u64 << 30) as f64;
     println!(
@@ -129,6 +130,7 @@ fn main() {
     let (a, b) = (i32::from(i16::MIN), i32::from(i16::MIN));
     let plain_im = (a * b).wrapping_add(b * a) >> 15; // a·d + b·c in int32_t, as a release build computes it
     #[expect(
+        clippy::as_conversions,
         clippy::cast_possible_truncation,
         reason = "the low 16 bits, as C's conversion to int16_t keeps them: the point of the example"
     )]

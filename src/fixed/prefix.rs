@@ -99,6 +99,10 @@ impl<V: FixedScale, const BITS: u8> FixedScale for FullScaleMax<V, BITS> {
     clippy::cast_possible_wrap,
     reason = "b is at most 63, asserted just above the cast"
 )]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 const fn bits(b: u8) -> i8 {
     assert!(b >= 1 && b <= 63, "a full scale of 1 to 63 bits");
     b as i8

@@ -1,5 +1,9 @@
 //! `Fixed` as a field of a `Series` item (SW-60): the columns of plain numbers.
 #![cfg(all(feature = "std", feature = "quantities"))]
+#![expect(
+    clippy::as_conversions,
+    reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"
+)]
 
 use shrink_wrap::prelude::*;
 use shrink_wrap::series::{Series, SeriesOwned};

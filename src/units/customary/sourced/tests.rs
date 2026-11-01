@@ -2,6 +2,10 @@
 //! Every magnitude checked exactly: against what NIST SP 811 prints (equal where bold, within half a unit of the last
 //! printed digit otherwise), against the literal values the sources state, and for the rules of the table (no bare
 //! ambiguous name, units of a group all listed, dimensions). Ends with the bit sizes STD-62's magnitude choice needs.
+#![expect(
+    clippy::as_conversions,
+    reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"
+)]
 
 use super::catalogue::*;
 use super::{AMBIGUOUS, Exact, Mag, ORIGINS, Src, Status, UNITS, Unit, dim};

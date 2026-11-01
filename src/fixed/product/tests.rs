@@ -1,3 +1,7 @@
+#![expect(
+    clippy::as_conversions,
+    reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"
+)]
 use crate::prefix::*;
 use crate::units::{Ampere, Ohm, Per, Ratio, Times, Volt, Watt};
 use crate::{Fixed, FixedScale, Magnitude, Overflow, Q15, Range, Rounding, Saturating, Wrapping};

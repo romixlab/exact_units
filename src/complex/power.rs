@@ -59,6 +59,7 @@ const _: () = {
 fn to_f64<T: Storage>(x: T) -> f64 {
     match x.to_repr() {
         #[expect(
+            clippy::as_conversions,
             clippy::cast_precision_loss,
             reason = "never exact anyway, as documented"
         )]

@@ -197,7 +197,7 @@ fn write_symbol<'t, E: Tree<'t>>(e: &E, f: &mut fmt::Formatter<'_>, depth: usize
         }
         Node::Pow(a, n) => {
             side(f, a, &|n| is_compound(n) || matches!(n, Node::Pow(..)))?;
-            write_superscript(f, *n)
+            write_superscript(f, i32::from(*n))
         }
         Node::Sqrt(a) => {
             f.write_str("√")?;

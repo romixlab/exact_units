@@ -1,5 +1,9 @@
 //! Rounding conversions and overflow policies (STD-63): every mode against a reference written independently of the
 //! crate's own (Euclidean division), the typed conversion against the run-time one, factors with π.
+#![expect(
+    clippy::as_conversions,
+    reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"
+)]
 
 use exact_units::prefix::{Centi, Deci, Kilo, Micro, Milli, One, Pow2, Rational};
 use exact_units::units::{Radian, Ratio, Second, Volt};

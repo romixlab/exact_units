@@ -83,6 +83,7 @@ pub(crate) fn round_f64(x: f64, r: Rounding) -> f64 {
         return x;
     }
     #[expect(
+        clippy::as_conversions,
         clippy::cast_possible_truncation,
         clippy::cast_precision_loss,
         reason = "|x| < 2⁵²: the cast truncates toward zero, the intent, and the whole part is an f64 exactly"
@@ -111,8 +112,9 @@ pub(crate) fn round_f64(x: f64, r: Rounding) -> f64 {
             }
         }
         #[expect(
+            clippy::as_conversions,
             clippy::cast_possible_truncation,
-            reason = "t is whole and below 2⁵², an i64 exactly"
+            reason = "t is whole and below 2⁵², an i64 exactly (a float has no TryFrom)"
         )]
         Rounding::NearestEven | Rounding::NearestAway => {
             let a = if neg { -frac } else { frac };
@@ -145,11 +147,12 @@ pub(crate) fn settle_i64<T: Storage>(x: i64, o: Overflow) -> Option<T> {
     match o {
         Overflow::Checked => T::from_i64(x),
         #[expect(
+            clippy::as_conversions,
             clippy::cast_possible_truncation,
-            reason = "T is of up to 32 bits: its ends fit i64"
+            reason = "constants (From is not const on stable); T is of up to 32 bits: its ends fit i64"
         )]
         Overflow::Saturate => Some(T::from_int_wrapping(i128::from(
-            x.clamp(T::MIN_INT as i64, T::MAX_INT as i64),
+            x.clamp(const { T::MIN_INT as i64 }, const { T::MAX_INT as i64 }),
         ))),
         Overflow::Wrap => Some(T::from_int_wrapping(i128::from(x))),
     }
@@ -172,9 +175,11 @@ pub(crate) fn settle_f64<T: Storage>(y: f64, o: Overflow) -> Option<T> {
 
 /// A whole float clamped to `min..=max`, `NaN` as 0.
 #[expect(
+    clippy::as_conversions,
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
-    reason = "the ends may round as floats (see below); y is whole and strictly between them where it is cast"
+    reason = "float <-> int, no From: the ends may round as floats (see below); y is whole and strictly between them \
+              where it is cast"
 )]
 fn saturate_f64(y: f64, min: i128, max: i128) -> i128 {
     if y.is_nan() {
@@ -198,8 +203,9 @@ fn wrap_f64(y: f64) -> i128 {
     )]
     const LIMIT: f64 = 170141183460469231731687303715884105728.0; // 2¹²⁷
     #[expect(
+        clippy::as_conversions,
         clippy::cast_possible_truncation,
-        reason = "a whole float strictly within ±2¹²⁷ is an i128 exactly"
+        reason = "a whole float strictly within ±2¹²⁷ is an i128 exactly (a float has no TryFrom)"
     )]
     if y < LIMIT && y > -LIMIT {
         y as i128
@@ -211,6 +217,10 @@ fn wrap_f64(y: f64) -> i128 {
 /// `x · m · 2^shift` rounded by `r`, for `|x| < 2⁶⁴` (any storage of up to 64 bits): its sign, the magnitude modulo
 /// 2¹²⁸, and whether the magnitude is below 2¹²⁸. The product `|x| · m` is exact in 128 bits.
 #[inline]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 pub(crate) const fn mul_fixed_point(x: i128, m: u64, shift: i32, r: Rounding) -> Scaled {
     let neg = x < 0;
     let p = x.unsigned_abs() * m as u128;
@@ -253,6 +263,10 @@ pub(crate) const fn mul_fixed_point(x: i128, m: u64, shift: i32, r: Rounding) ->
 /// [mul_fixed_point] for storages of up to 32 bits on both sides: the result's low 64 bits are all that wrapping
 /// into the target needs, so it settles in 64 bits, not 128.
 #[inline(always)]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 pub(crate) const fn mul_fixed_point_narrow(x: i64, m: u64, shift: i32, r: Rounding) -> Scaled64 {
     if shift <= -34 && shift >= -96 {
         // |x| < 2³², so |x| · m < 2⁹⁶ and the product shifted by k - 1 >= 33 is below 2⁶³: twice the quotient plus
@@ -362,6 +376,10 @@ impl Scaled {
         clippy::cast_possible_wrap,
         reason = "low <= 2¹²⁷: 2¹²⁷ wraps to i128::MIN, which its wrapping negation keeps, -2¹²⁷; else checked"
     )]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn exact(self) -> Option<i128> {
         if !self.fits {
             return None;
@@ -383,6 +401,10 @@ impl Scaled {
     #[expect(
         clippy::cast_possible_wrap,
         reason = "the low 128 bits in two's complement are the documented result"
+    )]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
     )]
     const fn wrapped(self) -> i128 {
         if self.neg {
@@ -461,17 +483,13 @@ impl StorageKind {
     ) -> Option<i128> {
         let (min, max) = Self::range(bits, signed);
         match (o, x) {
-            #[expect(
-                clippy::cast_sign_loss,
-                clippy::cast_possible_wrap,
-                reason = "low's two's complement bits, masked to at most 64 bits: v is an i128 exactly"
-            )]
             (Overflow::Wrap, _) => {
-                let v = (low as u128) & ((1u128 << bits) - 1);
+                // low's two's complement bits, masked to at most 64 bits: v is an i128 exactly
+                let v = low.cast_unsigned() & ((1u128 << bits) - 1);
                 Some(if signed && v >> (bits - 1) == 1 {
-                    v as i128 - (1i128 << bits)
+                    v.cast_signed() - (1i128 << bits)
                 } else {
-                    v as i128
+                    v.cast_signed()
                 })
             }
             (Overflow::Checked, Some(x)) => (min..=max).contains(&x).then_some(x),
@@ -527,14 +545,11 @@ impl Requantizer {
     /// The requantizer by `factor` into `to`, rounded by `r`, overflowing by `o`: [requantize] of each value.
     #[must_use]
     pub fn new(factor: &Magnitude, to: StorageKind, r: Rounding, o: Overflow) -> Self {
-        #[expect(
-            clippy::cast_possible_wrap,
-            reason = "num_low is the low 128 bits of num, two's complement, by design"
-        )]
         let exact = if let Some((num, den)) = factor.to_ratio() {
             Exact::Ratio {
                 num: i128::try_from(num).ok(),
-                num_low: num as i128,
+                // the low 128 bits of num, two's complement, by design
+                num_low: num.cast_signed(),
                 den: i128::try_from(den).unwrap_or(i128::MAX),
             }
         } else {
@@ -558,9 +573,10 @@ impl Requantizer {
     pub fn apply(&self, x: Repr) -> Option<Repr> {
         let (r, o, factor) = (self.r, self.o, &self.factor);
         #[expect(
+            clippy::as_conversions,
             clippy::cast_precision_loss,
             clippy::cast_possible_truncation,
-            reason = "a float target: the nearest f64, then the nearest f32, is the float conversion"
+            reason = "a float target: the nearest f64, then the nearest f32, is the float conversion (no From)"
         )]
         let (bits, signed) = match (self.to, x) {
             (StorageKind::F64, Repr::Int(i)) => {
@@ -581,9 +597,11 @@ impl Requantizer {
                 let (min, max) = StorageKind::range(bits, signed);
                 return match o {
                     #[expect(
+                        clippy::as_conversions,
                         clippy::cast_possible_truncation,
                         clippy::cast_precision_loss,
-                        reason = "the saturating cast and the way back check that y is that integer exactly"
+                        reason = "float <-> int has no From: the saturating cast and the way back check that y is \
+                                  that integer exactly"
                     )]
                     Overflow::Checked => {
                         let i = y as i128;

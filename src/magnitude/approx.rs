@@ -15,6 +15,10 @@ struct Wide {
     e: i32,
 }
 
+#[expect(
+    clippy::as_conversions,
+    reason = "a const item: From is not const on stable"
+)]
 const LOW: u128 = u64::MAX as u128;
 const TOP: u128 = 1 << 127;
 
@@ -51,6 +55,10 @@ impl Wide {
     #[expect(
         clippy::cast_possible_wrap,
         reason = "a leading-zero count of a u128 is at most 128"
+    )]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
     )]
     const fn int(x: u32) -> Wide {
         let z = (x as u128).leading_zeros();
@@ -95,6 +103,10 @@ impl Wide {
     }
 
     /// `self / rhs` by long division, rounded to nearest.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn div(self, rhs: Wide) -> Wide {
         // quotient bits of (self.m · 2¹²⁸) / rhs.m: 128 or 129 of them
         let d = rhs.m;
@@ -127,6 +139,10 @@ impl Wide {
     }
 
     /// `self + rhs`, both positive.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn add(self, rhs: Wide) -> Wide {
         let (a, b) = if self.e >= rhs.e {
             (self, rhs)
@@ -192,6 +208,10 @@ impl Magnitude {
     /// the correctly rounded `x · magnitude` only where that lies within `|x| · 2⁻⁶⁴` of a rounding step, and then by
     /// one step.
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn fixed_point(&self) -> (u64, i32) {
         let w = Work::of(self);
         // the doubled exponents give the square of the magnitude

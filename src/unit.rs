@@ -124,6 +124,10 @@ const fn in_range(e: i8) -> bool {
     clippy::cast_possible_truncation,
     reason = "e is checked to be in i8's range just above"
 )]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 const fn checked_exp(e: i16) -> Option<i8> {
     if e < i8::MIN as i16 || e > i8::MAX as i16 {
         return None;
@@ -279,6 +283,10 @@ impl<'i> Dim<'i> {
         clippy::too_many_lines,
         reason = "one const fn walks both sides' bases in step; split, it would pass the half-built result around"
     )]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn combine(self, o: Dim<'i>, sign: i16, times: i16) -> Option<Dim<'i>> {
         // with only one side a root, the other is squared so both describe the square of what they are
         let (fa, fb) = match (self.root, o.root) {
@@ -419,6 +427,10 @@ impl<'i> Dim<'i> {
 
     /// The dimension of a power: exponents multiplied by `n`. `None` when one leaves -8..=7.
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn checked_pow(self, n: i8) -> Option<Dim<'i>> {
         self.combine(Dim::new(0, 0, 0, 0, 0, 0, 0), 0, n as i16)
     }
@@ -583,12 +595,12 @@ impl fmt::Display for Dim<'_> {
             first = false;
             f.write_str(symbol)?;
             if self.root && exp % 2 != 0 {
-                write_superscript(f, exp)?;
+                write_superscript(f, i32::from(exp))?;
                 f.write_str("ᐟ²")?;
             } else {
                 let exp = if self.root { exp / 2 } else { exp };
                 if exp != 1 {
-                    write_superscript(f, exp)?;
+                    write_superscript(f, i32::from(exp))?;
                 }
             }
         }
@@ -657,19 +669,40 @@ impl From<Dim<'_>> for DimOwned {
     }
 }
 
-pub(crate) fn write_superscript(f: &mut fmt::Formatter<'_>, exp: i8) -> fmt::Result {
-    const DIGITS: [&str; 10] = ["⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
+/// `exp` in superscript digits, `⁻` before a negative one.
+pub(crate) fn write_superscript(f: &mut fmt::Formatter<'_>, exp: i32) -> fmt::Result {
     if exp < 0 {
         f.write_str("⁻")?;
     }
     let exp = exp.unsigned_abs();
-    if exp >= 100 {
-        f.write_str(DIGITS[(exp / 100) as usize])?;
+    // the largest power of ten not above exp (1 for 0)
+    let mut p = 1;
+    while p <= exp / 10 {
+        p *= 10;
     }
-    if exp >= 10 {
-        f.write_str(DIGITS[(exp / 10 % 10) as usize])?;
+    loop {
+        f.write_str(superscript_digit(exp / p % 10))?;
+        if p == 1 {
+            return Ok(());
+        }
+        p /= 10;
     }
-    f.write_str(DIGITS[(exp % 10) as usize])
+}
+
+/// A digit (`d` below 10) in superscript.
+const fn superscript_digit(d: u32) -> &'static str {
+    match d {
+        0 => "⁰",
+        1 => "¹",
+        2 => "²",
+        3 => "³",
+        4 => "⁴",
+        5 => "⁵",
+        6 => "⁶",
+        7 => "⁷",
+        8 => "⁸",
+        _ => "⁹",
+    }
 }
 
 /// How a value in a unit becomes coherent SI (the unit of [Dim] with no factor): `si = value · factor + offset`.

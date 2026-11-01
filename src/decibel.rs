@@ -50,6 +50,10 @@ impl Decibels {
     /// A decimal number as written: `"-3.01"`, `"6"`, `"+0.5"`. Panics (a compile error in `const` code) on
     /// anything else.
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn parse(s: &str) -> Decibels {
         let b = s.as_bytes();
         let mut i = 0;
@@ -113,11 +117,19 @@ impl Decibels {
         clippy::cast_possible_wrap,
         reason = "rounded to f64 as documented; decimals are at most 9"
     )]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn to_f64(self) -> f64 {
         self.num as f64 / crate::num::pow10_f64(self.decimals as i8)
     }
 
     /// `n / d` with `10^(n/d)` the gain of form `form`, reduced.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn exponent(self, form: LevelForm) -> (i64, u64) {
         let per_decade = match form {
             LevelForm::Power => 10,
@@ -232,6 +244,7 @@ macro_rules! from_db_const {
             /// [module](crate::decibel). A compile error in `const` code (a panic at run time) for a kind without a
             /// level form, a gain that doesn't fit `T` or `B`, or one too close to halfway between two stored values
             /// to decide.
+            #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
             pub const fn from_db_const(db: Decibels) -> Self {
                 let x = gain::<U, P>(db, Self::LEVEL_FORM).to_int();
                 if x > $ty::MAX as u128 {
@@ -318,6 +331,7 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
         let form = const { Self::LEVEL_FORM };
         let x = match self.get().to_repr() {
             #[expect(
+                clippy::as_conversions,
                 clippy::cast_precision_loss,
                 reason = "a level in dB is an f64, rounded"
             )]
@@ -356,9 +370,14 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     /// # }
     /// ```
     pub fn to_db_f32(self) -> f32 {
-        #[expect(clippy::cast_possible_truncation, reason = "10 or 20, exact in f32")]
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            reason = "10 or 20, exact in f32"
+        )]
         let per_decade = const { Self::LEVEL_FORM.db_per_decade() as f32 };
         #[expect(
+            clippy::as_conversions,
             clippy::cast_possible_truncation,
             reason = "the scale rounded to f32, the float this works in"
         )]
@@ -376,10 +395,15 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     /// ```
     #[must_use]
     pub fn from_db_f32(db: f32) -> Option<Self> {
-        #[expect(clippy::cast_possible_truncation, reason = "10 or 20, exact in f32")]
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            reason = "10 or 20, exact in f32"
+        )]
         let per_decade = const { Self::LEVEL_FORM.db_per_decade() as f32 };
         // times the reciprocal: 1000.0 for Milli is exact in f32, 0.001 isn't
         #[expect(
+            clippy::as_conversions,
             clippy::cast_possible_truncation,
             reason = "the scale rounded to f32, the float this works in"
         )]

@@ -42,9 +42,10 @@ pub trait Storage: Copy + PartialOrd + 'static {
     /// rounded for integers of more than 24 bits.
     #[inline(always)]
     #[expect(
+        clippy::as_conversions,
         clippy::cast_precision_loss,
         clippy::cast_possible_truncation,
-        reason = "the nearest f32, as documented: rounded where the value has more than 24 bits"
+        reason = "the nearest f32, as documented: rounded where the value has more than 24 bits (no From)"
     )]
     fn to_f32(self) -> f32 {
         match self.to_repr() {
@@ -136,9 +137,11 @@ pub trait UnsignedStorage: Storage {
     reason = "a float is whole when it equals its integer exactly"
 )]
 #[expect(
+    clippy::as_conversions,
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
-    reason = "the casts round and saturate, the checks after them catch both (2^63 before the i64 cast)"
+    reason = "float <-> int has no From: the casts round and saturate, the checks after them catch both (2^63 \
+              before the i64 cast)"
 )]
 fn whole_f32(x: f32, min: i128, max: i128) -> Option<i128> {
     if x.is_nan() || x < min as f32 || x > max as f32 {
@@ -165,9 +168,11 @@ fn whole_f32(x: f32, min: i128, max: i128) -> Option<i128> {
     reason = "a float is whole when it equals its integer exactly"
 )]
 #[expect(
+    clippy::as_conversions,
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
-    reason = "a rough range check in f64 and a truncation to i128, both checked again exactly after the cast"
+    reason = "float <-> int has no From: a rough range check in f64 and a truncation to i128, both checked again \
+              exactly after the cast"
 )]
 fn whole(x: f64, min: i128, max: i128) -> Option<i128> {
     // the range check is in f64 (min/max of up to 64 bits are close enough, the cast below checks again)
@@ -186,6 +191,10 @@ macro_rules! int {
         #[expect(
             clippy::allow_attributes,
             reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
+        )]
+        #[expect(
+            clippy::as_conversions,
+            reason = "a macro over several storages: the casts lossy for some carry their #[allow] and reason"
         )]
         impl Storage for $ty {
             const NAME: &'static str = stringify!($ty);
@@ -338,6 +347,10 @@ macro_rules! newtype {
             clippy::allow_attributes,
             reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
         )]
+        #[expect(
+            clippy::as_conversions,
+            reason = "a macro over several storages: the casts lossy for some carry their #[allow] and reason"
+        )]
         impl Storage for $ty {
             const NAME: &'static str = stringify!($ty);
             const IS_FLOAT: bool = false;
@@ -454,13 +467,9 @@ impl Storage for Nibble {
         Nibble::new_masked(Storage::div_rounded(self.value(), d, r))
     }
     #[inline(always)]
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "the low 8 bits of x, two's complement, of which new_masked keeps the documented low 4"
-    )]
     fn from_int_wrapping(x: i128) -> Self {
-        Nibble::new_masked(x as u8)
+        // the low 4 bits of x, two's complement: 0..=15 whatever its sign, a u8 always
+        Nibble::new_masked(u8::try_from(x & 0xf).unwrap_or(0))
     }
     #[inline]
     fn from_int(x: i128) -> Option<Self> {
@@ -561,6 +570,10 @@ macro_rules! float {
             clippy::allow_attributes,
             reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
         )]
+        #[expect(
+            clippy::as_conversions,
+            reason = "a macro over several storages: the casts lossy for some carry their #[allow] and reason"
+        )]
         impl Storage for $ty {
             const NAME: &'static str = stringify!($ty);
             const IS_FLOAT: bool = true;
@@ -641,6 +654,10 @@ macro_rules! float {
 float!(f32 f64);
 
 #[cfg(test)]
+#[expect(
+    clippy::as_conversions,
+    reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"
+)]
 mod tests {
     use super::Storage;
 

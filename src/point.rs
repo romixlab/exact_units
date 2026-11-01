@@ -337,6 +337,10 @@ impl<P, T: Storage> PointArith<P, T> for Linear {
     clippy::cast_possible_wrap,
     reason = "n is checked to be at most 2^BITS, BITS at most 64"
 )]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 const fn period_steps<S: FixedScale, P: FixedScale>(bits: u32) -> i128 {
     let Some((n, d)) = S::SCALE.div(P::SCALE).to_ratio() else {
         panic!("the period of a Modulo origin must be a whole number of the point's steps")
@@ -637,6 +641,7 @@ fn reduce<M: Modulus, P2: FixedScale, T2: Storage>(y: Repr) -> Option<T2> {
                 match M::MODULUS {
                     Some(s) => match s.div(P2::SCALE).to_ratio() {
                         #[expect(
+                            clippy::as_conversions,
                             clippy::cast_possible_wrap,
                             reason = "n is checked to be at most i128::MAX"
                         )]
@@ -782,6 +787,10 @@ struct Affine {
     num: i128,
     add: i128,
     den: i128,
+    /// `num`, `add` and `den` in 64 bits, for the narrow path only (where they fit, checked in [of](Affine::of)).
+    num64: i64,
+    add64: i64,
+    den64: i64,
     /// In 64 bits: both storages of up to 32 bits and `|x · num| + |add|` fits `i64`.
     narrow: bool,
     float: bool,
@@ -792,6 +801,10 @@ struct Affine {
 
 impl Affine {
     /// From `x` steps of `step1` above `off1` to steps of `step2` above `off2`: `y · step2 + off2 = x · step1 + off1`.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn of<T: Storage, T2: Storage>(
         step1: Magnitude,
         off1: Offset,
@@ -860,10 +873,18 @@ impl Affine {
             Some(_) => (num as f64, den as f64),
             None => (factor.to_f64(), 1.0),
         };
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "used on the narrow path only, where |num|, |add| and den fit i64 (checked above)"
+        )]
+        let (num64, add64, den64) = (num as i64, add as i64, den as i64);
         Affine {
             num,
             add,
             den,
+            num64,
+            add64,
+            den64,
             narrow,
             float,
             num_f,
@@ -886,8 +907,9 @@ impl Affine {
         let x = x.to_repr();
         if self.float {
             #[expect(
+                clippy::as_conversions,
                 clippy::cast_precision_loss,
-                reason = "the float path rounds by design, f64 holds 53 bits"
+                reason = "the float path rounds by design, f64 holds 53 bits (no From)"
             )]
             let x = match x {
                 Repr::Int(i) => i as f64,
@@ -906,15 +928,12 @@ impl Affine {
     }
 
     #[inline(always)]
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "on the narrow path |num| and |add| are at most top, checked to fit i64 in of"
-    )]
     fn apply<T: Storage, T2: Storage>(self, x: T) -> Option<T2> {
         if self.float {
             #[expect(
+                clippy::as_conversions,
                 clippy::cast_precision_loss,
-                reason = "the float path rounds by design, f64 holds 53 bits"
+                reason = "the float path rounds by design, f64 holds 53 bits (no From)"
             )]
             let x = match x.to_repr() {
                 Repr::Int(i) => i as f64,
@@ -925,17 +944,13 @@ impl Affine {
         if self.narrow {
             let mut y = x.to_i64();
             if self.num != 1 {
-                y *= self.num as i64;
+                y *= self.num64;
             }
             if self.add != 0 {
-                y += self.add as i64;
+                y += self.add64;
             }
             if self.den != 1 {
-                #[expect(
-                    clippy::cast_possible_truncation,
-                    reason = "on the narrow path den is at most i64::MAX, checked in of"
-                )]
-                let den = self.den as i64;
+                let den = self.den64;
                 if y % den != 0 {
                     return None;
                 }
@@ -962,6 +977,10 @@ impl Affine {
     clippy::cast_possible_wrap,
     reason = "p is checked to be at most i128::MAX"
 )]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 const fn mul_i(a: u128, b: u128) -> Option<i128> {
     match a.checked_mul(b) {
         Some(p) if p <= i128::MAX as u128 => Some(p as i128),
@@ -972,6 +991,10 @@ const fn mul_i(a: u128, b: u128) -> Option<i128> {
 #[expect(
     clippy::cast_possible_wrap,
     reason = "b is checked to be at most i128::MAX"
+)]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
 )]
 const fn mul_s(a: i128, b: u128) -> Option<i128> {
     if b > i128::MAX as u128 {
@@ -1005,8 +1028,9 @@ impl<O: Origin<Unit = U>, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> fmt:
     for Point<O, Fixed<U, P, T, B>>
 {
     #[expect(
+        clippy::as_conversions,
         clippy::cast_precision_loss,
-        reason = "the float is the approximation shown where the ratio doesn't fit"
+        reason = "the float is the approximation shown where the ratio doesn't fit (no From)"
     )]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let map = const { Affine::of::<T, f64>(P::SCALE, O::OFFSET, O::STEP, O::SHOWN) };

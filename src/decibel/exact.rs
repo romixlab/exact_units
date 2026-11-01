@@ -13,6 +13,10 @@ pub(crate) struct Num {
 const TOP: u128 = 1 << 127;
 
 impl Num {
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub(crate) const fn of(x: u128) -> Num {
         assert!(x != 0);
         let z = x.leading_zeros();
@@ -88,6 +92,10 @@ impl Num {
     }
 
     /// The nearest integer, ties to even; `None` above `u128`.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn round_int(self) -> Option<u128> {
         if self.e >= 0 {
             return None;
@@ -142,6 +150,10 @@ impl Num {
 
 /// `a · b` as `(high, low)` 128-bit halves.
 const fn mul_wide(a: u128, b: u128) -> (u128, u128) {
+    #[expect(
+        clippy::as_conversions,
+        reason = "a const item: From is not const on stable"
+    )]
     const LOW: u128 = u64::MAX as u128;
     let (a1, a0) = (a >> 64, a & LOW);
     let (b1, b0) = (b >> 64, b & LOW);
@@ -241,6 +253,10 @@ impl Interval {
     }
 
     /// `10^(n/d) · den / num`, `d > 0`.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub(crate) const fn level(n: i64, d: u64, num: u128, den: u128) -> Interval {
         // n/d = k + r/d with 0 <= r < d
         #[expect(
@@ -279,6 +295,10 @@ impl Interval {
     }
 
     /// The nearest `f64`, ties to even.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub(crate) const fn to_f64(self) -> f64 {
         let (m, e) = Interval::same_float(
             self.lo.round_float(53, -1022, 1023),
@@ -294,6 +314,10 @@ impl Interval {
     }
 
     /// The nearest `f32`, ties to even.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub(crate) const fn to_f32(self) -> f32 {
         let (m, e) = Interval::same_float(
             self.lo.round_float(24, -126, 127),
@@ -322,6 +346,10 @@ impl Interval {
 }
 
 #[cfg(test)]
+#[expect(
+    clippy::as_conversions,
+    reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"
+)]
 mod tests {
     use super::*;
 

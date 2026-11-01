@@ -56,6 +56,10 @@ pub trait IqStorage: ComplexStorage + sealed::Sealed {
 impl IqStorage for i16 {
     type Q = Pow2<-15>;
     type Acc = i64;
+    #[expect(
+        clippy::as_conversions,
+        reason = "a const item: From is not const on stable"
+    )]
     const HEADROOM: u64 = u32::MAX as u64;
     #[inline(always)]
     fn mac(acc: i64, (a, b): (i16, i16), (c, d): (i16, i16), neg: bool) -> i64 {
@@ -289,6 +293,7 @@ impl<U: Unit, P: FixedScale, T: IqStorage> Mac<U, P, T> {
         let den = const {
             match P::SCALE.div(P3::SCALE).to_ratio() {
                 #[expect(
+                    clippy::as_conversions,
                     clippy::cast_possible_wrap,
                     reason = "checked against i128::MAX in the guard"
                 )]
@@ -347,7 +352,7 @@ impl<U: Unit, P: FixedScale, T: IqStorage> Mac<U, P, T> {
         if n == 0 {
             return false;
         }
-        match t.checked_mul(n as i128) {
+        match i128::try_from(n).ok().and_then(|n| t.checked_mul(n)) {
             Some(tn) => T::acc_to_i128(self.re) >= tn,
             // beyond i128, which no sum reaches: above it for a positive threshold, below for a negative one
             None => t < 0,
@@ -653,6 +658,10 @@ impl Nco {
     /// ```
     #[inline]
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn tuned(f: u32, fs: u32) -> Self {
         let step = (((f as u64) << 32) + fs as u64 / 2) / fs as u64;
         #[expect(

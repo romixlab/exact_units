@@ -49,6 +49,10 @@ impl Decimal {
     /// A decimal number as written: `"0.1"`, `"-3"`, `"+2.5e-3"`, `"1_000"`. Panics (a compile error in `const`
     /// code) on anything else, a type suffix (`0.1f32`) included: the storage comes from the context.
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn parse(s: &str) -> Decimal {
         const FORM: &str = "a literal is a decimal number: 0.1, -3, 2.5e-3";
         let b = s.as_bytes();
@@ -139,6 +143,10 @@ impl Decimal {
 
     /// `|self| / scale` as a reduced fraction `(p, q)`, or a compile error for a scale that isn't a fraction of
     /// integers or a fraction too large for `u128`.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn over<P: FixedScale>(self) -> (u128, u128) {
         let Some((snum, sden)) = P::SCALE.to_ratio() else {
             panic!(
@@ -166,6 +174,10 @@ impl Decimal {
     }
 
     /// The stored value nearest to `self` in units of `P`, ties to even, as an `i128`.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn to_int<P: FixedScale>(self) -> i128 {
         if self.num == 0 {
             return 0;
@@ -299,6 +311,7 @@ macro_rules! from_decimal {
             /// [module](crate::literal). A compile error in `const` code (a panic at run time) for a value that
             /// doesn't fit `T` or `B`, or a scale that isn't a fraction of integers.
             #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
+            #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
             pub const fn from_decimal(x: Decimal) -> Self {
                 let v = x.to_int::<P>();
                 if v < $ty::MIN as i128 {

@@ -238,6 +238,10 @@ where
 }
 
 /// Every product of `a0..=a1` and `b0..=b1` fits `T`, else a compile error.
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 const fn proven_product<T: Storage>(a0: i64, a1: i64, b0: i64, b1: i64) {
     let c = [
         a0 as i128 * b0 as i128,
@@ -439,8 +443,13 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
 /// `a · b · num / den` or `a · num / (b · den)`.
 #[derive(Copy, Clone)]
 pub(crate) struct Requant {
-    num: u128,
     den: u128,
+    /// `num` and `den` in the width of the work: `i64` where `narrow`, `i128` for other integers (both fit there,
+    /// asserted in [of_terms](Requant::of_terms)).
+    num64: i64,
+    den64: i64,
+    num128: i128,
+    den128: i128,
     /// Integers whose largest product fits `i64`: the work is in 64 bits.
     narrow: bool,
     /// A float storage on either side: in `f64`, by `num_f / den_f` where both are exact, else by `factor`.
@@ -466,6 +475,10 @@ impl Requant {
 
     /// The factor for a sum of `terms` products (`a·b − c·d` of a complex multiply is 2), whose widened sum must
     /// fit too.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub(crate) const fn of_terms<T: Storage, T3: Storage>(
         m: Magnitude,
         per: bool,
@@ -503,9 +516,19 @@ impl Requant {
             );
             narrow = top <= i64::MAX as u128 && bottom <= i64::MAX as u128;
         }
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_possible_wrap,
+            reason = "used only for integers, where num and den are at most i128::MAX (asserted above) and at most \
+                      i64::MAX where narrow"
+        )]
+        let (num64, den64, num128, den128) = (num as i64, den as i64, num as i128, den as i128);
         Requant {
-            num,
             den,
+            num64,
+            den64,
+            num128,
+            den128,
             narrow,
             float,
             exact_f: ratio.is_some() && num <= 1 << 53 && den <= 1 << 53,
@@ -530,19 +553,11 @@ impl Requant {
         }
         if self.narrow {
             // |a · b · num| fits i64, checked at compile time
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "narrow: num and den are at most i64::MAX, checked at compile time"
-            )]
-            let p = a.to_i64() * b.to_i64() * self.num as i64;
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "narrow: num and den are at most i64::MAX, checked at compile time"
-            )]
+            let p = a.to_i64() * b.to_i64() * self.num64;
             let y = if self.den == 1 {
                 p
             } else {
-                rounding::div_i64(p, self.den as i64, r)
+                rounding::div_i64(p, self.den64, r)
             };
             return settle_narrow(y, o);
         }
@@ -550,19 +565,11 @@ impl Requant {
             return None;
         };
         // fits i128, checked at compile time
-        #[expect(
-            clippy::cast_possible_wrap,
-            reason = "num and den are at most i128::MAX, asserted at compile time"
-        )]
-        let p = a * b * self.num as i128;
-        #[expect(
-            clippy::cast_possible_wrap,
-            reason = "num and den are at most i128::MAX, asserted at compile time"
-        )]
+        let p = a * b * self.num128;
         let y = if self.den == 1 {
             p
         } else {
-            rounding::div_i128(p, self.den as i128, r)
+            rounding::div_i128(p, self.den128, r)
         };
         rounding::settle(y, o)
     }
@@ -585,19 +592,11 @@ impl Requant {
         if self.narrow {
             // |a · b ± c · d| · num fits i64, checked at compile time
             let cd = c.to_i64() * d.to_i64();
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "narrow: num and den are at most i64::MAX, checked at compile time"
-            )]
-            let p = (a.to_i64() * b.to_i64() + if neg { -cd } else { cd }) * self.num as i64;
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "narrow: num and den are at most i64::MAX, checked at compile time"
-            )]
+            let p = (a.to_i64() * b.to_i64() + if neg { -cd } else { cd }) * self.num64;
             let y = if self.den == 1 {
                 p
             } else {
-                rounding::div_i64(p, self.den as i64, r)
+                rounding::div_i64(p, self.den64, r)
             };
             return settle_narrow(y, o);
         }
@@ -608,19 +607,11 @@ impl Requant {
         };
         // fits i128, checked at compile time
         let cd = c * d;
-        #[expect(
-            clippy::cast_possible_wrap,
-            reason = "num and den are at most i128::MAX, asserted at compile time"
-        )]
-        let p = (a * b + if neg { -cd } else { cd }) * self.num as i128;
-        #[expect(
-            clippy::cast_possible_wrap,
-            reason = "num and den are at most i128::MAX, asserted at compile time"
-        )]
+        let p = (a * b + if neg { -cd } else { cd }) * self.num128;
         let y = if self.den == 1 {
             p
         } else {
-            rounding::div_i128(p, self.den as i128, r)
+            rounding::div_i128(p, self.den128, r)
         };
         rounding::settle(y, o)
     }
@@ -635,11 +626,7 @@ impl Requant {
             return self.finish_f64(to_f64(a) / d, r, o);
         }
         if self.narrow {
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "narrow: num and den are at most i64::MAX, checked at compile time"
-            )]
-            let (mut n, mut d) = (a.to_i64() * self.num as i64, b.to_i64() * self.den as i64);
+            let (mut n, mut d) = (a.to_i64() * self.num64, b.to_i64() * self.den64);
             if d == 0 {
                 return None;
             }
@@ -651,11 +638,7 @@ impl Requant {
         let (Repr::Int(a), Repr::Int(b)) = (a.to_repr(), b.to_repr()) else {
             return None;
         };
-        #[expect(
-            clippy::cast_possible_wrap,
-            reason = "num and den are at most i128::MAX, asserted at compile time"
-        )]
-        let (mut n, mut d) = (a * self.num as i128, b * self.den as i128);
+        let (mut n, mut d) = (a * self.num128, b * self.den128);
         if d == 0 {
             return None;
         }
@@ -695,6 +678,7 @@ fn settle_narrow<T3: Storage>(y: i64, o: Overflow) -> Option<T3> {
 fn to_f64<T: Storage>(x: T) -> f64 {
     match x.to_repr() {
         #[expect(
+            clippy::as_conversions,
             clippy::cast_precision_loss,
             reason = "the nearest f64 is the float path's semantics"
         )]

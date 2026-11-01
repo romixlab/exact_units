@@ -125,6 +125,7 @@ macro_rules! range {
             clippy::allow_attributes,
             reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
         )]
+        #[expect(clippy::as_conversions, reason = "const items: From is not const on stable")]
         impl<const MIN: i64, const MAX: i64> Bounds<$ty> for Range<MIN, MAX> {
             #[allow(
                 clippy::cast_possible_truncation,
@@ -175,6 +176,10 @@ impl<const MIN: u64, const MAX: u64> Bounds<u64> for RangeU64<MIN, MAX> {
         Some(MIN)
     };
     const MAX: Option<u64> = Some(MAX);
+    #[expect(
+        clippy::as_conversions,
+        reason = "a const item: From is not const on stable"
+    )]
     const INT_RANGE: Option<(i128, i128)> = Some((MIN as i128, MAX as i128));
 }
 
@@ -185,6 +190,10 @@ impl<const MIN: u64, const MAX: u64> Bounds<UVlq64> for RangeU64<MIN, MAX> {
         None => None,
     };
     const MAX: Option<UVlq64> = Some(UVlq64(MAX));
+    #[expect(
+        clippy::as_conversions,
+        reason = "a const item: From is not const on stable"
+    )]
     const INT_RANGE: Option<(i128, i128)> = Some((MIN as i128, MAX as i128));
 }
 
@@ -192,6 +201,10 @@ impl<const MIN: i64, const MAX: i64, const EXP: i8> Bounds<f64> for RangeDec<MIN
     #[expect(
         clippy::cast_precision_loss,
         reason = "a decimal bound of a float storage, rounded to the nearest f64"
+    )]
+    #[expect(
+        clippy::as_conversions,
+        reason = "a const item: From is not const on stable"
     )]
     const MIN: Option<f64> = {
         ordered::<MIN, MAX>();
@@ -201,6 +214,10 @@ impl<const MIN: i64, const MAX: i64, const EXP: i8> Bounds<f64> for RangeDec<MIN
         clippy::cast_precision_loss,
         reason = "a decimal bound of a float storage, rounded to the nearest f64"
     )]
+    #[expect(
+        clippy::as_conversions,
+        reason = "a const item: From is not const on stable"
+    )]
     const MAX: Option<f64> = Some(MAX as f64 * pow10_f64(EXP));
 }
 
@@ -209,6 +226,10 @@ impl<const MIN: i64, const MAX: i64, const EXP: i8> Bounds<f32> for RangeDec<MIN
         clippy::cast_possible_truncation,
         reason = "the f64 bound rounded to the nearest f32"
     )]
+    #[expect(
+        clippy::as_conversions,
+        reason = "a const item: From is not const on stable"
+    )]
     const MIN: Option<f32> = match <Self as Bounds<f64>>::MIN {
         Some(x) => Some(x as f32),
         None => None,
@@ -216,6 +237,10 @@ impl<const MIN: i64, const MAX: i64, const EXP: i8> Bounds<f32> for RangeDec<MIN
     #[expect(
         clippy::cast_possible_truncation,
         reason = "the f64 bound rounded to the nearest f32"
+    )]
+    #[expect(
+        clippy::as_conversions,
+        reason = "a const item: From is not const on stable"
     )]
     const MAX: Option<f32> = match <Self as Bounds<f64>>::MAX {
         Some(x) => Some(x as f32),

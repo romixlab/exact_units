@@ -101,6 +101,10 @@ const N32: usize = 40;
 
 /// [ATAN_T48] in steps of 2⁻³² turn (a [Bam32]), rounded: the 16-bit forms' angles.
 #[cfg(feature = "angle")]
+#[expect(
+    clippy::as_conversions,
+    reason = "a const item: From is not const on stable"
+)]
 const ATAN_T32: [i32; N16] = {
     let mut t = [0; N16];
     let mut i = 0;
@@ -144,6 +148,10 @@ const QUARTER_T48: u64 = 1 << 46;
 /// ```
 #[cfg(feature = "angle")]
 #[must_use]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 pub const fn atan2_16(y: i16, x: i16) -> Bam16 {
     if x == 0 && y == 0 {
         return Bam16::of(0);
@@ -194,6 +202,10 @@ pub const fn atan2_16(y: i16, x: i16) -> Bam16 {
 /// ```
 #[cfg(feature = "angle")]
 #[must_use]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 pub const fn atan2_32(y: i32, x: i32) -> Bam32 {
     if x == 0 && y == 0 {
         return Bam32::of(0);
@@ -251,6 +263,10 @@ pub const fn atan2_32(y: i32, x: i32) -> Bam32 {
 /// ```
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
 #[must_use]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 pub const fn sin_cos_16(a: Bam16) -> (Q15, Q15) {
     let a = a.get();
     // the nearest multiple of a quarter turn, k, and the rest in -1/8..1/8 turn
@@ -282,6 +298,10 @@ pub const fn sin_cos_16(a: Bam16) -> (Q15, Q15) {
 /// ```
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
 #[must_use]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 pub const fn sin_cos_32(a: Bam32) -> (Q31, Q31) {
     let a = a.get();
     let k = a.wrapping_add(0x2000_0000) >> 30;
@@ -316,6 +336,10 @@ pub const fn sin_cos_32(a: Bam32) -> (Q31, Q31) {
 /// ```
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
 #[must_use]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 pub const fn sin_cos_32_q15(a: Bam32) -> (Q15, Q15) {
     let a = a.get();
     let k = a.wrapping_add(0x2000_0000) >> 30;
@@ -374,6 +398,10 @@ const fn rotate_32(mut z: i64) -> (i64, i64) {
     clippy::cast_possible_truncation,
     reason = "q is checked to be in i16's range"
 )]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
 const fn round_q30_to_q15(v: i32) -> i16 {
     let q = (v + (1 << 14)) >> 15;
     if q > i16::MAX as i32 {
@@ -390,6 +418,10 @@ const fn round_q30_to_q15(v: i32) -> i16 {
 #[expect(
     clippy::cast_possible_truncation,
     reason = "q is checked to be in i32's range"
+)]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
 )]
 const fn round_q60_to_q31(v: i64) -> i32 {
     let q = (v + (1 << 28)) >> 29;

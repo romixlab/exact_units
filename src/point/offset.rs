@@ -110,6 +110,10 @@ impl Offset {
 
     /// `self + rhs`, `None` where [add](Self::add) panics: for offsets read from data (an API model).
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn checked_add(self, rhs: Self) -> Option<Self> {
         let Some((an, ad)) = self.to_ratio() else {
             return None;
@@ -145,6 +149,10 @@ impl Offset {
     }
 
     /// `num / den` from 128-bit parts, `None` when, without common factors, they don't fit a `u64`.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     const fn checked_from_ratio(n: i128, d: u128) -> Option<Self> {
         if n == 0 {
             return Some(Self::ZERO);
@@ -167,6 +175,10 @@ impl Offset {
     /// `(num, den)` without a common factor, if the offset is a fraction of integers that fits: `(5463, 20)` for
     /// 273.15.
     #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
     pub const fn to_ratio(&self) -> Option<(i128, u128)> {
         let Some(m) = self.magnitude else {
             return Some((0, 1));

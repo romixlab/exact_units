@@ -35,8 +35,9 @@ type Gamma<F> = Complex<Per<Volt, Volt>, One, F>;
 macro_rules! invert {
     ($z:expr, $p:ty, $p2:ty, $ty:ident) => {{
         #[allow(
+            clippy::as_conversions,
             clippy::cast_possible_truncation,
-            reason = "the scale factor rounded to the storage's float"
+            reason = "the scale factor rounded to the storage's float (no From)"
         )]
         let k = const { (1.0 / (<$p>::SCALE.to_f64() * <$p2>::SCALE.to_f64())) as $ty };
         let n = $z.re * $z.re + $z.im * $z.im;
