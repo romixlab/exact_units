@@ -27,10 +27,12 @@
 //!   time, exactly; `to_db` / `from_db` at run time in `f64` and `f32` (feature `std` or `libm`).
 //! - [literal]: [fixed!] turns a decimal literal into the stored value of the [Fixed] or [Complex] its context names
 //!   at compile time, exactly rounded: `fixed!(0.1)` in Q30, no hand-computed `107_374_182`.
+//! - `serde` (feature `serde`): every number as the number it stores, bounds checked on reading, and
+//!   `serde::with_unit` for a field as text with its unit (`"1.5 ms"`), read back exactly; `no_std`, no alloc.
 //!
 //! `no_std`, no alloc, and no dependencies without features. `shrink_wrap` adds the wire format (`shrink_wrap`'s),
 //! `std` every unit group and with `shrink_wrap` the owned forms of the wire types, `defmt` their `defmt::Format`,
-//! `libm` the run-time dB without `std`. Unit groups are cargo features (`time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`,
+//! `serde` their serde, `libm` the run-time dB without `std`. Unit groups are cargo features (`time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`,
 //! `radiation`, `dimensionless`, `information`, `counting`, `quantities` for all).
 //!
 //! Run-time quantities (a prefix and a number type chosen per value) are `ww_si`'s `Quantity` and `AnyQuantity`,
