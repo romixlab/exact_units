@@ -102,6 +102,28 @@ let unit = SIExpr::of::<Volt>();
 assert_eq!(unit.symbol().to_string(), "V");
 ```
 
+## Bit fields
+
+A field stored as `U1` .. `U64` or `I2` .. `I64` takes exactly its bits. Three 5-bit readings pack into 2 bytes, not 3:
+
+```rust
+use exact_units::{Fixed, prefix::Milli, units::Volt};
+use shrink_wrap::prelude::*;
+use shrink_wrap::un::U5;
+
+type Level = Fixed<Volt, Milli, U5>;
+let a = Level::new(U5::new(9).unwrap());
+let b = Level::new(U5::new(31).unwrap());
+let c = Level::new(U5::zero());
+
+let mut buf = [0u8; 8];
+let mut wr = BufWriter::new(&mut buf);
+wr.write(&a).unwrap();
+wr.write(&b).unwrap();
+wr.write(&c).unwrap();
+assert_eq!(wr.finish().unwrap().len(), 2); // 15 bits
+```
+
 ## serde: configs and other formats
 
 The `serde` feature gives the same rule to any serde format: a value is its stored number. It is `no_std` without alloc, so postcard on a firmware works as well as JSON on a host.

@@ -345,16 +345,19 @@
 .md-typeset .eu-bit--pad { --eu-bg: var(--eu-pad-bg); --eu-fg: var(--eu-pad-fg); }
 .md-typeset .eu-bits__strip {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: 1px;
   font-family: var(--md-code-font-family);
   font-size: 0.8rem;
 }
+/* a cell shrinks so 32 bits stay on one line in the text column; on a phone the strip scrolls */
 .md-typeset .eu-bit {
   display: inline-flex;
+  flex: 0 1 1.6em;
   flex-direction: column;
   align-items: center;
-  width: 1.6em;
+  min-width: 1.15em;
   padding-bottom: 0.15em;
   border-radius: 2px;
   line-height: 1.4;
@@ -379,6 +382,7 @@
 .md-typeset .eu-bits__key .eu-bit {
   display: inline-block;
   width: 0.9em;
+  min-width: 0;
   height: 0.9em;
   margin-right: 0.35em;
   padding: 0;
@@ -410,6 +414,12 @@
   word-break: break-all;
   background: var(--eu-bg);
   color: var(--eu-fg);
+}
+
+/* An identifier in a table's first column (a rounding mode, a bound, a type) never breaks inside */
+.md-typeset table:not([class]) td:first-child code {
+  white-space: nowrap;
+  word-break: normal;
 }
 
 /* A wider text column on large screens, so code examples rarely scroll */

@@ -81,6 +81,18 @@ assert_eq!(small.to_string(), "-1250 mV");
 assert_eq!(float.to_string(), "-1250 mV");
 ```
 
+With the `shrink_wrap` feature, `T` can also be an exact-width integer, `U1` .. `U64` or `I2` .. `I64`. It wraps and saturates at its own width, and takes only its bits [on the wire](../wire/shrink_wrap.md#bit-fields):
+
+```rust
+use exact_units::{Fixed, prefix::Milli, units::Volt};
+use shrink_wrap::un::U5;
+
+let v: Fixed<Volt, Milli, u8> = Fixed::new(31);
+let narrow = v.to::<Milli, U5>().unwrap(); // 0 ..= 31 fits 5 bits
+assert_eq!(narrow.to::<Milli, u8>(), Some(v));
+assert_eq!(Fixed::<Volt, Milli, u8>::new(32).to::<Milli, U5>(), None);
+```
+
 ## Arithmetic, briefly
 
 Values of one type add and subtract. A number of the storage multiplies and divides.
