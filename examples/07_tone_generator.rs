@@ -25,11 +25,6 @@ fn sine(phase: Bam16, amplitude: f32) -> Q15 {
     Fixed::of(((turns * TAU).sin() * amplitude * 32767.0) as i16)
 }
 
-/// A Q15 as a number, for printing.
-fn f(x: Q15) -> f32 {
-    x.get() as f32 / 32768.0
-}
-
 fn main() {
     // the oscillator: 1 kHz at 48 kHz sample rate is 65536 / 48 steps per sample; it wraps past a full turn,
     // and that is exactly what a phase should do
@@ -47,18 +42,13 @@ fn main() {
     let a: Q15 = fixed!(0.8);
     let b: Q15 = fixed!(0.5);
     let mixed = a + b; // saturates at the top of Q15
-    println!(
-        "{:.3} + {:.3} = {:.3} (Q15 saturates)",
-        f(a),
-        f(b),
-        f(mixed)
-    );
+    println!("{a:#.3} + {b:#.3} = {mixed:#.3} (Q15 saturates)");
     assert_eq!(mixed.get(), i16::MAX);
     // the plain i16 version, as a release build computes it: the click
     let plain = 26214i16.wrapping_add(16384);
     println!(
-        "plain i16: 26214 + 16384 = {plain}, i.e. {:.3}",
-        plain as f32 / 32768.0
+        "plain i16: 26214 + 16384 = {plain}, i.e. {:#.3}",
+        Q15::<Ratio>::of(plain)
     );
 
     // a few samples of voice one (at 0.8) mixed with voice two held at 0.5: the peaks clamp, they don't flip
@@ -67,11 +57,9 @@ fn main() {
         let one = sine(phase, 0.8);
         let plain = one.get().wrapping_add(b.get());
         println!(
-            "phase {phase:#}: {:.3} + {:.3} = {:.3} (plain i16: {:.3})",
-            f(one),
-            f(b),
-            f(one + b),
-            plain as f32 / 32768.0
+            "phase {phase:#}: {one:#.3} + {b:#.3} = {:#.3} (plain i16: {:#.3})",
+            one + b,
+            Q15::<Ratio>::of(plain)
         );
         phase += Bam16::of(8192); // an eighth of a turn
     }
@@ -81,12 +69,7 @@ fn main() {
     let volume: Q15 = fixed!(0.5);
     let quiet: Fixed<_, Pow2<-15>, i16> = mixed.times_into(volume, Rounding::Floor).unwrap();
     let quiet = quiet.convert::<Ratio, Pow2<-15>, i16>().unwrap();
-    println!(
-        "{:.3} at volume {:.3} = {:.3}",
-        f(mixed),
-        f(volume),
-        f(quiet.with_overflow())
-    );
+    println!("{mixed:#.3} at volume {volume:#.3} = {quiet:#.3}");
 
     // what it costs: a Q15 · Q15 into Q15 (floor, saturating) on a Cortex-M3 retires 975 instructions over 64 values
     // plain and 975 typed at opt-level "z", 698 and 698 at 3 (QEMU, see exact_units::fixed::product's docs). Both

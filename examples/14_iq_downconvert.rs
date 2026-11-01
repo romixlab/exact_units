@@ -68,11 +68,6 @@ mod dsp {
     }
 }
 
-/// A Q15 as a number, for printing.
-fn f(x: i16) -> f32 {
-    x as f32 / 32768.0
-}
-
 const N: usize = 64;
 
 fn main() {
@@ -86,11 +81,9 @@ fn main() {
     let mut buf = [0i16; 2 * N]; // the DMA buffer: re₀, im₀, re₁, im₁, ...
     Sample::write_interleaved(&samples, &mut buf);
     println!(
-        "ADC: {:.3}{:+.3}j, {:.3}{:+.3}j, ... (3 kHz, turning 22.5° a sample)",
-        f(buf[0]),
-        f(buf[1]),
-        f(buf[2]),
-        f(buf[3])
+        "ADC: {:#.3}, {:#.3}, ... (3 kHz, turning 22.5° a sample)",
+        Sample::of(buf[0], buf[1]),
+        Sample::of(buf[2], buf[3])
     );
 
     // the receiver: an NCO at the same 3 kHz takes it down to 0 Hz, a constant 0.5, in place
@@ -102,7 +95,7 @@ fn main() {
     let power = dsp::downconvert(&mut buf, &mut rx);
     for y in Sample::from_interleaved(&buf).take(3) {
         let (re, im) = y.get();
-        println!("mixed down: {:.4}{:+.4}j", f(re), f(im));
+        println!("mixed down: {y:#.4}");
         assert!((re as i32 - 16384).abs() <= 2 && im.abs() <= 2);
     }
 
@@ -121,7 +114,7 @@ fn main() {
     // the corner: (−1 − j)² = 2j. Typed, im saturates at 1 − 2⁻¹⁵; plain i32 products wrap to 0
     let m: CQ15 = Complex::of(i16::MIN, i16::MIN);
     let sq = m.mul_round(m, Rounding::NearestEven);
-    println!("(-1-1j)² typed: {:.4}{:+.4}j", f(sq.get().0), f(sq.get().1));
+    println!("(-1-1j)² typed: {sq:#.4}");
     assert_eq!(sq.get(), (0, i16::MAX));
     let (a, b) = (i16::MIN as i32, i16::MIN as i32);
     let plain_im = (a * b).wrapping_add(b * a) >> 15; // a·d + b·c in int32_t, as a release build computes it

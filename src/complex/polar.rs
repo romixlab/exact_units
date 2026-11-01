@@ -97,14 +97,19 @@ impl<U, P, T: Storage, A: PartialEq> PartialEq for Polar<U, P, T, A> {
     }
 }
 
-/// `50 Ω ∠ 0.927 rad`: both as they show themselves, `{:#}` passed on.
+/// `50 Ω ∠ 0.927 rad`: both as they show themselves, `{:#}` and its precision passed on.
 impl<U, P, T: Storage, A: fmt::Display> fmt::Display for Polar<U, P, T, A>
 where
     Fixed<U, P, T>: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
-            write!(f, "{:#} ∠ {:#}", self.abs, self.arg)
+            // the precision for both, the width for the whole
+            let prec = f.precision();
+            crate::fixed::format::pad(f, false, |f| match prec {
+                Some(p) => write!(f, "{:#.p$} ∠ {:#.p$}", self.abs, self.arg),
+                None => write!(f, "{:#} ∠ {:#}", self.abs, self.arg),
+            })
         } else {
             write!(f, "{} ∠ {}", self.abs, self.arg)
         }

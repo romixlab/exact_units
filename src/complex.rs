@@ -69,7 +69,7 @@
 //! let _ = Complex::<Ohm, One, i32>::new(1, 2) / Complex::<Ohm, One, i32>::new(1, 2);
 //! ```
 
-use crate::fixed::{Requant, check_product, write_prefix_unit, write_si_value};
+use crate::fixed::{Number, Requant, check_product, format, write_prefix_unit};
 use crate::prefix::{Product, Quotient};
 use crate::units::{Per, Times};
 use crate::{
@@ -709,30 +709,33 @@ mod arith {
     float_div!(f32 f64);
 }
 
-/// `3+4j Ω`, `3-4j mΩ`; with `{:#}` both parts in the unit itself, `0.05+0.025j Ω`.
+/// `3+4j Ω`, `3-4j mΩ`; with `{:#}` both parts in the unit itself, `0.05+0.025j Ω`, as [Fixed]'s `{:#}` writes
+/// them: a precision for each part (`{:#.2}` is `0.05+0.02j Ω`), width, fill and alignment for the whole field.
 impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> fmt::Display
     for Complex<U, P, T, B>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if f.alternate() {
+            let (re, im) = (Number::of(self.re, P::SCALE), Number::of(self.im, P::SCALE));
+            let prec = f.precision();
+            return format::pad(f, re.is_negative(), |f| {
+                re.write_abs(prec, f)?;
+                f.write_str(if im.is_negative() { "-" } else { "+" })?;
+                im.write_abs(prec, f)?;
+                f.write_str("j")?;
+                crate::tree::write_unit(crate::Prefix::Unit, &U::EXPR, f)
+            });
+        }
         // a negative part (−0.0 too) brings its own sign
         let plus = match self.im.to_repr() {
             Repr::Int(x) => x >= 0,
             Repr::Float(x) => !x.is_sign_negative(),
         };
-        let sign = if plus { "+" } else { "" };
-        if f.alternate() {
-            write_si_value::<P, T>(self.re, f)?;
-            f.write_str(sign)?;
-            write_si_value::<P, T>(self.im, f)?;
-            f.write_str("j")?;
-            crate::tree::write_unit(crate::Prefix::Unit, &U::EXPR, f)
-        } else {
-            self.re.fmt_number(f)?;
-            f.write_str(sign)?;
-            self.im.fmt_number(f)?;
-            f.write_str("j")?;
-            write_prefix_unit::<P>(U::EXPR, f)
-        }
+        self.re.fmt_number(f)?;
+        f.write_str(if plus { "+" } else { "" })?;
+        self.im.fmt_number(f)?;
+        f.write_str("j")?;
+        write_prefix_unit::<P>(U::EXPR, f)
     }
 }
 

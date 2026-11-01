@@ -15,7 +15,8 @@
 //! optional modulus (a turn, for angles that wrap) and how it is shown (°C, °F). On the wire a point is exactly its
 //! number.
 
-use crate::fixed::write_decimal;
+use crate::fixed::Number;
+use crate::fixed::format::pad;
 use crate::{
     Bounds, Fixed, FixedScale, Magnitude, OutOfBounds, Repr, Storage, Unit, UnitExpr, Unlimited,
 };
@@ -891,57 +892,50 @@ const fn mul_s(a: i128, b: u128) -> Option<i128> {
     a.checked_mul(b as i128)
 }
 
-/// `n / d` exactly as a decimal when `d` has no prime but 2 and 5 (and the digits fit), else as a float.
-pub(crate) fn write_ratio(n: i128, d: i128, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let g = offset::gcd(n.unsigned_abs(), d.unsigned_abs()) as i128;
-    let (n, d) = (n / g, d / g);
-    if d == 1 {
-        return write!(f, "{n}");
-    }
-    let (mut rest, mut digits) = (d, 0i8);
-    let mut scale: i128 = 1;
-    while rest % 10 == 0 || rest % 2 == 0 || rest % 5 == 0 {
-        // one more decimal digit takes out a 2, a 5 or both
-        if rest % 10 == 0 {
-            rest /= 10;
-        } else if rest % 2 == 0 {
-            rest /= 2;
-            scale *= 5;
-        } else {
-            rest /= 5;
-            scale *= 2;
-        }
-        digits += 1;
-        if digits > 30 {
-            break;
-        }
-    }
-    match n.checked_mul(scale) {
-        Some(x) if rest == 1 && digits <= 30 => write_decimal(x, -digits, f),
-        _ => write!(f, "{}", n as f64 / d as f64),
-    }
+/// `n / d` without a common factor, to write as a decimal: exactly when `d` has no prime but 2 and 5.
+pub(crate) fn ratio(n: i128, d: i128) -> Number {
+    let g = offset::gcd(n.unsigned_abs(), d.unsigned_abs()).max(1);
+    Number::ratio(
+        (n < 0) != (d < 0),
+        n.unsigned_abs() / g,
+        d.unsigned_abs() / g,
+    )
 }
 
-/// The number on the origin's own scale with its symbol: `25.5 °C`, `98 °F`, exact where the steps are decimal.
+/// `n / d` as [ratio] writes it, with its sign.
+pub(crate) fn write_ratio(n: i128, d: i128, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let x = ratio(n, d);
+    if x.is_negative() {
+        f.write_str("-")?;
+    }
+    x.write_abs(None, f)
+}
+
+/// The number on the origin's own scale with its symbol: `25.5 °C`, `98 °F`, exact where the steps are decimal. A
+/// precision rounds the number as [Fixed]'s `{:#}` does (`{:.1}`); width, fill and alignment take the symbol in.
 impl<O: Origin<Unit = U>, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> fmt::Display
     for Point<O, Fixed<U, P, T, B>>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let map = const { Affine::of::<T, f64>(P::SCALE, O::OFFSET, O::STEP, O::SHOWN) };
-        match self.raw().to_repr() {
+        let x = match self.raw().to_repr() {
             Repr::Int(x) if P::SCALE.div(O::STEP).is_rational() => {
                 match x.checked_mul(map.num).and_then(|y| y.checked_add(map.add)) {
-                    Some(y) => write_ratio(y, map.den, f)?,
-                    None => write!(f, "{}", (x as f64 * map.num_f + map.add_f) / map.den_f)?,
+                    Some(y) => ratio(y, map.den),
+                    None => Number::Float((x as f64 * map.num_f + map.add_f) / map.den_f),
                 }
             }
-            Repr::Int(x) => write!(f, "{}", (x as f64 * map.num_f + map.add_f) / map.den_f)?,
-            Repr::Float(x) => write!(f, "{}", (x * map.num_f + map.add_f) / map.den_f)?,
-        }
-        if !O::SYMBOL.is_empty() {
-            write!(f, " {}", O::SYMBOL)?;
-        }
-        Ok(())
+            Repr::Int(x) => Number::Float((x as f64 * map.num_f + map.add_f) / map.den_f),
+            Repr::Float(x) => Number::Float((x * map.num_f + map.add_f) / map.den_f),
+        };
+        let prec = f.precision();
+        pad(f, x.is_negative(), |f| {
+            x.write_abs(prec, f)?;
+            if !O::SYMBOL.is_empty() {
+                write!(f, " {}", O::SYMBOL)?;
+            }
+            Ok(())
+        })
     }
 }
 

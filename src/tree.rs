@@ -305,9 +305,24 @@ pub fn offset<'t, E: Tree<'t>>(e: &E) -> f64 {
     }
 }
 
-/// A named unit without a symbol ([Ratio](crate::units::Ratio)): a prefix is written as %, ‰, ppm, ppb.
+/// A named unit without a symbol ([Ratio](crate::units::Ratio)), or products, quotients and powers of such
+/// (`Ratio · Ratio`, a Q15 squared): a prefix is written as %, ‰, ppm, ppb, no prefix as nothing.
 pub fn is_ratio<'t, E: Tree<'t>>(e: &E) -> bool {
-    matches!(e.node(), Some(Node::Named { symbol: "", .. }))
+    ratio_at(e, 0)
+}
+
+fn ratio_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> bool {
+    if depth >= MAX_UNIT_DEPTH {
+        return false;
+    }
+    match e.node() {
+        Some(Node::Named { symbol, .. }) => symbol.is_empty(),
+        Some(Node::Mul(a, b) | Node::Div(a, b)) => {
+            ratio_at(&a, depth + 1) && ratio_at(&b, depth + 1)
+        }
+        Some(Node::Pow(a, _) | Node::Sqrt(a)) => ratio_at(&a, depth + 1),
+        None => false,
+    }
 }
 
 /// A named unit (no parentheses after a prefix).

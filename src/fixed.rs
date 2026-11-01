@@ -23,7 +23,9 @@ mod product;
 pub(crate) use product::{Requant, check as check_product};
 mod rounding;
 pub(crate) use rounding::{div_i128 as round_div_i128, settle as settle_i128};
+pub(crate) mod format;
 mod storage;
+pub(crate) use format::Number;
 
 /// A value in unit `U` and prefix `P`, stored as `T`, within the bounds `B`: on the wire exactly `T`, the unit,
 /// prefix and bounds are only in the type. `shared_us: u64` becomes `shared: Fixed<Second, Micro, u64>` (or
@@ -1043,50 +1045,28 @@ fn rescale<T: Storage>(x: Repr, scale: Magnitude) -> Option<T> {
 }
 
 /// The number as stored and the prefix with the unit: `1500 µs`, `4 KiB`, `50 %`, a scale without a prefix after
-/// the number (`15·10⁻⁴ s`, `32767·1/65535`); `{:#}` writes it in the unit itself, `0.0015 s`.
+/// the number (`15·10⁻⁴ s`, `32767·1/65535`).
+///
+/// `{:#}` writes the value in the unit itself, `0.0015 s`: exactly where the steps are a fraction of integers whose
+/// decimal ends (powers of ten, Q formats and binary angles, `1/65535` not), as a float otherwise. A dimensionless
+/// value is the number alone: a [Q15](crate::Q15) of 0.8 is `0.8` (`0.79998779296875` exactly, as it is stored).
+/// It takes the formatter's flags: a precision rounds to that many digits, to the nearest and a tie to even (like
+/// Rust's float formatting and [Rounding::NearestEven]), so `{:#.3}` of that Q15 is `0.800`; width, fill, alignment,
+/// `+` and `0` apply to the whole field with the unit (`{:#10.2}` of 1500 mV is `    1.50 V`).
 impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> fmt::Display for Fixed<U, P, T, B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
-            write_si_value::<P, T>(self.value, f)?;
-            write_unit(Prefix::Unit, &U::EXPR, f)
+            let x = Number::of(self.value, P::SCALE);
+            let prec = f.precision();
+            format::pad(f, x.is_negative(), |f| {
+                x.write_abs(prec, f)?;
+                write_unit(Prefix::Unit, &U::EXPR, f)
+            })
         } else {
             self.value.fmt_number(f)?;
             write_prefix_unit::<P>(U::EXPR, f)
         }
     }
-}
-
-/// `v` steps of `P` as a number of the unit itself: exact for a power of ten, else as a float.
-pub(crate) fn write_si_value<P: FixedScale, T: Storage>(
-    v: T,
-    f: &mut fmt::Formatter<'_>,
-) -> fmt::Result {
-    match v.to_repr() {
-        Repr::Int(x) => match (P::SCALE.apply_int(x), P::SCALE.as_pow10()) {
-            (Some(x), _) => write!(f, "{x}"),
-            (None, Some(e)) => write_decimal(x, e, f),
-            (None, None) => write!(f, "{}", P::SCALE.apply_f64(x as f64)),
-        },
-        Repr::Float(x) => write!(f, "{}", P::SCALE.apply_f64(x)),
-    }
-}
-
-/// An integer at a power of ten below the unit, exactly: 1500 at 10⁻⁶ is `0.0015`.
-pub(crate) fn write_decimal(x: i128, e: i8, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    if !(-38..0).contains(&e) {
-        return write!(f, "{}", Magnitude::pow10(e).apply_f64(x as f64));
-    }
-    let digits = e.unsigned_abs() as u32;
-    let p = 10u128.pow(digits);
-    let m = x.unsigned_abs();
-    let (int, mut frac) = (m / p, m % p);
-    let mut width = digits as usize;
-    while frac % 10 == 0 {
-        frac /= 10;
-        width -= 1;
-    }
-    let sign = if x < 0 { "-" } else { "" };
-    write!(f, "{sign}{int}.{frac:0width$}")
 }
 
 pub(crate) fn write_prefix_unit<P: FixedScale>(
