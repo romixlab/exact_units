@@ -1,0 +1,31 @@
+<svg class="eu-svg" viewBox="0 0 560 210" width="560" height="210" role="img" aria-label="The four parameters of Fixed: unit, scale, storage and bounds; in memory the plain u32" xmlns="http://www.w3.org/2000/svg">
+  <text x="40" y="34" class="mono" style="font-size:15px" textLength="369" lengthAdjust="spacingAndGlyphs">Fixed&lt;Second, Micro, u32, Range&lt;1, 5000&gt;&gt;</text>
+  <path d="M94 44 v6 h54 v-6" class="accent-line"/>
+  <path d="M166 44 v6 h45 v-6" class="blue-line"/>
+  <path d="M229 44 v6 h27 v-6" class="green-line"/>
+  <path d="M274 44 v6 h126 v-6" class="purple-line"/>
+  <line x1="121" y1="50" x2="121" y2="66" class="thin"/>
+  <line x1="188.5" y1="50" x2="188.5" y2="94" class="thin"/>
+  <line x1="242.5" y1="50" x2="242.5" y2="66" class="thin"/>
+  <line x1="337" y1="50" x2="337" y2="94" class="thin"/>
+  <text x="121" y="81" text-anchor="middle">unit</text>
+  <text x="121" y="97" text-anchor="middle" class="soft">time, in s</text>
+  <text x="188.5" y="109" text-anchor="middle">scale</text>
+  <text x="188.5" y="125" text-anchor="middle" class="soft">a step is 10⁻⁶</text>
+  <text x="242.5" y="81" text-anchor="middle">storage</text>
+  <text x="242.5" y="97" text-anchor="middle" class="soft">the bytes</text>
+  <text x="337" y="109" text-anchor="middle">bounds</text>
+  <text x="337" y="125" text-anchor="middle" class="soft">1 ..= 5000 allowed</text>
+  <text x="40" y="164">In memory and on the wire, 1500 µs is</text>
+  <g class="mono">
+    <rect x="300" y="146" width="34" height="26" rx="3" class="faint"/>
+    <rect x="336" y="146" width="34" height="26" rx="3" class="faint"/>
+    <rect x="372" y="146" width="34" height="26" rx="3" class="faint"/>
+    <rect x="408" y="146" width="34" height="26" rx="3" class="faint"/>
+    <text x="317" y="164" text-anchor="middle" class="mono">dc</text>
+    <text x="353" y="164" text-anchor="middle" class="mono">05</text>
+    <text x="389" y="164" text-anchor="middle" class="mono">00</text>
+    <text x="425" y="164" text-anchor="middle" class="mono">00</text>
+  </g>
+  <text x="300" y="194" class="soft">the u32 1500, nothing else</text>
+</svg>

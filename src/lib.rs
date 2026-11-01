@@ -47,6 +47,10 @@ extern crate std;
 #[doc = include_str!("../README.md")]
 struct ReadmeDoctests;
 
+// the book's pages (docs/) run as doctests too, so every example on the site compiles and does what it says
+#[cfg(all(doctest, feature = "std"))]
+mod book;
+
 pub mod complex;
 pub mod cordic;
 pub mod decibel;

@@ -1,0 +1,99 @@
+---
+level: basic
+---
+
+# Units and dimensions
+
+## Unit markers
+
+A unit is a zero-size marker type in `exact_units::units`: `Second`, `Volt`, `Byte`, `Sample`. Each knows its dimension, its symbol and its exact scale.
+
+The markers come in groups, one cargo feature each. A firmware turns on only the groups it uses.
+
+| Feature | Units |
+|---|---|
+| `time` | `Second`, `Minute`, `Hour`, `Day`, `Week`, `Hertz`, `HertzPerSecond`, `Baud` |
+| `electrical` | `Ampere`, `Volt`, `Ohm`, `Farad`, `Siemens`, `Henry`, `Coulomb`, `Watt`, `VoltAmpere`, `Var`, `Weber`, `Tesla` |
+| `mechanical` | `Meter`, `KiloGram`, `Newton`, `Pascal`, `Joule`, `Torque`, `Litre`, `Speed`, `Acceleration`, ... |
+| `angle` | `Radian`, `Degree`, `Turn`, `Steradian`, `AngularVelocity`, `AngularAcceleration` |
+| `thermal` | `Kelvin`, `DegreeCelsius` |
+| `chemical` | `Mole`, `Katal` |
+| `photometric` | `Candela`, `Lumen`, `Lux` |
+| `radiation` | `Becquerel`, `Gray`, `Sievert`, `ElectronVolt` |
+| `dimensionless` | `Ratio`: duty, probability, scale |
+| `information` | `Bit`, `Nibble`, `Byte`, `Halfword`, `Word`, `Doubleword` |
+| `counting` | `Item`, `Sample`, `Frame`, `Packet`, `Line`, `Row`, `Record`, `Entry`, `Cycle`, `Block`, `Sector`, `Chunk`, `Char`, `Code` |
+| `customary` | inch, pound, psi, gallon and the rest: [Customary units](../customary.md) |
+
+`quantities` turns on every group but `customary`. `std` turns on `quantities`.
+
+## Building units
+
+Three markers build the units nobody named:
+
+- `Per<A, B>`: a quotient, $A / B$. A voltage gain is `Per<Volt, Volt>`.
+- `Times<A, B>`: a product, $A \cdot B$. An impulse is `Times<Newton, Second>`.
+- `Sqrt<A>`: a root, $\sqrt{A}$. A noise density is `Per<Volt, Sqrt<Hertz>>`.
+
+```rust
+use exact_units::{Fixed, prefix::Nano, units::{Hertz, Per, Sqrt, Volt}};
+
+let noise: Fixed<Per<Volt, Sqrt<Hertz>>, Nano, u32> = Fixed::new(12);
+assert_eq!(noise.to_string(), "12 n(V/√Hz)");
+```
+
+## Dimensions
+
+Every unit has a dimension: the powers of the base quantities it is made of. A volt is
+
+$$
+\mathrm{V} = \mathrm{kg} \cdot \mathrm{m}^{2} \cdot \mathrm{s}^{-3} \cdot \mathrm{A}^{-1}
+$$
+
+Two units convert only when their dimensions are equal. Besides the seven SI bases, `exact_units` has more:
+
+```mermaid
+graph LR
+  D[Dim] --> SI["SI bases<br/>s, m, kg, A, K, mol, cd"]
+  D --> AN["angle<br/>rad"]
+  D --> IN["information<br/>bit"]
+  D --> CO["counted bases<br/>Sample, Packet, your own"]
+  D --> RT["a square root<br/>√Hz"]
+```
+
+### Angle is a dimension
+
+In SI an angle is a plain number. Here it is a dimension of its own, so two classic mix-ups don't compile.
+
+A torque is N·m per radian, not an energy:
+
+```rust,compile_fail
+use exact_units::{Fixed, prefix::One, units::{Joule, Torque}};
+
+let _ = Fixed::<Torque, One, i32>::new(5).convert::<Joule, One, i32>();
+```
+
+50 Hz is not 50 rad/s:
+
+```rust,compile_fail
+use exact_units::{Fixed, prefix::One, units::{AngularVelocity, Hertz}};
+
+let _ = Fixed::<Hertz, One, u32>::new(50).convert::<AngularVelocity, One, u32>();
+```
+
+### Counted things are dimensions
+
+Samples, packets, frames and bytes each have a dimension of their own. A buffer sized in samples is not one sized in bytes:
+
+```rust,compile_fail
+use exact_units::{Fixed, prefix::One, units::{Byte, Sample}};
+
+let samples: Fixed<Sample, One, u32> = Fixed::new(256);
+let _ = samples.convert::<Byte, One, u32>();
+```
+
+An API declares its own counted units too: [Your own units](../units/declare.md).
+
+## Kinds
+
+Some units share a dimension and still mean different things: a resistance (Ω) and a transimpedance (V/A), a voltage gain (V/V) and a duty cycle. Those are [kinds](../maths/kinds.md), and they don't convert into each other either.
