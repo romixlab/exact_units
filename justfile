@@ -8,7 +8,7 @@ default:
 test *flags:
     CARGO_BUILD_WARNINGS=deny cargo nextest run --features customary,serde --no-fail-fast
     CARGO_BUILD_WARNINGS=deny cargo nextest run --no-default-features --features std --no-fail-fast
-    CARGO_BUILD_WARNINGS=deny cargo nextest run --no-default-features --features shrink_wrap,quantities --no-fail-fast
+    CARGO_BUILD_WARNINGS=deny cargo nextest run --no-default-features --features shrink_wrap,quantities,serde --no-fail-fast
     # nextest does not run doctests
     CARGO_BUILD_WARNINGS=deny cargo test --doc --features customary,serde
 
@@ -34,9 +34,9 @@ check:
     cargo check --no-default-features --features=defmt
     cargo check --no-default-features --features=time,information,counting,dimensionless
     cargo check --no-default-features --features=std
-    cargo check --no-default-features --features=shrink_wrap,defmt,time
+    cargo check --no-default-features --features=shrink_wrap,defmt,time,serde
     cargo check --no-default-features --features=electrical,libm --target thumbv7em-none-eabihf
-    cargo check --no-default-features --features=angle,dimensionless --target thumbv6m-none-eabi
+    cargo check --no-default-features --features=angle,dimensionless,counting,serde --target thumbv6m-none-eabi
 
 # A library has nothing to put on PATH: builds it with the deploy profile, as a dependent's release build would
 install:
@@ -60,7 +60,7 @@ _cov-collect:
     cargo llvm-cov clean --workspace
     cargo llvm-cov nextest --no-report --features customary,serde
     cargo llvm-cov nextest --no-report --no-default-features --features std
-    cargo llvm-cov nextest --no-report --no-default-features --features shrink_wrap,quantities
+    cargo llvm-cov nextest --no-report --no-default-features --features shrink_wrap,quantities,serde
 
 # Test coverage as CI computes it: lcov.info plus a summary printed
 cov: _cov-collect

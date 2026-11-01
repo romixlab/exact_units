@@ -58,6 +58,8 @@ mod magnitude;
 pub mod num;
 mod point;
 mod products;
+#[cfg(feature = "serde")]
+pub mod serde;
 #[cfg(feature = "shrink_wrap")]
 mod si_expr;
 mod si_prefix;

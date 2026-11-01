@@ -1005,7 +1005,7 @@ impl Magnitude {
 
 /// A [Magnitude] in serde (RON snapshots of APIs): its parts, each exponent doubled as on the wire, `primes` as
 /// `(prime, exp_x2)`; rebuilt with [Magnitude::from_parts_x2], so a hand-edited file can't hold a non-canonical one.
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "std"))]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct MagnitudeParts {
     pow10: i8,
@@ -1021,7 +1021,7 @@ struct MagnitudeParts {
     primes: Vec<(u32, i8)>,
 }
 
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "std"))]
 #[expect(
     clippy::trivially_copy_pass_by_ref,
     reason = "serde's skip_serializing_if passes a reference"
@@ -1030,7 +1030,7 @@ fn is_zero(x: &i8) -> bool {
     *x == 0
 }
 
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "std"))]
 impl serde::Serialize for Magnitude {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let (pow10, pow2) = self.pow10_pow2_x2();
@@ -1047,7 +1047,7 @@ impl serde::Serialize for Magnitude {
     }
 }
 
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "std"))]
 impl<'de> serde::Deserialize<'de> for Magnitude {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let p = MagnitudeParts::deserialize(deserializer)?;

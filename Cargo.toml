@@ -16,15 +16,17 @@ exclude = ["assets/"]
 [features]
 default = ["std", "shrink_wrap"]
 # std enables every unit group but `customary`, like ww_si's; with `shrink_wrap` also the owned wire mirrors
-std = ["shrink_wrap?/std", "quantities"]
+std = ["shrink_wrap?/std", "serde?/std", "quantities"]
 defmt = ["dep:defmt", "shrink_wrap?/defmt"]
 # the wire format: SerializeShrinkWrap / DeserializeShrinkWrap for every type, SIExpr, Fixed over UNib32, UVlq*, Nibble
 shrink_wrap = ["dep:shrink_wrap"]
 # log10 and 10^x from libm (pure Rust) for `Fixed::to_db` / `from_db` and their f32 forms without std; with std
 # too, so every target computes the same bits
 libm = ["dep:libm"]
-# serde for the owned wire mirrors (DimOwned, CountedOwned) and Magnitude: units in RON snapshots of APIs
-serde = ["std", "shrink_wrap", "dep:serde"]
+# serde for the numbers (Fixed, Complex, Point, Polar, indices, Decibels) as their stored values, bounds checked on
+# reading, and `serde::with_unit` for "1.5 ms" text: no_std, no alloc. With `std` also Magnitude and Offset, with
+# `std` and `shrink_wrap` the owned wire mirrors (DimOwned, CountedOwned, ProvenanceOwned), for RON snapshots of APIs
+serde = ["dep:serde"]
 
 # unit groups: a firmware enables the ones it uses, `quantities` all of them but `customary`
 quantities = [
@@ -69,7 +71,7 @@ counting = []
 [dependencies]
 defmt = { version = "1.1", optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
-serde = { version = "1.0", default-features = false, features = ["derive", "std"], optional = true }
+serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
 # WireWeaver's wire format; from its repository until shrink_wrap 0.2 is on crates.io. wire_weaver itself
 # [patch]es this source to its own shrink_wrap, so there is one shrink_wrap in its builds.
 shrink_wrap = { version = "0.2.0", git = "https://github.com/vhrdtech/wire_weaver", default-features = false, optional = true }
@@ -77,6 +79,9 @@ shrink_wrap = { version = "0.2.0", git = "https://github.com/vhrdtech/wire_weave
 [dev-dependencies]
 # the reference the compile-time levels are tested against
 libm = { version = "0.2", default-features = false }
+# serde round trips (tests/serde.rs, tests/props): a binary format without alloc and JSON
+postcard = { version = "1.1", default-features = false }
+serde_json = { version = "1.0", default-features = false, features = ["std"] }
 
 # property tests (tests/props); not under Kani, which runs the same properties as proofs (`just verify`)
 [target.'cfg(not(kani))'.dev-dependencies]
@@ -90,6 +95,11 @@ required-features = ["shrink_wrap"]
 [[test]]
 name = "series"
 required-features = ["shrink_wrap"]
+
+# serde of the numbers and the with_unit text
+[[test]]
+name = "serde"
+required-features = ["serde"]
 
 # examples/NN_*.rs: one story each, in reading order; the README's Examples section lists them
 [[example]]

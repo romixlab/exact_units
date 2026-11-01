@@ -237,7 +237,7 @@ impl Offset {
 
 /// An [Offset] in serde (RON snapshots of APIs): `negative` left out when false, `magnitude` left out for zero; a
 /// negative zero is refused, so a hand-edited file can't hold a non-canonical one.
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "std"))]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct OffsetParts {
     #[serde(default, skip_serializing_if = "core::ops::Not::not")]
@@ -246,7 +246,7 @@ struct OffsetParts {
     magnitude: Option<Magnitude>,
 }
 
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "std"))]
 impl serde::Serialize for Offset {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         OffsetParts {
@@ -257,7 +257,7 @@ impl serde::Serialize for Offset {
     }
 }
 
-#[cfg(feature = "serde")]
+#[cfg(all(feature = "serde", feature = "std"))]
 impl<'de> serde::Deserialize<'de> for Offset {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let p = OffsetParts::deserialize(deserializer)?;
