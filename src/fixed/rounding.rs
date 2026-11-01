@@ -480,8 +480,7 @@ impl StorageKind {
 
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "bits is 1 to 64 as StorageKind documents, so the ends fit i128; a hand-built kind outside 1..=64 \
-                  overflows here"
+        reason = "bits is 1 to 64: Requantizer::new checks a StorageKind, so the ends fit i128"
     )]
     const fn range(bits: u32, signed: bool) -> (i128, i128) {
         if signed {
@@ -494,8 +493,8 @@ impl StorageKind {
     /// `x` in this integer kind by `o`: wrapping keeps the low `bits` (sign-extended when signed).
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "bits is 1 to 64 as StorageKind documents: the mask fits u128, and with the top bit set v - 2^bits is \
-                  in -2^(bits - 1)..0; a hand-built kind outside 1..=64 overflows here"
+        reason = "bits is 1 to 64 (Requantizer::new checks a StorageKind): the mask fits u128, and with the top bit \
+                  set v - 2^bits is in -2^(bits - 1)..0"
     )]
     fn settle_int(
         bits: u32,
@@ -529,7 +528,8 @@ impl StorageKind {
 /// time, as a dynamic client has them from the model; [Requantizer] for many values. Gives the same number as the
 /// typed conversion, bit for bit (the conformance corpus checks both). `None` where `o` is [Overflow::Checked] and
 /// the result doesn't fit, where `x · num` of a fraction factor doesn't fit 128 bits (the typed conversion doesn't
-/// compile there), and for an integer `x` of more than 64 bits with a factor that isn't a fraction of integers.
+/// compile there), for an integer `x` of more than 64 bits with a factor that isn't a fraction of integers, and for a
+/// [StorageKind::Int] whose `bits` isn't 1 to 64.
 #[must_use]
 pub fn requantize(
     x: Repr,
@@ -549,6 +549,8 @@ pub struct Requantizer {
     to: StorageKind,
     r: Rounding,
     o: Overflow,
+    /// `to` is a float or an integer of 1 to 64 bits; [apply](Requantizer::apply) gives `None` otherwise.
+    to_valid: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -566,9 +568,14 @@ enum Exact {
 }
 
 impl Requantizer {
-    /// The requantizer by `factor` into `to`, rounded by `r`, overflowing by `o`: [requantize] of each value.
+    /// The requantizer by `factor` into `to`, rounded by `r`, overflowing by `o`: [requantize] of each value. A
+    /// [StorageKind::Int] whose `bits` isn't 1 to 64 converts nothing: [apply](Self::apply) gives `None`.
     #[must_use]
     pub fn new(factor: &Magnitude, to: StorageKind, r: Rounding, o: Overflow) -> Self {
+        let to_valid = match to {
+            StorageKind::Int { bits, .. } => matches!(bits, 1..=64),
+            StorageKind::F32 | StorageKind::F64 => true,
+        };
         let exact = if let Some((num, den)) = factor.to_ratio() {
             Exact::Ratio {
                 num: i128::try_from(num).ok(),
@@ -586,6 +593,7 @@ impl Requantizer {
             to,
             r,
             o,
+            to_valid,
         }
     }
 
@@ -595,6 +603,9 @@ impl Requantizer {
         reason = "a float is whole when it equals its integer exactly"
     )]
     pub fn apply(&self, x: Repr) -> Option<Repr> {
+        if !self.to_valid {
+            return None;
+        }
         let (r, o, factor) = (self.r, self.o, &self.factor);
         #[expect(
             clippy::as_conversions,
@@ -662,5 +673,53 @@ impl Requantizer {
             }
         };
         StorageKind::settle_int(bits, signed, exact, low, neg, o).map(Repr::Int)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Overflow, Repr, Requantizer, Rounding, StorageKind, requantize};
+    use crate::Magnitude;
+
+    #[test]
+    fn int_kind_outside_1_to_64_bits_converts_nothing() {
+        for bits in [0, 65, 127, 128, 200, u32::MAX] {
+            for signed in [false, true] {
+                let to = StorageKind::Int { bits, signed };
+                for o in [Overflow::Wrap, Overflow::Checked, Overflow::Saturate] {
+                    let q = Requantizer::new(&Magnitude::ONE, to, Rounding::NearestEven, o);
+                    assert_eq!(q.apply(Repr::Int(5)), None, "{to:?} {o:?}");
+                    assert_eq!(q.apply(Repr::Float(5.0)), None, "{to:?} {o:?}");
+                    let r =
+                        requantize(Repr::Int(-1), &Magnitude::ONE, to, Rounding::NearestEven, o);
+                    assert_eq!(r, None, "{to:?} {o:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn int_kind_of_1_and_64_bits_converts() {
+        let one = StorageKind::Int {
+            bits: 1,
+            signed: true,
+        };
+        let q = Requantizer::new(&Magnitude::ONE, one, Rounding::NearestEven, Overflow::Wrap);
+        assert_eq!(q.apply(Repr::Int(1)), Some(Repr::Int(-1)));
+        let u64_kind = StorageKind::Int {
+            bits: 64,
+            signed: false,
+        };
+        let q = Requantizer::new(
+            &Magnitude::ONE,
+            u64_kind,
+            Rounding::NearestEven,
+            Overflow::Saturate,
+        );
+        assert_eq!(q.apply(Repr::Int(-3)), Some(Repr::Int(0)));
+        assert_eq!(
+            q.apply(Repr::Int(i128::MAX)),
+            Some(Repr::Int(i128::from(u64::MAX)))
+        );
     }
 }
