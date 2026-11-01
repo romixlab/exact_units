@@ -89,6 +89,29 @@ jobs:
       # nextest does not run doctests
       - run: cargo test --doc --features customary,serde
 
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-nextest
+      # the same feature sets as the test job, merged into one report
+      - run: cargo llvm-cov nextest --no-report --features customary,serde
+      - run: cargo llvm-cov nextest --no-report --no-default-features --features std
+      - run: cargo llvm-cov nextest --no-report --no-default-features --features shrink_wrap,quantities
+      - run: cargo llvm-cov report --lcov --output-path lcov.info
+      - uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          # a fork PR has no access to the repo's CODECOV_TOKEN secret
+          fail_ci_if_error: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+
   no-std:
     name: no_std build (thumbv6m)
     runs-on: ubuntu-latest

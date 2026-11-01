@@ -47,3 +47,19 @@ deploy:
 # Regenerate the tables of docs/customary.md from the sourced catalogue of customary units
 customary-docs:
     CUSTOMARY_DOCS=update cargo nextest run --all-features docs_page_tables
+
+# Collect coverage for the feature sets `just test` uses (shared by cov and cov-html)
+_cov-collect:
+    cargo llvm-cov clean --workspace
+    cargo llvm-cov nextest --no-report --features customary,serde
+    cargo llvm-cov nextest --no-report --no-default-features --features std
+    cargo llvm-cov nextest --no-report --no-default-features --features shrink_wrap,quantities
+
+# Test coverage as CI computes it: lcov.info plus a summary printed
+cov: _cov-collect
+    cargo llvm-cov report --lcov --output-path lcov.info
+    cargo llvm-cov report --summary-only
+
+# Test coverage as a browsable HTML report
+cov-html: _cov-collect
+    cargo llvm-cov report --html --open

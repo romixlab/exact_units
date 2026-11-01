@@ -26,6 +26,7 @@ Features and their status are tracked in wire_weaver's `FEATURES.md` (the `STD-*
 just test            # cargo nextest with all features, without the wire format, without std; doctests
 just lint            # fmt, cargo sort, typos, clippy and rustdoc with -D warnings
 just check           # cargo check of the feature sets firmware uses
+just cov             # test coverage as CI computes it, lcov.info plus a printed summary
 just customary-docs  # regenerate docs/customary.md's tables from the catalogue
 ```
 

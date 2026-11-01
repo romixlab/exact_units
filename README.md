@@ -1,5 +1,6 @@
 ![Crates.io Version](https://img.shields.io/crates/v/exact_units)
 [![CI](https://github.com/romixlab/exact_units/actions/workflows/ci.yml/badge.svg)](https://github.com/romixlab/exact_units/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/romixlab/exact_units/graph/badge.svg)](https://codecov.io/gh/romixlab/exact_units)
 
 > Units of measure checked at compile time, with exact scales and the cases other unit crates leave out: a number with
 > its unit, scale and storage in the type, the same bytes as the plain integer, `no_std` and no alloc.
