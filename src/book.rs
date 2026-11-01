@@ -27,4 +27,8 @@ pages! {
     QFormats = "fixed_point/q_formats.md";
     Bam = "fixed_point/bam.md";
     Products = "fixed_point/products.md";
+    Points = "points/points.md";
+    Wrapping = "points/wrapping.md";
+    Registers = "points/registers.md";
+    Indices = "points/indices.md";
 }
