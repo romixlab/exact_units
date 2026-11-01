@@ -1,0 +1,5 @@
+# what a run generates: the corpus it grows, crashes, coverage; the hand-written seeds are in seeds/
+target/
+corpus/
+artifacts/
+coverage/

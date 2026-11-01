@@ -143,7 +143,9 @@ pub(crate) fn magnitude(pow10: i8, pow2: i8, irr: [i8; 3], primes: &[(u32, i8)])
     }
 }
 
-/// A prefix by a variant number and a parameter: each round-trips within its `MAX_SIZE`.
+/// A prefix by a variant number and a parameter: each round-trips within its `MAX_SIZE`. `Unknown(tag)` with the tag of
+/// a kind this version knows (the named prefixes and the three families) doesn't encode: a reader would take it for
+/// that kind.
 pub(crate) fn prefix(which: u8, param: i8, tag: u16) {
     let p = match which % 5 {
         0 => Prefix::ALL
@@ -152,7 +154,13 @@ pub(crate) fn prefix(which: u8, param: i8, tag: u16) {
         1 => Pow10Exp::new(param).map(Prefix::Pow10),
         2 => Pow2Exp::new(param).map(Prefix::Pow2),
         3 => FullScaleBits::new(param.unsigned_abs()).map(Prefix::FullScale),
-        _ => Some(Prefix::Unknown(tag)),
+        _ => {
+            let known = u16::try_from(Prefix::ALL.len() + 3).unwrap_or(u16::MAX);
+            let p = Prefix::Unknown(tag);
+            let mut buf = [0u8; 16];
+            assert_eq!(p.to_ww_bytes(&mut buf).is_ok(), tag >= known, "{p:?}");
+            (tag >= known).then_some(p)
+        }
     };
     if let Some(p) = p {
         round_trip(&p);

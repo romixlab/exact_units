@@ -9,8 +9,9 @@ repository = "https://github.com/romixlab/exact_units"
 keywords = ["units", "no_std", "embedded", "dimensional-analysis", "fixed-point"]
 categories = ["no-std", "embedded", "science"]
 # the logo's sources and exports are for the README and rustdoc, which link them from GitHub; the book's site
-# tooling builds docs/ into a website and isn't part of the crate (docs/ stays: a test reads docs/customary.md)
-exclude = ["assets/", "docs_ext/", "overrides/", "tools/", "pyproject.toml", "uv.lock", "zensical.toml"]
+# tooling builds docs/ into a website and isn't part of the crate (docs/ stays: a test reads docs/customary.md);
+# fuzz/ is a crate of its own
+exclude = ["assets/", "docs_ext/", "fuzz/", "overrides/", "tools/", "pyproject.toml", "uv.lock", "zensical.toml"]
 
 [workspace]
 

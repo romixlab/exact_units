@@ -1,0 +1,73 @@
+[package]
+name = "exact_units-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+# a workspace of its own: the crate's builds, tests and lints never see this one (it needs nightly and libFuzzer)
+[workspace]
+
+# the features of exact_units the property functions ask for with cfg(feature = ..), all on
+[features]
+default = ["customary", "serde"]
+customary = ["exact_units/customary"]
+serde = ["exact_units/serde"]
+
+[dependencies]
+arbitrary = { version = "1", features = ["derive"] }
+exact_units = { path = ".." }
+libfuzzer-sys = "0.4"
+serde = "1.0"
+serde_json = { version = "1.0", default-features = false, features = ["std"] }
+shrink_wrap = { version = "0.2.0", git = "https://github.com/vhrdtech/wire_weaver", default-features = false, features = ["std"] }
+
+[lints.rust]
+# cfg(kani) and cfg(fuzzing) pick what of tests/props is compiled in
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)", "cfg(fuzzing)"] }
+
+# Each target calls a property function of tests/props, compiled in by path (see props.rs).
+
+[[bin]]
+name = "decimal"
+path = "fuzz_targets/decimal.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decibels"
+path = "fuzz_targets/decibels.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "names"
+path = "fuzz_targets/names.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wire_bytes"
+path = "fuzz_targets/wire_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wire_values"
+path = "fuzz_targets/wire_values.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "serde_json"
+path = "fuzz_targets/serde_json.rs"
+test = false
+doc = false
+bench = false
