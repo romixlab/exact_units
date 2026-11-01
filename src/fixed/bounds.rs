@@ -3,6 +3,16 @@
 use super::storage::Storage;
 use crate::num::pow10_f64;
 #[cfg(feature = "shrink_wrap")]
+use shrink_wrap::un::{
+    I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14, I15, I16, I17, I18, I19, I20, I21,
+    I22, I23, I24, I25, I26, I27, I28, I29, I30, I31, I32, I33, I34, I35, I36, I37, I38, I39, I40,
+    I41, I42, I43, I44, I45, I46, I47, I48, I49, I50, I51, I52, I53, I54, I55, I56, I57, I58, I59,
+    I60, I61, I62, I63, I64, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16,
+    U17, U18, U19, U20, U21, U22, U23, U24, U25, U26, U27, U28, U29, U30, U31, U32, U33, U34, U35,
+    U36, U37, U38, U39, U40, U41, U42, U43, U44, U45, U46, U47, U48, U49, U50, U51, U52, U53, U54,
+    U55, U56, U57, U58, U59, U60, U61, U62, U63, U64,
+};
+#[cfg(feature = "shrink_wrap")]
 use shrink_wrap::{Nibble, UNib32, UVlq32, UVlq64};
 
 /// The range a value of `T` must be in, both ends inclusive, `None` for no limit: a zero-size marker, never sent. A
@@ -177,6 +187,153 @@ range! {
     UVlq32 u32::MIN, u32::MAX, x => UVlq32(x as u32);
     UVlq64 u64::MIN, u64::MAX, x => UVlq64(x as u64);
     Nibble 0, 15, x => Nibble::new_masked(x as u8);
+    U1 0u64, 1u64, x => match U1::new(x as u8) { Some(v) => v, None => U1::zero() };
+    U2 0u64, 3u64, x => match U2::new(x as u8) { Some(v) => v, None => U2::zero() };
+    U3 0u64, 7u64, x => match U3::new(x as u8) { Some(v) => v, None => U3::zero() };
+    U4 0u64, 15u64, x => match U4::new(x as u8) { Some(v) => v, None => U4::zero() };
+    U5 0u64, 31u64, x => match U5::new(x as u8) { Some(v) => v, None => U5::zero() };
+    U6 0u64, 63u64, x => match U6::new(x as u8) { Some(v) => v, None => U6::zero() };
+    U7 0u64, 127u64, x => match U7::new(x as u8) { Some(v) => v, None => U7::zero() };
+    U8 0u64, 255u64, x => match U8::new(x as u8) { Some(v) => v, None => U8::zero() };
+    U9 0u64, 511u64, x => match U9::new(x as u16) { Some(v) => v, None => U9::zero() };
+    U10 0u64, 1023u64, x => match U10::new(x as u16) { Some(v) => v, None => U10::zero() };
+    U11 0u64, 2047u64, x => match U11::new(x as u16) { Some(v) => v, None => U11::zero() };
+    U12 0u64, 4095u64, x => match U12::new(x as u16) { Some(v) => v, None => U12::zero() };
+    U13 0u64, 8191u64, x => match U13::new(x as u16) { Some(v) => v, None => U13::zero() };
+    U14 0u64, 16383u64, x => match U14::new(x as u16) { Some(v) => v, None => U14::zero() };
+    U15 0u64, 32767u64, x => match U15::new(x as u16) { Some(v) => v, None => U15::zero() };
+    U16 0u64, 65535u64, x => match U16::new(x as u16) { Some(v) => v, None => U16::zero() };
+    U17 0u64, 131071u64, x => match U17::new(x as u32) { Some(v) => v, None => U17::zero() };
+    U18 0u64, 262143u64, x => match U18::new(x as u32) { Some(v) => v, None => U18::zero() };
+    U19 0u64, 524287u64, x => match U19::new(x as u32) { Some(v) => v, None => U19::zero() };
+    U20 0u64, 1048575u64, x => match U20::new(x as u32) { Some(v) => v, None => U20::zero() };
+    U21 0u64, 2097151u64, x => match U21::new(x as u32) { Some(v) => v, None => U21::zero() };
+    U22 0u64, 4194303u64, x => match U22::new(x as u32) { Some(v) => v, None => U22::zero() };
+    U23 0u64, 8388607u64, x => match U23::new(x as u32) { Some(v) => v, None => U23::zero() };
+    U24 0u64, 16777215u64, x => match U24::new(x as u32) { Some(v) => v, None => U24::zero() };
+    U25 0u64, 33554431u64, x => match U25::new(x as u32) { Some(v) => v, None => U25::zero() };
+    U26 0u64, 67108863u64, x => match U26::new(x as u32) { Some(v) => v, None => U26::zero() };
+    U27 0u64, 134217727u64, x => match U27::new(x as u32) { Some(v) => v, None => U27::zero() };
+    U28 0u64, 268435455u64, x => match U28::new(x as u32) { Some(v) => v, None => U28::zero() };
+    U29 0u64, 536870911u64, x => match U29::new(x as u32) { Some(v) => v, None => U29::zero() };
+    U30 0u64, 1073741823u64, x => match U30::new(x as u32) { Some(v) => v, None => U30::zero() };
+    U31 0u64, 2147483647u64, x => match U31::new(x as u32) { Some(v) => v, None => U31::zero() };
+    U32 0u64, 4294967295u64, x => match U32::new(x as u32) { Some(v) => v, None => U32::zero() };
+    U33 0u64, 8589934591u64, x => match U33::new(x as u64) { Some(v) => v, None => U33::zero() };
+    U34 0u64, 17179869183u64, x => match U34::new(x as u64) { Some(v) => v, None => U34::zero() };
+    U35 0u64, 34359738367u64, x => match U35::new(x as u64) { Some(v) => v, None => U35::zero() };
+    U36 0u64, 68719476735u64, x => match U36::new(x as u64) { Some(v) => v, None => U36::zero() };
+    U37 0u64, 137438953471u64, x => match U37::new(x as u64) { Some(v) => v, None => U37::zero() };
+    U38 0u64, 274877906943u64, x => match U38::new(x as u64) { Some(v) => v, None => U38::zero() };
+    U39 0u64, 549755813887u64, x => match U39::new(x as u64) { Some(v) => v, None => U39::zero() };
+    U40 0u64, 1099511627775u64, x => match U40::new(x as u64) { Some(v) => v, None => U40::zero() };
+    U41 0u64, 2199023255551u64, x => match U41::new(x as u64) { Some(v) => v, None => U41::zero() };
+    U42 0u64, 4398046511103u64, x => match U42::new(x as u64) { Some(v) => v, None => U42::zero() };
+    U43 0u64, 8796093022207u64, x => match U43::new(x as u64) { Some(v) => v, None => U43::zero() };
+    U44 0u64, 17592186044415u64, x => match U44::new(x as u64) { Some(v) => v, None => U44::zero() };
+    U45 0u64, 35184372088831u64, x => match U45::new(x as u64) { Some(v) => v, None => U45::zero() };
+    U46 0u64, 70368744177663u64, x => match U46::new(x as u64) { Some(v) => v, None => U46::zero() };
+    U47 0u64, 140737488355327u64, x => match U47::new(x as u64) { Some(v) => v, None => U47::zero() };
+    U48 0u64, 281474976710655u64, x => match U48::new(x as u64) { Some(v) => v, None => U48::zero() };
+    U49 0u64, 562949953421311u64, x => match U49::new(x as u64) { Some(v) => v, None => U49::zero() };
+    U50 0u64, 1125899906842623u64, x => match U50::new(x as u64) { Some(v) => v, None => U50::zero() };
+    U51 0u64, 2251799813685247u64, x => match U51::new(x as u64) { Some(v) => v, None => U51::zero() };
+    U52 0u64, 4503599627370495u64, x => match U52::new(x as u64) { Some(v) => v, None => U52::zero() };
+    U53 0u64, 9007199254740991u64, x => match U53::new(x as u64) { Some(v) => v, None => U53::zero() };
+    U54 0u64, 18014398509481983u64, x => match U54::new(x as u64) { Some(v) => v, None => U54::zero() };
+    U55 0u64, 36028797018963967u64, x => match U55::new(x as u64) { Some(v) => v, None => U55::zero() };
+    U56 0u64, 72057594037927935u64, x => match U56::new(x as u64) { Some(v) => v, None => U56::zero() };
+    U57 0u64, 144115188075855871u64, x => match U57::new(x as u64) { Some(v) => v, None => U57::zero() };
+    U58 0u64, 288230376151711743u64, x => match U58::new(x as u64) { Some(v) => v, None => U58::zero() };
+    U59 0u64, 576460752303423487u64, x => match U59::new(x as u64) { Some(v) => v, None => U59::zero() };
+    U60 0u64, 1152921504606846975u64, x => match U60::new(x as u64) { Some(v) => v, None => U60::zero() };
+    U61 0u64, 2305843009213693951u64, x => match U61::new(x as u64) { Some(v) => v, None => U61::zero() };
+    U62 0u64, 4611686018427387903u64, x => match U62::new(x as u64) { Some(v) => v, None => U62::zero() };
+    U63 0u64, 9223372036854775807u64, x => match U63::new(x as u64) { Some(v) => v, None => U63::zero() };
+    U64 0u64, 18446744073709551615u64, x => match U64::new(x as u64) { Some(v) => v, None => U64::zero() };
+    I2 -2i64, 1i64, x => match I2::new(x as i8) { Some(v) => v, None => I2::zero() };
+    I3 -4i64, 3i64, x => match I3::new(x as i8) { Some(v) => v, None => I3::zero() };
+    I4 -8i64, 7i64, x => match I4::new(x as i8) { Some(v) => v, None => I4::zero() };
+    I5 -16i64, 15i64, x => match I5::new(x as i8) { Some(v) => v, None => I5::zero() };
+    I6 -32i64, 31i64, x => match I6::new(x as i8) { Some(v) => v, None => I6::zero() };
+    I7 -64i64, 63i64, x => match I7::new(x as i8) { Some(v) => v, None => I7::zero() };
+    I8 -128i64, 127i64, x => match I8::new(x as i8) { Some(v) => v, None => I8::zero() };
+    I9 -256i64, 255i64, x => match I9::new(x as i16) { Some(v) => v, None => I9::zero() };
+    I10 -512i64, 511i64, x => match I10::new(x as i16) { Some(v) => v, None => I10::zero() };
+    I11 -1024i64, 1023i64, x => match I11::new(x as i16) { Some(v) => v, None => I11::zero() };
+    I12 -2048i64, 2047i64, x => match I12::new(x as i16) { Some(v) => v, None => I12::zero() };
+    I13 -4096i64, 4095i64, x => match I13::new(x as i16) { Some(v) => v, None => I13::zero() };
+    I14 -8192i64, 8191i64, x => match I14::new(x as i16) { Some(v) => v, None => I14::zero() };
+    I15 -16384i64, 16383i64, x => match I15::new(x as i16) { Some(v) => v, None => I15::zero() };
+    I16 -32768i64, 32767i64, x => match I16::new(x as i16) { Some(v) => v, None => I16::zero() };
+    I17 -65536i64, 65535i64, x => match I17::new(x as i32) { Some(v) => v, None => I17::zero() };
+    I18 -131072i64, 131071i64, x => match I18::new(x as i32) { Some(v) => v, None => I18::zero() };
+    I19 -262144i64, 262143i64, x => match I19::new(x as i32) { Some(v) => v, None => I19::zero() };
+    I20 -524288i64, 524287i64, x => match I20::new(x as i32) { Some(v) => v, None => I20::zero() };
+    I21 -1048576i64, 1048575i64, x => match I21::new(x as i32) { Some(v) => v, None => I21::zero() };
+    I22 -2097152i64, 2097151i64, x => match I22::new(x as i32) { Some(v) => v, None => I22::zero() };
+    I23 -4194304i64, 4194303i64, x => match I23::new(x as i32) { Some(v) => v, None => I23::zero() };
+    I24 -8388608i64, 8388607i64, x => match I24::new(x as i32) { Some(v) => v, None => I24::zero() };
+    I25 -16777216i64, 16777215i64, x => match I25::new(x as i32) { Some(v) => v, None => I25::zero() };
+    I26 -33554432i64, 33554431i64, x => match I26::new(x as i32) { Some(v) => v, None => I26::zero() };
+    I27 -67108864i64, 67108863i64, x => match I27::new(x as i32) { Some(v) => v, None => I27::zero() };
+    I28 -134217728i64, 134217727i64, x => match I28::new(x as i32) { Some(v) => v, None => I28::zero() };
+    I29 -268435456i64, 268435455i64, x => match I29::new(x as i32) { Some(v) => v, None => I29::zero() };
+    I30 -536870912i64, 536870911i64, x => match I30::new(x as i32) { Some(v) => v, None => I30::zero() };
+    I31 -1073741824i64, 1073741823i64, x => match I31::new(x as i32) { Some(v) => v, None => I31::zero() };
+    I32 -2147483648i64, 2147483647i64, x => match I32::new(x as i32) { Some(v) => v, None => I32::zero() };
+    I33 -4294967296i64, 4294967295i64, x => match I33::new(x as i64) { Some(v) => v, None => I33::zero() };
+    I34 -8589934592i64, 8589934591i64, x => match I34::new(x as i64) { Some(v) => v, None => I34::zero() };
+    I35 -17179869184i64, 17179869183i64, x => match I35::new(x as i64) { Some(v) => v, None => I35::zero() };
+    I36 -34359738368i64, 34359738367i64, x => match I36::new(x as i64) { Some(v) => v, None => I36::zero() };
+    I37 -68719476736i64, 68719476735i64, x => match I37::new(x as i64) { Some(v) => v, None => I37::zero() };
+    I38 -137438953472i64, 137438953471i64, x => match I38::new(x as i64) { Some(v) => v, None => I38::zero() };
+    I39 -274877906944i64, 274877906943i64, x => match I39::new(x as i64) { Some(v) => v, None => I39::zero() };
+    I40 -549755813888i64, 549755813887i64, x => match I40::new(x as i64) { Some(v) => v, None => I40::zero() };
+    I41 -1099511627776i64, 1099511627775i64, x => match I41::new(x as i64) { Some(v) => v, None => I41::zero() };
+    I42 -2199023255552i64, 2199023255551i64, x => match I42::new(x as i64) { Some(v) => v, None => I42::zero() };
+    I43 -4398046511104i64, 4398046511103i64, x => match I43::new(x as i64) { Some(v) => v, None => I43::zero() };
+    I44 -8796093022208i64, 8796093022207i64, x => match I44::new(x as i64) { Some(v) => v, None => I44::zero() };
+    I45 -17592186044416i64, 17592186044415i64, x => match I45::new(x as i64) { Some(v) => v, None => I45::zero() };
+    I46 -35184372088832i64, 35184372088831i64, x => match I46::new(x as i64) { Some(v) => v, None => I46::zero() };
+    I47 -70368744177664i64, 70368744177663i64, x => match I47::new(x as i64) { Some(v) => v, None => I47::zero() };
+    I48 -140737488355328i64, 140737488355327i64, x => match I48::new(x as i64) { Some(v) => v, None => I48::zero() };
+    I49 -281474976710656i64, 281474976710655i64, x => match I49::new(x as i64) { Some(v) => v, None => I49::zero() };
+    I50 -562949953421312i64, 562949953421311i64, x => match I50::new(x as i64) { Some(v) => v, None => I50::zero() };
+    I51 -1125899906842624i64, 1125899906842623i64, x => match I51::new(x as i64) { Some(v) => v, None => I51::zero() };
+    I52 -2251799813685248i64, 2251799813685247i64, x => match I52::new(x as i64) { Some(v) => v, None => I52::zero() };
+    I53 -4503599627370496i64, 4503599627370495i64, x => match I53::new(x as i64) { Some(v) => v, None => I53::zero() };
+    I54 -9007199254740992i64, 9007199254740991i64, x => match I54::new(x as i64) { Some(v) => v, None => I54::zero() };
+    I55 -18014398509481984i64, 18014398509481983i64, x => match I55::new(x as i64) { Some(v) => v, None => I55::zero() };
+    I56 -36028797018963968i64, 36028797018963967i64, x => match I56::new(x as i64) { Some(v) => v, None => I56::zero() };
+    I57 -72057594037927936i64, 72057594037927935i64, x => match I57::new(x as i64) { Some(v) => v, None => I57::zero() };
+    I58 -144115188075855872i64, 144115188075855871i64, x => match I58::new(x as i64) { Some(v) => v, None => I58::zero() };
+    I59 -288230376151711744i64, 288230376151711743i64, x => match I59::new(x as i64) { Some(v) => v, None => I59::zero() };
+    I60 -576460752303423488i64, 576460752303423487i64, x => match I60::new(x as i64) { Some(v) => v, None => I60::zero() };
+    I61 -1152921504606846976i64, 1152921504606846975i64, x => match I61::new(x as i64) { Some(v) => v, None => I61::zero() };
+    I62 -2305843009213693952i64, 2305843009213693951i64, x => match I62::new(x as i64) { Some(v) => v, None => I62::zero() };
+    I63 -4611686018427387904i64, 4611686018427387903i64, x => match I63::new(x as i64) { Some(v) => v, None => I63::zero() };
+    I64 -9223372036854775808i64, 9223372036854775807i64, x => match I64::new(x as i64) { Some(v) => v, None => I64::zero() };
+}
+
+#[cfg(feature = "shrink_wrap")]
+impl<const MIN: u64, const MAX: u64> Bounds<U64> for RangeU64<MIN, MAX> {
+    const MIN: Option<U64> = match <Self as Bounds<u64>>::MIN {
+        Some(x) => Some(match U64::new(x) {
+            Some(v) => v,
+            None => U64::zero(),
+        }),
+        None => None,
+    };
+    const MAX: Option<U64> = Some(match U64::new(MAX) {
+        Some(v) => v,
+        None => U64::zero(),
+    });
+    #[expect(
+        clippy::as_conversions,
+        reason = "a const item: From is not const on stable"
+    )]
+    const INT_RANGE: Option<(i128, i128)> = Some((MIN as i128, MAX as i128));
 }
 
 impl<const MIN: u64, const MAX: u64> Bounds<u64> for RangeU64<MIN, MAX> {
@@ -303,6 +460,133 @@ bounded! {
     UVlq32 x => x.0;
     UVlq64 x => x.0;
     Nibble x => x.value();
+    U1 x => x.value();
+    U2 x => x.value();
+    U3 x => x.value();
+    U4 x => x.value();
+    U5 x => x.value();
+    U6 x => x.value();
+    U7 x => x.value();
+    U8 x => x.value();
+    U9 x => x.value();
+    U10 x => x.value();
+    U11 x => x.value();
+    U12 x => x.value();
+    U13 x => x.value();
+    U14 x => x.value();
+    U15 x => x.value();
+    U16 x => x.value();
+    U17 x => x.value();
+    U18 x => x.value();
+    U19 x => x.value();
+    U20 x => x.value();
+    U21 x => x.value();
+    U22 x => x.value();
+    U23 x => x.value();
+    U24 x => x.value();
+    U25 x => x.value();
+    U26 x => x.value();
+    U27 x => x.value();
+    U28 x => x.value();
+    U29 x => x.value();
+    U30 x => x.value();
+    U31 x => x.value();
+    U32 x => x.value();
+    U33 x => x.value();
+    U34 x => x.value();
+    U35 x => x.value();
+    U36 x => x.value();
+    U37 x => x.value();
+    U38 x => x.value();
+    U39 x => x.value();
+    U40 x => x.value();
+    U41 x => x.value();
+    U42 x => x.value();
+    U43 x => x.value();
+    U44 x => x.value();
+    U45 x => x.value();
+    U46 x => x.value();
+    U47 x => x.value();
+    U48 x => x.value();
+    U49 x => x.value();
+    U50 x => x.value();
+    U51 x => x.value();
+    U52 x => x.value();
+    U53 x => x.value();
+    U54 x => x.value();
+    U55 x => x.value();
+    U56 x => x.value();
+    U57 x => x.value();
+    U58 x => x.value();
+    U59 x => x.value();
+    U60 x => x.value();
+    U61 x => x.value();
+    U62 x => x.value();
+    U63 x => x.value();
+    U64 x => x.value();
+    I2 x => x.value();
+    I3 x => x.value();
+    I4 x => x.value();
+    I5 x => x.value();
+    I6 x => x.value();
+    I7 x => x.value();
+    I8 x => x.value();
+    I9 x => x.value();
+    I10 x => x.value();
+    I11 x => x.value();
+    I12 x => x.value();
+    I13 x => x.value();
+    I14 x => x.value();
+    I15 x => x.value();
+    I16 x => x.value();
+    I17 x => x.value();
+    I18 x => x.value();
+    I19 x => x.value();
+    I20 x => x.value();
+    I21 x => x.value();
+    I22 x => x.value();
+    I23 x => x.value();
+    I24 x => x.value();
+    I25 x => x.value();
+    I26 x => x.value();
+    I27 x => x.value();
+    I28 x => x.value();
+    I29 x => x.value();
+    I30 x => x.value();
+    I31 x => x.value();
+    I32 x => x.value();
+    I33 x => x.value();
+    I34 x => x.value();
+    I35 x => x.value();
+    I36 x => x.value();
+    I37 x => x.value();
+    I38 x => x.value();
+    I39 x => x.value();
+    I40 x => x.value();
+    I41 x => x.value();
+    I42 x => x.value();
+    I43 x => x.value();
+    I44 x => x.value();
+    I45 x => x.value();
+    I46 x => x.value();
+    I47 x => x.value();
+    I48 x => x.value();
+    I49 x => x.value();
+    I50 x => x.value();
+    I51 x => x.value();
+    I52 x => x.value();
+    I53 x => x.value();
+    I54 x => x.value();
+    I55 x => x.value();
+    I56 x => x.value();
+    I57 x => x.value();
+    I58 x => x.value();
+    I59 x => x.value();
+    I60 x => x.value();
+    I61 x => x.value();
+    I62 x => x.value();
+    I63 x => x.value();
+    I64 x => x.value();
 }
 
 #[cfg(test)]

@@ -3,6 +3,16 @@
 use super::rounding::{self, Rounding};
 use core::fmt;
 #[cfg(feature = "shrink_wrap")]
+use shrink_wrap::un::{
+    I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14, I15, I16, I17, I18, I19, I20, I21,
+    I22, I23, I24, I25, I26, I27, I28, I29, I30, I31, I32, I33, I34, I35, I36, I37, I38, I39, I40,
+    I41, I42, I43, I44, I45, I46, I47, I48, I49, I50, I51, I52, I53, I54, I55, I56, I57, I58, I59,
+    I60, I61, I62, I63, I64, U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12, U13, U14, U15, U16,
+    U17, U18, U19, U20, U21, U22, U23, U24, U25, U26, U27, U28, U29, U30, U31, U32, U33, U34, U35,
+    U36, U37, U38, U39, U40, U41, U42, U43, U44, U45, U46, U47, U48, U49, U50, U51, U52, U53, U54,
+    U55, U56, U57, U58, U59, U60, U61, U62, U63, U64,
+};
+#[cfg(feature = "shrink_wrap")]
 use shrink_wrap::{Nibble, UNib32, UVlq32, UVlq64};
 
 /// A number as an exact integer or a float, for conversions between storages and prefixes.
@@ -792,6 +802,501 @@ impl UnsignedStorage for Nibble {
     }
 }
 
+/// `x` reduced modulo 2^`bits`: `0..2^bits` for an unsigned result, two's complement's centered range for a signed
+/// one. `bits` is at most 64, so the modulus and every step below fit `i128`.
+#[cfg(feature = "shrink_wrap")]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "bits is at most 64: the modulus is at most 2^64, and the shift, the halving and the centering \
+              subtraction all stay within i128"
+)]
+fn wrap_mod(x: i128, bits: u32, signed: bool) -> i128 {
+    let modulus = 1i128 << bits;
+    let r = x.rem_euclid(modulus);
+    if signed && r >= modulus / 2 {
+        r - modulus
+    } else {
+        r
+    }
+}
+
+/// `x` clamped to `min..=max`.
+#[cfg(feature = "shrink_wrap")]
+const fn clamp_i128(x: i128, min: i128, max: i128) -> i128 {
+    if x < min {
+        min
+    } else if x > max {
+        max
+    } else {
+        x
+    }
+}
+
+/// shrink_wrap's exact-width unsigned integers (`U1`..`U64`, SW-45): `BITS` is the type's own width, not its backing
+/// `u8`/`u16`/`u32`/`u64`; arithmetic wraps or saturates at that width, not the backing integer's.
+#[cfg(feature = "shrink_wrap")]
+macro_rules! unsigned_exact {
+    ($($ty:ident $bits:literal $base:ident)*) => {$(
+        #[expect(
+            clippy::allow_attributes,
+            reason = "the casts differ per width: an #[expect] is unfulfilled where one is exact"
+        )]
+        #[expect(
+            clippy::as_conversions,
+            reason = "a macro over several widths: the cast is lossy only for U64, which carries its #[allow] and \
+                      reason"
+        )]
+        impl Storage for $ty {
+            const NAME: &'static str = stringify!($ty);
+
+            const IS_FLOAT: bool = false;
+
+            const ZERO: Self = $ty::zero();
+
+            const BITS: u32 = $bits;
+
+            const MIN_INT: i128 = 0;
+
+            const MAX_INT: i128 = (1i128 << $bits) - 1;
+
+            #[inline(always)]
+            fn to_repr(self) -> Repr {
+                Repr::Int(i128::from(self.value()))
+            }
+
+            #[inline(always)]
+            #[allow(
+                clippy::cast_lossless,
+                clippy::cast_possible_wrap,
+                reason = "exact for storages of up to 32 bits, the only ones Fixed::to and points call it for"
+            )]
+            fn to_i64(self) -> i64 {
+                self.value() as i64
+            }
+
+            #[inline(always)]
+            fn from_i64(x: i64) -> Option<Self> {
+                $base::try_from(x).ok().and_then($ty::new)
+            }
+
+            #[inline(always)]
+            fn div_whole(self, d: u128) -> Option<Self> {
+                $ty::new(Storage::div_whole(self.value(), d)?)
+            }
+
+            #[inline(always)]
+            fn div_rounded(self, d: u128, r: Rounding) -> Self {
+                $ty::new(Storage::div_rounded(self.value(), d, r)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            fn from_int_wrapping(x: i128) -> Self {
+                $ty::from_int(wrap_mod(x, $bits, false)).unwrap_or($ty::zero())
+            }
+
+            #[inline]
+            fn from_int(x: i128) -> Option<Self> {
+                $base::try_from(x).ok().and_then($ty::new)
+            }
+
+            #[inline]
+            fn from_float(x: f64) -> Option<Self> {
+                $ty::new($base::from_float(x)?)
+            }
+
+            fn fmt_number(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                fmt::Display::fmt(&self.value(), f)
+            }
+
+            #[inline(always)]
+            fn checked_add(self, rhs: Self) -> Option<Self> {
+                $ty::new(self.value().checked_add(rhs.value())?)
+            }
+
+            #[inline(always)]
+            fn checked_sub(self, rhs: Self) -> Option<Self> {
+                $ty::new(self.value().checked_sub(rhs.value())?)
+            }
+
+            #[inline(always)]
+            fn checked_mul(self, rhs: Self) -> Option<Self> {
+                $ty::new(self.value().checked_mul(rhs.value())?)
+            }
+
+            #[inline(always)]
+            fn checked_div(self, rhs: Self) -> Option<Self> {
+                $ty::new(self.value().checked_div(rhs.value())?)
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two values of at most 64 bits add within i128 without overflow; wrap_mod reduces the sum \
+                          modulo 2^bits"
+            )]
+            fn wrapping_add(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) + i128::from(rhs.value());
+                $ty::from_int(wrap_mod(x, $bits, false)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two values of at most 64 bits subtract within i128 without overflow; wrap_mod reduces \
+                          the difference modulo 2^bits"
+            )]
+            fn wrapping_sub(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) - i128::from(rhs.value());
+                $ty::from_int(wrap_mod(x, $bits, false)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two values of at most 64 bits (2^64 · 2^64 fits i128) multiply within i128 without \
+                          overflow; wrap_mod reduces the product modulo 2^bits"
+            )]
+            fn wrapping_mul(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) * i128::from(rhs.value());
+                $ty::from_int(wrap_mod(x, $bits, false)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "panics for a zero rhs, as the type's division does; an unsigned quotient never exceeds \
+                          its dividend, within i128"
+            )]
+            fn wrapping_div(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) / i128::from(rhs.value());
+                $ty::from_int(wrap_mod(x, $bits, false)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two values of at most 64 bits add within i128 without overflow; clamp_i128 saturates at \
+                          the type's own ends"
+            )]
+            fn saturating_add(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) + i128::from(rhs.value());
+                $ty::from_int(clamp_i128(x, Self::MIN_INT, Self::MAX_INT)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two values of at most 64 bits subtract within i128 without overflow; clamp_i128 \
+                          saturates at the type's own ends"
+            )]
+            fn saturating_sub(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) - i128::from(rhs.value());
+                $ty::from_int(clamp_i128(x, Self::MIN_INT, Self::MAX_INT)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two values of at most 64 bits (2^64 · 2^64 fits i128) multiply within i128 without \
+                          overflow; clamp_i128 saturates at the type's own ends"
+            )]
+            fn saturating_mul(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) * i128::from(rhs.value());
+                $ty::from_int(clamp_i128(x, Self::MIN_INT, Self::MAX_INT)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "panics for a zero rhs, as the type's division does; an unsigned quotient never exceeds \
+                          its dividend, within i128"
+            )]
+            fn saturating_div(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) / i128::from(rhs.value());
+                $ty::from_int(clamp_i128(x, Self::MIN_INT, Self::MAX_INT)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            fn add(self, rhs: Self) -> Self {
+                debug_assert!(self.checked_add(rhs).is_some(), "attempt to add with overflow");
+                self.wrapping_add(rhs)
+            }
+
+            #[inline(always)]
+            fn sub(self, rhs: Self) -> Self {
+                debug_assert!(self.checked_sub(rhs).is_some(), "attempt to subtract with overflow");
+                self.wrapping_sub(rhs)
+            }
+
+            #[inline(always)]
+            fn mul(self, rhs: Self) -> Self {
+                debug_assert!(self.checked_mul(rhs).is_some(), "attempt to multiply with overflow");
+                self.wrapping_mul(rhs)
+            }
+
+            #[inline(always)]
+            fn div(self, rhs: Self) -> Self {
+                debug_assert!(
+                    rhs.value() == 0 || self.checked_div(rhs).is_some(),
+                    "attempt to divide with overflow"
+                );
+                self.wrapping_div(rhs)
+            }
+        }
+
+        impl UnsignedStorage for $ty {
+            #[inline(always)]
+            fn to_u64(self) -> u64 {
+                u64::from(self.value())
+            }
+
+            #[inline(always)]
+            fn from_u64(x: u64) -> Option<Self> {
+                $base::try_from(x).ok().and_then($ty::new)
+            }
+        }
+    )*};
+}
+
+#[cfg(feature = "shrink_wrap")]
+unsigned_exact!(
+    U1 1 u8 U2 2 u8 U3 3 u8 U4 4 u8 U5 5 u8 U6 6 u8 U7 7 u8 U8 8 u8
+    U9 9 u16 U10 10 u16 U11 11 u16 U12 12 u16 U13 13 u16 U14 14 u16 U15 15 u16 U16 16 u16
+    U17 17 u32 U18 18 u32 U19 19 u32 U20 20 u32 U21 21 u32 U22 22 u32 U23 23 u32 U24 24 u32
+    U25 25 u32 U26 26 u32 U27 27 u32 U28 28 u32 U29 29 u32 U30 30 u32 U31 31 u32 U32 32 u32
+    U33 33 u64 U34 34 u64 U35 35 u64 U36 36 u64 U37 37 u64 U38 38 u64 U39 39 u64 U40 40 u64
+    U41 41 u64 U42 42 u64 U43 43 u64 U44 44 u64 U45 45 u64 U46 46 u64 U47 47 u64 U48 48 u64
+    U49 49 u64 U50 50 u64 U51 51 u64 U52 52 u64 U53 53 u64 U54 54 u64 U55 55 u64 U56 56 u64
+    U57 57 u64 U58 58 u64 U59 59 u64 U60 60 u64 U61 61 u64 U62 62 u64 U63 63 u64 U64 64 u64
+);
+
+/// shrink_wrap's exact-width signed integers (`I2`..`I64`, SW-45): `BITS` is the type's own width, not its backing
+/// `i8`/`i16`/`i32`/`i64`; arithmetic wraps or saturates at that width (two's complement), not the backing
+/// integer's.
+#[cfg(feature = "shrink_wrap")]
+macro_rules! signed_exact {
+    ($($ty:ident $bits:literal $base:ident)*) => {$(
+        #[expect(
+            clippy::allow_attributes,
+            reason = "the casts differ per width: an #[expect] is unfulfilled where one is exact"
+        )]
+        #[expect(
+            clippy::as_conversions,
+            reason = "a macro over several widths: the cast is exact except where the width is i64's own, which \
+                      carries its #[allow] and reason"
+        )]
+        impl Storage for $ty {
+            const NAME: &'static str = stringify!($ty);
+
+            const IS_FLOAT: bool = false;
+
+            const ZERO: Self = $ty::zero();
+
+            const BITS: u32 = $bits;
+
+            const MIN_INT: i128 = -(1i128 << ($bits - 1));
+
+            const MAX_INT: i128 = (1i128 << ($bits - 1)) - 1;
+
+            #[inline(always)]
+            fn to_repr(self) -> Repr {
+                Repr::Int(i128::from(self.value()))
+            }
+
+            #[inline(always)]
+            #[allow(
+                clippy::cast_lossless,
+                clippy::cast_possible_wrap,
+                reason = "exact for storages of up to 32 bits, the only ones Fixed::to and points call it for"
+            )]
+            fn to_i64(self) -> i64 {
+                self.value() as i64
+            }
+
+            #[inline(always)]
+            fn from_i64(x: i64) -> Option<Self> {
+                $base::try_from(x).ok().and_then($ty::new)
+            }
+
+            #[inline(always)]
+            fn div_whole(self, d: u128) -> Option<Self> {
+                $ty::new(Storage::div_whole(self.value(), d)?)
+            }
+
+            #[inline(always)]
+            fn div_rounded(self, d: u128, r: Rounding) -> Self {
+                $ty::new(Storage::div_rounded(self.value(), d, r)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            fn from_int_wrapping(x: i128) -> Self {
+                $ty::from_int(wrap_mod(x, $bits, true)).unwrap_or($ty::zero())
+            }
+
+            #[inline]
+            fn from_int(x: i128) -> Option<Self> {
+                $base::try_from(x).ok().and_then($ty::new)
+            }
+
+            #[inline]
+            fn from_float(x: f64) -> Option<Self> {
+                $ty::new($base::from_float(x)?)
+            }
+
+            fn fmt_number(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                fmt::Display::fmt(&self.value(), f)
+            }
+
+            #[inline(always)]
+            fn checked_add(self, rhs: Self) -> Option<Self> {
+                $ty::new(self.value().checked_add(rhs.value())?)
+            }
+
+            #[inline(always)]
+            fn checked_sub(self, rhs: Self) -> Option<Self> {
+                $ty::new(self.value().checked_sub(rhs.value())?)
+            }
+
+            #[inline(always)]
+            fn checked_mul(self, rhs: Self) -> Option<Self> {
+                $ty::new(self.value().checked_mul(rhs.value())?)
+            }
+
+            #[inline(always)]
+            fn checked_div(self, rhs: Self) -> Option<Self> {
+                $ty::new(self.value().checked_div(rhs.value())?)
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two values of at most 64 bits add within i128 without overflow; wrap_mod reduces the sum \
+                          modulo 2^bits"
+            )]
+            fn wrapping_add(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) + i128::from(rhs.value());
+                $ty::from_int(wrap_mod(x, $bits, true)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two values of at most 64 bits subtract within i128 without overflow; wrap_mod reduces \
+                          the difference modulo 2^bits"
+            )]
+            fn wrapping_sub(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) - i128::from(rhs.value());
+                $ty::from_int(wrap_mod(x, $bits, true)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two values of at most 64 bits (2^63 · 2^63 fits i128) multiply within i128 without \
+                          overflow; wrap_mod reduces the product modulo 2^bits"
+            )]
+            fn wrapping_mul(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) * i128::from(rhs.value());
+                $ty::from_int(wrap_mod(x, $bits, true)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "panics for a zero rhs, as the type's division does; the one case the quotient overflows \
+                          (MIN / -1) wrap_mod wraps back to MIN, within i128"
+            )]
+            fn wrapping_div(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) / i128::from(rhs.value());
+                $ty::from_int(wrap_mod(x, $bits, true)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two values of at most 64 bits add within i128 without overflow; clamp_i128 saturates at \
+                          the type's own ends"
+            )]
+            fn saturating_add(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) + i128::from(rhs.value());
+                $ty::from_int(clamp_i128(x, Self::MIN_INT, Self::MAX_INT)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two values of at most 64 bits subtract within i128 without overflow; clamp_i128 \
+                          saturates at the type's own ends"
+            )]
+            fn saturating_sub(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) - i128::from(rhs.value());
+                $ty::from_int(clamp_i128(x, Self::MIN_INT, Self::MAX_INT)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two values of at most 64 bits (2^63 · 2^63 fits i128) multiply within i128 without \
+                          overflow; clamp_i128 saturates at the type's own ends"
+            )]
+            fn saturating_mul(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) * i128::from(rhs.value());
+                $ty::from_int(clamp_i128(x, Self::MIN_INT, Self::MAX_INT)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "panics for a zero rhs, as the type's division does; the one case the quotient overflows \
+                          (MIN / -1) clamp_i128 saturates to MAX"
+            )]
+            fn saturating_div(self, rhs: Self) -> Self {
+                let x = i128::from(self.value()) / i128::from(rhs.value());
+                $ty::from_int(clamp_i128(x, Self::MIN_INT, Self::MAX_INT)).unwrap_or($ty::zero())
+            }
+
+            #[inline(always)]
+            fn add(self, rhs: Self) -> Self {
+                debug_assert!(self.checked_add(rhs).is_some(), "attempt to add with overflow");
+                self.wrapping_add(rhs)
+            }
+
+            #[inline(always)]
+            fn sub(self, rhs: Self) -> Self {
+                debug_assert!(self.checked_sub(rhs).is_some(), "attempt to subtract with overflow");
+                self.wrapping_sub(rhs)
+            }
+
+            #[inline(always)]
+            fn mul(self, rhs: Self) -> Self {
+                debug_assert!(self.checked_mul(rhs).is_some(), "attempt to multiply with overflow");
+                self.wrapping_mul(rhs)
+            }
+
+            #[inline(always)]
+            fn div(self, rhs: Self) -> Self {
+                debug_assert!(
+                    rhs.value() == 0 || self.checked_div(rhs).is_some(),
+                    "attempt to divide with overflow"
+                );
+                self.wrapping_div(rhs)
+            }
+        }
+    )*};
+}
+
+#[cfg(feature = "shrink_wrap")]
+signed_exact!(
+    I2 2 i8 I3 3 i8 I4 4 i8 I5 5 i8 I6 6 i8 I7 7 i8 I8 8 i8
+    I9 9 i16 I10 10 i16 I11 11 i16 I12 12 i16 I13 13 i16 I14 14 i16 I15 15 i16 I16 16 i16
+    I17 17 i32 I18 18 i32 I19 19 i32 I20 20 i32 I21 21 i32 I22 22 i32 I23 23 i32 I24 24 i32
+    I25 25 i32 I26 26 i32 I27 27 i32 I28 28 i32 I29 29 i32 I30 30 i32 I31 31 i32 I32 32 i32
+    I33 33 i64 I34 34 i64 I35 35 i64 I36 36 i64 I37 37 i64 I38 38 i64 I39 39 i64 I40 40 i64
+    I41 41 i64 I42 42 i64 I43 43 i64 I44 44 i64 I45 45 i64 I46 46 i64 I47 47 i64 I48 48 i64
+    I49 49 i64 I50 50 i64 I51 51 i64 I52 52 i64 I53 53 i64 I54 54 i64 I55 55 i64 I56 56 i64
+    I57 57 i64 I58 58 i64 I59 59 i64 I60 60 i64 I61 61 i64 I62 62 i64 I63 63 i64 I64 64 i64
+);
+
 macro_rules! float {
     ($($ty:ident)*) => {$(
         #[expect(
@@ -976,5 +1481,69 @@ mod tests {
     fn div_by_zero_of_a_float_is_itself() {
         assert_eq!(Storage::div_rounded(1.5f32, 0, crate::Rounding::Floor), 1.5);
         assert_eq!(Storage::div_whole(1.5f64, 0), Some(1.5));
+    }
+
+    #[cfg(feature = "shrink_wrap")]
+    mod exact_width {
+        use super::super::UnsignedStorage;
+        use super::Storage;
+        use shrink_wrap::un::{I5, U5};
+
+        #[test]
+        fn name_bits_and_int_range() {
+            assert_eq!(<U5 as Storage>::NAME, "U5");
+            assert_eq!(<U5 as Storage>::BITS, 5);
+            assert_eq!(<U5 as Storage>::MIN_INT, 0);
+            assert_eq!(<U5 as Storage>::MAX_INT, 31);
+            assert_eq!(<I5 as Storage>::NAME, "I5");
+            assert_eq!(<I5 as Storage>::BITS, 5);
+            assert_eq!(<I5 as Storage>::MIN_INT, -16);
+            assert_eq!(<I5 as Storage>::MAX_INT, 15);
+        }
+
+        #[test]
+        fn saturates_and_wraps_at_its_own_width_not_the_backing_u8() {
+            let max = U5::max();
+            let one = U5::one();
+            assert_eq!(Storage::checked_add(max, one), None);
+            assert_eq!(Storage::wrapping_add(max, one), U5::zero());
+            assert_eq!(Storage::saturating_add(max, one), max);
+            let zero = U5::zero();
+            assert_eq!(Storage::checked_sub(zero, one), None);
+            assert_eq!(Storage::wrapping_sub(zero, one), max);
+            assert_eq!(Storage::saturating_sub(zero, one), zero);
+        }
+
+        #[test]
+        fn signed_wraps_and_saturates_at_min_divided_by_minus_one() {
+            let min = I5::min();
+            let minus_one = I5::new(-1).unwrap();
+            // -16 / -1 is 16, one past I5::MAX (15): wraps back to MIN, saturates to MAX
+            assert_eq!(Storage::checked_div(min, minus_one), None);
+            assert_eq!(Storage::wrapping_div(min, minus_one), min);
+            assert_eq!(Storage::saturating_div(min, minus_one), I5::max());
+        }
+
+        #[test]
+        fn from_int_wrapping_masks_to_the_storage_width() {
+            assert_eq!(<U5 as Storage>::from_int_wrapping(32), U5::zero());
+            assert_eq!(<U5 as Storage>::from_int_wrapping(-1), U5::max());
+            assert_eq!(<I5 as Storage>::from_int_wrapping(16), I5::min());
+            assert_eq!(<I5 as Storage>::from_int_wrapping(-17), I5::max());
+        }
+
+        #[test]
+        fn unsigned_storage_round_trips_through_u64() {
+            let max = U5::max();
+            assert_eq!(max.to_u64(), 31);
+            assert_eq!(U5::from_u64(31), Some(max));
+            assert_eq!(U5::from_u64(32), None);
+        }
+
+        #[test]
+        #[should_panic(expected = "attempt to divide by zero")]
+        fn div_by_zero_panics() {
+            let _ = Storage::div(U5::one(), U5::zero());
+        }
     }
 }

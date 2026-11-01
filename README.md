@@ -120,7 +120,7 @@ know that a field is in µs, not just a `u32`. A unit known only at run time tra
 | unit groups   | `time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`, `radiation`, `dimensionless`, `information`, `counting`; `quantities` for all |
 | `customary`   | imperial, US customary and other units outside the SI (opt-in only, see [docs/customary.md](docs/customary.md)) |
 | `std`         | every unit group but `customary`; with `shrink_wrap` the owned wire mirrors `DimOwned`, `CountedOwned`, `SIExprOwned` for hosts |
-| `shrink_wrap` | the wire format: `SerializeShrinkWrap` / `DeserializeShrinkWrap` for every type, `SIExpr`, `Fixed` over `UNib32` / `UVlq*` / `Nibble` |
+| `shrink_wrap` | the wire format: `SerializeShrinkWrap` / `DeserializeShrinkWrap` for every type, `SIExpr`, `Fixed` over `UNib32` / `UVlq*` / `Nibble` / `U1`..`U64` / `I2`..`I64` (exact-width bit fields, `Fixed<Volt, Milli, U5>` is 5 bits on the wire) |
 | `serde`       | `serde` for the numbers, no_std without alloc: `Fixed`, `Point`, indices as their stored number, `Complex` as `{ re, im }`, bounds checked on reading; `serde::with_unit` for `"1.5 ms"` text read back exactly. With `std` also `Magnitude` and `Offset`, with `std` and `shrink_wrap` the owned wire mirrors |
 | `defmt`       | `defmt::Format`                                                                                      |
 | `libm`        | `to_db` / `from_db` and their `f32` forms without `std`, from the pure-Rust `libm` (also with `std`, so every target computes the same bits) |

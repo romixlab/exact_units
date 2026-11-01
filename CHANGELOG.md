@@ -278,6 +278,12 @@ firmware that only needs units in its types builds without it; the bytes don't d
   For users: every public item is documented and has `Debug`, and 141 pure functions and the `self`-returning
   builders are `#[must_use]` (a dropped result now warns).
 * Property tests and proofs (`tests/props`): each property is one plain function against an exact `i128` reference, run by a proptest in `just test` and by a Kani proof in the new `just verify` (`cargo kani --tests`, not in CI). They cover the rounding modes of `requantize` / `to_rounded` over rational scales (i8 to i64, every i8 and its pairs walked whole), monotonic rounding, round trips within a step, saturating and wrapping `+`, `-`, `*` and `times_into` against the exact result settled, no panic and no wrong value for any input of `from_f32`, `RangeDec`, `from_db_const`, conversion factors with denominators past `i64` and `i128`, points and offsets, `{:#.p}` against an exact decimal rounded half to even (every Q15), and `fixed!(literal)` and `Fixed::from_decimal` against the nearest stored value. Each of the six conversion fixes below (`from_f32` at 2⁶³, `RangeDec` f32 bounds, `from_db_const`, denominators past `i64` in `Fixed::to` and points, offsets past `i128`) has a property that fails on the code before it.
+* `Storage` and `UnsignedStorage` for shrink_wrap's exact-width integers, `U1`..`U64` and `I2`..`I64` (feature
+  `shrink_wrap`): `Fixed<Volt, Milli, U5>` takes 5 bits on the wire, not a whole byte. `BITS` is the type's own
+  width, not its backing `u8`/`u16`/`u32`/`u64` or `i8`/`i16`/`i32`/`i64`; `checked_`/`wrapping_`/`saturating_`
+  and the panicking operators wrap or saturate at that width (two's complement for the signed ones), as `Nibble`
+  already did at 4 bits. `Range<MIN, MAX>` and `Fixed::bounded` cover them too; `U64`'s own `RangeU64` joins
+  `u64`'s and `UVlq64`'s for a bound above `i64::MAX`.
 
 ### 🐛 Fixes
 

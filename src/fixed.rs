@@ -1334,6 +1334,7 @@ mod tests {
     use crate::prefix::*;
     use crate::units::{Byte, Ratio, Second, Volt};
     use core::time::Duration;
+    use shrink_wrap::un::U5;
     use shrink_wrap::{Nibble, UNib32, UVlq64};
 
     #[cfg(feature = "customary")]
@@ -1681,6 +1682,64 @@ mod tests {
             t
         );
         assert_eq!(size_of::<Micros<u64>>(), 8);
+    }
+
+    #[test]
+    fn u5_is_five_bits_on_the_wire() {
+        assert_eq!(
+            <U5 as SerializeShrinkWrap>::ELEMENT_SIZE,
+            ElementSize::Sized { size_bits: 5 }
+        );
+        // three 5-bit values pack into 15 bits, 2 bytes, not 3 as byte-aligned values would
+        let a = Fixed::<Volt, Milli, U5>::new(U5::new(9).unwrap());
+        let b = Fixed::<Volt, Milli, U5>::new(U5::new(31).unwrap());
+        let c = Fixed::<Volt, Milli, U5>::new(U5::zero());
+        let mut buf = [0u8; 8];
+        let mut wr = BufWriter::new(&mut buf);
+        wr.write(&a).unwrap();
+        wr.write(&b).unwrap();
+        wr.write(&c).unwrap();
+        let bytes = wr.finish().unwrap();
+        assert_eq!(bytes.len(), 2);
+
+        let mut rd = BufReader::new(bytes);
+        assert_eq!(rd.read::<Fixed<Volt, Milli, U5>>().unwrap(), a);
+        assert_eq!(rd.read::<Fixed<Volt, Milli, U5>>().unwrap(), b);
+        assert_eq!(rd.read::<Fixed<Volt, Milli, U5>>().unwrap(), c);
+    }
+
+    #[test]
+    fn u5_debug_and_display_name() {
+        assert_eq!(<U5 as Storage>::NAME, "U5");
+        let v = Fixed::<Volt, Milli, U5>::new(U5::new(9).unwrap());
+        assert_eq!(format!("{v:?}"), "Volt(9 mV U5)");
+    }
+
+    #[test]
+    fn u5_converts_to_u8_and_i16() {
+        let v = Fixed::<Volt, Milli, U5>::new(U5::new(31).unwrap());
+        assert_eq!(v.to::<Milli, u8>(), Some(Fixed::new(31u8)));
+        assert_eq!(v.to::<Milli, i16>(), Some(Fixed::new(31i16)));
+        let back: Fixed<Volt, Milli, u8> = Fixed::new(31);
+        assert_eq!(back.to::<Milli, U5>(), Some(v));
+        let too_big = Fixed::<Volt, Milli, u8>::new(32);
+        assert_eq!(too_big.to::<Milli, U5>(), None);
+    }
+
+    #[test]
+    fn u5_saturates_at_its_own_top() {
+        let max = Fixed::<Volt, Milli, U5, Saturating>::of(U5::max());
+        let one = Fixed::<Volt, Milli, U5, Saturating>::of(U5::one());
+        assert_eq!(max.saturating_add(one).get(), U5::max());
+        assert_eq!(max.checked_add(one), None);
+    }
+
+    #[test]
+    fn u5_range_bounds() {
+        type T = Fixed<Volt, Milli, U5, Range<0, 20>>;
+        assert!(T::try_new(U5::new(20).unwrap()).is_ok());
+        assert_eq!(T::try_new(U5::new(21).unwrap()), Err(OutOfBounds));
+        assert_eq!(T::try_new(U5::new(31).unwrap()), Err(OutOfBounds));
     }
 
     #[test]
