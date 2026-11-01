@@ -64,7 +64,7 @@ pub use complex::Nco;
 pub use complex::{Admittance, Impedance};
 #[cfg(feature = "dimensionless")]
 pub use complex::{CQ15, CQ31};
-pub use complex::{Complex, ComplexStorage, Interleaved, IqStorage, Mac, NormStorage};
+pub use complex::{Complex, ComplexStorage, Interleaved, IqStorage, Mac, NormStorage, Polar};
 #[cfg(feature = "angle")]
 pub use fixed::{Bam16, Bam32, PhaseBam16, PhaseBam32};
 pub use fixed::{

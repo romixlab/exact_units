@@ -115,3 +115,59 @@ pub fn scale_f32(x: f32, exp: i8) -> f32 {
         x / POW10_F32[(-exp) as usize]
     }
 }
+
+/// The float functions `core` lacks: from libm when it is on, so every target computes the same bits, else from
+/// std. What levels in dB and the polar form of a [Complex](crate::Complex) take.
+#[cfg(any(feature = "std", feature = "libm"))]
+pub(crate) mod math {
+    #[cfg(feature = "libm")]
+    pub(crate) use libm::{
+        atan2, atan2f, exp10, exp10f, hypot, hypotf, log10, log10f, sincos, sincosf,
+    };
+
+    #[cfg(not(feature = "libm"))]
+    mod from_std {
+        #[inline(always)]
+        pub(crate) fn log10(x: f64) -> f64 {
+            x.log10()
+        }
+        #[inline(always)]
+        pub(crate) fn log10f(x: f32) -> f32 {
+            x.log10()
+        }
+        #[inline(always)]
+        pub(crate) fn exp10(x: f64) -> f64 {
+            10f64.powf(x)
+        }
+        #[inline(always)]
+        pub(crate) fn exp10f(x: f32) -> f32 {
+            10f32.powf(x)
+        }
+        #[inline(always)]
+        pub(crate) fn hypot(x: f64, y: f64) -> f64 {
+            x.hypot(y)
+        }
+        #[inline(always)]
+        pub(crate) fn hypotf(x: f32, y: f32) -> f32 {
+            x.hypot(y)
+        }
+        #[inline(always)]
+        pub(crate) fn atan2(y: f64, x: f64) -> f64 {
+            y.atan2(x)
+        }
+        #[inline(always)]
+        pub(crate) fn atan2f(y: f32, x: f32) -> f32 {
+            y.atan2(x)
+        }
+        #[inline(always)]
+        pub(crate) fn sincos(x: f64) -> (f64, f64) {
+            x.sin_cos()
+        }
+        #[inline(always)]
+        pub(crate) fn sincosf(x: f32) -> (f32, f32) {
+            x.sin_cos()
+        }
+    }
+    #[cfg(not(feature = "libm"))]
+    pub(crate) use from_std::*;
+}

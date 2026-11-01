@@ -19,6 +19,7 @@
 
 ### 🚀 Features
 
+* Polar form and levels of a `Complex` (STD-90): `Polar<U, P, T, A>`, a magnitude `Fixed` and a phase angle, with `Complex::to_polar` / `from_polar` and `Polar::to_complex`. Floats: `abs` (`hypot`), `arg` (`atan2`, a `Fixed<Phase<Radian>, One, F>`) and `from_polar` (`sin`/`cos`, a phase in any angle unit), feature `std` or `libm`. Integers, no float and no feature: `abs` is the correctly rounded root of the exact `norm_sqr` in the unsigned twin (`u16` for `i16`, since |−32768 − 32768j| is 46341), `abs_rounded(r)` and `abs_saturating`; `arg` by CORDIC into a `PhaseBam16` (`i8`, `i16`) or `PhaseBam32` (`i32`), within 0.51 of a step; `from_polar` by Q31 sin/cos, `None` where a part doesn't fit (feature `angle`, and `dimensionless` for `from_polar`). `to_db` / `to_db_f32` from |z|² by the unit's level form (20·lg|z| = 10·lg|z|²), and `norm_sqr_at(Decibels)` / `db!(norm_sqr -15)`, a level as a threshold on `norm_sqr` worked out at compile time, so a firmware tests |Γ| ≤ −15 dB as one integer compare.
 * IQ fixed-point DSP (STD-91): `CQ15<U = Ratio>` and `CQ31<U = Ratio>`, saturating Q15 and Q31 IQ samples.
   `mul_round` and `mul_conj_round` multiply two complex values into their own scale and storage, each part summed
   exactly in the wide type, rounded once and saturated: (−1 − j)² is `0 + j·(1 − 2⁻¹⁵)`. `mix` and `mix_conj`

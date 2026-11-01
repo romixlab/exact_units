@@ -21,7 +21,7 @@
 //! # }
 //! ```
 
-mod exact;
+pub(crate) mod exact;
 
 use crate::{Bounds, Fixed, FixedScale, LevelForm, Unit};
 
@@ -133,6 +133,9 @@ const fn gcd(mut a: u64, mut b: u64) -> u64 {
 /// stored value nearest to the exact gain. It is an associated const ([AtLevel]), so nothing of it runs at run time;
 /// [Fixed::from_db_const] is the same as a `const fn`, for a level that isn't a literal.
 ///
+/// `db!(norm_sqr -15)` is the |z|² of a complex value at that level, a threshold for
+/// [Complex::norm_sqr](crate::Complex::norm_sqr) ([the level module](crate::complex::level)).
+///
 /// ```
 /// # #[cfg(feature = "electrical")] {
 /// use exact_units::{Fixed, db, prefix::{Micro, One}, units::{Per, Volt, Watt}};
@@ -157,6 +160,14 @@ const fn gcd(mut a: u64, mut b: u64) -> u64 {
 /// ```
 #[macro_export]
 macro_rules! db {
+    (norm_sqr $level:literal) => {
+        <_ as $crate::decibel::AtLevel<
+            $crate::decibel::NormSqrLevel<
+                { $crate::decibel::Decibels::parse(stringify!($level)).num() },
+                { $crate::decibel::Decibels::parse(stringify!($level)).decimals() },
+            >,
+        >>::AT
+    };
     ($level:literal) => {
         <_ as $crate::decibel::AtLevel<
             $crate::decibel::Level<
@@ -166,6 +177,10 @@ macro_rules! db {
         >>::AT
     };
 }
+
+/// The |z|² of a complex value at a level in dB as a type: what `db!(norm_sqr -15)` names, a threshold for
+/// [Complex::norm_sqr](crate::Complex::norm_sqr) ([Complex::norm_sqr_at](crate::Complex::norm_sqr_at)).
+pub struct NormSqrLevel<const NUM: i64, const DECIMALS: u8>;
 
 /// A level in dB as a type, `NUM · 10^-DECIMALS` dB: what [db!](crate::db) names, so the storage of the [Fixed] can
 /// come from the context.
@@ -179,7 +194,7 @@ pub trait AtLevel<L>: Sized {
 
 /// The exact gain of `db` in units of `P · U` as an interval, or a compile error for a scale that isn't a fraction of
 /// integers.
-const fn gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) -> exact::Interval {
+pub(crate) const fn gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) -> exact::Interval {
     let unit = match U::EXPR.magnitude() {
         Some(m) => m,
         None => panic!("a level needs an exact scale"),
@@ -248,37 +263,12 @@ macro_rules! from_db_const {
 from_db_const!(int u8 u16 u32 u64 i8 i16 i32 i64);
 from_db_const!(float f32 to_f32 f64 to_f64);
 
-/// `log10` and `10^x`: from libm when it is on, so every target computes the same bits, else from std.
 #[cfg(any(feature = "std", feature = "libm"))]
-mod math {
-    #[cfg(feature = "libm")]
-    pub(super) use libm::{exp10, exp10f, log10, log10f};
-
-    #[cfg(not(feature = "libm"))]
-    #[inline(always)]
-    pub(super) fn log10(x: f64) -> f64 {
-        x.log10()
-    }
-    #[cfg(not(feature = "libm"))]
-    #[inline(always)]
-    pub(super) fn log10f(x: f32) -> f32 {
-        x.log10()
-    }
-    #[cfg(not(feature = "libm"))]
-    #[inline(always)]
-    pub(super) fn exp10(x: f64) -> f64 {
-        10f64.powf(x)
-    }
-    #[cfg(not(feature = "libm"))]
-    #[inline(always)]
-    pub(super) fn exp10f(x: f32) -> f32 {
-        10f32.powf(x)
-    }
-}
+use crate::num::math;
 
 impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// The form a level of `U` takes, or a compile error for a kind without one.
-    const LEVEL_FORM: LevelForm = match U::KIND.level_form() {
+    pub(crate) const LEVEL_FORM: LevelForm = match U::KIND.level_form() {
         Some(form) => form,
         None => panic!(
             "decibels are for a ratio of powers (W/W) or of root-power quantities (V/V, A/A, Pa/Pa): a plain \
