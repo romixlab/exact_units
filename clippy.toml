@@ -1,2 +1,7 @@
 # `core::cmp::Ordering` stays as written, `core::f64::consts::PI` gets an import
 absolute-paths-max-segments = 3
+# a test fails by panicking: unwrap, expect, panic and indexing are how it says so
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true

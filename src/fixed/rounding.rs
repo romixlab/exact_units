@@ -37,7 +37,8 @@ macro_rules! round_div {
     ($($name:ident $t:ty;)*) => {$(
         /// `p / d` rounded by `r`, for `d > 0`.
         #[inline(always)]
-        #[allow(unused_comparisons)]
+        #[expect(clippy::allow_attributes, reason = "the comparison is unused for the unsigned types only")]
+        #[allow(unused_comparisons, reason = "`p < 0` is always false for an unsigned type")]
         pub(crate) const fn $name(p: $t, d: $t, r: Rounding) -> $t {
             // floor quotient and a remainder in 0..d: an arithmetic shift and a mask where d is a power of 2 (LLVM
             // doesn't always see that in `div_euclid` at opt-level 3)
@@ -173,6 +174,10 @@ fn saturate_f64(y: f64, min: i128, max: i128) -> i128 {
 /// A whole float as an `i128` that has its low 64 bits: from 2¹²⁷ on a whole f64 is a multiple of 2⁷⁵, 0 modulo
 /// 2⁶⁴, as `NaN` and infinities are taken to be.
 fn wrap_f64(y: f64) -> i128 {
+    #[expect(
+        clippy::lossy_float_literal,
+        reason = "2¹²⁷ is an f64 exactly, its shortest digits are not these"
+    )]
     const LIMIT: f64 = 170141183460469231731687303715884105728.0; // 2¹²⁷
     if y < LIMIT && y > -LIMIT {
         y as i128
@@ -495,6 +500,10 @@ impl Requantizer {
     }
 
     /// `x` converted, as [requantize] does.
+    #[expect(
+        clippy::float_cmp,
+        reason = "a float is whole when it equals its integer exactly"
+    )]
     pub fn apply(&self, x: Repr) -> Option<Repr> {
         let (r, o, factor) = (self.r, self.o, &self.factor);
         let (bits, signed) = match (self.to, x) {

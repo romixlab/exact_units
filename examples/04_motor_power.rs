@@ -14,6 +14,12 @@
 //!
 //! `cargo run --example 04_motor_power --features electrical`
 
+#![expect(
+    clippy::print_stdout,
+    clippy::unwrap_used,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use exact_units::prefix::{FullScale, Micro, Milli, One, Rational};
 use exact_units::units::{Ampere, Ohm, Volt, Watt};
 use exact_units::{Fixed, Range, Rounding};

@@ -113,7 +113,6 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
     /// # }
     /// ```
     #[inline(always)]
-    #[allow(clippy::type_complexity)] // the written form of the result is the point
     pub fn mul_round<U2: Unit, B2: Unlimited<T>>(
         self,
         rhs: Complex<U2, P, T, B2>,
@@ -135,7 +134,6 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
     /// # }
     /// ```
     #[inline(always)]
-    #[allow(clippy::type_complexity)]
     pub fn mul_conj_round<U2: Unit, B2: Unlimited<T>>(
         self,
         rhs: Complex<U2, P, T, B2>,
@@ -332,6 +330,10 @@ impl<U: Unit, P: FixedScale, T: IqStorage> Mac<U, P, T> {
         const { assert!(!T2::IS_FLOAT, "a Mac's threshold is an integer storage") };
         let t = match threshold.get().to_repr() {
             crate::Repr::Int(t) => t,
+            #[expect(
+                clippy::unreachable,
+                reason = "the const assert above refuses a float storage"
+            )]
             crate::Repr::Float(_) => unreachable!(),
         };
         if n == 0 {

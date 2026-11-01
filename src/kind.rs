@@ -238,7 +238,7 @@ impl fmt::Display for Kind<'_> {
 /// # }
 /// ```
 #[cfg(all(feature = "electrical", feature = "dimensionless"))]
-#[allow(dead_code)]
+#[expect(dead_code, reason = "a holder of doctests")]
 struct KindsInConversions;
 
 /// A phase angle is not a mechanical (plane) angle: [Phase](crate::units::Phase) converts within its kind, a plane
@@ -297,7 +297,7 @@ struct KindsInConversions;
 /// let _ = Fixed::<Phase<Watt>, One, f32>::new(1.0).convert::<Phase<Watt>, One, f32>();
 /// ```
 #[cfg(feature = "angle")]
-#[allow(dead_code)]
+#[expect(dead_code, reason = "a holder of doctests")]
 struct PhaseKinds;
 
 mod phase {

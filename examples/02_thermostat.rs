@@ -12,6 +12,12 @@
 //!
 //! `cargo run --example 02_thermostat --features thermal`
 
+#![expect(
+    clippy::print_stdout,
+    clippy::unwrap_used,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use exact_units::origins::{Celsius, Fahrenheit};
 use exact_units::prefix::{Centi, Rational};
 use exact_units::units::Kelvin;

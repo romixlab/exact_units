@@ -13,6 +13,12 @@
 //!
 //! `cargo run --example 06_audio_limiter --features electrical,libm`
 
+#![expect(
+    clippy::print_stdout,
+    clippy::unwrap_used,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use exact_units::prefix::{Milli, One};
 use exact_units::units::{Per, Volt, Watt};
 use exact_units::{Fixed, Range, Rounding, db};

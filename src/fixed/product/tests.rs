@@ -73,7 +73,7 @@ fn powers_of_pi_multiply_exactly() {
 }
 
 #[test]
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity, reason = "the types of products are the test")]
 fn kinds_of_products_and_quotients() {
     let v = MilliVolt::new(2000);
     let gain = Fixed::<Per<Volt, Volt>, Milli, i32>::new(1500);

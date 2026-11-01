@@ -13,6 +13,12 @@
 //!
 //! `cargo run --example 13_impedance_match --features electrical,angle,dimensionless,libm`
 
+#![expect(
+    clippy::print_stdout,
+    clippy::unwrap_used,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use exact_units::prefix::{Milli, One, Pow2, Product};
 use exact_units::units::{Degree, Per, Phase, Times, Volt};
 use exact_units::{Admittance, Complex, Fixed, Impedance, Saturating, db};

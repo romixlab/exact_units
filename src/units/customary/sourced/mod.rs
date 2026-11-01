@@ -6,6 +6,15 @@
 //! values SP 811 prints and the ambiguity groups the docs table is made of. The source extracts are kept with the
 //! STD-72 design notes.
 
+#![expect(
+    clippy::unwrap_used,
+    reason = "test-only data: a row that doesn't parse fails the tests"
+)]
+#![expect(
+    clippy::print_stdout,
+    reason = "the catalogue tests print what they checked, nextest shows it on failure"
+)]
+
 mod catalogue;
 mod mag;
 mod markers;

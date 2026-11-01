@@ -18,6 +18,12 @@
 //!
 //! `cargo run --example 08_data_logger --features counting,time`
 
+#![expect(
+    clippy::print_stdout,
+    clippy::unwrap_used,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use exact_units::units::{Item, Packet, Second};
 use exact_units::{Fixed, Index, IndexFrom1, Millis, Offset, Point, Range, Seq, origin};
 

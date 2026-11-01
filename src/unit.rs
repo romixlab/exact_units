@@ -738,7 +738,10 @@ pub enum Provenance<'i> {
 }
 
 // written out: derive_shrink_wrap drops a variant's `#[default]`, so `derive(Default)` can't see it
-#[allow(clippy::derivable_impls)]
+#[expect(
+    clippy::derivable_impls,
+    reason = "derive_shrink_wrap drops a variant's #[default]"
+)]
 impl Default for Provenance<'_> {
     fn default() -> Self {
         Provenance::Defined
@@ -746,7 +749,7 @@ impl Default for Provenance<'_> {
 }
 
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
-#[allow(clippy::derivable_impls)]
+#[expect(clippy::derivable_impls, reason = "the owned mirror of the impl above")]
 impl Default for ProvenanceOwned {
     fn default() -> Self {
         ProvenanceOwned::Defined
@@ -757,7 +760,10 @@ impl Default for ProvenanceOwned {
 /// `Div(Torque, AngularVelocity)`). Every [Unit] has one in [Unit::EXPR]; [units::by_name](crate::units::by_name)
 /// finds the named ones of this crate.
 // Only ever in `static`s and consts, never moved around: boxing the named variant would buy nothing
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "only in statics and consts, never moved"
+)]
 #[derive(Debug, PartialEq)]
 pub enum UnitExpr {
     /// A unit with a marker of its own.

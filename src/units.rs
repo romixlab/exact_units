@@ -12,8 +12,7 @@
 use crate::Kind;
 #[cfg(feature = "shrink_wrap")]
 use crate::SIExpr;
-#[allow(unused_imports)] // `Scale` with no quantity group enabled
-use crate::unit::{Dim, Scale, Unit, UnitExpr};
+use crate::unit::{Dim, Unit, UnitExpr};
 use core::marker::PhantomData;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::RefBox;
@@ -184,7 +183,7 @@ crate::unit! {
     #[cfg(feature = "angle")]
     pub struct Radian = "rad", [rad 1];
 
-    /// Angle in degrees of arc, ° (π/180 rad, exactly: [Scale::Exact]).
+    /// Angle in degrees of arc, ° (π/180 rad, exactly: [Scale::Exact](crate::Scale::Exact)).
     #[cfg(feature = "angle")]
     pub struct Degree = "°", [rad 1], Exact(1 / 180, pi 1);
 

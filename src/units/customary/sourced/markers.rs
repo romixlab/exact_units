@@ -91,7 +91,7 @@ fn the_rest_is_other_markers_and_origins() {
     };
     let scale = |e: &UnitExpr| match e {
         UnitExpr::Named { scale, .. } => exact(*scale),
-        _ => unreachable!(),
+        other => panic!("{other:?}"),
     };
     assert_eq!(scale(Degree::EXPR), magnitude(row("degree_angle").mag));
     assert_eq!(scale(Turn::EXPR), magnitude(row("turn").mag));
@@ -173,7 +173,7 @@ fn marker_of(id: &str) -> String {
 
 /// The tables of `docs/customary.md` made from the catalogue, by the name of their block.
 fn docs_blocks() -> Vec<(&'static str, String)> {
-    use std::fmt::Write as _;
+    use core::fmt::Write as _;
     let mut ambiguous = String::from("| Name | Symbols | Markers | Why |\n|---|---|---|---|\n");
     for a in AMBIGUOUS {
         let code = |s: &[String]| {

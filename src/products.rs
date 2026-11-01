@@ -2,20 +2,15 @@
 //! [UnitDiv] impls. Each line is checked against the dimensions of its units at compile time, so the table can't be
 //! wrong.
 
-#[allow(unused_imports)] // with no unit group enabled
-use crate::units;
-#[allow(unused_imports)]
-use crate::{Unit, UnitDiv, UnitMul};
-
 /// A ratio keeps the unit: 48 V · 0.5 duty = 24 V.
 #[cfg(feature = "dimensionless")]
-impl<U: Unit> UnitMul<units::Ratio> for U {
+impl<U: crate::Unit> crate::UnitMul<crate::units::Ratio> for U {
     type Output = U;
 }
 
 /// A ratio keeps the unit: 24 V / 0.5 = 48 V.
 #[cfg(feature = "dimensionless")]
-impl<U: Unit> UnitDiv<units::Ratio> for U {
+impl<U: crate::Unit> crate::UnitDiv<crate::units::Ratio> for U {
     type Output = U;
 }
 
@@ -25,31 +20,33 @@ macro_rules! products {
     ($($(#[$meta:meta])* $a:ident * $b:ident = $o:ident;)*) => {
         $(
             $(#[$meta])*
-            impl UnitMul<units::$b> for units::$a {
-                type Output = units::$o;
+            impl crate::UnitMul<crate::units::$b> for crate::units::$a {
+                type Output = crate::units::$o;
             }
             $(#[$meta])*
-            impl UnitMul<units::$a> for units::$b {
-                type Output = units::$o;
+            impl crate::UnitMul<crate::units::$a> for crate::units::$b {
+                type Output = crate::units::$o;
             }
             $(#[$meta])*
-            impl UnitDiv<units::$a> for units::$o {
-                type Output = units::$b;
+            impl crate::UnitDiv<crate::units::$a> for crate::units::$o {
+                type Output = crate::units::$b;
             }
             $(#[$meta])*
-            impl UnitDiv<units::$b> for units::$o {
-                type Output = units::$a;
+            impl crate::UnitDiv<crate::units::$b> for crate::units::$o {
+                type Output = crate::units::$a;
             }
             $(#[$meta])*
             const _: () = {
                 assert!(
-                    <units::$a as Unit>::DIM.mul(<units::$b as Unit>::DIM).same(<units::$o as Unit>::DIM),
+                    <crate::units::$a as crate::Unit>::DIM
+                        .mul(<crate::units::$b as crate::Unit>::DIM)
+                        .same(<crate::units::$o as crate::Unit>::DIM),
                     concat!(stringify!($a * $b = $o), ": SI exponents differ")
                 );
                 assert!(
-                    !<units::$a as Unit>::EXPR.has_offset()
-                        && !<units::$b as Unit>::EXPR.has_offset()
-                        && !<units::$o as Unit>::EXPR.has_offset(),
+                    !<crate::units::$a as crate::Unit>::EXPR.has_offset()
+                        && !<crate::units::$b as crate::Unit>::EXPR.has_offset()
+                        && !<crate::units::$o as crate::Unit>::EXPR.has_offset(),
                     concat!(stringify!($a * $b = $o), ": a unit with an offset scale can't be in a product")
                 );
             };

@@ -14,6 +14,12 @@
 //!
 //! `cargo run --example 01_timer --no-default-features --features time`
 
+#![expect(
+    clippy::print_stdout,
+    clippy::unwrap_used,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use core::time::Duration;
 use exact_units::prefix::{Milli, Nano};
 use exact_units::{Fixed, Micros, Millis, Nanos};

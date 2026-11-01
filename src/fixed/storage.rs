@@ -112,6 +112,10 @@ pub trait UnsignedStorage: Storage {
 /// `f32` to an integer type if it is whole and in range, in `i64` for types of up to 63 bits (an `i128` conversion
 /// is a library call on a 32-bit MCU).
 #[inline(always)]
+#[expect(
+    clippy::float_cmp,
+    reason = "a float is whole when it equals its integer exactly"
+)]
 fn whole_f32(x: f32, min: i128, max: i128) -> Option<i128> {
     if x.is_nan() || x < min as f32 || x > max as f32 {
         return None;
@@ -128,6 +132,10 @@ fn whole_f32(x: f32, min: i128, max: i128) -> Option<i128> {
 }
 
 /// `f64` to an integer type if it is whole and in range.
+#[expect(
+    clippy::float_cmp,
+    reason = "a float is whole when it equals its integer exactly"
+)]
 fn whole(x: f64, min: i128, max: i128) -> Option<i128> {
     // the range check is in f64 (min/max of up to 64 bits are close enough, the cast below checks again)
     if x.is_nan() || x < min as f64 || x > max as f64 {

@@ -777,11 +777,11 @@ mod series_store {
         }
     }
 
-    // SAFETY: the cells of `u16`, read back through `from_code`, which maps any value to a prefix
     #[expect(
         unsafe_code,
         reason = "shrink_wrap's SeriesCells is an unsafe trait: the impl reuses u16's cells"
     )]
+    // SAFETY: the cells of `u16`, read back through `from_code`, which maps any value to a prefix
     unsafe impl SeriesCells for Prefix {
         type Cells<const R: usize> = <u16 as SeriesCells>::Cells<R>;
 

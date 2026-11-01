@@ -14,6 +14,12 @@
 //!
 //! `cargo run --example 05_light_sensor --features electrical,dimensionless`
 
+#![expect(
+    clippy::print_stdout,
+    clippy::unwrap_used,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use exact_units::prefix::{Mega, Micro, Milli, One};
 use exact_units::units::{Ampere, Ohm, Per, Ratio, Volt};
 use exact_units::{Duty16, Fixed, Rounding};

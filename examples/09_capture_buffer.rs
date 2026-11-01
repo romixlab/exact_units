@@ -13,6 +13,12 @@
 //!
 //! `cargo run --example 09_capture_buffer --features counting,time,information`
 
+#![expect(
+    clippy::print_stdout,
+    clippy::unwrap_used,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use exact_units::prefix::{Kibi, Kilo, One};
 use exact_units::units::{self, Byte, Cycle, Per, Sample, Second};
 use exact_units::{Bytes, Fixed, Rounding, Unit};

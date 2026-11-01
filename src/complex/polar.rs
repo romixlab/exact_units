@@ -250,7 +250,6 @@ macro_rules! float_polar {
 
             /// |z| ([abs](Self::abs)) and arg z ([arg](Self::arg)).
             #[inline(always)]
-            #[allow(clippy::type_complexity)] // the written form of the result is the point
             pub fn to_polar(self) -> Polar<U, P, $ty, Fixed<Phase<Radian>, One, $ty>> {
                 Polar::new(self.abs(), self.arg())
             }

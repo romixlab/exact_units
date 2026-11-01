@@ -307,7 +307,7 @@ policy! {
     Saturating saturating_add saturating_sub saturating_mul saturating_div saturating_neg;
 }
 
-#[allow(private_bounds)] // the policy is a detail of the three markers
+#[expect(private_bounds, reason = "the policy is a detail of the three markers")]
 impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Complex<U, P, T, B> {
     /// The conjugate `re − j·im`, negated by the policy.
     #[inline(always)]
@@ -334,7 +334,6 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
     /// # }
     /// ```
     #[inline(always)]
-    #[allow(clippy::type_complexity)] // the written form of the result is the point
     pub fn norm_sqr(self) -> Fixed<Times<U, U>, Product<P, P>, T::Norm> {
         Fixed::new(T::norm_sqr(self.re, self.im))
     }
@@ -509,7 +508,10 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
     /// `self · rhs` in the scale [Product]`<P, P2>`, `None` where a step overflows `T`. For operands of any policy;
     /// the result is [Unbounded].
     #[inline(always)]
-    #[allow(clippy::type_complexity)] // the written form of the result is the point
+    #[expect(
+        clippy::type_complexity,
+        reason = "the written form of the result is the point"
+    )]
     pub fn checked_times<U2: Unit, P2: FixedScale, B2: Unlimited<T>>(
         self,
         rhs: Complex<U2, P2, T, B2>,
@@ -568,7 +570,6 @@ impl<U, P, T: ComplexStorage> From<Fixed<U, P, T>> for Complex<U, P, T> {
 
 /// `+`, `-`, negation, `*` and `/` by a number and by a real [Fixed], and `*` of two complex values, by the overflow
 /// policy `B` (the [module](crate::complex) says what each does).
-#[allow(private_bounds)]
 mod arith {
     use super::*;
 

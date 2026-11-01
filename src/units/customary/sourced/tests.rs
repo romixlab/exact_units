@@ -5,7 +5,7 @@
 
 use super::catalogue::*;
 use super::{AMBIGUOUS, Exact, Mag, ORIGINS, Src, Status, UNITS, Unit, dim};
-use std::cmp::Ordering;
+use core::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Just enough of an unsigned big integer for exact comparisons: little-endian u32 limbs.

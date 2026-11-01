@@ -68,6 +68,10 @@ fn settle(x: i128, min: i128, max: i128, o: Overflow) -> Option<i128> {
 
 /// Every i16 from scale `P` to `P2` in `T2`, every mode and policy: the typed conversion, the reference and the
 /// run-time one agree.
+#[expect(
+    clippy::unwrap_used,
+    reason = "a test helper: a value that doesn't fit fails the test"
+)]
 fn exhaustive<P: FixedScale, P2: FixedScale, T2: Storage + Into<i128>>(num: i128, den: i128) {
     let factor = P::SCALE.div(P2::SCALE);
     assert_eq!(factor.to_ratio(), Some((num as u128, den as u128)));

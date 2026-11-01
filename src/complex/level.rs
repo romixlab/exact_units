@@ -59,7 +59,6 @@ macro_rules! norm_sqr_at {
             /// compare with [norm_sqr](Self::norm_sqr). `db!(norm_sqr -15)` is the same as a constant. A compile
             /// error in `const` code (a panic at run time) for a kind without a level form or a level whose |z|²
             /// doesn't fit; see the [module](crate::complex::level).
-            #[allow(clippy::type_complexity)] // the written form of the result is the point
             pub const fn norm_sqr_at(db: Decibels) -> Fixed<Times<U, U>, Product<P, P>, $norm> {
                 let form = Fixed::<U, P, $ty>::LEVEL_FORM;
                 norm_sqr_at!(@$round norm_sqr_gain::<U, P>(db, form), $norm)

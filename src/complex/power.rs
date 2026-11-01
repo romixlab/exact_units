@@ -70,7 +70,10 @@ fn magnitude_f64<T: NormStorage>(re: T, im: T) -> f64 {
     crate::num::sqrt_f64(to_f64(T::norm_sqr(re, im)))
 }
 
-#[allow(private_bounds)] // the policy is a detail of the three markers, as in the `complex` module
+#[expect(
+    private_bounds,
+    reason = "the policy is a detail of the three markers, as in the `complex` module"
+)]
 impl<P: FixedScale, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Complex<Volt, P, T, B> {
     /// `S = V · I*`, the complex power of an RMS voltage and current phasor (ISO 80000-6), as
     /// `Complex<VoltAmpere, ..>`: [active](Complex::active), [reactive](Complex::reactive) and

@@ -2,12 +2,9 @@
 //! turn, the Unix epoch. Each is a zero-size marker declared with [origin!](crate::origin); a user crate declares its own the same
 //! way (a register formula, a vehicle bus' offset).
 
-#[allow(unused_imports)]
-use crate::{Magnitude, Offset, Origin};
-
 #[cfg(feature = "time")]
 mod time {
-    use super::*;
+    use crate::Offset;
     use crate::units::Second;
     use crate::{Micros, Millis, Nanos, Point, Secs};
 
@@ -42,8 +39,8 @@ pub use time::*;
 
 #[cfg(feature = "thermal")]
 mod thermal {
-    use super::*;
     use crate::units::Kelvin;
+    use crate::{Magnitude, Offset};
 
     crate::origin! {
         /// Thermodynamic temperature, from absolute zero: `Point<AbsoluteZero, Fixed<Kelvin, Milli, u32>>` is a
@@ -79,9 +76,9 @@ pub use thermal::*;
 
 #[cfg(feature = "mechanical")]
 mod pressure {
-    use super::*;
     use crate::point::AmbientPressure;
     use crate::units::Pascal;
+    use crate::{Magnitude, Offset};
 
     crate::origin! {
         /// Absolute pressure, from vacuum.
@@ -112,10 +109,10 @@ pub use pressure::*;
 
 #[cfg(feature = "angle")]
 mod angle {
-    use super::*;
     use crate::point::{Modulo, UnitZero};
     use crate::prefix::{One, Rational};
     use crate::units::{Degree, Radian, Turn};
+    use crate::{Magnitude, Offset, Origin};
     use core::marker::PhantomData;
 
     /// An angle from the unit's zero that wraps every turn: `Point<Angle<Turn>, Bam16>` is a binary angle whose

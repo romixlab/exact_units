@@ -39,7 +39,10 @@ pub const MAX_UNIT_DEPTH: usize = 32;
 
 /// One node of a unit tree, its children as `E`.
 // A node lives for one step of a walk on the stack; boxing the named variant would need alloc
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one node on the stack per step, boxing needs alloc"
+)]
 #[derive(Debug)]
 pub enum Node<'a, E> {
     /// A named unit. `dim` and `scale` are `None` for a unit known by its name only (a user's marker that a client

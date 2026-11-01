@@ -14,6 +14,12 @@
 //!
 //! `cargo run --example 11_us_customer --features customary`
 
+#![expect(
+    clippy::print_stdout,
+    clippy::unwrap_used,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use exact_units::prefix::{Kilo, One};
 use exact_units::units::{
     CubicInch, GallonImperial, GallonUs, Inch, InchOfMercury32f, InchOfMercuryConventional, Litre,

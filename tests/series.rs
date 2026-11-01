@@ -5,6 +5,7 @@ use shrink_wrap::prelude::*;
 use shrink_wrap::series::{Series, SeriesOwned};
 
 /// `bytes` are within the bound of a `Series` of `n` items of `T` (SW-62).
+#[expect(clippy::expect_used, reason = "a test helper: no bound fails the test")]
 fn within_bound<T: for<'i> shrink_wrap::series::SeriesColumns<'i>>(n: usize, bytes: &[u8]) {
     let max = Series::<T>::max_bytes(n).expect("fixed numbers have a bound");
     assert!(bytes.len() <= max, "{} bytes, bound {max}", bytes.len());

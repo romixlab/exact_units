@@ -24,6 +24,11 @@
 //!
 //! `cargo run --example 14_iq_downconvert --no-default-features --features angle,dimensionless,electrical`
 
+#![expect(
+    clippy::print_stdout,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use exact_units::prefix::Pow2;
 use exact_units::{CQ15, Complex, Nco, Rounding};
 

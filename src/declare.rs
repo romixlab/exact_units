@@ -60,7 +60,8 @@ macro_rules! unit {
         }
 
         $(#[$all_attr])*
-        #[allow(unused_doc_comments)]
+        #[expect(clippy::allow_attributes, reason = "a table may have no documented line")]
+        #[allow(unused_doc_comments, reason = "doc comments of the lines land on the expressions of the table")]
         $all_vis static $all: &[&$crate::UnitExpr] = &[
             $(
                 $(#[$($attr)*])*
@@ -170,7 +171,8 @@ macro_rules! __unit_dim {
         $crate::counted!($name)
     };
     ($name:ident [$($d:ident $e:literal),* $(,)?]) => {{
-        #[allow(unused_mut)]
+        #[expect(clippy::allow_attributes, reason = "mutated only when the dimension has exponents")]
+        #[allow(unused_mut, reason = "a dimension with no exponents is never changed")]
         let mut dim = $crate::Dim::ONE;
         $(dim.$d = $crate::__dim_exp($e);)*
         dim

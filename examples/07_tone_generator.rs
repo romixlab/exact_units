@@ -13,6 +13,12 @@
 //!
 //! `cargo run --example 07_tone_generator --features dimensionless,angle`
 
+#![expect(
+    clippy::print_stdout,
+    clippy::unwrap_used,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use exact_units::prefix::Pow2;
 use exact_units::units::Ratio;
 use exact_units::{Bam16, Fixed, Q15, Rounding, fixed};

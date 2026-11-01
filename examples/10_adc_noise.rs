@@ -14,6 +14,12 @@
 //!
 //! `cargo run --example 10_adc_noise --features electrical,time`
 
+#![expect(
+    clippy::print_stdout,
+    clippy::unwrap_used,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use exact_units::prefix::{Micro, Nano, One};
 use exact_units::units::{Hertz, Per, Sqrt, Volt};
 use exact_units::{Fixed, Unit};

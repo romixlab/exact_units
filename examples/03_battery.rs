@@ -12,6 +12,11 @@
 //!
 //! `cargo run --example 03_battery --features electrical,dimensionless`
 
+#![expect(
+    clippy::print_stdout,
+    reason = "an example prints what it shows and unwraps values it knows are there"
+)]
+
 use exact_units::prefix::{Centi, Deci, Milli};
 use exact_units::units::{Ampere, Ratio, Second, Volt};
 use exact_units::{Fixed, Range, RangeDec, Rounding};

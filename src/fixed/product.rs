@@ -267,7 +267,10 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// `self · rhs` in the scale [Product]`<P, P2>`, `None` on overflow of `T`. For operands of any bounds; the
     /// result is [Unbounded].
     #[inline(always)]
-    #[allow(clippy::type_complexity)] // the written form of the result is the point
+    #[expect(
+        clippy::type_complexity,
+        reason = "the written form of the result is the point"
+    )]
     pub fn checked_times<U2: Unit, P2: FixedScale, B2: Bounds<T>>(
         self,
         rhs: Fixed<U2, P2, T, B2>,
@@ -299,7 +302,10 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// `self / rhs` in the scale [Quotient]`<P, P2>`, truncated as `T` divides; `None` for a zero divisor (of an
     /// integer `T`) or on overflow (`MIN / -1`).
     #[inline(always)]
-    #[allow(clippy::type_complexity)] // the written form of the result is the point
+    #[expect(
+        clippy::type_complexity,
+        reason = "the written form of the result is the point"
+    )]
     pub fn checked_per<U2: Unit, P2: FixedScale, B2: Bounds<T>>(
         self,
         rhs: Fixed<U2, P2, T, B2>,
