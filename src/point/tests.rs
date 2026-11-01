@@ -22,6 +22,25 @@ fn offsets() {
     assert_eq!(Offset::int(9).mul(Magnitude::ratio(5, 9)), Offset::int(5));
 }
 
+#[test]
+fn offsets_with_a_denominator_past_i128() {
+    // 1/(2⁶³·3⁴¹) is above 0, and so is (281·1423·726493069·80226749)/(2⁶³·3⁴¹)
+    let tiny = Magnitude::ratio(1, 3u64.pow(40))
+        .mul(Magnitude::ratio(1, 3))
+        .mul(Magnitude::pow2(-63));
+    let a = Offset::new(false, tiny);
+    assert!(!a.to_string().starts_with('-'), "{a}");
+    assert!(a.to_f64() > 0.0);
+    // its sum with 1 has the same denominator: past 64 bits, so none
+    let b = Offset::new(
+        false,
+        tiny.mul(Magnitude::ratio(281 * 1423, 1))
+            .mul(Magnitude::ratio(726_493_069 * 80_226_749, 1)),
+    );
+    assert_eq!(b.checked_add(Offset::int(1)), None);
+    assert_eq!(a.checked_add(Offset::int(1)), None);
+}
+
 #[cfg(feature = "time")]
 mod time {
     use super::*;

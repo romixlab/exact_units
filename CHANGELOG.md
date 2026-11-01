@@ -300,4 +300,18 @@ firmware that only needs units in its types builds without it; the bytes don't d
   of a 0 by a denominator past `i128::MAX` is 0 (it was `None`).
 * `Point::to` between storages of up to 32 bits divides by an origin factor denominator past `i64::MAX` in 128 bits
   (it was cut to its low 64 bits: a division by 0 panicked, another gave a wrong value).
+* `Storage::from_f32` for `i64` refuses 2^63 (it returned `Some(i64::MAX)`: `i64::MAX as f32` rounds up to 2^63 and the
+  saturating cast passed the range check).
+* `RangeDec`'s `f32` upper bound is the nearest `f32` to the decimal, like the lower one (it rounded twice:
+  `RangeDec<-5, 5, -4>` refused `5e-4f32`).
+* `from_db_const` of a gain below about −1.3·10^10 dB is 0 (the exponent of 2 wrapped in `u32` and gave a wrong
+  nonzero).
+* `Fixed::to`, `to_rounded` and `requantize` between storages of up to 32 bits divide by a factor denominator past
+  `i64::MAX` in 128 bits (it was cut to its low 64 bits: a division by 0 panicked, another gave a wrong value); `to`
+  of a 0 by a denominator past `i128::MAX` is 0 (it was `None`).
+* `Point::to` between storages of up to 32 bits divides by an origin factor denominator past `i64::MAX` in 128 bits
+  (it was cut to its low 64 bits: a division by 0 panicked, another gave a wrong value).
+* `Offset::checked_add` of an offset with a denominator past `i128::MAX` is `None` (the denominator wrapped negative and
+  a sum could come out as a wrong `Some`), and `Offset`'s `Display` shows such an offset by its magnitude (it printed a
+  positive offset as a negative number).
 
