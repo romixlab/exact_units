@@ -277,6 +277,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
 
 ### 🐛 Fixes
 
+* `Magnitude`'s `Display` of a factor whose square roots multiply past `u128` (five primes near 2³² under one `√`) writes the prime powers; it panicked in debug and printed a wrong root in release.
 * A product or quotient of `Ratio`s (`Ratio · Ratio`, a `CQ15` squared) prints no unit, as `Ratio` does; it printed a stray ` ·`.
 * `Storage::from_f32` for `i64` refuses 2^63 (it returned `Some(i64::MAX)`: `i64::MAX as f32` rounds up to 2^63 and the
   saturating cast passed the range check).

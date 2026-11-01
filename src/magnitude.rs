@@ -1100,7 +1100,7 @@ impl Default for Magnitude {
 impl core::fmt::Display for Magnitude {
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "the stored exponents are i8, so w.pow10 + w.pow2 fits i32; but *r *= p can overflow u128 when the primes with a half exponent multiply past 2^128 (a panic in debug, a wrong root in release)"
+        reason = "the stored exponents are i8, so w.pow10 + w.pow2 fits i32"
     )]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let (p10, p2) = self.pow10_pow2_x2();
@@ -1147,7 +1147,10 @@ impl core::fmt::Display for Magnitude {
                 None => fits = false,
             }
             if half {
-                *r *= p;
+                match r.checked_mul(p) {
+                    Some(x) => *r = x,
+                    None => fits = false,
+                }
             }
         }
         if !fits || num > u128::from(u64::MAX) || den > u128::from(u64::MAX) {

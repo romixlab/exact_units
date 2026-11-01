@@ -219,6 +219,19 @@ fn display() {
 }
 
 #[test]
+fn display_of_a_root_past_u128() {
+    // √(p₁·p₂·p₃·p₄·p₅) of five primes near 2³²: the root under √ is past u128, so it prints as prime powers
+    let m = [4294967291, 4294967279, 4294967231, 4294967197, 4294967189]
+        .map(|p| Magnitude::ratio(p, 1).sqrt())
+        .into_iter()
+        .fold(Magnitude::ONE, Magnitude::mul);
+    assert_eq!(
+        m.to_string(),
+        "·4294967189¹ᐟ²·4294967197¹ᐟ²·4294967231¹ᐟ²·4294967279¹ᐟ²·4294967291¹ᐟ²"
+    );
+}
+
+#[test]
 fn sizes() {
     // what a `&'static Magnitude` costs a firmware that holds one at run time
     assert_eq!(size_of::<PrimePower>(), 6);
