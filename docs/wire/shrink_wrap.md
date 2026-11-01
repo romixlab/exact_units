@@ -102,6 +102,36 @@ let unit = SIExpr::of::<Volt>();
 assert_eq!(unit.symbol().to_string(), "V");
 ```
 
+## serde: configs and other formats
+
+The `serde` feature gives the same rule to any serde format: a value is its stored number. It is `no_std` without alloc, so postcard on a firmware works as well as JSON on a host.
+
+- `Fixed`, `Point` and the indices: the stored number.
+- `Complex`: `{ re, im }`.
+- `Decibels`: the decimal as text in JSON or TOML, `"-3.01"`.
+
+Reading checks the bounds, as construction does. A field marked `with_unit` reads and writes text with its unit, exactly into the field's scale:
+
+```rust
+use exact_units::{Fixed, Millis, Range, prefix::Milli, units::Second};
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
+struct Config {
+    period: Millis<u32>,
+    timeout: Fixed<Second, Milli, u16, Range<1, 5000>>,
+    #[serde(with = "exact_units::serde::with_unit")]
+    debounce: Millis<u16>,
+}
+
+let c: Config = serde_json::from_str(r#"{ "period": 20, "timeout": 250, "debounce": "15 ms" }"#).unwrap();
+assert_eq!(c.debounce.get(), 15);
+assert_eq!(serde_json::to_string(&c).unwrap(), r#"{"period":20,"timeout":250,"debounce":"0.015 s"}"#);
+
+// 6000 ms is past the timeout's bounds: refused, with the reason
+let e = serde_json::from_str::<Config>(r#"{ "period": 20, "timeout": 6000, "debounce": "15 ms" }"#);
+assert!(e.unwrap_err().to_string().starts_with("6000 ms is out of 1..=5000 ms"));
+```
+
 ## More on WireWeaver's site
 
 - [exact_units in an API](https://ww.vhrd.tech/std_library/exact_units/): `Fixed` against `ww_si::Quantity`, clients and Python.

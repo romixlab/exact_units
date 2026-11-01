@@ -22,7 +22,7 @@ exact_units = { version = "0.1", default-features = false, features = ["time", "
 | `defmt` | `defmt::Format` for every type |
 | `libm` | `to_db` / `from_db` without `std`, from the pure-Rust `libm` |
 | `shrink_wrap` | the wire format, see [The wire](../wire/shrink_wrap.md) |
-| `serde` | `serde` for `Magnitude`, `Offset` and the owned wire types |
+| `serde` | `serde` for the numbers, `no_std` without alloc, see [The wire](../wire/shrink_wrap.md#serde-configs-and-other-formats) |
 | `std` | every unit group but `customary`; the owned wire types |
 
 ## Nothing at run time
