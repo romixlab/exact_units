@@ -1,6 +1,6 @@
 //! Polar form, levels from |z|² and the RF helpers against libm (STD-90).
 
-use crate::prefix::{Milli, One, Pow2};
+use crate::prefix::One;
 use crate::units::Ratio;
 use crate::{Complex, Rounding};
 use core::f64::consts::PI;
@@ -214,6 +214,7 @@ fn int_round_trip() {
 #[cfg(any(feature = "std", feature = "libm"))]
 mod float {
     use super::*;
+    use crate::prefix::{Milli, Pow2};
     use crate::units::{Per, Volt, Watt};
     use crate::{Fixed, decibel::Decibels};
 
