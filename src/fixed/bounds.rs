@@ -111,16 +111,12 @@ impl<T: Storage> Bounds<T> for Saturating {
 
 /// `x` as an integer of `min..=max`, a compile error where it is used otherwise.
 const fn fits(x: i128, min: i128, max: i128) -> i128 {
-    if x < min || x > max {
-        panic!("a bound doesn't fit the storage");
-    }
+    assert!(!(x < min || x > max), "a bound doesn't fit the storage");
     x
 }
 
 const fn ordered<const MIN: i64, const MAX: i64>() {
-    if MIN > MAX {
-        panic!("a range's MIN is above its MAX");
-    }
+    assert!(MIN <= MAX, "a range's MIN is above its MAX");
 }
 
 macro_rules! range {
@@ -161,9 +157,7 @@ range! {
 
 impl<const MIN: u64, const MAX: u64> Bounds<u64> for RangeU64<MIN, MAX> {
     const MIN: Option<u64> = {
-        if MIN > MAX {
-            panic!("a range's MIN is above its MAX");
-        }
+        assert!(MIN <= MAX, "a range's MIN is above its MAX");
         Some(MIN)
     };
     const MAX: Option<u64> = Some(MAX);

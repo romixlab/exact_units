@@ -51,12 +51,12 @@ fn main() {
     assert!(Channel::try_new(5).is_err());
 
     // the ring: the next slot after 7 is refused by the bounds; the ring wraps on purpose, and says so
-    let last = Slot::try_new(7).unwrap();
-    assert!(last.checked_add(Fixed::new(1)).is_none());
-    let next = last
+    let last_slot = Slot::try_new(7).unwrap();
+    assert!(last_slot.checked_add(Fixed::new(1)).is_none());
+    let next = last_slot
         .checked_add(Fixed::new(1))
         .unwrap_or(Slot::try_new(0).unwrap());
-    println!("after slot {last} comes slot {next}");
+    println!("after slot {last_slot} comes slot {next}");
 
     // timestamps: a point since boot. Two of them make an amount; a point and an amount make a point
     let boot = Uptime::from_raw(0);

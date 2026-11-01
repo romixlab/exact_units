@@ -123,7 +123,7 @@ fn kinds_of_products_and_quotients() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "attempt to multiply with overflow")]
 #[cfg(debug_assertions)]
 fn unbounded_overflow_panics_in_debug() {
     let v = Fixed::<Volt, One, i16>::new(300);

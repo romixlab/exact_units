@@ -71,7 +71,7 @@ fn main() {
     assert_ne!(<Record as Unit>::DIM, <Sample as Unit>::DIM);
     // and a client that only knows a unit by its name (from an API model) looks it up
     assert_eq!(
-        units::by_name("Sample").map(|e| e.to_string()).as_deref(),
+        units::by_name("Sample").map(ToString::to_string).as_deref(),
         Some("sample")
     );
 

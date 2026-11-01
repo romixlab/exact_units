@@ -163,7 +163,7 @@ impl fmt::Display for SIExpr<'_> {
 
 #[cfg(feature = "std")]
 mod owned {
-    use super::*;
+    use super::{Dim, Node, RefBox, SIExpr, SIExprOwned, Scale, Tree, UnitExpr, fmt, tree};
     use std::boxed::Box;
     use std::string::ToString;
 
@@ -310,7 +310,7 @@ mod owned {
 #[cfg(feature = "defmt")]
 impl defmt::Format for SIExpr<'_> {
     fn format(&self, f: defmt::Formatter<'_>) {
-        DefmtExpr(self, 0).format(f)
+        DefmtExpr(self, 0).format(f);
     }
 }
 
@@ -324,9 +324,12 @@ impl defmt::Format for DefmtExpr<'_, '_> {
         if depth > crate::MAX_UNIT_DEPTH {
             return defmt::write!(f, "…");
         }
-        let child = |r: &RefBox<'_, SIExpr<'_>>, f: defmt::Formatter<'_>| match r.read() {
-            Ok(e) => DefmtExpr(&e, depth).format(f),
-            Err(_) => defmt::write!(f, "?"),
+        let child = |r: &RefBox<'_, SIExpr<'_>>, f: defmt::Formatter<'_>| {
+            if let Ok(e) = r.read() {
+                DefmtExpr(&e, depth).format(f);
+            } else {
+                defmt::write!(f, "?");
+            }
         };
         match self.0 {
             SIExpr::Named { symbol, .. } => defmt::write!(f, "{=str}", symbol),

@@ -227,6 +227,10 @@ fn sizes() {
 
 #[cfg(feature = "shrink_wrap")]
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one table of wire cases, read top to bottom"
+)]
 fn wire() {
     let mut buf = [0u8; 64];
     let bytes = |m: Magnitude, buf: &mut [u8]| m.to_ww_bytes(buf).unwrap().to_vec();

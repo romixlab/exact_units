@@ -312,7 +312,7 @@ mod pressure {
         // gauge against 1 atm, from the stated origin
         assert_eq!(
             tyre.against(Point::<AboveStandardAtmosphere, Fixed<Pascal, Hecto, i32>>::from_raw(0))
-                .and_then(|p| p.to::<Vacuum, One, u32>())
+                .and_then(Point::to::<Vacuum, One, u32>)
                 .map(Point::raw),
             Some(321_325)
         );

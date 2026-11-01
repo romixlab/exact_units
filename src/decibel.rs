@@ -203,13 +203,11 @@ pub trait AtLevel<L>: Sized {
 /// The exact gain of `db` in units of `P · U` as an interval, or a compile error for a scale that isn't a fraction of
 /// integers.
 pub(crate) const fn gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) -> exact::Interval {
-    let unit = match U::EXPR.magnitude() {
-        Some(m) => m,
-        None => panic!("a level needs an exact scale"),
+    let Some(unit) = U::EXPR.magnitude() else {
+        panic!("a level needs an exact scale")
     };
-    let (num, den) = match P::SCALE.mul(unit).to_ratio() {
-        Some(r) => r,
-        None => panic!("a level at compile time needs a scale that is a fraction of integers"),
+    let Some((num, den)) = P::SCALE.mul(unit).to_ratio() else {
+        panic!("a level at compile time needs a scale that is a fraction of integers")
     };
     let (n, d) = db.exponent(form);
     // the value in units of the scale: 10^(n/d) / (num / den)

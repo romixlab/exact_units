@@ -362,7 +362,7 @@ fn interleaved_buffers() {
 
     // map in place, the odd end untouched; a round trip through the iterator
     let mut buf = [10i16, 20, 30, 40, 50];
-    let n = CQ15::<Ratio>::map_interleaved(&mut buf, |x| x.mul_j());
+    let n = CQ15::<Ratio>::map_interleaved(&mut buf, Complex::mul_j);
     assert_eq!((n, buf), (2, [-20, 10, -40, 30, 50]));
     let back: Vec<CQ15> = CQ15::from_interleaved(&buf).collect();
     let mut again = [0i16; 4];

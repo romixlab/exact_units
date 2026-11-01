@@ -478,18 +478,21 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
 
     /// `self + rhs`, at the edge of `T` or `B` where it would leave them.
     #[inline]
+    #[must_use]
     pub fn saturating_add(self, rhs: Self) -> Self {
         Self::clamped(self.value.saturating_add(rhs.value))
     }
 
     /// `self - rhs`, at the edge of `T` or `B` where it would leave them.
     #[inline]
+    #[must_use]
     pub fn saturating_sub(self, rhs: Self) -> Self {
         Self::clamped(self.value.saturating_sub(rhs.value))
     }
 
     /// `self * n`, at the edge of `T` or `B` where it would leave them.
     #[inline]
+    #[must_use]
     pub fn saturating_mul(self, n: T) -> Self {
         Self::clamped(self.value.saturating_mul(n))
     }
@@ -514,18 +517,21 @@ impl<U, P, T: Storage, B: Unlimited<T>> Fixed<U, P, T, B> {
     /// `self + rhs`, wrapping around at the edge of `T` like a counter: `u32::MAX` µs + 2 µs is 1 µs. Only without
     /// bounds; what `+` is for [Wrapping].
     #[inline(always)]
+    #[must_use]
     pub fn wrapping_add(self, rhs: Self) -> Self {
         Self::new_unchecked(self.value.wrapping_add(rhs.value))
     }
 
     /// `self - rhs`, wrapping around at the edge of `T`. Only without bounds.
     #[inline(always)]
+    #[must_use]
     pub fn wrapping_sub(self, rhs: Self) -> Self {
         Self::new_unchecked(self.value.wrapping_sub(rhs.value))
     }
 
     /// `self * n`, wrapping around at the edge of `T`. Only without bounds.
     #[inline(always)]
+    #[must_use]
     pub fn wrapping_mul(self, n: T) -> Self {
         Self::new_unchecked(self.value.wrapping_mul(n))
     }
@@ -628,7 +634,7 @@ impl<U, P, T: Storage + Ord, B: Bounds<T>> Ord for Fixed<U, P, T, B> {
 
 impl<U, P, T: Storage + Hash, B: Bounds<T>> Hash for Fixed<U, P, T, B> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.value.hash(state)
+        self.value.hash(state);
     }
 }
 
@@ -636,7 +642,7 @@ impl<U, P, T: Storage + Hash, B: Bounds<T>> Hash for Fixed<U, P, T, B> {
 /// same operator on `T` (panics on overflow in debug builds), for [Wrapping] modulo 2^bits, for [Saturating] at the
 /// ends of `T`. A bounded value has [checked_add](Fixed::checked_add) and friends.
 mod arith {
-    use super::*;
+    use super::{Fixed, Saturating, Storage, Wrapping};
     use core::iter::Sum;
     use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
@@ -977,16 +983,7 @@ impl Conversion {
                 rounding::settle_i64(y.to_i64(), o)
             };
         }
-        if !self.wide {
-            // |x| · num fits i64, checked at compile time
-            let p = x.to_i64() * self.num as i64;
-            let y = if self.den == 1 {
-                p
-            } else {
-                rounding::div_i64(p, self.den as i64, r)
-            };
-            rounding::settle_i64(y, o)
-        } else {
+        if self.wide {
             let Repr::Int(x) = x.to_repr() else {
                 return None;
             };
@@ -997,6 +994,15 @@ impl Conversion {
                 rounding::div_i128(p, i128::try_from(self.den).unwrap_or(i128::MAX), r)
             };
             rounding::settle(y, o)
+        } else {
+            // |x| · num fits i64, checked at compile time
+            let p = x.to_i64() * self.num as i64;
+            let y = if self.den == 1 {
+                p
+            } else {
+                rounding::div_i64(p, self.den as i64, r)
+            };
+            rounding::settle_i64(y, o)
         }
     }
 
@@ -1017,15 +1023,7 @@ impl Conversion {
                 T2::from_i64(y.to_i64())
             };
         }
-        if !self.wide {
-            // |x| · num fits i64, checked at compile time
-            let p = x.to_i64() * self.num as i64;
-            let den = self.den as i64;
-            if den != 1 && p % den != 0 {
-                return None;
-            }
-            T2::from_i64(if den == 1 { p } else { p / den })
-        } else {
+        if self.wide {
             let Repr::Int(x) = x.to_repr() else {
                 return None;
             };
@@ -1035,6 +1033,14 @@ impl Conversion {
                 return None;
             }
             T2::from_int(if den == 1 { p } else { p / den })
+        } else {
+            // |x| · num fits i64, checked at compile time
+            let p = x.to_i64() * self.num as i64;
+            let den = self.den as i64;
+            if den != 1 && p % den != 0 {
+                return None;
+            }
+            T2::from_i64(if den == 1 { p } else { p / den })
         }
     }
 }
@@ -1127,10 +1133,10 @@ impl<U: Unit, P: FixedScale, T: Storage + defmt::Format, B: Bounds<T>> defmt::Fo
                 Prefix::defmt_ratio(P::RUNTIME.unwrap_or(Prefix::Unit), f);
             }
             UnitExpr::Named { symbol, .. } if P::SYMBOL.is_empty() && P::RUNTIME.is_none() => {
-                defmt::write!(f, "{} ·{} {=str}", self.value, P::SCALE, symbol)
+                defmt::write!(f, "{} ·{} {=str}", self.value, P::SCALE, symbol);
             }
             UnitExpr::Named { symbol, .. } => {
-                defmt::write!(f, "{} {=str}{=str}", self.value, P::SYMBOL, symbol)
+                defmt::write!(f, "{} {=str}{=str}", self.value, P::SYMBOL, symbol);
             }
             // compound units are rare on a device: the type name instead of a rendered tree
             _ => defmt::write!(f, "{} {=str}?", self.value, P::SYMBOL),
@@ -1304,7 +1310,7 @@ mod tests {
     fn general_aliases() {
         use crate::units::{Hertz, Line, Packet};
         let lines: Count<Line, u32> = Count::new(12);
-        assert_eq!(format!("{}", lines), "12 line");
+        assert_eq!(format!("{lines}"), "12 line");
         assert_eq!(size_of::<Count<Packet, u16>>(), 2);
         assert_eq!(format!("{}", Percent::new(50u8)), "50 %");
         assert_eq!(format!("{}", Permille::new(5u16)), "5 ‰");
@@ -1419,11 +1425,11 @@ mod tests {
         let limit: Millis<u16> = Fixed::new(250);
         assert!(t > limit);
         assert!(limit < t);
-        assert!(t != limit);
-        assert!(t == Millis::<u16>::new(300));
+        assert_ne!(t, limit);
+        assert_eq!(t, Millis::<u16>::new(300));
         assert_eq!(t.partial_cmp(&limit), Some(Ordering::Greater));
         // and with the overflow policies, which are the same numbers
-        assert!(Fixed::<Second, Milli, u16, Wrapping>::of(300) == t);
+        assert_eq!(Fixed::<Second, Milli, u16, Wrapping>::of(300), t);
         assert!(Fixed::<Second, Milli, u16, Saturating>::of(299) < t);
         // floats: NaN is unordered
         let x = Fixed::<Ratio, One, f32, RangeDec<0, 10, 0>>::try_new(1.0).unwrap();

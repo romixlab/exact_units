@@ -94,7 +94,7 @@ fn atan2_16_grid() {
             worst = (e, y, x);
         }
     }
-    assert!(worst.0.abs() < BOUND, "atan2_16{:?}", worst);
+    assert!(worst.0.abs() < BOUND, "atan2_16{worst:?}");
 }
 
 #[test]
@@ -166,7 +166,7 @@ fn atan2_32_grid() {
             }
         }
     }
-    assert!(worst.0.abs() < BOUND, "atan2_32{:?}", worst);
+    assert!(worst.0.abs() < BOUND, "atan2_32{worst:?}");
 }
 
 #[test]
@@ -211,7 +211,7 @@ fn sin_cos_16_every_angle() {
             }
         }
     }
-    assert!(worst.0.abs() < BOUND, "sin_cos_16{:?}", worst);
+    assert!(worst.0.abs() < BOUND, "sin_cos_16{worst:?}");
 }
 
 #[test]
@@ -257,7 +257,7 @@ fn sin_cos_32_grid() {
             }
         }
     }
-    assert!(worst.0.abs() < BOUND, "sin_cos_32{:?}", worst);
+    assert!(worst.0.abs() < BOUND, "sin_cos_32{worst:?}");
 }
 
 #[test]
@@ -298,11 +298,11 @@ fn sin_cos_32_q15_grid() {
                 worst = (e, a);
             }
         }
-        if a & 0xffff == 0 {
+        if a.trailing_zeros() >= 16 {
             assert_eq!((s, c), sin_cos_16(Bam16::of((a >> 16) as u16)), "{a:#x}");
         }
     }
-    assert!(worst.0.abs() < BOUND, "sin_cos_32_q15{:?}", worst);
+    assert!(worst.0.abs() < BOUND, "sin_cos_32_q15{worst:?}");
 }
 
 #[test]

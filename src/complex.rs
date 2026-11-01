@@ -88,10 +88,13 @@ use shrink_wrap::prelude::*;
 /// overflow policy, which [Storage] doesn't have.
 pub trait ComplexStorage: Storage {
     /// `-self`, panicking on overflow (`MIN`) in debug builds as the operator does.
+    #[must_use]
     fn neg(self) -> Self;
     /// `-self`, `MIN` for `MIN`.
+    #[must_use]
     fn wrapping_neg(self) -> Self;
     /// `-self`, `MAX` for `MIN`.
+    #[must_use]
     fn saturating_neg(self) -> Self;
     /// `-self`, `None` for `MIN`.
     fn checked_neg(self) -> Option<Self>;
@@ -311,12 +314,14 @@ policy! {
 impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Complex<U, P, T, B> {
     /// The conjugate `re − j·im`, negated by the policy.
     #[inline(always)]
+    #[must_use]
     pub fn conj(self) -> Self {
         Self::of(self.re, B::neg(self.im))
     }
 
     /// `self · j`: a quarter turn forward, `−im + j·re`.
     #[inline(always)]
+    #[must_use]
     pub fn mul_j(self) -> Self {
         Self::of(B::neg(self.im), self.re)
     }
@@ -571,7 +576,11 @@ impl<U, P, T: ComplexStorage> From<Fixed<U, P, T>> for Complex<U, P, T> {
 /// `+`, `-`, negation, `*` and `/` by a number and by a real [Fixed], and `*` of two complex values, by the overflow
 /// policy `B` (the [module](crate::complex) says what each does).
 mod arith {
-    use super::*;
+    use super::{
+        Add, AddAssign, Complex, ComplexStorage, Div, DivAssign, Fixed, FixedScale, Mul, MulAssign,
+        Neg, Per, Policy, Product, Quotient, Sub, SubAssign, Sum, Times, Unit, Unlimited,
+        check_product,
+    };
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Add for Complex<U, P, T, B> {
         type Output = Self;
@@ -764,7 +773,7 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage + defmt::Format, B: Unlimited<T>>
     for Complex<U, P, T, B>
 {
     fn format(&self, f: defmt::Formatter<'_>) {
-        defmt::write!(f, "{} + j·{}", self.re(), self.im())
+        defmt::write!(f, "{} + j·{}", self.re(), self.im());
     }
 }
 

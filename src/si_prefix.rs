@@ -566,7 +566,6 @@ impl Prefix {
     #[must_use]
     pub const fn symbol(&self) -> &'static str {
         match self {
-            Prefix::Unit => "",
             Prefix::Milli => "m",
             Prefix::Micro => "µ",
             Prefix::Nano => "n",
@@ -595,7 +594,11 @@ impl Prefix {
             Prefix::Mebi => "Mi",
             Prefix::Gibi => "Gi",
             Prefix::Tebi => "Ti",
-            Prefix::Pow10(_) | Prefix::Pow2(_) | Prefix::FullScale(_) | Prefix::Unknown(_) => "",
+            Prefix::Unit
+            | Prefix::Pow10(_)
+            | Prefix::Pow2(_)
+            | Prefix::FullScale(_)
+            | Prefix::Unknown(_) => "",
         }
     }
 
@@ -611,14 +614,17 @@ impl Prefix {
             Prefix::Nano => defmt::write!(f, " ppb"),
             p @ (Prefix::Pow10(_) | Prefix::Pow2(_) | Prefix::FullScale(_)) => {
                 if let Some(m) = p.magnitude() {
-                    defmt::write!(f, " {}", m)
+                    defmt::write!(f, " {}", m);
                 }
             }
             Prefix::Unknown(tag) => defmt::write!(f, " ·<scale {=u16}>", tag),
-            p => match p.si_pow10() {
-                Some(e) => defmt::write!(f, "e{=i8}", e),
-                None => defmt::write!(f, " {=str}", p.symbol()),
-            },
+            p => {
+                if let Some(e) = p.si_pow10() {
+                    defmt::write!(f, "e{=i8}", e);
+                } else {
+                    defmt::write!(f, " {=str}", p.symbol());
+                }
+            }
         }
     }
 }
@@ -728,7 +734,7 @@ mod series_store {
 
     impl Prefix {
         #[inline(always)]
-        fn code(&self) -> u16 {
+        fn code(self) -> u16 {
             if let Prefix::Unknown(_) = self {
                 return UNKNOWN_CODE;
             }

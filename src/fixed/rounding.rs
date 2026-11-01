@@ -482,16 +482,15 @@ impl Requantizer {
     /// The requantizer by `factor` into `to`, rounded by `r`, overflowing by `o`: [requantize] of each value.
     #[must_use]
     pub fn new(factor: &Magnitude, to: StorageKind, r: Rounding, o: Overflow) -> Self {
-        let exact = match factor.to_ratio() {
-            Some((num, den)) => Exact::Ratio {
+        let exact = if let Some((num, den)) = factor.to_ratio() {
+            Exact::Ratio {
                 num: i128::try_from(num).ok(),
                 num_low: num as i128,
                 den: i128::try_from(den).unwrap_or(i128::MAX),
-            },
-            None => {
-                let (m, shift) = factor.fixed_point();
-                Exact::FixedPoint { m, shift }
             }
+        } else {
+            let (m, shift) = factor.fixed_point();
+            Exact::FixedPoint { m, shift }
         };
         Requantizer {
             factor: *factor,

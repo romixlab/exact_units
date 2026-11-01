@@ -95,7 +95,7 @@ pub struct PrimePower {
 impl defmt::Format for PrimePower {
     fn format(&self, f: defmt::Formatter<'_>) {
         let (prime, exp) = (self.prime, self.exp);
-        defmt::write!(f, "PrimePower {{ prime: {}, exp: {} }}", prime, exp)
+        defmt::write!(f, "PrimePower {{ prime: {}, exp: {} }}", prime, exp);
     }
 }
 
@@ -389,10 +389,10 @@ const fn pow_mod(mut b: u64, mut e: u64, m: u64) -> u64 {
 
 /// Miller-Rabin with the bases that decide every `u64`.
 pub(crate) const fn is_prime(n: u64) -> bool {
+    const BASES: [u64; 12] = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37];
     if n < 2 {
         return false;
     }
-    const BASES: [u64; 12] = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37];
     let mut i = 0;
     while i < BASES.len() {
         if n == BASES[i] {
@@ -723,9 +723,8 @@ impl Magnitude {
             if e % 2 != 0 {
                 return None;
             }
-            let p = match (bases[i] as u128).checked_pow(e.unsigned_abs() / 2) {
-                Some(p) => p,
-                None => return None,
+            let Some(p) = (bases[i] as u128).checked_pow(e.unsigned_abs() / 2) else {
+                return None;
             };
             if e > 0 {
                 num = match num.checked_mul(p) {
@@ -843,6 +842,10 @@ struct MagnitudeParts {
 }
 
 #[cfg(feature = "serde")]
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's skip_serializing_if passes a reference"
+)]
 fn is_zero(x: &i8) -> bool {
     *x == 0
 }

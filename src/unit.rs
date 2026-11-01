@@ -111,9 +111,7 @@ const FIXED: usize = 9;
 /// An exponent in `const` code, a compile error (a panic at run time) when out of -8..=7.
 #[must_use]
 pub const fn exp(e: i8) -> i8 {
-    if !in_range(e) {
-        panic!("exponent of a dimension out of -8..=7");
-    }
+    assert!(in_range(e), "exponent of a dimension out of -8..=7");
     e
 }
 
@@ -273,6 +271,10 @@ impl<'i> Dim<'i> {
     /// `self^times · o^sign`, `None` when an exponent leaves -8..=7 or more than [MAX_COUNTED] counted bases are left.
     /// A side without `root` is squared first when the other has it; the result is made canonical (halved, without
     /// `root`, when every exponent is even).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one const fn walks both sides' bases in step; split, it would pass the half-built result around"
+    )]
     const fn combine(self, o: Dim<'i>, sign: i16, times: i16) -> Option<Dim<'i>> {
         // with only one side a root, the other is squared so both describe the square of what they are
         let (fa, fb) = match (self.root, o.root) {
@@ -740,6 +742,10 @@ impl Scale {
         owned(feature = "std"),
         derive_owned(Clone, Debug, PartialEq, Eq, Hash),
         cfg_attr_owned(feature = "serde", derive(serde::Serialize, serde::Deserialize)),
+        cfg_attr_owned(
+            feature = "serde",
+            expect(clippy::unsafe_derive_deserialize, reason = "the unsafe is shrink_wrap's, in the generated owned type")
+        ),
         ww_repr = unib32
     )
 )]

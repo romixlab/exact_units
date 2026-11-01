@@ -61,6 +61,7 @@ pub trait Storage: Copy + PartialOrd + 'static {
     /// `self / d` in the type's own width when that is exact (`None` when `d` doesn't divide it); `self` for floats.
     fn div_whole(self, d: u128) -> Option<Self>;
     /// `self / d` in the type's own width, rounded by `r` (`d > 0`); `self` for floats.
+    #[must_use]
     fn div_rounded(self, d: u128, r: Rounding) -> Self;
     /// The low bits of `x` that fit (Rust's `as`, two's complement; `Nibble` the low 4); the nearest float for
     /// floats.
@@ -77,28 +78,40 @@ pub trait Storage: Copy + PartialOrd + 'static {
     /// `self / rhs`, `None` on overflow and for a zero `rhs` (integers).
     fn checked_div(self, rhs: Self) -> Option<Self>;
     /// `self + rhs`, wrapping on overflow.
+    #[must_use]
     fn wrapping_add(self, rhs: Self) -> Self;
     /// `self - rhs`, wrapping on overflow.
+    #[must_use]
     fn wrapping_sub(self, rhs: Self) -> Self;
     /// `self · rhs`, wrapping on overflow.
+    #[must_use]
     fn wrapping_mul(self, rhs: Self) -> Self;
     /// `self / rhs`, wrapping on overflow (`MIN / -1`); panics for a zero `rhs` (integers).
+    #[must_use]
     fn wrapping_div(self, rhs: Self) -> Self;
     /// `self + rhs`, saturating at the type's ends.
+    #[must_use]
     fn saturating_add(self, rhs: Self) -> Self;
     /// `self - rhs`, saturating at the type's ends.
+    #[must_use]
     fn saturating_sub(self, rhs: Self) -> Self;
     /// `self · rhs`, saturating at the type's ends.
+    #[must_use]
     fn saturating_mul(self, rhs: Self) -> Self;
     /// `self / rhs`, saturating at the type's ends; panics for a zero `rhs` (integers).
+    #[must_use]
     fn saturating_div(self, rhs: Self) -> Self;
     /// `+` as the type's own operator: panics on overflow in debug builds.
+    #[must_use]
     fn add(self, rhs: Self) -> Self;
     /// `-` as the type's own operator: panics on overflow in debug builds.
+    #[must_use]
     fn sub(self, rhs: Self) -> Self;
     /// `*` as the type's own operator: panics on overflow in debug builds.
+    #[must_use]
     fn mul(self, rhs: Self) -> Self;
     /// `/` as the type's own operator: panics for a zero `rhs` (integers) and on overflow in debug builds.
+    #[must_use]
     fn div(self, rhs: Self) -> Self;
 }
 

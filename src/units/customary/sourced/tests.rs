@@ -364,7 +364,7 @@ fn no_bare_ambiguous_name() {
     let mut bare_names = BTreeSet::new();
     for a in AMBIGUOUS {
         assert!(bare_names.insert(a.bare), "group {} twice", a.bare);
-        assert!(!a.note.is_empty());
+        assert_ne!(a.note, "");
         for u in UNITS {
             assert_ne!(
                 u.id,

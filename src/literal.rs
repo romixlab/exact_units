@@ -135,16 +135,14 @@ impl Decimal {
     /// `|self| / scale` as a reduced fraction `(p, q)`, or a compile error for a scale that isn't a fraction of
     /// integers or a fraction too large for `u128`.
     const fn over<P: FixedScale>(self) -> (u128, u128) {
-        let (snum, sden) = match P::SCALE.to_ratio() {
-            Some(r) => r,
-            None => panic!(
+        let Some((snum, sden)) = P::SCALE.to_ratio() else {
+            panic!(
                 "a literal needs a scale that is a fraction of integers: the stored values of a scale with π or a \
                  root in it aren't decimals"
-            ),
+            )
         };
-        let ten = match 10u128.checked_pow(self.exp.unsigned_abs() as u32) {
-            Some(t) => t,
-            None => panic!("a literal's exponent is out of range"),
+        let Some(ten) = 10u128.checked_pow(self.exp.unsigned_abs() as u32) else {
+            panic!("a literal's exponent is out of range")
         };
         let (mut p, mut q) = (self.num.unsigned_abs() as u128, 1u128);
         if self.exp >= 0 {
@@ -172,9 +170,10 @@ impl Decimal {
         // rem > q/2, or rem == q/2 and int is odd; q - rem can't overflow where 2 · rem could
         let up = rem > q - rem || (rem == q - rem && int & 1 == 1);
         let x = int + up as u128;
-        if x > i128::MAX as u128 {
-            panic!("this literal is too large for its storage");
-        }
+        assert!(
+            x <= i128::MAX as u128,
+            "this literal is too large for its storage"
+        );
         if self.num < 0 {
             -(x as i128)
         } else {

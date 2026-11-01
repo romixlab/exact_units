@@ -656,7 +656,7 @@ where
 /// point + vector, point − vector, point − point: like `T`'s operators (panic on overflow in debug builds; a modulo
 /// origin wraps instead). A result outside `B` panics; `checked_add` and friends return `None`.
 mod arith {
-    use super::*;
+    use super::{Bounds, Fixed, Origin, Point, PointArith, PointDiff, Storage};
     use core::ops::{Add, AddAssign, Sub, SubAssign};
 
     impl<O, U, P, T, B> Add<Fixed<U, P, T>> for Point<O, Fixed<U, P, T, B>>
@@ -732,10 +732,10 @@ mod arith {
 
     #[inline(always)]
     fn in_bounds<O, U, P, T: Storage, B: Bounds<T>>(y: T) -> Point<O, Fixed<U, P, T, B>> {
-        match Fixed::try_new(y) {
-            Ok(f) => Point::new(f),
-            Err(_) => panic!("a point moved outside its bounds"),
-        }
+        let Ok(f) = Fixed::try_new(y) else {
+            panic!("a point moved outside its bounds")
+        };
+        Point::new(f)
     }
 }
 
@@ -963,7 +963,7 @@ impl<O: Origin<Unit = U>, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> fmt:
 #[cfg(feature = "defmt")]
 impl<O: Origin, F: defmt::Format> defmt::Format for Point<O, F> {
     fn format(&self, f: defmt::Formatter<'_>) {
-        defmt::write!(f, "{=str} {}", O::NAME, self.coord)
+        defmt::write!(f, "{=str} {}", O::NAME, self.coord);
     }
 }
 
@@ -1007,6 +1007,6 @@ impl<O, F: Ord> Ord for Point<O, F> {
 
 impl<O, F: Hash> Hash for Point<O, F> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.coord.hash(state)
+        self.coord.hash(state);
     }
 }

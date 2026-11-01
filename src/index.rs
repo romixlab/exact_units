@@ -73,6 +73,13 @@ use shrink_wrap::prelude::*;
     derive_shrink_wrap(borrowed, owned(feature = "std"), transparent, validate = Self::validate)
 )]
 #[repr(transparent)]
+#[cfg_attr(
+    not(feature = "shrink_wrap"),
+    expect(
+        clippy::struct_field_names,
+        reason = "an index's one value is its index; derive_shrink_wrap's copy doesn't trip it"
+    )
+)]
 pub struct Index<Of, T: UnsignedStorage, B: Bounds<T> = Unbounded> {
     /// The position, 0 the first.
     index: T,
@@ -346,18 +353,21 @@ impl<Of, T: UnsignedStorage> Seq<Of, T> {
 
     /// The next one, 0 after the largest `T`.
     #[inline(always)]
+    #[must_use]
     pub fn next(self) -> Self {
         self.wrapping_add(T::from_int(1).unwrap_or(T::ZERO))
     }
 
     /// `n` further on, modulo 2^bits of `T`.
     #[inline(always)]
+    #[must_use]
     pub fn wrapping_add(self, n: T) -> Self {
         Self::new(self.get().wrapping_add(n))
     }
 
     /// `n` back, modulo 2^bits of `T`.
     #[inline(always)]
+    #[must_use]
     pub fn wrapping_sub(self, n: T) -> Self {
         Self::new(self.get().wrapping_sub(n))
     }

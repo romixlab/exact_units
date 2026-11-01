@@ -34,13 +34,13 @@ pub const fn powi_f64(x: f64, n: i8) -> f64 {
 /// multiplies by): `sqrt` is not in `core`. An integer square root of the significand, NaN below zero.
 #[must_use]
 pub const fn sqrt_f64(x: f64) -> f64 {
+    const MANT: u64 = (1 << 52) - 1;
     if x.is_nan() || x < 0.0 {
         return f64::NAN;
     }
     if x == 0.0 || x == f64::INFINITY {
         return x;
     }
-    const MANT: u64 = (1 << 52) - 1;
     let bits = x.to_bits();
     let biased = ((bits >> 52) & 0x7ff) as i32;
     // x = mant · 2^exp, mant with its leading bit at 52

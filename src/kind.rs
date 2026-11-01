@@ -479,10 +479,7 @@ mod tests {
             p.convert::<Phase<Degree>, One, i32>(),
             Some(Fixed::new(-45))
         );
-        assert_eq!(
-            std::format!("{}", p),
-            std::format!("{}", p.as_plane_angle())
-        );
+        assert_eq!(std::format!("{p}"), std::format!("{}", p.as_plane_angle()));
         // the electrical angle wraps at a turn: 0.75 turn · 2 pole pairs is 0.5 turn of phase
         let rotor: Bam32 = Fixed::of(3 << 30);
         assert_eq!(rotor.electrical(2), PhaseBam32::of(1 << 31));

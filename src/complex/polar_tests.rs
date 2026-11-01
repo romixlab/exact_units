@@ -154,7 +154,7 @@ fn int_from_polar_against_libm() {
     );
     let diag =
         Complex::<Ratio, One, i16>::from_polar(crate::Fixed::new(46_341), PhaseBam16::of(5 << 13));
-    assert_eq!(diag.map(|z| z.get()), Some((-32_768, -32_768)));
+    assert_eq!(diag.map(Complex::get), Some((-32_768, -32_768)));
     for abs in [1u32, 1 << 20, i32::MAX as u32] {
         for a in spread_i32(5_000) {
             let a = a as u32;

@@ -182,7 +182,7 @@ fn docs_blocks() -> Vec<(&'static str, String)> {
                 .collect::<Vec<_>>()
                 .join(", ")
         };
-        let symbols: Vec<String> = a.symbols.iter().map(|s| s.to_string()).collect();
+        let symbols: Vec<String> = a.symbols.iter().map(ToString::to_string).collect();
         let members: Vec<String> = a.members.iter().map(|m| marker_of(m)).collect();
         writeln!(
             ambiguous,

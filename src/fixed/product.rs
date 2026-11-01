@@ -230,7 +230,7 @@ where
     fn mul(self, rhs: Fixed<U2, P2, T, Range<B0, B1>>) -> Self::Output {
         const {
             check::<U1, U2, P1, P2>(false);
-            proven_product::<T>(A0, A1, B0, B1)
+            proven_product::<T>(A0, A1, B0, B1);
         };
         // proven in range: wrapping is the plain multiply
         Fixed::new(self.value.wrapping_mul(rhs.value))

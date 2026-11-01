@@ -238,16 +238,15 @@ impl Default for Offset {
 /// `273.15`, `-40`, `45967/180`: exactly, as a decimal where the denominator is one of 2 and 5 only.
 impl core::fmt::Display for Offset {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self.to_ratio() {
-            Some((n, d)) => super::write_ratio(n, d as i128, f),
-            None => {
-                if self.negative {
-                    f.write_str("-")?;
-                }
-                match self.magnitude {
-                    Some(m) => write!(f, "1{m}"),
-                    None => f.write_str("0"),
-                }
+        if let Some((n, d)) = self.to_ratio() {
+            super::write_ratio(n, d as i128, f)
+        } else {
+            if self.negative {
+                f.write_str("-")?;
+            }
+            match self.magnitude {
+                Some(m) => write!(f, "1{m}"),
+                None => f.write_str("0"),
             }
         }
     }
