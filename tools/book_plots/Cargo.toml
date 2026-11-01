@@ -1,0 +1,15 @@
+# The plots of the book (docs/), computed with exact_units itself and written as SVG into docs/plots/ by
+# `just docs-build` before the site is built. Not part of the crate: a workspace of its own, never published.
+[package]
+name = "book_plots"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+exact_units = { path = "../..", default-features = false, features = ["std"] }
+
+[lints.rust]
+unsafe_code = "forbid"

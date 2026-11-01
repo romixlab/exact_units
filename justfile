@@ -9,8 +9,10 @@ test *flags:
     CARGO_BUILD_WARNINGS=deny cargo nextest run --features customary,serde --no-fail-fast
     CARGO_BUILD_WARNINGS=deny cargo nextest run --no-default-features --features std --no-fail-fast
     CARGO_BUILD_WARNINGS=deny cargo nextest run --no-default-features --features shrink_wrap,quantities,serde --no-fail-fast
-    # nextest does not run doctests
+    # nextest does not run doctests; they include the book's pages (src/book.rs)
     CARGO_BUILD_WARNINGS=deny cargo test --doc --features customary,serde
+    # the book site's Markdown extensions (docs_ext: the `bits` fence, `rust,compile_fail` blocks)
+    uv run --group dev pytest -q docs_ext
 
 # The Kani proofs in tests/props: the properties the proptests draw inputs for, proved for every input. Needs Kani
 # (`cargo install --locked kani-verifier && cargo kani setup`); takes minutes, so it isn't part of `just test`
@@ -26,6 +28,7 @@ lint:
     cargo clippy --all-targets --all-features -- -D warnings
     cargo clippy --all-targets --no-default-features --features std -- -D warnings
     RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
+    cargo clippy --manifest-path tools/book_plots/Cargo.toml --target-dir target -- -D warnings
 
 # cargo check the feature sets a firmware and a host use: no unit group, defmt, a few groups, without and with the wire format, CORDIC on an M0
 check:
@@ -50,6 +53,22 @@ deploy:
     if [ -n "$dirty" ]; then echo "local changes, not deploying:"; echo "$dirty"; exit 1; fi
     git pull --ff-only
     just install
+
+# Serve the book (docs/, zensical.toml) at http://localhost:8000 and rebuild it on every change
+docs: docs-prep
+    uv run zensical serve
+
+# Build the book into site/, strict as CI builds it: a warning fails the build
+docs-build: docs-prep
+    uv run zensical build --clean --strict
+
+# What the book needs beside its pages, none of it in git: KaTeX (pinned, hash-checked), the logo, the plots the
+# crate computes (tools/book_plots)
+docs-prep:
+    uv run python -m eu_docs_ext.vendor docs
+    mkdir -p docs/assets/logo
+    cp assets/logo/*.svg docs/assets/logo/
+    cargo run -q --manifest-path tools/book_plots/Cargo.toml --target-dir target -- docs/plots
 
 # Regenerate the tables of docs/customary.md from the sourced catalogue of customary units
 customary-docs:

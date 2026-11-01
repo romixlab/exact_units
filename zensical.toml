@@ -1,0 +1,204 @@
+# The exact_units book: `just docs` serves it, `just docs-build` builds it strict into site/ (as CI does).
+# Pages carry a reading level (`level:` front matter, docs/levels.md); each part lists its Basic pages first.
+[project]
+site_url = "https://exact.vhrd.tech/"
+site_name = "exact_units"
+site_description = "Units of measure fixed at compile time, exact: a number with its unit, scale and storage in the type"
+site_author = "Roman Isaikin"
+copyright = "Copyright &copy; 2026 Roman Isaikin, MIT licensed"
+repo_url = "https://github.com/romixlab/exact_units"
+repo_name = "romixlab/exact_units"
+edit_uri = "edit/main/docs/"
+
+nav = [
+    { "Home" = [
+            "index.md",
+            "levels.md",
+            "start/why.md",
+        ]
+    },
+    { "First steps" = [
+            "start/first_steps.md",
+            "start/units.md",
+            "start/display.md",
+            "start/literals.md",
+            "start/firmware.md",
+        ]
+    },
+    { "Doing maths" = [
+            "maths/arithmetic.md",
+            "maths/conversions.md",
+            "maths/bounds.md",
+            { "Advanced" = [
+                    "maths/rounding.md",
+                    "maths/overflow.md",
+                    "maths/kinds.md",
+                ]
+            },
+        ]
+    },
+    { "Fixed point" = [
+            "fixed_point/q_formats.md",
+            "fixed_point/bam.md",
+            { "Advanced" = [
+                    "fixed_point/products.md",
+                    "fixed_point/cost.md",
+                ]
+            },
+        ]
+    },
+    { "Points" = [
+            "points/points.md",
+            { "Advanced" = [
+                    "points/wrapping.md",
+                    "points/registers.md",
+                    "points/indices.md",
+                ]
+            },
+        ]
+    },
+    { "Levels" = [
+            "levels/decibels.md",
+            { "Advanced" = [
+                    "levels/thresholds.md",
+                ]
+            },
+        ]
+    },
+    { "Complex" = [
+            { "Advanced" = [
+                    "complex/complex.md",
+                    "complex/iq.md",
+                    "complex/cordic.md",
+                ]
+            },
+        ]
+    },
+    { "Your units" = [
+            "customary.md",
+            { "Advanced" = [
+                    "units/declare.md",
+                ]
+            },
+        ]
+    },
+    { "The wire" = [
+            { "Advanced" = [
+                    "wire/shrink_wrap.md",
+                ]
+            },
+        ]
+    },
+    { "Recipes" = [
+            "recipes/sensors.md",
+            "recipes/timing.md",
+            "recipes/examples.md",
+        ]
+    },
+    { "Nomicon" = [
+            "nomicon/magnitude.md",
+            "nomicon/compile_time.md",
+            "nomicon/reliability.md",
+        ]
+    },
+]
+
+extra_css = ["vendor/katex/katex.min.css", "stylesheets/book.css"]
+# KaTeX is served from the site itself (docs/vendor, fetched and hash-checked by docs_ext/eu_docs_ext/vendor.py)
+extra_javascript = [
+    "vendor/katex/katex.min.js",
+    "vendor/katex/contrib/auto-render.min.js",
+    "javascripts/katex.js",
+]
+
+[project.theme]
+custom_dir = "overrides"
+favicon = "assets/logo/icon-small.svg"
+logo = "assets/logo/mark-light.svg"
+language = "en"
+features = [
+    "content.code.annotate",
+    "content.code.copy",
+    "content.code.select",
+    "content.footnote.tooltips",
+    "content.tabs.link",
+    "content.tooltips",
+    "navigation.footer",
+    "navigation.indexes",
+    "navigation.instant",
+    "navigation.instant.prefetch",
+    "navigation.path",
+    "navigation.sections",
+    "navigation.tabs",
+    "navigation.top",
+    "navigation.tracking",
+    "search.highlight",
+]
+
+[project.theme.font]
+text = "IBM Plex Sans"
+code = "IBM Plex Mono"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+primary = "custom"
+accent = "custom"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+primary = "custom"
+accent = "custom"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/romixlab/exact_units"
+name = "exact_units on GitHub"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/rust"
+link = "https://docs.rs/exact_units"
+name = "API reference on docs.rs"
+
+[project.markdown_extensions]
+abbr = {}
+# `rust,compile_fail` blocks (the pages are doctests) shown as Rust that doesn't compile (docs_ext/eu_docs_ext/rustdoc.py)
+"eu_docs_ext.rustdoc" = {}
+admonition = {}
+attr_list = {}
+def_list = {}
+footnotes = {}
+md_in_html = {}
+tables = {}
+toc = { permalink = true }
+# $...$ and $$...$$, drawn by KaTeX (docs/javascripts/katex.js)
+pymdownx.arithmatex = { generic = true }
+pymdownx.betterem = {}
+pymdownx.caret = {}
+pymdownx.details = {}
+pymdownx.emoji = { emoji_generator = "zensical.extensions.emoji.to_svg", emoji_index = "zensical.extensions.emoji.twemoji" }
+pymdownx.highlight = { anchor_linenums = true, line_spans = "__span", pygments_lang_class = true }
+pymdownx.inlinehilite = {}
+pymdownx.keys = {}
+pymdownx.mark = {}
+pymdownx.smartsymbols = {}
+# figures: the SVG drawings in docs/figures (in git) and the plots in docs/plots (`just docs-prep`) are inlined into
+# the page with --8<--, so their classes take the page's colours in light and dark
+pymdownx.snippets = { base_path = ["docs"], check_paths = true }
+pymdownx.superfences = { custom_fences = [
+    { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+    # how a number's bits are laid out (docs_ext/eu_docs_ext/bits.py, docs/levels.md "For writers")
+    { name = "bits", class = "eu-bits", format = "eu_docs_ext.bits.fence" },
+] }
+pymdownx.tabbed = { alternate_style = true, combine_header_slug = true }
+pymdownx.tasklist = { custom_checkbox = true }
+pymdownx.tilde = {}

@@ -2,3 +2,11 @@ target/
 .DS_Store
 .idea/
 /lcov.info
+# the book: Python environment, built site, what `just docs-build` generates into docs/
+/.venv/
+/site/
+/docs/plots/
+/docs/vendor/
+/docs/assets/logo/
+__pycache__/
+/.pytest_cache/

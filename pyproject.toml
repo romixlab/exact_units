@@ -1,0 +1,17 @@
+# The book's site (docs/, zensical.toml): Zensical and the site's own Markdown extensions (docs_ext/eu_docs_ext).
+# Not a Python package of the crate: `uv run zensical ...` through `just docs` and `just docs-build`.
+[project]
+name = "exact-units-book"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["zensical==0.0.74"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["docs_ext/eu_docs_ext"]
+
+[dependency-groups]
+dev = ["pytest>=8"]

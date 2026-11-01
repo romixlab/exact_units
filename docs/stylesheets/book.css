@@ -1,0 +1,413 @@
+/* The book's look: VHRD's docs style (WireWeaver's docs/stylesheets/vhrd.css: IBM Plex type, serif headings, black
+   text, quiet links, the reading level badges) with the exact_units logo's orange as the accent. The orange is darkened
+   on white to keep text contrast at 4.6:1 and more; on the dark scheme the logo's own orange reads at 7:1. */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@500;600&display=swap");
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #c25400;
+  --md-primary-fg-color--light: #ff7100;
+  --md-primary-fg-color--dark: #9a4300;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #ffffffb3;
+  --md-accent-fg-color: #c25400;
+  --md-accent-fg-color--transparent: #ff71001a;
+  --md-accent-bg-color: #ffffff;
+  --md-default-fg-color: #1a1a1a;
+  --md-default-bg-color: #ffffff;
+  --md-code-bg-color: #f6f6f6;
+  --md-typeset-a-color: #1a1a1a;
+  --md-footer-bg-color: #1a1a1a;
+  --md-footer-bg-color--dark: #0f0f10;
+  /* the figures' colours (docs/figures/*.svg read these through currentColor and their own classes) */
+  --eu-ink: #373c42;
+  --eu-soft: #69717a;
+  --eu-faint: #e4e7eb;
+  --eu-accent: #ff7100;
+  --eu-accent-text: #c25400;
+  --eu-blue: #2f5f9e;
+  --eu-green: #2e7d43;
+  --eu-purple: #7a3fa0;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #ff7100;
+  --md-primary-fg-color--light: #ff8a2a;
+  --md-primary-fg-color--dark: #c25400;
+  --md-primary-bg-color: #0f0f10;
+  --md-primary-bg-color--light: #0f0f10b3;
+  --md-accent-fg-color: #ff8a2a;
+  --md-accent-fg-color--transparent: #ff71001f;
+  --md-accent-bg-color: #0f0f10;
+  --md-default-fg-color: #ececec;
+  --md-default-bg-color: #0f0f10;
+  --md-code-bg-color: #161617;
+  --md-typeset-a-color: #ececec;
+  --md-footer-bg-color: #161617;
+  --md-footer-bg-color--dark: #0f0f10;
+  --eu-ink: #dddddd;
+  --eu-soft: #a6a8aa;
+  --eu-faint: #25292c;
+  --eu-accent: #ff7100;
+  --eu-accent-text: #ff8a2a;
+  --eu-blue: #9cc0ee;
+  --eu-green: #8fd6a1;
+  --eu-purple: #cdaeea;
+}
+
+/* The header is the page's colour, not a bar of the accent: the logo carries the orange */
+.md-header,
+.md-tabs {
+  background-color: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+}
+.md-header {
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+.md-tabs__link--active,
+.md-tabs__link:hover {
+  color: var(--md-accent-fg-color);
+}
+.md-search__form {
+  background-color: var(--md-default-fg-color--lightest);
+}
+.md-header .md-search__input::placeholder,
+.md-header .md-search__icon {
+  color: var(--md-default-fg-color--light);
+}
+[data-md-color-scheme="slate"] .md-logo img {
+  content: url("../assets/logo/mark-dark.svg");
+}
+.md-header__button.md-logo img {
+  height: 1.8rem;
+}
+
+/* Serif headings, as on the brand web pages */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-weight: 500;
+  color: var(--md-default-fg-color);
+}
+
+/* Links in text colour, a quiet underline that turns orange on hover */
+.md-typeset a {
+  text-decoration: underline;
+  text-decoration-color: var(--md-default-fg-color--lighter);
+  text-underline-offset: 3px;
+}
+.md-typeset a:hover,
+.md-typeset a:focus {
+  color: var(--md-accent-fg-color);
+  text-decoration-color: var(--md-accent-fg-color);
+}
+.md-typeset a.md-button {
+  text-decoration: none;
+}
+
+/* The home page: the logo is the title, the h1 stays for screen readers and search */
+.md-typeset .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.md-typeset .eu-hero {
+  margin: 0.5rem 0 1.5rem;
+  text-align: center;
+}
+.md-typeset .eu-hero img {
+  width: min(420px, 90%);
+}
+[data-md-color-scheme="default"] .md-typeset .eu-hero .eu-hero--dark,
+[data-md-color-scheme="slate"] .md-typeset .eu-hero .eu-hero--light {
+  display: none;
+}
+
+/* Figures: SVG drawings of the book (docs/figures, inlined or as <img>) and the plots `just docs-build` makes */
+.md-typeset figure.eu-figure {
+  margin: 1.5em auto;
+  max-width: 100%;
+}
+.md-typeset figure.eu-figure svg,
+.md-typeset figure.eu-figure img {
+  max-width: 100%;
+  height: auto;
+}
+.md-typeset figure.eu-figure figcaption {
+  max-width: 36rem;
+  margin: 0.4em auto 0;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.7rem;
+}
+/* SVG drawings take their colours from the scheme: classes on their elements, colours from the tokens above */
+.eu-svg {
+  color: var(--eu-ink);
+  font-family: var(--md-text-font-family);
+}
+.eu-svg text {
+  fill: currentColor;
+  font-size: 13px;
+}
+.eu-svg .mono {
+  font-family: var(--md-code-font-family);
+}
+.eu-svg .soft {
+  fill: var(--eu-soft);
+  stroke: var(--eu-soft);
+}
+.eu-svg text.soft {
+  stroke: none;
+}
+.eu-svg .line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+.eu-svg .thin {
+  fill: none;
+  stroke: var(--eu-soft);
+  stroke-width: 1;
+}
+.eu-svg .faint {
+  fill: var(--eu-faint);
+  stroke: none;
+}
+.eu-svg .accent {
+  fill: var(--eu-accent);
+  stroke: var(--eu-accent);
+}
+.eu-svg text.accent {
+  fill: var(--eu-accent-text);
+  stroke: none;
+}
+.eu-svg .accent-line {
+  fill: none;
+  stroke: var(--eu-accent);
+  stroke-width: 2.5;
+}
+.eu-svg .blue {
+  fill: var(--eu-blue);
+  stroke: var(--eu-blue);
+}
+.eu-svg .blue-line {
+  fill: none;
+  stroke: var(--eu-blue);
+  stroke-width: 2.5;
+}
+.eu-svg .green {
+  fill: var(--eu-green);
+  stroke: var(--eu-green);
+}
+.eu-svg .green-line {
+  fill: none;
+  stroke: var(--eu-green);
+  stroke-width: 2.5;
+}
+.eu-svg .purple-line {
+  fill: none;
+  stroke: var(--eu-purple);
+  stroke-width: 2.5;
+}
+.eu-svg text.blue,
+.eu-svg text.green {
+  stroke: none;
+}
+.eu-svg .dash {
+  stroke-dasharray: 4 3;
+}
+
+/* A code block that doesn't compile (its fence is `rust,compile_fail`): a red edge and a label */
+.md-typeset .eu-no-compile {
+  position: relative;
+  border-left: 3px solid #c8141c;
+}
+.md-typeset .eu-no-compile::before {
+  content: "doesn't compile";
+  position: absolute;
+  top: 0.2em;
+  right: 2.6em;
+  z-index: 1;
+  color: #c8141c;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+[data-md-color-scheme="slate"] .md-typeset .eu-no-compile {
+  border-left-color: #f24c44;
+}
+[data-md-color-scheme="slate"] .md-typeset .eu-no-compile::before {
+  color: #f24c44;
+}
+
+/* Reading level badge above a page title (overrides/partials/level.html, docs/levels.md): graphite for Basic, orange
+   for Advanced, solid graphite for Nomicon; the signal bars of the icon fill up with the level */
+.md-typeset .eu-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin: 0 0 0.6rem;
+  padding: 0.15em 0.65em 0.15em 0.5em;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.md-typeset .eu-level + h1 {
+  margin-top: 0;
+}
+.md-typeset .eu-level__icon {
+  width: 1.05em;
+  height: 0.9em;
+  fill: currentColor;
+}
+.md-typeset .eu-level__icon .eu-level__off {
+  opacity: 0.25;
+}
+.md-typeset .eu-level:hover,
+.md-typeset .eu-level:focus {
+  text-decoration: none;
+  border-color: var(--md-accent-fg-color);
+}
+[data-md-color-scheme="default"] .md-typeset .eu-level--basic {
+  color: #4a4a4c;
+  border-color: #4a4a4c59;
+}
+[data-md-color-scheme="default"] .md-typeset .eu-level--advanced {
+  color: #c25400;
+  border-color: #c2540066;
+  background-color: #ff71000d;
+}
+[data-md-color-scheme="default"] .md-typeset .eu-level--nomicon {
+  color: #ffffff;
+  border-color: #4a4a4c;
+  background-color: #4a4a4c;
+}
+[data-md-color-scheme="default"] .md-typeset .eu-level--nomicon .eu-level__icon {
+  color: #ff8a2a;
+}
+[data-md-color-scheme="slate"] .md-typeset .eu-level--basic {
+  color: #c4c4c6;
+  border-color: #c4c4c659;
+}
+[data-md-color-scheme="slate"] .md-typeset .eu-level--advanced {
+  color: #ff8a2a;
+  border-color: #ff8a2a66;
+  background-color: #ff710014;
+}
+[data-md-color-scheme="slate"] .md-typeset .eu-level--nomicon {
+  color: #ececec;
+  border-color: #4a4a4c;
+  background-color: #4a4a4c;
+}
+[data-md-color-scheme="slate"] .md-typeset .eu-level--nomicon .eu-level__icon {
+  color: #ff7100;
+}
+@media screen and (min-width: 60em) {
+  .md-typeset .grid.eu-level-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.md-typeset .eu-level-cards .eu-level {
+  margin-bottom: 0.2rem;
+}
+
+/* Bit layouts, the `bits` fence (docs_ext/eu_docs_ext/bits.py): every bit in a cell with its number above, coloured
+   by the kind of its field, a bar where a field starts; then a key and a table of the fields. */
+[data-md-color-scheme="default"] .md-typeset .eu-bits {
+  --eu-sign-bg: #fde3cf; --eu-sign-fg: #a84800;
+  --eu-int-bg: #dbe7f6; --eu-int-fg: #2f5f9e;
+  --eu-frac-bg: #dcefe0; --eu-frac-fg: #2e7d43;
+  --eu-quad-bg: #ece0f5; --eu-quad-fg: #7a3fa0;
+  --eu-pad-bg: #efefef; --eu-pad-fg: #7a7a7a;
+}
+[data-md-color-scheme="slate"] .md-typeset .eu-bits {
+  --eu-sign-bg: #3d2410; --eu-sign-fg: #ffb072;
+  --eu-int-bg: #1d2c42; --eu-int-fg: #9cc0ee;
+  --eu-frac-bg: #1c3324; --eu-frac-fg: #8fd6a1;
+  --eu-quad-bg: #2e2240; --eu-quad-fg: #cdaeea;
+  --eu-pad-bg: #232325; --eu-pad-fg: #8f8f8f;
+}
+.md-typeset .eu-bits {
+  margin: 1em 0;
+}
+.md-typeset .eu-bit--sign { --eu-bg: var(--eu-sign-bg); --eu-fg: var(--eu-sign-fg); }
+.md-typeset .eu-bit--int { --eu-bg: var(--eu-int-bg); --eu-fg: var(--eu-int-fg); }
+.md-typeset .eu-bit--frac { --eu-bg: var(--eu-frac-bg); --eu-fg: var(--eu-frac-fg); }
+.md-typeset .eu-bit--quad { --eu-bg: var(--eu-quad-bg); --eu-fg: var(--eu-quad-fg); }
+.md-typeset .eu-bit--pad { --eu-bg: var(--eu-pad-bg); --eu-fg: var(--eu-pad-fg); }
+.md-typeset .eu-bits__strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  font-family: var(--md-code-font-family);
+  font-size: 0.8rem;
+}
+.md-typeset .eu-bit {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  width: 1.6em;
+  padding-bottom: 0.15em;
+  border-radius: 2px;
+  line-height: 1.4;
+  background: var(--eu-bg);
+  color: var(--eu-fg);
+}
+.md-typeset .eu-bit__no {
+  font-size: 0.55rem;
+  opacity: 0.7;
+}
+.md-typeset .eu-bit--start {
+  box-shadow: inset 2px 0 0 var(--eu-fg);
+}
+.md-typeset .eu-bits__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin: 0.5rem 0;
+  font-size: 0.7rem;
+  color: var(--md-default-fg-color--light);
+}
+.md-typeset .eu-bits__key .eu-bit {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 0.35em;
+  padding: 0;
+  vertical-align: -0.1em;
+  box-shadow: inset 0 0 0 1px var(--eu-fg);
+}
+.md-typeset table.eu-bits__fields {
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+.md-typeset table.eu-bits__fields th,
+.md-typeset table.eu-bits__fields td {
+  padding: 0.15em 0.8em 0.15em 0;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  text-align: left;
+  vertical-align: top;
+}
+.md-typeset table.eu-bits__fields td.eu-bits__at {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--md-default-fg-color--light);
+  white-space: nowrap;
+}
+.md-typeset .eu-bits__chip {
+  padding: 0 0.3em;
+  border-radius: 3px;
+  font-family: var(--md-code-font-family);
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: var(--eu-bg);
+  color: var(--eu-fg);
+}

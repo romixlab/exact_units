@@ -1,0 +1,68 @@
+name: Book
+
+# The book (docs/, zensical.toml): built strict on every change, so a broken page, link or figure fails CI. The
+# deploy job publishes it to GitHub Pages (https://exact.vhrd.tech/, docs/CNAME) and runs only when started by hand
+# until Pages and DNS are set up; then add `push: branches: [main]` to its trigger (see the deploy job).
+
+on:
+  merge_group:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Publish the built book to the gh-pages branch"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build the book (strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      # the site's Markdown extensions (the `bits` fence, `rust,compile_fail` blocks)
+      - run: uv run --group dev pytest -q docs_ext
+      # KaTeX, the logo and the plots, then the site: a warning fails
+      - run: just docs-build
+      - run: touch site/.nojekyll
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site/
+          retention-days: 7
+
+  # Off until GitHub Pages serves the gh-pages branch and exact.vhrd.tech points at it: runs only when started by hand
+  # with "deploy" ticked. To publish on every push to main, add `github.event_name == 'push'` to the `if`.
+  deploy:
+    name: publish to GitHub Pages
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site/
+      - uses: JamesIves/github-pages-deploy-action@v4.9.0
+        with:
+          branch: gh-pages
+          folder: site
+          git-config-name: Github Action
+          git-config-email: romix.lab@gmail.com
