@@ -42,6 +42,7 @@
 use super::Complex;
 #[cfg(all(feature = "angle", any(feature = "std", feature = "libm")))]
 use crate::Bounds;
+use crate::fixed::format::pad;
 #[cfg(any(feature = "std", feature = "libm"))]
 use crate::num::math;
 #[cfg(all(feature = "angle", any(feature = "std", feature = "libm")))]
@@ -106,7 +107,7 @@ where
         if f.alternate() {
             // the precision for both, the width for the whole
             let prec = f.precision();
-            crate::fixed::format::pad(f, false, |f| match prec {
+            pad(f, false, |f| match prec {
                 Some(p) => write!(f, "{:#.p$} ∠ {:#.p$}", self.abs, self.arg),
                 None => write!(f, "{:#} ∠ {:#}", self.abs, self.arg),
             })

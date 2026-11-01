@@ -17,6 +17,10 @@ impl Number {
     /// `v` steps of `scale`: exact when the scale is a fraction of integers and the product fits.
     pub(crate) fn of<T: Storage>(v: T, scale: Magnitude) -> Number {
         match v.to_repr() {
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "no exact form (not a fraction of integers, or past u128): written as the nearest float"
+            )]
             Repr::Int(x) => {
                 let exact = scale.to_ratio().and_then(|(num, den)| {
                     let m = x.unsigned_abs().checked_mul(num)?;
@@ -29,6 +33,10 @@ impl Number {
     }
 
     /// `±m / d`, `d > 0`; a float when `d` is too large to take a digit at a time.
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a d too large for the digits is shown as the nearest float"
+    )]
     pub(crate) fn ratio(neg: bool, m: u128, d: u128) -> Number {
         if d > u128::MAX / 10 {
             Number::Float(m as f64 / d as f64 * if neg { -1.0 } else { 1.0 })
@@ -60,6 +68,10 @@ impl Number {
         let (int, mut r) = (m / d, m % d);
         let Some(prec) = prec else {
             if !ends(d) {
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "a decimal that doesn't end is shown as the float's shortest form"
+                )]
                 return write!(f, "{}", m as f64 / d as f64);
             }
             write!(f, "{int}")?;
@@ -79,6 +91,10 @@ impl Number {
         let (mut nines, mut n) = (0usize, 0usize);
         while n < prec && r != 0 {
             r *= 10;
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "r was below d, so 10·r / d is a digit"
+            )]
             let digit = (r / d) as u8;
             r %= d;
             n += 1;
@@ -118,7 +134,7 @@ impl Number {
 
 /// The integer part or a held digit; one more when rounded up.
 fn write_held(f: &mut fmt::Formatter<'_>, int: u128, held: Option<u8>, up: bool) -> fmt::Result {
-    let up = up as u8;
+    let up = u8::from(up);
     match held {
         // m / d < u128::MAX / 10: int + 1 fits
         None if up == 1 => write!(f, "{}", int + 1),

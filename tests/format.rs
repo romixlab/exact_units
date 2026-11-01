@@ -119,7 +119,7 @@ fn floats_and_other_ratios() {
     let x = Fixed::<Ratio, Rational<1, 3>, i32>::new(2);
     assert_eq!(format!("{x:#}"), format!("{}", 2.0f64 / 3.0));
     assert_eq!(format!("{x:#.4}"), "0.6667");
-    assert_eq!(format!("{:#.25}", x), "0.6666666666666666666666667");
+    assert_eq!(format!("{x:#.25}"), "0.6666666666666666666666667");
     let x = Fixed::<Ratio, Rational<1, 3>, i32>::new(-1);
     assert_eq!(format!("{x:#.3}"), "-0.333");
 }
