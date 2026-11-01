@@ -141,13 +141,12 @@ mod tests {
         (
             [e.clone(), e.clone(), e.clone(), e.clone(), e.clone(), e.clone(), e],
             (-8i8..=7, -8i8..=7),
-            proptest::collection::vec((0..BASES.len(), any::<bool>()), 0..8),
+            proptest::collection::vec((proptest::sample::select(&BASES[..]), any::<bool>()), 0..8),
             any::<bool>(),
         )
             .prop_map(|([s, m, kg, a, k, mol, cd], (rad, bit), counted, root)| {
                 let mut d = Dim::new(s, m, kg, a, k, mol, cd).with_rad(rad).with_bit(bit);
-                for (i, up) in counted {
-                    let (c, n) = BASES[i];
+                for ((c, n), up) in counted {
                     let b = Dim::counted(c, n);
                     d = if up { d.checked_mul(b) } else { d.checked_div(b) }.unwrap_or(d);
                 }

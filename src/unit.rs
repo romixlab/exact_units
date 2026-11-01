@@ -987,6 +987,21 @@ pub enum UnitExpr {
 }
 
 impl UnitExpr {
+    /// Levels of the tree: 1 for a named unit, one more for each `Mul`, `Div`, `Pow` or `Sqrt` above the deepest
+    /// one. A typed unit has at most [MAX_UNIT_DEPTH](crate::MAX_UNIT_DEPTH) ([Unit::DEPTH]).
+    #[must_use]
+    pub const fn depth(&self) -> usize {
+        let below = match self {
+            UnitExpr::Named { .. } => return 1,
+            UnitExpr::Mul(a, b) | UnitExpr::Div(a, b) => {
+                let (a, b) = (a.depth(), b.depth());
+                if a > b { a } else { b }
+            }
+            UnitExpr::Pow(a, _) | UnitExpr::Sqrt(a) => a.depth(),
+        };
+        below.saturating_add(1)
+    }
+
     /// The dimension of the whole expression. Panics (a compile error in `const` code) when an exponent leaves
     /// -8..=7, like [Dim::mul].
     #[must_use]
@@ -1143,6 +1158,12 @@ pub trait Unit: Copy + Default + 'static {
 
     /// Name, symbol and scale, or the tree of a compound unit.
     const EXPR: &'static UnitExpr;
+
+    /// Levels of [EXPR](Self::EXPR), [UnitExpr::depth]. [Per](crate::units::Per), [Times](crate::units::Times) and
+    /// [Sqrt](crate::units::Sqrt) count it from their parts and refuse more than
+    /// [MAX_UNIT_DEPTH](crate::MAX_UNIT_DEPTH), a compile error where the unit's tree is used: a run-time unit
+    /// ([SIExpr]) is followed that deep, so a typed one is never deeper.
+    const DEPTH: usize = Self::EXPR.depth();
 
     /// The same unit as it goes on the wire in an `ww_si::AnyQuantity`. Made from [EXPR](Self::EXPR)
     /// for a named unit; a compound marker of its own (not `Per` / `Times`) writes its tree here too. With the

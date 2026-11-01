@@ -35,6 +35,28 @@ use core::fmt;
 
 /// Deepest nesting of a unit tree that is followed. A run-time unit comes from another device, so its depth is
 /// bounded here and not by the stack: a deeper part is shown as `…` and has no dimension or factor.
+///
+/// A typed unit is never deeper: [Per](crate::units::Per), [Times](crate::units::Times) and
+/// [Sqrt](crate::units::Sqrt) count their levels ([Unit::DEPTH](crate::Unit::DEPTH)), and one of more than 32 is a
+/// compile error where its tree is used:
+///
+/// ```compile_fail
+/// # #[cfg(feature = "quantities")] {
+/// use exact_units::Unit;
+/// use exact_units::units::{Meter, Per, Times};
+///
+/// // two levels per step over Meter's one, the dimension stays m
+/// type L3 = Times<Per<Meter, Meter>, Meter>;
+/// type L9 = Times<Per<Times<Per<Times<Per<L3, Meter>, Meter>, Meter>, Meter>, Meter>, Meter>;
+/// type L15 = Times<Per<Times<Per<Times<Per<L9, Meter>, Meter>, Meter>, Meter>, Meter>, Meter>;
+/// type L21 = Times<Per<Times<Per<Times<Per<L15, Meter>, Meter>, Meter>, Meter>, Meter>, Meter>;
+/// type L27 = Times<Per<Times<Per<Times<Per<L21, Meter>, Meter>, Meter>, Meter>, Meter>, Meter>;
+/// type L33 = Times<Per<Times<Per<Times<Per<L27, Meter>, Meter>, Meter>, Meter>, Meter>, Meter>;
+/// let _ = <L33 as Unit>::EXPR;
+/// # }
+/// # #[cfg(not(feature = "quantities"))]
+/// # compile_error!("the example needs Meter");
+/// ```
 pub const MAX_UNIT_DEPTH: usize = 32;
 
 /// One node of a unit tree, its children as `E`.

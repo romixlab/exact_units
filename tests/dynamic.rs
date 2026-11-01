@@ -259,6 +259,32 @@ fn depth_limit() {
     assert_ne!(back, *<units::Volt as Unit>::EXPR);
 }
 
+/// A typed unit of [MAX_UNIT_DEPTH] levels compiles, and every walk follows it to the end; one more level is a
+/// compile error (the `compile_fail` example of `MAX_UNIT_DEPTH`).
+#[test]
+fn typed_depth_up_to_the_limit() {
+    use units::Meter;
+    type L2 = Per<Meter, Meter>;
+    type L8 = Times<Per<Times<Per<Times<Per<L2, Meter>, Meter>, Meter>, Meter>, Meter>, Meter>;
+    type L14 = Times<Per<Times<Per<Times<Per<L8, Meter>, Meter>, Meter>, Meter>, Meter>, Meter>;
+    type L20 = Times<Per<Times<Per<Times<Per<L14, Meter>, Meter>, Meter>, Meter>, Meter>, Meter>;
+    type L26 = Times<Per<Times<Per<Times<Per<L20, Meter>, Meter>, Meter>, Meter>, Meter>, Meter>;
+    type L32 = Times<Per<Times<Per<Times<Per<L26, Meter>, Meter>, Meter>, Meter>, Meter>, Meter>;
+    assert_eq!(<Meter as Unit>::DEPTH, 1);
+    assert_eq!(<L2 as Unit>::DEPTH, 2);
+    assert_eq!(<L32 as Unit>::DEPTH, MAX_UNIT_DEPTH);
+    assert_eq!(<L32 as Unit>::EXPR.depth(), MAX_UNIT_DEPTH);
+    assert_eq!(<units::Sqrt<units::Hertz> as Unit>::DEPTH, 2);
+
+    let si = <L32 as Unit>::SI_EXPR;
+    assert!(!si.to_string().contains('…'), "{si}");
+    assert_eq!(si.dim(), Some(<L32 as Unit>::DIM));
+    assert_eq!(*si, *<L32 as Unit>::EXPR);
+    let owned = SIExprOwned::from(si);
+    let bytes = owned.to_ww_bytes_owned().unwrap();
+    assert_eq!(SIExprOwned::from_ww_bytes_owned(&bytes).unwrap(), owned);
+}
+
 #[test]
 fn bad_bytes() {
     // `Mul` whose children don't decode: shown as `?`, no dimension

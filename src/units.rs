@@ -9,7 +9,7 @@
 //! compiler gets their [Unit] impls from it, and the snapshot of this crate (WireWeaver's walker reads the same
 //! lines) their docs and definitions, so clients know them without a table (INT-13).
 
-use crate::Kind;
+use crate::{Kind, MAX_UNIT_DEPTH};
 #[cfg(feature = "shrink_wrap")]
 use crate::SIExpr;
 use crate::unit::{Dim, Unit, UnitExpr};
@@ -381,12 +381,34 @@ pub struct Sqrt<U> {
     _u: PhantomData<U>,
 }
 
+/// A compile error for a compound unit of more than [MAX_UNIT_DEPTH] levels, where its tree is used: a unit deeper
+/// than any reader follows.
+const fn check_depth(levels: usize) {
+    assert!(
+        levels <= MAX_UNIT_DEPTH,
+        "a unit tree of more than MAX_UNIT_DEPTH (32) levels: no reader follows it"
+    );
+}
+
+/// Levels of a compound unit over parts of `a` and `b` levels.
+const fn deeper(a: usize, b: usize) -> usize {
+    let below = if a > b { a } else { b };
+    below.saturating_add(1)
+}
+
 impl<U: Unit> Unit for Sqrt<U> {
     const DIM: Dim<'static> = U::DIM.sqrt();
     const KIND: Kind<'static> = U::KIND.sqrt();
-    const EXPR: &'static UnitExpr = &UnitExpr::Sqrt(U::EXPR);
+    const DEPTH: usize = deeper(U::DEPTH, 0);
+    const EXPR: &'static UnitExpr = {
+        check_depth(Self::DEPTH);
+        &UnitExpr::Sqrt(U::EXPR)
+    };
     #[cfg(feature = "shrink_wrap")]
-    const SI_EXPR: &'static SIExpr<'static> = &SIExpr::Sqrt(RefBox::Ref { value: U::SI_EXPR });
+    const SI_EXPR: &'static SIExpr<'static> = {
+        check_depth(Self::DEPTH);
+        &SIExpr::Sqrt(RefBox::Ref { value: U::SI_EXPR })
+    };
 }
 
 /// A unit of plane angle (rad¹ and no kind of its own): [Radian], [Degree], [Turn], or an API's own angle unit. What
@@ -434,6 +456,7 @@ impl<A: PlaneAngle> Unit for Phase<A> {
         A::DIM
     };
     const KIND: Kind<'static> = Kind::Named("phase angle");
+    const DEPTH: usize = A::DEPTH;
     const EXPR: &'static UnitExpr = A::EXPR;
     #[cfg(feature = "shrink_wrap")]
     const SI_EXPR: &'static SIExpr<'static> = A::SI_EXPR;
@@ -442,23 +465,37 @@ impl<A: PlaneAngle> Unit for Phase<A> {
 impl<A: Unit, B: Unit> Unit for Per<A, B> {
     const DIM: Dim<'static> = A::DIM.div(B::DIM);
     const KIND: Kind<'static> = A::KIND.div(A::DIM, B::KIND, B::DIM);
-    const EXPR: &'static UnitExpr = &UnitExpr::Div(A::EXPR, B::EXPR);
+    const DEPTH: usize = deeper(A::DEPTH, B::DEPTH);
+    const EXPR: &'static UnitExpr = {
+        check_depth(Self::DEPTH);
+        &UnitExpr::Div(A::EXPR, B::EXPR)
+    };
     #[cfg(feature = "shrink_wrap")]
-    const SI_EXPR: &'static SIExpr<'static> = &SIExpr::Div(
-        RefBox::Ref { value: A::SI_EXPR },
-        RefBox::Ref { value: B::SI_EXPR },
-    );
+    const SI_EXPR: &'static SIExpr<'static> = {
+        check_depth(Self::DEPTH);
+        &SIExpr::Div(
+            RefBox::Ref { value: A::SI_EXPR },
+            RefBox::Ref { value: B::SI_EXPR },
+        )
+    };
 }
 
 impl<A: Unit, B: Unit> Unit for Times<A, B> {
     const DIM: Dim<'static> = A::DIM.mul(B::DIM);
     const KIND: Kind<'static> = A::KIND.mul(A::DIM, B::KIND, B::DIM);
-    const EXPR: &'static UnitExpr = &UnitExpr::Mul(A::EXPR, B::EXPR);
+    const DEPTH: usize = deeper(A::DEPTH, B::DEPTH);
+    const EXPR: &'static UnitExpr = {
+        check_depth(Self::DEPTH);
+        &UnitExpr::Mul(A::EXPR, B::EXPR)
+    };
     #[cfg(feature = "shrink_wrap")]
-    const SI_EXPR: &'static SIExpr<'static> = &SIExpr::Mul(
-        RefBox::Ref { value: A::SI_EXPR },
-        RefBox::Ref { value: B::SI_EXPR },
-    );
+    const SI_EXPR: &'static SIExpr<'static> = {
+        check_depth(Self::DEPTH);
+        &SIExpr::Mul(
+            RefBox::Ref { value: A::SI_EXPR },
+            RefBox::Ref { value: B::SI_EXPR },
+        )
+    };
 }
 
 /// The named unit of this crate called `name` (the marker's name, `"Volt"`), if its feature is enabled: what a
