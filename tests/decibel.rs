@@ -997,3 +997,22 @@ mod run_time {
         assert!((c - r.get()).abs() <= 1.0);
     }
 }
+
+/// A gain far below one step rounds to 0, however far: the exponent of 2 left `u32` below about −1.3·10^10 dB and
+/// wrapped into a wrong nonzero.
+#[test]
+fn tiny_gains_round_to_zero() {
+    for n in [
+        -1_000_i64,
+        -10_000_000_000,
+        -12_929_139_750,
+        -12_929_139_780,
+        i64::MIN / 2,
+    ] {
+        assert_eq!(
+            PowerGain::<One, u64>::from_db_const(Decibels::new(n, 0)).get(),
+            0,
+            "{n} dB"
+        );
+    }
+}

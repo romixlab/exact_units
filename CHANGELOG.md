@@ -274,4 +274,10 @@ firmware that only needs units in its types builds without it; the bytes don't d
   saturating cast passed the range check).
 * `RangeDec`'s `f32` upper bound is the nearest `f32` to the decimal, like the lower one (it rounded twice:
   `RangeDec<-5, 5, -4>` refused `5e-4f32`).
+* `Storage::from_f32` for `i64` refuses 2^63 (it returned `Some(i64::MAX)`: `i64::MAX as f32` rounds up to 2^63 and the
+  saturating cast passed the range check).
+* `RangeDec`'s `f32` upper bound is the nearest `f32` to the decimal, like the lower one (it rounded twice:
+  `RangeDec<-5, 5, -4>` refused `5e-4f32`).
+* `from_db_const` of a gain below about −1.3·10^10 dB is 0 (the exponent of 2 wrapped in `u32` and gave a wrong
+  nonzero).
 

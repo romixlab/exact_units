@@ -92,16 +92,16 @@ impl Num {
         if self.e >= 0 {
             return None;
         }
+        if self.e < -128 {
+            // m · 2^e < 2^128 · 2^-129 = 1/2 (compared before the cast: -e may not fit a u32)
+            return Some(0);
+        }
         #[expect(
             clippy::cast_sign_loss,
             clippy::cast_possible_truncation,
-            reason = "FINDING: -e above u32::MAX wraps, so a gain below 2^-(2^32) (about -1.3e10 dB) rounds to a wrong nonzero"
+            reason = "-e is 1..=128 here"
         )]
         let s = (-self.e) as u32;
-        if s > 128 {
-            // m · 2^-s < 2^128 · 2^-129 = 1/2
-            return Some(0);
-        }
         let int = if s == 128 { 0 } else { self.m >> s };
         let rem = if s == 128 {
             self.m
