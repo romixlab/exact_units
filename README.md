@@ -63,6 +63,9 @@ crate is about, all of it checked at compile time:
   in integers at compile time with an error bound (a level too close to halfway between two stored values doesn't
   compile), so a firmware threshold in dB is an integer compare. At run time `to_db` / `from_db` in `f64` and
   `to_db_f32` / `from_db_f32` in `f32`, with `std` or the pure-Rust `libm`.
+- **Decimal literals, exact at compile time.** `fixed!(0.1)` is the stored value nearest to 0.1 in the scale and
+  storage of the `Fixed` it is assigned to (107374182 in Q30), ties to even; a value that doesn't fit, a negative one
+  of an unsigned storage or one outside the bounds doesn't compile. No constant computed by hand.
 - **Products keep their unit and scale.** mV times mA is a `Fixed` in mV·mA with the exact scale 10⁻⁶ as a type,
   one integer multiply on the device, and `convert` takes it to a watt; V/V times V is a volt, a gain times a gain is
   still a gain. Rounding into another scale (`times_into`, a Q15 multiply) is named, never a float.
@@ -201,7 +204,8 @@ real message.
     mismatch loss, and the firmware's |Γ| ≤ −15 dB as one integer compare on |Γ|², not the 20·lg slip that passes
     −7.5 dB.
 14. `14_iq_downconvert` (`angle,dimensionless,electrical`): Q15 IQ samples mixed down by an NCO on a Cortex-M0; a
-    complex multiply that saturates at (−1 − j)² where plain `int32_t` products wrap to 0, and an exact power sum.
+    complex multiply that saturates at (−1 − j)² where plain `int32_t` products wrap to 0, and an exact power sum
+    tested against `db!(norm_sqr -10)`, −10 dBFS.
 
 ## License
 

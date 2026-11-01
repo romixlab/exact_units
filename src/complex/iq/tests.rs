@@ -439,3 +439,30 @@ mod nco {
         assert!(y.get().1.abs() <= 1);
     }
 }
+
+#[test]
+fn mean_at_least_compares_exactly() {
+    use crate::Fixed;
+    use crate::prefix::Product;
+    use crate::units::Times;
+    type Q30<T> = Fixed<Times<Ratio, Ratio>, Product<Pow2<-15>, Pow2<-15>>, T>;
+    let y = q15(16384, 0); // |y|² = 2²⁸
+    let mut power = Mac::new();
+    for _ in 0..3 {
+        power.mac_conj(y, y);
+    }
+    // the mean is 2²⁸ exactly: at least 2²⁸, not at least 2²⁸ + 1
+    assert!(power.mean_at_least(Q30::<u32>::new(1 << 28), 3));
+    assert!(!power.mean_at_least(Q30::<u32>::new((1 << 28) + 1), 3));
+    // a threshold of another integer storage, a negative one, no products
+    assert!(power.mean_at_least(Q30::<i64>::new(-1), 3));
+    assert!(!power.mean_at_least(Q30::<u32>::new(0), 0));
+    // Q31: a threshold times n beyond i128 is above every sum, a negative one below
+    type Q62<T> = Fixed<Times<Ratio, Ratio>, Product<Pow2<-31>, Pow2<-31>>, T>;
+    let z = q31(i32::MIN, 0);
+    let mut big: Mac<_, _, i32> = Mac::new();
+    big.mac_conj(z, z);
+    assert!(!big.mean_at_least(Q62::<u64>::new(u64::MAX), usize::MAX));
+    assert!(big.mean_at_least(Q62::<i64>::new(i64::MIN), usize::MAX));
+    assert!(big.mean_at_least(Q62::<u64>::new(1 << 62), 1));
+}

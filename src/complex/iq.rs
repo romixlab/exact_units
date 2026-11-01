@@ -303,6 +303,46 @@ impl<U: Unit, P: FixedScale, T: IqStorage> Mac<U, P, T> {
         };
         Some(Complex::new(part(self.re)?, part(self.im)?))
     }
+
+    /// Whether the mean of the real sum over `n` products is at least `threshold`, `Σ re ≥ threshold · n`, exact:
+    /// a power detector's test of Σ|y|² (`mac_conj(y, y)`) against a level in the products' unit and scale,
+    /// `db!(norm_sqr -10)` or `fixed!(0.1)`. One multiply and one compare of integers, no division. The imaginary
+    /// sum takes no part (a power sum has none); no products (`n = 0`) are no signal, `false`. The threshold is an
+    /// integer storage.
+    ///
+    /// ```
+    /// # #[cfg(feature = "dimensionless")] {
+    /// use exact_units::{CQ15, Complex, Fixed, Mac, fixed, prefix::{Pow2, Product}, units::{Ratio, Times}};
+    /// type PowerQ30 = Fixed<Times<Ratio, Ratio>, Product<Pow2<-15>, Pow2<-15>>, u32>;
+    /// const BUSY: PowerQ30 = fixed!(0.1);
+    /// let y: CQ15 = Complex::of(16384, 0); // 0.5, a power of 0.25
+    /// let mut power = Mac::new();
+    /// power.mac_conj(y, y);
+    /// power.mac_conj(y, y);
+    /// assert!(power.mean_at_least(BUSY, 2));
+    /// assert!(!power.mean_at_least(BUSY, 6)); // 0.5 over 6 is 0.083
+    /// # }
+    /// ```
+    #[inline]
+    pub fn mean_at_least<T2: crate::Storage, B2: crate::Bounds<T2>>(
+        &self,
+        threshold: crate::Fixed<U, P, T2, B2>,
+        n: usize,
+    ) -> bool {
+        const { assert!(!T2::IS_FLOAT, "a Mac's threshold is an integer storage") };
+        let t = match threshold.get().to_repr() {
+            crate::Repr::Int(t) => t,
+            crate::Repr::Float(_) => unreachable!(),
+        };
+        if n == 0 {
+            return false;
+        }
+        match t.checked_mul(n as i128) {
+            Some(tn) => T::acc_to_i128(self.re) >= tn,
+            // beyond i128, which no sum reaches: above it for a positive threshold, below for a negative one
+            None => t < 0,
+        }
+    }
 }
 
 impl<U1: Unit, P1: FixedScale, U2: Unit, P2: FixedScale, T: IqStorage>
