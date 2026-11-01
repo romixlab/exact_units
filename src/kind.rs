@@ -74,6 +74,7 @@ const ROOT_POWER: [Dim<'static>; 6] = [
     Dim::new(-3, 2, 1, 0, 0, 0, 0).sqrt(),
 ];
 
+#[expect(clippy::indexing_slicing, reason = "i < dims.len(), the loop bound")]
 const fn any_same(dims: &[Dim<'static>], d: Dim<'_>) -> bool {
     let mut i = 0;
     while i < dims.len() {
@@ -86,6 +87,10 @@ const fn any_same(dims: &[Dim<'static>], d: Dim<'_>) -> bool {
 }
 
 /// `==` on two names in `const` code.
+#[expect(
+    clippy::indexing_slicing,
+    reason = "i < a.len() == b.len(), the loop bound"
+)]
 const fn same_str(a: &str, b: &str) -> bool {
     let (a, b) = (a.as_bytes(), b.as_bytes());
     if a.len() != b.len() {

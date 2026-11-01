@@ -55,6 +55,10 @@ impl SIExpr<'static> {
     /// The run-time form of a named [UnitExpr], in `const` code. Panics (a compile error in `const` code) for a
     /// compound one: those have no `'static` children to point to, [Unit::SI_EXPR] of `Per` / `Times` has them.
     #[must_use]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: a unit expression that is not a named unit"
+    )]
     pub const fn named(e: &'static UnitExpr) -> SIExpr<'static> {
         match *e {
             UnitExpr::Named {

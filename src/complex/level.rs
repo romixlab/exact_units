@@ -39,6 +39,10 @@ use {super::NormStorage, crate::Storage, crate::num::math};
 
 /// The exact |z|² at level `db` for `|z|` of unit `U` in scale `P`: 10^(dB/10) of a root-power kind, 10^(dB/5) of a
 /// power kind, in units of `P · P`.
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented: a level form this kind lacks"
+)]
 const fn norm_sqr_gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) -> exact::Interval {
     let db = match form {
         LevelForm::RootPower => db,

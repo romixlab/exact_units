@@ -180,6 +180,10 @@ impl FullScaleBits {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "self.0 is in 2..=32 (FullScaleBits::new): b and b - 1 index FULL_ENDS, one end per n"
+    )]
     pub const fn magnitude(self) -> Magnitude {
         let b = (self.0 - 2) as usize;
         let start = if b == 0 { 0 } else { FULL_ENDS[b - 1] as usize };

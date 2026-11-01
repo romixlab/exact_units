@@ -42,11 +42,12 @@ fn main() {
     // channels: the user's CH4 is the register array's index 3, by a named step
     let gains: [u16; 4] = [100, 100, 250, 400];
     let ch = Channel::try_new(4).unwrap();
-    println!(
-        "CH{ch} reads regs[{}] = {}",
-        ch.to_index(),
-        gains[usize::from(ch.to_index().get())]
-    );
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "Channel's bounds (1..=4) keep its index within the 4 registers"
+    )]
+    let gain = gains[usize::from(ch.to_index().get())];
+    println!("CH{ch} reads regs[{}] = {gain}", ch.to_index());
     assert!(Channel::try_new(0).is_err()); // there is no CH0
     assert!(Channel::try_new(5).is_err());
 

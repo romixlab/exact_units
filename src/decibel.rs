@@ -54,6 +54,11 @@ impl Decibels {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(
+        clippy::indexing_slicing,
+        clippy::panic,
+        reason = "every b[i] is read after i < b.len(); a malformed level is a compile error in const code (a panic at run time), as documented"
+    )]
     pub const fn parse(s: &str) -> Decibels {
         let b = s.as_bytes();
         let mut i = 0;
@@ -224,6 +229,10 @@ pub trait AtLevel<L>: Sized {
 
 /// The exact gain of `db` in units of `P · U` as an interval, or a compile error for a scale that isn't a fraction of
 /// integers.
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented: a kind without a level form"
+)]
 pub(crate) const fn gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) -> exact::Interval {
     let Some(unit) = U::EXPR.magnitude() else {
         panic!("a level needs an exact scale")

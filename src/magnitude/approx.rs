@@ -212,6 +212,7 @@ impl Magnitude {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(clippy::indexing_slicing, reason = "i < MAX_FACTORS, the loop bound")]
     pub const fn fixed_point(&self) -> (u64, i32) {
         let w = Work::of(self);
         // the doubled exponents give the square of the magnitude

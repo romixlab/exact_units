@@ -105,6 +105,10 @@ const N32: usize = 40;
     clippy::as_conversions,
     reason = "a const item: From is not const on stable"
 )]
+#[expect(
+    clippy::indexing_slicing,
+    reason = "i < N16, the length of both tables"
+)]
 const ATAN_T32: [i32; N16] = {
     let mut t = [0; N16];
     let mut i = 0;
@@ -152,6 +156,7 @@ const QUARTER_T48: u64 = 1 << 46;
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
 )]
+#[expect(clippy::indexing_slicing, reason = "i < N16, the length of ATAN_T32")]
 pub const fn atan2_16(y: i16, x: i16) -> Bam16 {
     if x == 0 && y == 0 {
         return Bam16::of(0);
@@ -206,6 +211,7 @@ pub const fn atan2_16(y: i16, x: i16) -> Bam16 {
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
 )]
+#[expect(clippy::indexing_slicing, reason = "i < N32, the length of ATAN_T48")]
 pub const fn atan2_32(y: i32, x: i32) -> Bam32 {
     if x == 0 && y == 0 {
         return Bam32::of(0);
@@ -360,6 +366,7 @@ pub const fn sin_cos_32_q15(a: Bam32) -> (Q15, Q15) {
 
 /// (cos z, sin z) in Q30 for `z` in -1/8..1/8 turn in steps of 2⁻³²: (K, 0) turned by `z`.
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
+#[expect(clippy::indexing_slicing, reason = "i < N16, the length of ATAN_T32")]
 const fn rotate_16(mut z: i32) -> (i32, i32) {
     let (mut x, mut y) = (K16_Q30, 0);
     let mut i = 0;
@@ -377,6 +384,7 @@ const fn rotate_16(mut z: i32) -> (i32, i32) {
 
 /// (cos z, sin z) in Q60 for `z` in -1/8..1/8 turn in steps of 2⁻⁴⁸.
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
+#[expect(clippy::indexing_slicing, reason = "i < N32, the length of ATAN_T48")]
 const fn rotate_32(mut z: i64) -> (i64, i64) {
     let (mut x, mut y) = (K32_Q60, 0);
     let mut i = 0;

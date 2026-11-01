@@ -53,6 +53,11 @@ impl Decimal {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(
+        clippy::indexing_slicing,
+        clippy::panic,
+        reason = "every b[i] is read after i < b.len(); a malformed literal is a compile error in const code (a panic at run time), as documented"
+    )]
     pub const fn parse(s: &str) -> Decimal {
         const FORM: &str = "a literal is a decimal number: 0.1, -3, 2.5e-3";
         let b = s.as_bytes();
@@ -147,6 +152,10 @@ impl Decimal {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: a scale that is not a fraction of integers, or a fraction past u128"
+    )]
     const fn over<P: FixedScale>(self) -> (u128, u128) {
         let Some((snum, sden)) = P::SCALE.to_ratio() else {
             panic!(
@@ -210,6 +219,10 @@ impl Decimal {
 }
 
 /// `a · b`, or a compile error: the scale and the literal together need more than 128 bits.
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented: a fraction past u128"
+)]
 const fn mul(a: u128, b: u128) -> u128 {
     match a.checked_mul(b) {
         Some(x) => x,

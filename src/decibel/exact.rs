@@ -283,6 +283,10 @@ impl Interval {
     }
 
     /// The nearest integer, the same for both ends, or a compile error.
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: a gain past u128 or too close to a tie to decide"
+    )]
     pub(crate) const fn to_int(self) -> u128 {
         match (self.lo.round_int(), self.hi.round_int()) {
             (Some(a), Some(b)) if a == b => a,
@@ -332,6 +336,10 @@ impl Interval {
         f32::from_bits(bits)
     }
 
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: a float too close to a tie to decide or outside the normal range"
+    )]
     const fn same_float(lo: Option<(u128, i64)>, hi: Option<(u128, i64)>) -> (u128, i64) {
         match (lo, hi) {
             (Some(a), Some(b)) if a.0 == b.0 && a.1 == b.1 => a,

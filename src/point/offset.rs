@@ -99,6 +99,10 @@ impl Offset {
     /// `self + rhs`. Both must be fractions of integers (no π) and the sum's numerator and denominator fit a `u64`,
     /// else it panics (at compile time in a `const`).
     #[must_use]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: offsets that are not fractions of integers, or a sum past 64-bit parts"
+    )]
     pub const fn add(self, rhs: Self) -> Self {
         match self.checked_add(rhs) {
             Some(sum) => sum,

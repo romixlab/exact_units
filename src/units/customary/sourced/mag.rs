@@ -24,6 +24,10 @@ const fn gcd(mut a: u128, mut b: u128) -> u128 {
     a
 }
 
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented: a sourced factor past u128"
+)]
 const fn checked(v: Option<u128>) -> u128 {
     match v {
         Some(v) => v,

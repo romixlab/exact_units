@@ -822,6 +822,10 @@ impl Conversion {
 
     /// From unit `U` in scale `P` to `U2` in `P2`: both units' exact factors to SI and the same dimension, else a
     /// compile error.
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: units without an exact factor to SI"
+    )]
     const fn between<U: Unit, P: FixedScale, U2: Unit, P2: FixedScale, T: Storage, T2: Storage>()
     -> Self {
         assert!(
@@ -846,6 +850,10 @@ impl Conversion {
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: a factor that is not a fraction of integers"
     )]
     const fn by<T: Storage, T2: Storage>(m: Magnitude, rounding: bool) -> Self {
         let ratio = m.to_ratio();

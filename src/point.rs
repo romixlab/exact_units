@@ -341,6 +341,10 @@ impl<P, T: Storage> PointArith<P, T> for Linear {
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
 )]
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented: a period that is not a whole number of steps"
+)]
 const fn period_steps<S: FixedScale, P: FixedScale>(bits: u32) -> i128 {
     let Some((n, d)) = S::SCALE.div(P::SCALE).to_ratio() else {
         panic!("the period of a Modulo origin must be a whole number of the point's steps")
@@ -773,6 +777,11 @@ mod arith {
     }
 
     #[inline(always)]
+    #[expect(
+        clippy::panic,
+        reason = "`+` and `-` of a bounded point panic outside its bounds, as documented; checked_add is the \
+                  non-panicking form"
+    )]
     fn in_bounds<O, U, P, T: Storage, B: Bounds<T>>(y: T) -> Point<O, Fixed<U, P, T, B>> {
         let Ok(f) = Fixed::try_new(y) else {
             panic!("a point moved outside its bounds")
@@ -804,6 +813,10 @@ impl Affine {
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: a conversion between points that does not fit its widened arithmetic"
     )]
     const fn of<T: Storage, T2: Storage>(
         step1: Magnitude,

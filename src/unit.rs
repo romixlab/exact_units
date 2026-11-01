@@ -140,6 +140,10 @@ const fn checked_exp(e: i16) -> Option<i8> {
 }
 
 /// Byte-wise order of two names, in `const` code.
+#[expect(
+    clippy::indexing_slicing,
+    reason = "i < the shorter length, the loop bound"
+)]
 const fn cmp_names(a: &str, b: &str) -> core::cmp::Ordering {
     use core::cmp::Ordering;
     let (a, b) = (a.as_bytes(), b.as_bytes());
@@ -202,6 +206,7 @@ impl<'i> Dim<'i> {
 
     /// From the exponents of s, m, kg, A, K, mol, cd, rad, bit, `None` when one is out of -8..=7.
     #[must_use]
+    #[expect(clippy::indexing_slicing, reason = "i < FIXED, the loop bound")]
     pub const fn checked_new(exps: [i8; FIXED]) -> Option<Dim<'i>> {
         let mut i = 0;
         while i < FIXED {
@@ -286,6 +291,10 @@ impl<'i> Dim<'i> {
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "indices below FIXED and below the slot counts, the loop bounds"
     )]
     const fn combine(self, o: Dim<'i>, sign: i16, times: i16) -> Option<Dim<'i>> {
         // with only one side a root, the other is squared so both describe the square of what they are
@@ -402,6 +411,10 @@ impl<'i> Dim<'i> {
         Some(out)
     }
 
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "i < the slots in use, checked first"
+    )]
     const fn slot(&self, i: usize) -> Option<(Counted<'i>, i8)> {
         if i >= MAX_COUNTED {
             return None;
@@ -451,6 +464,10 @@ impl<'i> Dim<'i> {
     /// The dimension of a square root, for unit markers: V/√Hz is `Volt.div(Hertz.sqrt())`. Panics (a compile
     /// error in `const` code) where [checked_sqrt](Self::checked_sqrt) is `None`.
     #[must_use]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: a dimension that is already a root"
+    )]
     pub const fn sqrt(self) -> Dim<'i> {
         match self.checked_sqrt() {
             Some(d) => d,
@@ -461,6 +478,10 @@ impl<'i> Dim<'i> {
     /// The dimension of a product, for unit markers: panics (a compile error in `const` code) when an exponent leaves
     /// -8..=7 or there are more than [MAX_COUNTED] counted bases.
     #[must_use]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: an exponent out of -8..=7 or too many counted bases"
+    )]
     pub const fn mul(self, o: Dim<'i>) -> Dim<'i> {
         match self.checked_mul(o) {
             Some(d) => d,
@@ -470,6 +491,10 @@ impl<'i> Dim<'i> {
 
     /// The dimension of a quotient, for unit markers: panics like [mul](Self::mul).
     #[must_use]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: an exponent out of -8..=7 or too many counted bases"
+    )]
     pub const fn div(self, o: Dim<'i>) -> Dim<'i> {
         match self.checked_div(o) {
             Some(d) => d,
@@ -479,6 +504,10 @@ impl<'i> Dim<'i> {
 
     /// `==` in `const` code.
     #[must_use]
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "indices below FIXED and below the slot counts, the loop bounds"
+    )]
     pub const fn same(self, o: Dim<'_>) -> bool {
         let a = self.exps();
         let b = o.exps();
@@ -515,6 +544,10 @@ impl<'i> Dim<'i> {
     /// Whether the dimension is as it must be on the wire: counted bases in used slots first, sorted by crate and
     /// name without duplicates, exponents not 0; `root` only with an odd exponent.
     #[must_use]
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "indices below FIXED and below the slot counts, the loop bounds"
+    )]
     pub const fn is_canonical(&self) -> bool {
         if self.root {
             let mut odd = false;
@@ -859,6 +892,10 @@ impl UnitExpr {
     /// The dimension of the whole expression. Panics (a compile error in `const` code) when an exponent leaves
     /// -8..=7, like [Dim::mul].
     #[must_use]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: a unit expression whose dimension does not combine"
+    )]
     pub const fn dim(&self) -> Dim<'static> {
         match self {
             UnitExpr::Named { dim, .. } => *dim,

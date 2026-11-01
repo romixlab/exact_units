@@ -242,6 +242,7 @@ where
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
 )]
+#[expect(clippy::indexing_slicing, reason = "i < 4, the length of c")]
 const fn proven_product<T: Storage>(a0: i64, a1: i64, b0: i64, b1: i64) {
     let c = [
         a0 as i128 * b0 as i128,
@@ -478,6 +479,10 @@ impl Requant {
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: a factor that is not a fraction of integers"
     )]
     pub(crate) const fn of_terms<T: Storage, T3: Storage>(
         m: Magnitude,
