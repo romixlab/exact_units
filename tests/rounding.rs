@@ -397,3 +397,40 @@ fn bounds_prove_conversions() {
     let us: Fixed<Second, Micro, u32> = ms.into_rounded(Rounding::Truncate);
     assert_eq!(us.get(), 255_000);
 }
+
+exact_units::scale! {
+    /// Steps of 3·2⁻⁶³: into kilo the factor's denominator is 2⁶⁶·125, into one it is 2⁶³, both past i64.
+    struct Tiny = "", Exact(3 / 1, pow2 -63);
+}
+
+exact_units::scale! {
+    /// Steps of 10⁻¹⁹·2⁻⁶³/3: into one the factor's denominator is past i128.
+    struct Tinier = "", Exact(1 / 3, pow10 -19, pow2 -63);
+}
+
+#[test]
+fn denominators_past_i64() {
+    // an i32 takes the 64-bit path, which can't divide by these: the 128-bit one does
+    let zero = Fixed::<Radian, Tiny, i32>::new(0);
+    assert_eq!(zero.to::<Kilo, i32>().map(Fixed::get), Some(0));
+    assert_eq!(zero.to::<One, i32>().map(Fixed::get), Some(0));
+    assert_eq!(Fixed::<Radian, Tiny, i32>::new(1).to::<One, i32>(), None);
+    for (x, r, want) in [
+        (1, Rounding::Ceil, 1),
+        (1, Rounding::Floor, 0),
+        (-1, Rounding::Ceil, 0),
+        (-1, Rounding::Floor, -1),
+        (i32::MAX, Rounding::NearestEven, 0),
+    ] {
+        let got = Fixed::<Radian, Tiny, i32>::new(x).to_rounded::<One, i32>(r);
+        assert_eq!(got.map(Fixed::get), Some(want), "{x} {r:?}");
+    }
+    // past i128 only 0 is whole
+    assert_eq!(
+        Fixed::<Radian, Tinier, i64>::new(0)
+            .to::<One, i64>()
+            .map(Fixed::get),
+        Some(0)
+    );
+    assert_eq!(Fixed::<Radian, Tinier, i64>::new(1).to::<One, i64>(), None);
+}

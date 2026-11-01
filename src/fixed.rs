@@ -854,7 +854,8 @@ impl Conversion {
                  ln 10 or a half exponent (convert through a float storage, or round with to_rounded)"
             ),
         };
-        let wide = T::BITS > 32 || T2::BITS > 32;
+        // a den past i64 divides only in 128 bits
+        let wide = T::BITS > 32 || T2::BITS > 32 || den > i64::MAX as u128;
         if !float {
             let limit = if wide {
                 i128::MAX as u128
@@ -1027,7 +1028,7 @@ impl Conversion {
             let p = x.to_i64() * self.num as i64;
             #[expect(
                 clippy::cast_possible_truncation,
-                reason = "FINDING: den is not checked against i64::MAX; past it the low 64 bits divide (0 panics)"
+                reason = "not wide: den is at most i64::MAX, by takes the wide path past it"
             )]
             let y = if self.den == 1 {
                 p
@@ -1064,7 +1065,10 @@ impl Conversion {
                 reason = "wide: num is at most i128::MAX / max_abs, asserted in by"
             )]
             let p = x * self.num as i128;
-            let den = i128::try_from(self.den).ok()?;
+            // past i128, |p| < den: only 0 is whole
+            let Ok(den) = i128::try_from(self.den) else {
+                return if p == 0 { T2::from_int(0) } else { None };
+            };
             if den != 1 && p % den != 0 {
                 return None;
             }
@@ -1078,7 +1082,7 @@ impl Conversion {
             let p = x.to_i64() * self.num as i64;
             #[expect(
                 clippy::cast_possible_truncation,
-                reason = "FINDING: den is not checked against i64::MAX; past it the low 64 bits divide (0 panics)"
+                reason = "not wide: den is at most i64::MAX, by takes the wide path past it"
             )]
             let den = self.den as i64;
             if den != 1 && p % den != 0 {
