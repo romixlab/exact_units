@@ -289,21 +289,23 @@ impl Expr {
     }
 }
 
-/// The most nodes on a path an owned unit tree decodes with: shrink_wrap's reader stops at
+/// The nodes on a path an owned unit tree always decodes with: shrink_wrap's reader stops at
 /// `BufReader::DEFAULT_MAX_DEPTH` (128) nested values, so a recursive type from untrusted data can't overflow the
-/// stack. Far past `MAX_UNIT_DEPTH` (32), the depth the crate follows.
-const DECODED_DEPTH: usize = 127;
+/// stack, and a named unit's own fields (its dimension, a counted base) take up to 4 of them. Far past
+/// `MAX_UNIT_DEPTH` (32), the depth the crate follows.
+const DECODED_DEPTH: usize = 124;
 
 /// A unit tree round-trips, owned and borrowed, and every walk over it (symbol, name, dimension, factor, magnitude,
 /// known unit) ends without a panic, also past `MAX_UNIT_DEPTH`. The owned form decodes up to [DECODED_DEPTH] nodes
-/// deep and is refused as too deeply nested past it; the borrowed one reads its top node only.
+/// deep, and from there on may be refused as too deeply nested, never past 128; the borrowed one reads its top node
+/// only.
 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
 pub(crate) fn si_expr(e: &Expr) {
     let owned = e.build();
     let bytes = owned.to_ww_bytes_owned().expect("encodes");
     match SIExprOwned::from_ww_bytes_owned(&bytes) {
         Ok(back) => {
-            assert!(e.depth() <= DECODED_DEPTH, "{} deep, decodes", e.depth());
+            assert!(e.depth() <= 128, "{} deep, decodes", e.depth());
             assert_eq!(back, owned);
             assert_eq!(back.to_ww_bytes_owned().expect("encodes"), bytes);
         }
@@ -437,16 +439,21 @@ mod tests {
     /// Chains at the reader's depth limit and past it.
     #[test]
     fn deep_units() {
-        for depth in [32, 33, 126, 127, 128, 200] {
-            let mut e = Expr::Known(0);
-            for k in 1..depth {
-                e = if k % 2 == 0 {
-                    Expr::Sqrt(Box::new(e))
-                } else {
-                    Expr::Mul(Box::new(e), Box::new(Expr::Known(1)))
-                };
+        for depth in [32, 33, 124, 125, 126, 127, 128, 129, 200] {
+            for leaf in [
+                Expr::Known(0),
+                Expr::Own("Rpm".into(), "rpm".into(), [1, -2, 3], -3),
+            ] {
+                let mut e = leaf.clone();
+                for k in 1..depth {
+                    e = if k % 2 == 0 {
+                        Expr::Sqrt(Box::new(e))
+                    } else {
+                        Expr::Mul(Box::new(e), Box::new(leaf.clone()))
+                    };
+                }
+                super::si_expr(&e);
             }
-            super::si_expr(&e);
         }
     }
 

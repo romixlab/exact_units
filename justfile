@@ -22,11 +22,12 @@ verify:
 # Fuzz one target of fuzz/ for SECONDS: the property functions of tests/props, coverage-guided. Needs a nightly
 # toolchain and cargo-fuzz (`rustup toolchain install nightly`, `cargo install cargo-fuzz`). Starts from the
 # hand-written seeds in fuzz/seeds/TARGET; the corpus it grows (fuzz/corpus/TARGET) and a crash (fuzz/artifacts/TARGET)
-# stay out of git. Targets: decimal, decibels, names, wire_bytes, wire_values, serde_json
+# stay out of git. Targets: decimal, decibels, names, wire_bytes, wire_values, serde_json. ASan keeps the stack of
+# every allocation for good: 4 frames of it, so the deep recursion of unit trees doesn't grow it past the 2 GB limit
 [working-directory('fuzz')]
 fuzz target seconds="60":
     mkdir -p corpus/{{target}}
-    cargo +nightly fuzz run {{target}} corpus/{{target}} seeds/{{target}} -- -dict=units.dict -max_total_time={{seconds}} -max_len=4096
+    ASAN_OPTIONS=malloc_context_size=4 cargo +nightly fuzz run {{target}} corpus/{{target}} seeds/{{target}} -- -dict=units.dict -max_total_time={{seconds}} -max_len=4096
 
 # Format, sort, spelling, clippy and rustdoc as CI runs them, warnings are errors
 lint:
