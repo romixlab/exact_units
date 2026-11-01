@@ -78,6 +78,10 @@ shrink_wrap = { version = "0.2.0", git = "https://github.com/vhrdtech/wire_weave
 # the reference the compile-time levels are tested against
 libm = { version = "0.2", default-features = false }
 
+# property tests (tests/props); not under Kani, which runs the same properties as proofs (`just verify`)
+[target.'cfg(not(kani))'.dev-dependencies]
+proptest = { version = "1.12", default-features = false, features = ["std"] }
+
 # the wire: SIExpr, Dim and Scale bytes, Series of Fixed fields
 [[test]]
 name = "dynamic"
@@ -177,6 +181,8 @@ unreachable_pub = "warn"
 unused_qualifications = "warn"
 unused_lifetimes = "warn"
 rust_2018_idioms = { level = "warn", priority = -1 }
+# `cargo kani` sets cfg(kani): the proofs in tests/props
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

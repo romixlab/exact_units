@@ -29,6 +29,7 @@ just check           # cargo check of the feature sets firmware uses
 just cov             # test coverage as CI computes it, lcov.info plus a printed summary
 just customary-docs  # regenerate docs/customary.md's tables from the catalogue
 just logo            # export the logo from assets/logo/logo.typ (typst and the Audiowide font installed)
+just verify          # the Kani proofs of tests/props (minutes; needs cargo-kani, not in CI)
 ```
 
 CI (`.github/workflows/ci.yml`) fails on any warning and also builds for `thumbv6m-none-eabi`. Run `just lint` and
@@ -49,6 +50,21 @@ numbers), `saturating_*` for the `Saturating` bound, `checked_*` where the API r
 `#[expect]` stating the invariant (`i16 * i16 fits in i32`) or the documented overflow (`like T's +`). None of these
 may add work on Cortex-M where the old operation could not overflow. Tests, test modules and examples carry one
 file-level `#![expect]` per lint clippy.toml can't exempt for tests.
+
+## Properties and proofs
+
+`tests/props` (one test crate, root `main.rs`) holds properties, each checked against an exact reference in
+`reference.rs` (integer arithmetic in `i128`, written without the crate's helpers). A property is a plain
+`pub(crate) fn` that takes its inputs and asserts; it is called from a `#[cfg(not(kani))]` `proptest!` beside it
+(inputs drawn by `mod strategy`, weighted to the ends) and from a `#[cfg(kani)] #[kani::proof]` in a `mod proofs`
+(inputs `kani::any()`). Where the input space is small (every i8, every i16, every Q15 pair) a plain `#[test]` walks
+it whole instead of sampling. A fix gets a property, or an input for one, that fails on the code before it; a bug in
+a narrow window (a cast that wraps at 2³²) gets a strategy aimed at that window, as random inputs never hit it.
+
+Kani proofs use storages of 16 bits or less: a proof over an `i32` or a pair of them runs for 10 minutes and more
+(SAT on 64-bit products), one over `i16` in seconds. A proof with a loop sets `#[kani::unwind(n)]`. proptest is a
+dev-dependency only where `cfg(not(kani))`; proptest writes failing seeds to `tests/proptest-regressions/`, commit
+those of a real bug with its fix.
 
 ## Changelog, commits, landing
 
