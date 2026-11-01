@@ -24,4 +24,7 @@ pages! {
     Rounding = "maths/rounding.md";
     Overflow = "maths/overflow.md";
     Kinds = "maths/kinds.md";
+    QFormats = "fixed_point/q_formats.md";
+    Bam = "fixed_point/bam.md";
+    Products = "fixed_point/products.md";
 }

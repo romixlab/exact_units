@@ -1,0 +1,43 @@
+<svg class="eu-svg" viewBox="0 0 600 370" width="600" height="370" role="img" aria-label="A binary angle wheel: 65536 steps a turn, the two top bits are the quadrant, 65000 plus 1365 wraps to 829" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="eu-arrow-bam" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" class="accent"/></marker></defs>
+  <path d="M180 180 L300.0 180.0 A120 120 0 0 0 180.0 60.0 Z" class="faint"/>
+  <text x="226.7" y="138.3" text-anchor="middle" class="mono soft">00…</text>
+  <text x="133.3" y="138.3" text-anchor="middle" class="mono soft">01…</text>
+  <path d="M180 180 L60.0 180.0 A120 120 0 0 0 180.0 300.0 Z" class="faint"/>
+  <text x="133.3" y="231.7" text-anchor="middle" class="mono soft">10…</text>
+  <text x="226.7" y="231.7" text-anchor="middle" class="mono soft">11…</text>
+  <circle cx="180" cy="180" r="120" class="line"/>
+  <line x1="290.0" y1="180.0" x2="310.0" y2="180.0" class="line"/>
+  <line x1="286.2" y1="136.0" x2="295.5" y2="132.2" class="thin"/>
+  <line x1="261.3" y1="98.7" x2="268.4" y2="91.6" class="thin"/>
+  <line x1="224.0" y1="73.8" x2="227.8" y2="64.5" class="thin"/>
+  <line x1="180.0" y1="70.0" x2="180.0" y2="50.0" class="line"/>
+  <line x1="136.0" y1="73.8" x2="132.2" y2="64.5" class="thin"/>
+  <line x1="98.7" y1="98.7" x2="91.6" y2="91.6" class="thin"/>
+  <line x1="73.8" y1="136.0" x2="64.5" y2="132.2" class="thin"/>
+  <line x1="70.0" y1="180.0" x2="50.0" y2="180.0" class="line"/>
+  <line x1="73.8" y1="224.0" x2="64.5" y2="227.8" class="thin"/>
+  <line x1="98.7" y1="261.3" x2="91.6" y2="268.4" class="thin"/>
+  <line x1="136.0" y1="286.2" x2="132.2" y2="295.5" class="thin"/>
+  <line x1="180.0" y1="290.0" x2="180.0" y2="310.0" class="line"/>
+  <line x1="224.0" y1="286.2" x2="227.8" y2="295.5" class="thin"/>
+  <line x1="261.3" y1="261.3" x2="268.4" y2="268.4" class="thin"/>
+  <line x1="286.2" y1="224.0" x2="295.5" y2="227.8" class="thin"/>
+  <text x="322.0" y="185.0" text-anchor="start" class="mono">0</text>
+  <text x="322.0" y="200.0" text-anchor="start" class="soft">0°</text>
+  <text x="180.0" y="36.0" text-anchor="middle" class="mono">16384</text>
+  <text x="180.0" y="51.0" text-anchor="middle" class="soft">90°</text>
+  <text x="38.0" y="185.0" text-anchor="end" class="mono">32768</text>
+  <text x="38.0" y="200.0" text-anchor="end" class="soft">180°</text>
+  <text x="180.0" y="334.0" text-anchor="middle" class="mono">49152</text>
+  <text x="180.0" y="349.0" text-anchor="middle" class="soft">270°</text>
+  <circle cx="299.8" cy="186.2" r="4.5" class="soft"/>
+  <circle cx="299.6" cy="170.5" r="5" class="accent"/>
+  <path d="M321.8 187.3 A142 142 0 0 0 321.6 168.7" class="accent-line" style="stroke-width:2" marker-end="url(#eu-arrow-bam)"/>
+  <text x="360" y="110" class="">Bam16: a u16, 65536 steps a turn</text>
+  <text x="360" y="130" class="">one step is 1/65536 turn</text>
+  <text x="360" y="170" class="accent">65000 + 1365 = 829</text>
+  <text x="360" y="190" class="">past a turn, + wraps: that is a phase</text>
+  <text x="360" y="230" class="soft">the top two bits are the quadrant</text>
+  <text x="360" y="250" class="mono soft">00 · 01 · 10 · 11</text>
+</svg>
