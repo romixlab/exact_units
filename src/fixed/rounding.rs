@@ -35,16 +35,18 @@ pub enum Overflow {
 
 macro_rules! round_div {
     ($($name:ident $t:ty;)*) => {$(
-        /// `p / d` rounded by `r`, for `d > 0`.
+        /// `p / d` rounded by `r`. Panics for a zero `d`, in every build, as integer division does.
         #[inline(always)]
         #[expect(clippy::allow_attributes, reason = "the comparison is unused for the unsigned types only")]
         #[allow(unused_comparisons, reason = "`p < 0` is always false for an unsigned type")]
         #[expect(
             clippy::arithmetic_side_effects,
-            reason = "d > 0, the precondition (a d of 0 underflows): d - 1 doesn't wrap; up \
-                      needs rem != 0, then d >= 2 and q < p / d, so q + 1 doesn't overflow"
+            reason = "d > 0, asserted first: d - 1 doesn't wrap; up needs rem != 0, then d >= 2 and q < p / d, so \
+                      q + 1 doesn't overflow"
         )]
         pub(crate) const fn $name(p: $t, d: $t, r: Rounding) -> $t {
+            // a constant d (every caller's den) folds this away
+            assert!(d != 0, "division by zero");
             // floor quotient and a remainder in 0..d: an arithmetic shift and a mask where d is a power of 2 (LLVM
             // doesn't always see that in `div_euclid` at opt-level 3)
             let (q, rem) = if d & (d - 1) == 0 {

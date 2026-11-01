@@ -66,7 +66,8 @@ pub trait Storage: Copy + PartialOrd + 'static {
     fn from_i64(x: i64) -> Option<Self>;
     /// `self / d` in the type's own width when that is exact (`None` when `d` doesn't divide it); `self` for floats.
     fn div_whole(self, d: u128) -> Option<Self>;
-    /// `self / d` in the type's own width, rounded by `r` (`d > 0`); `self` for floats.
+    /// `self / d` in the type's own width, rounded by `r`; `self` for floats. Panics for a zero `d` (integers), as
+    /// integer division does, in every build.
     #[must_use]
     fn div_rounded(self, d: u128, r: Rounding) -> Self;
     /// The low bits of `x` that fit (Rust's `as`, two's complement; `Nibble` the low 4); the nearest float for
@@ -780,5 +781,34 @@ mod tests {
         assert_eq!(<i32 as Storage>::from_f32((1u32 << 31) as f32), None);
         assert_eq!(<i8 as Storage>::from_f32(127.0), Some(127));
         assert_eq!(<i8 as Storage>::from_f32(128.0), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "division by zero")]
+    fn div_rounded_by_zero_panics_u8() {
+        let _ = Storage::div_rounded(7u8, 0, crate::Rounding::NearestEven);
+    }
+
+    #[test]
+    #[should_panic(expected = "division by zero")]
+    fn div_rounded_by_zero_panics_i32() {
+        let _ = Storage::div_rounded(-7i32, 0, crate::Rounding::Floor);
+    }
+
+    #[test]
+    #[should_panic(expected = "division by zero")]
+    fn div_rounded_by_zero_panics_u64() {
+        let _ = Storage::div_rounded(u64::MAX, 0, crate::Rounding::Truncate);
+    }
+
+    #[test]
+    #[should_panic(expected = "division by zero")]
+    fn div_rounded_of_zero_by_zero_panics() {
+        let _ = Storage::div_rounded(0i64, 0, crate::Rounding::Ceil);
+    }
+
+    #[test]
+    fn div_by_zero_of_a_float_is_itself() {
+        assert_eq!(Storage::div_rounded(1.5f32, 0, crate::Rounding::Floor), 1.5);
     }
 }
