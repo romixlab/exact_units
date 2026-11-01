@@ -264,6 +264,11 @@ firmware that only needs units in its types builds without it; the bytes don't d
   behind every unit `Display` and name), `Prefix`.
 * `num`: `const` helpers for scales, `pow10_f64`, `powi_f64`, `scale_f64`, `scale_f32`, and `sqrt_f64`, a `const`
   square root rounded exactly like `f64::sqrt`.
+* A strict lint policy in `Cargo.toml`'s `[lints]` and `clippy.toml`: `clippy::pedantic` and `clippy::cargo`, the
+  cast lints, `unsafe_code` denied, `missing_docs`, `unreachable_pub` and restriction lints against panics, `std` where
+  `core` does and silent suppressions. Every suppression is an `#[expect(.., reason = "..")]` at the narrowest scope.
+  For users: every public item is documented and has `Debug`, and 141 pure functions and the `self`-returning
+  builders are `#[must_use]` (a dropped result now warns).
 
 ### 🐛 Fixes
 

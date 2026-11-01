@@ -33,6 +33,13 @@ just customary-docs  # regenerate docs/customary.md's tables from the catalogue
 CI (`.github/workflows/ci.yml`) fails on any warning and also builds for `thumbv6m-none-eabi`. Run `just lint` and
 `just test` before declaring a change done.
 
+Lints are strict on purpose (`[lints]` in `Cargo.toml`, `clippy.toml`): pedantic, the cast lints, no panics in library
+code (`unwrap`, `expect`, `unreachable`), `core` before `std`, every public item documented. A lint is never silenced
+crate-wide for convenience; a suppression is `#[expect(lint, reason = "why it is right here")]` on the narrowest item
+or statement (`allow_attributes` forbids `#[allow]`). In a macro over several storages, where a cast is lossy for some
+and not others, `#[allow(lint, reason)]` sits inside under one `#[expect(clippy::allow_attributes, reason)]`. A cast
+that loses information is `From`/`TryFrom`, or its reason says why the value fits; a reason that can't say so is a bug.
+
 ## Changelog, commits, landing
 
 Every user-visible change gets an entry under `## Unreleased` in `CHANGELOG.md` in the same commit
