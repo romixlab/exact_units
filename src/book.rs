@@ -36,4 +36,9 @@ pages! {
     Complex = "complex/complex.md";
     Iq = "complex/iq.md";
     Cordic = "complex/cordic.md";
+    #[cfg(feature = "customary")]
+    Customary = "customary.md";
+    Declare = "units/declare.md";
+    #[cfg(feature = "shrink_wrap")]
+    Wire = "wire/shrink_wrap.md";
 }

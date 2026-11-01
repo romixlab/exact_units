@@ -1,3 +1,7 @@
+---
+level: basic
+---
+
 # Imperial and US customary units
 
 `exact_units` has a marker for every imperial, US customary and other non-SI unit still in use (feature `customary`,
