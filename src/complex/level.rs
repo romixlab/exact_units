@@ -30,19 +30,16 @@
 //! macro says which is meant.
 
 use super::Complex;
-use crate::decibel::{Decibels, gain};
+use crate::decibel::{Decibels, exact, gain};
 use crate::prefix::Product;
 use crate::units::Times;
 use crate::{Fixed, FixedScale, LevelForm, Unit, Unlimited};
 #[cfg(any(feature = "std", feature = "libm"))]
-use {super::NormStorage, crate::Storage};
+use {super::NormStorage, crate::Storage, crate::num::math};
 
 /// The exact |z|² at level `db` for `|z|` of unit `U` in scale `P`: 10^(dB/10) of a root-power kind, 10^(dB/5) of a
 /// power kind, in units of `P · P`.
-const fn norm_sqr_gain<U: Unit, P: FixedScale>(
-    db: Decibels,
-    form: LevelForm,
-) -> crate::decibel::exact::Interval {
+const fn norm_sqr_gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) -> exact::Interval {
     let db = match form {
         LevelForm::RootPower => db,
         // 10^(dB/5) is 10^((2·dB)/10)
@@ -123,7 +120,7 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
             let s = P::SCALE.to_f64() * U::EXPR.factor();
             s * s
         };
-        form.db_per_decade() / 2.0 * crate::num::math::log10(n * s)
+        form.db_per_decade() / 2.0 * math::log10(n * s)
     }
 
     /// [to_db](Self::to_db) in `f32`, with no `f64` on the way: the float of a Cortex-M4F or M33. |z|² of an `i32`
@@ -142,6 +139,6 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
             let s = P::SCALE.to_f64() * U::EXPR.factor();
             (s * s) as f32
         };
-        half * crate::num::math::log10f(n * s)
+        half * math::log10f(n * s)
     }
 }

@@ -166,3 +166,6 @@ split-debuginfo = "unpacked"
 [profile.deploy]
 inherits = "release"
 incremental = true
+
+[lints.clippy]
+absolute_paths = "warn"
