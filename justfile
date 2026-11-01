@@ -3,12 +3,13 @@ default:
     @just --list
 
 # The tests. `--changed` (what a session runs before it is ready) is the same run: the repository is one crate.
+# Warnings are errors, as in CI (its toolchain action sets `-D warnings`): a test config that warns fails here too.
 test *flags:
-    cargo nextest run --all-features --no-fail-fast
-    cargo nextest run --no-default-features --features std --no-fail-fast
-    cargo nextest run --no-default-features --features shrink_wrap,quantities --no-fail-fast
+    CARGO_BUILD_WARNINGS=deny cargo nextest run --all-features --no-fail-fast
+    CARGO_BUILD_WARNINGS=deny cargo nextest run --no-default-features --features std --no-fail-fast
+    CARGO_BUILD_WARNINGS=deny cargo nextest run --no-default-features --features shrink_wrap,quantities --no-fail-fast
     # nextest does not run doctests
-    cargo test --doc --all-features
+    CARGO_BUILD_WARNINGS=deny cargo test --doc --all-features
 
 # Format, sort, spelling, clippy and rustdoc as CI runs them, warnings are errors
 lint:
