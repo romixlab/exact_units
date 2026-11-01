@@ -138,14 +138,17 @@ pub trait UnsignedStorage: Storage {
 #[expect(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
-    reason = "FINDING: the casts saturate and round, the checks after them catch that, except for i64 and x = 2^63, \
-              which saturates to i64::MAX, rounds back to 2^63 and passes"
+    reason = "the casts round and saturate, the checks after them catch both (2^63 before the i64 cast)"
 )]
 fn whole_f32(x: f32, min: i128, max: i128) -> Option<i128> {
     if x.is_nan() || x < min as f32 || x > max as f32 {
         return None;
     }
     let i = if max <= i128::from(i64::MAX) {
+        // i64::MAX as f32 rounds up to 2^63, which `x as i64` saturates back to i64::MAX: not whole, not in range
+        if x >= (1u64 << 63) as f32 {
+            return None;
+        }
         i128::from(x as i64)
     } else {
         x as i128
@@ -636,3 +639,29 @@ macro_rules! float {
 }
 
 float!(f32 f64);
+
+#[cfg(test)]
+mod tests {
+    use super::Storage;
+
+    #[test]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "powers of two and their neighbours, exact in f32"
+    )]
+    fn from_f32_at_the_ends() {
+        let two63 = (1u64 << 63) as f32;
+        // 2^63 is no i64 (it used to saturate to i64::MAX and pass the check)
+        assert_eq!(<i64 as Storage>::from_f32(two63), None);
+        assert_eq!(<i64 as Storage>::from_f32(-two63), Some(i64::MIN));
+        let below = (1u64 << 63) - (1 << 39);
+        assert_eq!(
+            <i64 as Storage>::from_f32(below as f32),
+            Some(below.cast_signed())
+        );
+        assert_eq!(<u64 as Storage>::from_f32(2.0 * two63), None);
+        assert_eq!(<i32 as Storage>::from_f32((1u32 << 31) as f32), None);
+        assert_eq!(<i8 as Storage>::from_f32(127.0), Some(127));
+        assert_eq!(<i8 as Storage>::from_f32(128.0), None);
+    }
+}

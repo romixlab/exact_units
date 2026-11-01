@@ -268,4 +268,6 @@ firmware that only needs units in its types builds without it; the bytes don't d
 ### 🐛 Fixes
 
 * A product or quotient of `Ratio`s (`Ratio · Ratio`, a `CQ15` squared) prints no unit, as `Ratio` does; it printed a stray ` ·`.
+* `Storage::from_f32` for `i64` refuses 2^63 (it returned `Some(i64::MAX)`: `i64::MAX as f32` rounds up to 2^63 and the
+  saturating cast passed the range check).
 
