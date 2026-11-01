@@ -27,7 +27,6 @@
   (`Im(S)` in `Var`), `apparent()` (`|S|` in VA, `None` where the root doesn't fit `T`) and `power_factor()`
   (`P / S` as a plain `Ratio`). A reactive or apparent power never converts to a plain watt by `convert` (feature
   `electrical` and `dimensionless`).
-
 * `Complex<U, P, T, B = Unbounded>` (STD-84): a complex quantity, `re` then `im` in unit `U` and scale `P`, both
   stored as a signed `T` (`ComplexStorage`: `i8`..`i64`, `f32`, `f64`), with an overflow policy `B` (`Unbounded`,
   `Wrapping`, `Saturating`). `#[repr(C)]`, the common interleaved layout of complex samples; on the wire a
