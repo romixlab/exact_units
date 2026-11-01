@@ -1,8 +1,9 @@
 //! Property 10: serde (feature `serde`, RON snapshots of APIs) of any text at all. A `Magnitude`, `Offset`, `DimOwned`
 //! or `ProvenanceOwned` read from JSON is an error or a value that writes and reads back the same. A magnitude and an
 //! offset go on the wire as they are (serde rebuilds them canonical); a dimension does where it is canonical (serde
-//! takes its fields as written). Never a panic. Strings, so no Kani proof; `fuzz/`
-//! runs the same function.
+//! takes its fields as written), a provenance unless it is `Unknown` with the tag of a known kind. Never a panic.
+//! Strings, so no Kani proof; `fuzz/` runs the same function.
+#![expect(clippy::panic, reason = "a property fails by panicking")]
 
 use super::wire::round_trip;
 use core::fmt::Debug;
@@ -25,7 +26,6 @@ fn read<T: DeserializeOwned + Serialize + PartialEq + Debug>(s: &str) -> Option<
 }
 
 /// JSON text as each serde type: an error, or a value that round-trips through JSON and through the wire.
-#[expect(clippy::expect_used, reason = "a property fails by panicking")]
 pub(crate) fn any_json(s: &str) {
     if let Some(m) = read::<Magnitude>(s) {
         round_trip(&m);
@@ -63,8 +63,16 @@ pub(crate) fn any_json(s: &str) {
         let _ = d.as_dim().to_string();
     }
     if let Some(p) = read::<ProvenanceOwned>(s) {
-        let bytes = p.to_ww_bytes_owned().expect("encodes");
-        assert_eq!(ProvenanceOwned::from_ww_bytes_owned(&bytes).ok(), Some(p));
+        // `Unknown(tag)`, a kind from a newer version, goes on the wire with a tag no kind of this version has
+        match (p.to_ww_bytes_owned(), &p) {
+            (Ok(bytes), _) => {
+                assert_eq!(ProvenanceOwned::from_ww_bytes_owned(&bytes).ok(), Some(p));
+            }
+            (Err(_), ProvenanceOwned::Unknown(tag)) => {
+                assert!(*tag < 2, "{s:?}: {p:?} doesn't encode");
+            }
+            (Err(e), _) => panic!("{s:?}: {p:?} doesn't encode: {e:?}"),
+        }
     }
 }
 
@@ -111,6 +119,9 @@ mod tests {
             r#"{"negative":true}"#,
             r#"{"negative":true,"magnitude":{"pow10":0}}"#,
             r#""Defined""#,
+            r#"{"Unknown":0}"#,
+            r#"{"Unknown":1}"#,
+            r#"{"Unknown":2}"#,
             r#"{"s":0,"m":0,"kg":0,"a":0,"k":0,"mol":0,"cd":0,"rad":0,"bit":0,"root":false,"counted":[null,null,null,null]}"#,
             r#"{"s":9,"m":0,"kg":0,"a":0,"k":0,"mol":0,"cd":0,"rad":0,"bit":0,"root":false,"counted":[null,null,null,null]}"#,
             r#"{"s":0,"m":0,"kg":0,"a":0,"k":0,"mol":0,"cd":0,"rad":0,"bit":0,"root":true,"counted":[null,null,null,null]}"#,
