@@ -412,15 +412,89 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
         r: Rounding,
         o: Overflow,
     ) -> Option<Complex<Times<U, U2>, P3, T3>> {
+        let (re, im) = self.wide_product::<U2, P2, B2, P3, T3>(rhs, false, r, o)?;
+        Some(Complex::new(re, im))
+    }
+
+    /// `self · conj(rhs)` in the scale `P3` and storage `T3`, each part rounded once by `r` from the exact result
+    /// in the widened type; `None` where a part doesn't fit `T3`. The conjugate is never formed in `T`, so an `im` of
+    /// `T::MIN` is exact: the correlation of two signals, the phase difference of two phasors, the down-conversion
+    /// by a local oscillator's phasor.
+    ///
+    /// ```
+    /// # #[cfg(feature = "dimensionless")] {
+    /// use exact_units::{CQ15, Complex, Rounding, prefix::Pow2};
+    /// let a: CQ15 = Complex::of(0, 16384); // 0.5j
+    /// let p: Complex<_, Pow2<-15>, i16> = a.times_conj_into(a, Rounding::NearestEven).unwrap();
+    /// assert_eq!(p.get(), (8192, 0)); // |a|² = 0.25
+    /// # }
+    /// ```
+    #[inline(always)]
+    pub fn times_conj_into<
+        U2: Unit,
+        P2: FixedScale,
+        B2: Unlimited<T>,
+        P3: FixedScale,
+        T3: ComplexStorage,
+    >(
+        self,
+        rhs: Complex<U2, P2, T, B2>,
+        r: Rounding,
+    ) -> Option<Complex<Times<U, U2>, P3, T3>> {
+        self.times_conj_requantize(rhs, r, Overflow::Checked)
+    }
+
+    /// As [times_conj_into](Self::times_conj_into), each part settled by `o` where it doesn't fit `T3`; `None` only
+    /// for [Overflow::Checked].
+    #[inline(always)]
+    pub fn times_conj_requantize<
+        U2: Unit,
+        P2: FixedScale,
+        B2: Unlimited<T>,
+        P3: FixedScale,
+        T3: ComplexStorage,
+    >(
+        self,
+        rhs: Complex<U2, P2, T, B2>,
+        r: Rounding,
+        o: Overflow,
+    ) -> Option<Complex<Times<U, U2>, P3, T3>> {
+        let (re, im) = self.wide_product::<U2, P2, B2, P3, T3>(rhs, true, r, o)?;
+        Some(Complex::new(re, im))
+    }
+
+    /// The parts of `self · rhs`, or of `self · conj(rhs)`, in `P3` and `T3`: (ac − bd) + j(ad + bc) or (ac + bd) +
+    /// j(bc − ad), each summed exactly in the widened type and rounded once.
+    #[inline(always)]
+    pub(crate) fn wide_product<
+        U2: Unit,
+        P2: FixedScale,
+        B2: Unlimited<T>,
+        P3: FixedScale,
+        T3: ComplexStorage,
+    >(
+        self,
+        rhs: Complex<U2, P2, T, B2>,
+        conj: bool,
+        r: Rounding,
+        o: Overflow,
+    ) -> Option<(T3, T3)> {
         let q = const {
             check_product::<U, U2, P, P2>(false);
             Requant::of_terms::<T, T3>(Product::<P, P2>::SCALE.div(P3::SCALE), false, 2)
         };
         let (a, b, c, d) = (self.re, self.im, rhs.re, rhs.im);
-        Some(Complex::new(
-            q.sum2((a, c), (b, d), true, r, o)?,
-            q.sum2((a, d), (b, c), false, r, o)?,
-        ))
+        Some(if conj {
+            (
+                q.sum2((a, c), (b, d), false, r, o)?,
+                q.sum2((b, c), (a, d), true, r, o)?,
+            )
+        } else {
+            (
+                q.sum2((a, c), (b, d), true, r, o)?,
+                q.sum2((a, d), (b, c), false, r, o)?,
+            )
+        })
     }
 
     /// `self · rhs` in the scale [Product]`<P, P2>`, `None` where a step overflows `T`. For operands of any policy;
@@ -680,6 +754,13 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage + defmt::Format, B: Unlimited<T>>
         defmt::write!(f, "{} + j·{}", self.re(), self.im())
     }
 }
+
+mod iq;
+#[cfg(all(feature = "angle", feature = "dimensionless"))]
+pub use iq::Nco;
+#[cfg(feature = "dimensionless")]
+pub use iq::{CQ15, CQ31};
+pub use iq::{Interleaved, IqStorage, Mac};
 
 #[cfg(all(feature = "electrical", feature = "dimensionless"))]
 mod power;

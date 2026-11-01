@@ -22,6 +22,7 @@ pub mod prefix;
 mod product;
 pub(crate) use product::{Requant, check as check_product};
 mod rounding;
+pub(crate) use rounding::{div_i128 as round_div_i128, settle as settle_i128};
 mod storage;
 
 /// A value in unit `U` and prefix `P`, stored as `T`, within the bounds `B`: on the wire exactly `T`, the unit,

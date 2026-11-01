@@ -8,6 +8,7 @@
 //! | [atan2_32] | `i32, i32` | [Bam32] | 40 | `i64` | < 0.51 of a step of 2⁻³² turn |
 //! | [sin_cos_16] | [Bam16] | [Q15], [Q15] | 24 | `i32` | < 0.51 of a step of 2⁻¹⁵ |
 //! | [sin_cos_32] | [Bam32] | [Q31], [Q31] | 40 | `i64` | < 0.51 of a step of 2⁻³¹ |
+//! | [sin_cos_32_q15] | [Bam32] | [Q15], [Q15] | 24 | `i32` | < 0.51 of a step of 2⁻¹⁵ |
 //!
 //! The error is against the exact value (libm's in the tests): half a step for the one rounding at the end, and
 //! less than a hundredth of a step from the iterations. So a result is the correctly rounded value or, where that
@@ -272,6 +273,35 @@ pub const fn sin_cos_32(a: Bam32) -> (Q31, Q31) {
         _ => (-c, s),
     };
     (Q31::of(round_q60_to_q31(s)), Q31::of(round_q60_to_q31(c)))
+}
+
+/// `(sin a, cos a)` of a 32-bit binary angle in Q15: [sin_cos_16]'s iterations on all 32 bits of the angle, so a
+/// phase accumulator of 32 bits (an NCO's) drives a Q15 phasor without first rounding its phase to 16 bits, which
+/// alone would cost up to 1.6 steps of Q15 (2π · 2⁻¹⁷ of a turn). Error below 0.51 of a step (2⁻¹⁵), as
+/// [sin_cos_16]'s.
+///
+/// ```
+/// # #[cfg(all(feature = "angle", feature = "dimensionless"))] {
+/// use exact_units::{Bam32, cordic::sin_cos_32_q15};
+/// let (s, c) = sin_cos_32_q15(Bam32::of(0x2000_0000)); // 45°
+/// assert_eq!((s.get(), c.get()), (23170, 23170));
+/// let (s, c) = sin_cos_32_q15(Bam32::of(0x8000_0000)); // 180°
+/// assert_eq!((s.get(), c.get()), (0, -32768));
+/// # }
+/// ```
+#[cfg(all(feature = "angle", feature = "dimensionless"))]
+pub const fn sin_cos_32_q15(a: Bam32) -> (Q15, Q15) {
+    let a = a.get();
+    let k = a.wrapping_add(0x2000_0000) >> 30;
+    let r = a.wrapping_sub(k << 30) as i32;
+    let (c, s) = rotate_16(r);
+    let (s, c) = match k {
+        0 => (s, c),
+        1 => (c, -s),
+        2 => (-s, -c),
+        _ => (-c, s),
+    };
+    (Q15::of(round_q30_to_q15(s)), Q15::of(round_q30_to_q15(c)))
 }
 
 /// (cos z, sin z) in Q30 for `z` in -1/8..1/8 turn in steps of 2⁻³²: (K, 0) turned by `z`.

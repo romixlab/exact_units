@@ -11,7 +11,8 @@
 //!   square root (V/√Hz). [Magnitude]: a factor of integers and powers of 10, 2 and π (`°` is π/180 rad).
 //! - [Complex]`<U, P, T, B>`: a complex quantity, two `T` in unit `U` and scale `P`: an [Impedance], an
 //!   [Admittance], a phasor, a Q15 IQ sample. Products and conversions by the rules of `Fixed`, part by part, and
-//!   a complex multiply rounded once into a chosen scale.
+//!   a complex multiply rounded once into a chosen scale. For IQ samples: [CQ15] and [CQ31], a multiply-accumulate
+//!   in the wide type ([Mac]), interleaved buffers ([Interleaved]) and an [Nco] mixer.
 //! - [Point]`<O, Fixed<..>>`: a position against an [Origin] (°C, °F, gauge pressure, an angle that wraps at a
 //!   turn): point + vector = point, point − point = vector, conversions between origins exact or refused.
 //! - [Index]`<Of, T, B>`, [IndexFrom1] and [Seq]`<Of, T>` (feature `counting`): a position in a table of `Of`, 0- or
@@ -57,9 +58,13 @@ pub mod tree;
 mod unit;
 pub mod units;
 
+#[cfg(all(feature = "angle", feature = "dimensionless"))]
+pub use complex::Nco;
 #[cfg(feature = "electrical")]
 pub use complex::{Admittance, Impedance};
-pub use complex::{Complex, ComplexStorage, NormStorage};
+#[cfg(feature = "dimensionless")]
+pub use complex::{CQ15, CQ31};
+pub use complex::{Complex, ComplexStorage, Interleaved, IqStorage, Mac, NormStorage};
 #[cfg(feature = "angle")]
 pub use fixed::{Bam16, Bam32, PhaseBam16, PhaseBam32};
 pub use fixed::{

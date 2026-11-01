@@ -274,6 +274,37 @@ fn sin_cos_32_axes() {
 }
 
 #[test]
+#[cfg(all(feature = "angle", feature = "dimensionless"))]
+fn sin_cos_32_q15_grid() {
+    let q15 = |v: f64| (v * 32768.0).clamp(-32768.0, 32767.0);
+    let near_axes =
+        (0..8u32).flat_map(|k| (-3000i32..=3000).map(move |d| (k << 29).wrapping_add(d as u32)));
+    let angles = lcg(5)
+        .take(400_000)
+        .map(|r| (r >> 32) as u32)
+        .chain(near_axes)
+        // every 16-bit angle, where it must agree with sin_cos_16
+        .chain((0..=u16::MAX as u32).map(|a| a << 16));
+    let mut worst = (0.0f64, 0);
+    for a in angles {
+        let (s, c) = sin_cos_32_q15(Bam32::of(a));
+        let t = a as f64 / libm::ldexp(1.0, 32) * TAU;
+        for e in [
+            s.get() as f64 - q15(libm::sin(t)),
+            c.get() as f64 - q15(libm::cos(t)),
+        ] {
+            if e.abs() > worst.0.abs() {
+                worst = (e, a);
+            }
+        }
+        if a & 0xffff == 0 {
+            assert_eq!((s, c), sin_cos_16(Bam16::of((a >> 16) as u16)), "{a:#x}");
+        }
+    }
+    assert!(worst.0.abs() < BOUND, "sin_cos_32_q15{:?}", worst);
+}
+
+#[test]
 #[cfg(feature = "angle")]
 fn const_evaluable() {
     const A: Bam16 = atan2_16(1, 0);
