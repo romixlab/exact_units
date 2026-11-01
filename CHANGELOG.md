@@ -232,16 +232,6 @@ firmware that only needs units in its types builds without it; the bytes don't d
   behind every unit `Display` and name), `Prefix`.
 * `num`: `const` helpers for scales, `pow10_f64`, `powi_f64`, `scale_f64`, `scale_f32`, and `sqrt_f64`, a `const`
   square root rounded exactly like `f64::sqrt`.
-* `Complex<U, P, T, B = Unbounded>` (STD-84): a complex quantity, `re` then `im` in unit `U` and scale `P`, both
-  stored as a signed `T` (`ComplexStorage`: `i8`..`i64`, `f32`, `f64`), with an overflow policy `B` (`Unbounded`,
-  `Wrapping`, `Saturating`). `#[repr(C)]`, the layout of CMSIS-DSP's interleaved complex buffers; on the wire a
-  `sized` struct of the two numbers. `re()` / `im()` as `Fixed`, `conj`, `mul_j`, `+ - neg` and `*` `/` by a number
-  or a real `Fixed` by the policy, `Complex * Complex` in `Times<U1, U2>` and `Product<P1, P2>` with the kind rules
-  (an `Impedance` times an `Admittance` converts to a `Ratio`), float `Complex / Complex`, `to` / `requantize` /
-  `convert` part by part, `norm_sqr` exact in a storage that always holds it (`NormStorage`: `u32` for `i16`),
-  `times_into` / `times_requantize` rounding each part once from the widened product (the Q15 complex multiply,
-  saturating as CMSIS does), `checked_*`; `Display` `50-25j mΩ` (`{:#}` `0.05-0.025j Ω`), `Debug`, `defmt`. Aliases
-  `Impedance<P, T>` and `Admittance<P, T>` (feature `electrical`).
 * `Count<Of, T>` (`Fixed<Of, One, T>`, a count of `Of`s in the bytes of a `T`), `Percent<T>` and `Permille<T>`
   (`Fixed<Ratio, Centi | Milli, T>`, feature `dimensionless`, shown as `50 %`, `5 ‰`), `Kibibytes<T>`,
   `Mebibytes<T>`, `Gibibytes<T>` beside `Bytes<T>` (feature `information`) and `Hz<T>` (`Fixed<Hertz, One, T>`,
