@@ -538,6 +538,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
 
 ### 🐛 Fixes
 
+* A `DimOwned` read with serde is refused unless canonical, as the wire reader already refused it: counted bases unsorted, twice or after an empty slot, an exponent of 0 or outside -8..=7, `root` without an odd exponent. Before, serde took the fields as written, so one dimension had several values that compared unequal (`Sample·Frame` against `Frame·Sample`) and a value read from a RON snapshot could fail to go on the wire. `Dim::is_canonical` also checks the -8..=7 range of every exponent. Found by the property tests of untrusted serde input.
 * `Magnitude::from_parts_x2`, and so a `Magnitude` or `Offset` read with serde, drops a prime to the power 0: `primes: [(3, 0)]` gave a magnitude with an empty slot, unequal to `Magnitude::ONE` and refused by the wire's own check when sent on. Found by the wire-format property tests.
 * `Decimal::parse` (and so `fixed!`) reads an exponent of any length: one of six digits or more was refused as "not a decimal number" even where the digits after the point bring it into range (`0.` and 67233 decimals, `e100000`), and one past `i16` is now refused as out of range. Found by the property tests of untrusted text.
 * `Storage::div_whole` documents that an integer storage panics for a zero `d`, as integer division does.

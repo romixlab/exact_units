@@ -425,3 +425,41 @@ fn with_unit_round_trips_the_ends_of_wide_storages() {
         );
     }
 }
+
+/// A dimension reads from serde only canonical, as from the wire: two equal dimensions are equal values. Before the
+/// check, serde took the fields as written, and `Sample·Frame` with its bases swapped compared unequal to itself.
+#[cfg(all(feature = "std", feature = "shrink_wrap"))]
+#[test]
+fn dim_reads_only_canonical() {
+    use exact_units::{Dim, DimOwned};
+
+    let json = |s: i8, root: bool, counted: &str| {
+        format!(
+            r#"{{"s":{s},"m":0,"kg":0,"a":0,"k":0,"mol":0,"cd":0,"rad":0,"bit":0,"root":{root},"counted":[{counted}]}}"#
+        )
+    };
+    let base = |name: &str, exp: i8| format!(r#"{{"crate_name":"exact_units","name":"{name}","exp":{exp}}}"#);
+    let (frame, sample) = (base("Frame", 1), base("Sample", 1));
+
+    let good = json(-1, false, &format!("{frame},{sample},null,null"));
+    let d: DimOwned = serde_json::from_str(&good).unwrap();
+    let want = Dim::counted("exact_units", "Frame")
+        .mul(Dim::counted("exact_units", "Sample"))
+        .div(Dim::new(1, 0, 0, 0, 0, 0, 0));
+    assert_eq!(d.as_dim(), want);
+    assert_eq!(serde_json::to_string(&d).unwrap(), good);
+
+    for bad in [
+        json(-1, false, &format!("{sample},{frame},null,null")),
+        json(-1, false, &format!("{sample},{sample},null,null")),
+        json(-1, false, &format!("null,{sample},null,null")),
+        json(-1, false, &format!("{},null,null,null", base("Sample", 0))),
+        json(-1, false, &format!("{},null,null,null", base("Sample", 8))),
+        json(8, false, "null,null,null,null"),
+        json(-9, false, "null,null,null,null"),
+        json(2, true, "null,null,null,null"),
+    ] {
+        let e = serde_json::from_str::<DimOwned>(&bad).unwrap_err();
+        assert!(e.to_string().contains("isn't canonical"), "{bad}: {e}");
+    }
+}

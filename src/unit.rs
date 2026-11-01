@@ -63,6 +63,8 @@ pub struct Counted<'i> {
         owned(feature = "std"),
         derive_owned(Clone, Debug, PartialEq, Eq, Hash),
         cfg_attr_owned(feature = "serde", derive(serde::Serialize, serde::Deserialize)),
+        // serde reads the fields into DimFields and keeps only a canonical dimension, as the wire does
+        cfg_attr_owned(feature = "serde", serde(try_from = "DimFields")),
         final_structure,
         validate = Self::validate
     )
@@ -554,8 +556,10 @@ impl<'i> Dim<'i> {
         true
     }
 
-    /// Whether the dimension is as it must be on the wire: counted bases in used slots first, sorted by crate and
-    /// name without duplicates, exponents not 0; `root` only with an odd exponent.
+    /// Whether the dimension is as it must be on the wire: every exponent in -8..=7, counted bases in used slots
+    /// first, sorted by crate and name without duplicates, exponents not 0; `root` only with an odd exponent. Every
+    /// decoder (the wire, borrowed and owned, and serde) accepts only such a dimension, so two equal dimensions are
+    /// equal field by field.
     #[must_use]
     #[expect(
         clippy::indexing_slicing,
@@ -566,9 +570,25 @@ impl<'i> Dim<'i> {
         reason = "i < FIXED and i < MAX_COUNTED, the loop bounds; i - 1 only after i > 0"
     )]
     pub const fn is_canonical(&self) -> bool {
+        let e = self.exps();
+        let mut i = 0;
+        while i < FIXED {
+            if !in_range(e[i]) {
+                return false;
+            }
+            i += 1;
+        }
+        let mut i = 0;
+        while i < MAX_COUNTED {
+            if let Some(c) = self.counted[i]
+                && !in_range(c.exp)
+            {
+                return false;
+            }
+            i += 1;
+        }
         if self.root {
             let mut odd = false;
-            let e = self.exps();
             let mut i = 0;
             while i < FIXED {
                 odd |= e[i] % 2 != 0;
@@ -715,6 +735,63 @@ impl From<Dim<'_>> for DimOwned {
                     exp: c.exp,
                 })
             }),
+        }
+    }
+}
+
+/// A [DimOwned] as serde reads it, before the check: the same fields.
+#[cfg(all(feature = "serde", feature = "std", feature = "shrink_wrap"))]
+#[derive(serde::Deserialize)]
+struct DimFields {
+    s: i8,
+    m: i8,
+    kg: i8,
+    a: i8,
+    k: i8,
+    mol: i8,
+    cd: i8,
+    rad: i8,
+    bit: i8,
+    root: bool,
+    counted: [Option<CountedOwned>; MAX_COUNTED],
+}
+
+/// A dimension serde read that isn't [canonical](Dim::is_canonical).
+#[cfg(all(feature = "serde", feature = "std", feature = "shrink_wrap"))]
+struct NotCanonical;
+
+#[cfg(all(feature = "serde", feature = "std", feature = "shrink_wrap"))]
+impl fmt::Display for NotCanonical {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(
+            "a dimension that isn't canonical: exponents in -8..=7, counted bases first, sorted by crate and name \
+             without duplicates, exponents not 0, root only with an odd exponent",
+        )
+    }
+}
+
+#[cfg(all(feature = "serde", feature = "std", feature = "shrink_wrap"))]
+impl TryFrom<DimFields> for DimOwned {
+    type Error = NotCanonical;
+
+    fn try_from(f: DimFields) -> Result<Self, NotCanonical> {
+        let d = DimOwned {
+            s: f.s,
+            m: f.m,
+            kg: f.kg,
+            a: f.a,
+            k: f.k,
+            mol: f.mol,
+            cd: f.cd,
+            rad: f.rad,
+            bit: f.bit,
+            root: f.root,
+            counted: f.counted,
+        };
+        if d.as_dim().is_canonical() {
+            Ok(d)
+        } else {
+            Err(NotCanonical)
         }
     }
 }
