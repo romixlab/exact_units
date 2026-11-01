@@ -391,9 +391,12 @@ fn special_float(s: &str) -> Option<(f64, &str)> {
 }
 
 /// The number at the start of `s` (before `rest`) as the nearest `f64`: core's parser, which rounds correctly, on
-/// the digits without their `_`.
+/// the digits without their `_` (copied for that, so up to 128 bytes; without `_` of any length).
 fn to_f64(s: &str, rest: &str) -> Option<f64> {
     let number = s.get(..s.len().checked_sub(rest.len())?)?;
+    if !number.contains('_') {
+        return number.parse().ok();
+    }
     let mut buf = Buf::new();
     for part in number.split('_') {
         buf.write_str(part).ok()?;

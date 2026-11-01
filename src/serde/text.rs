@@ -15,8 +15,8 @@ pub(crate) struct Decimal {
 impl Decimal {
     /// The decimal number at the start of `s` and the text after it: `"1.5 ms"` is 1.5 and `" ms"`. An optional
     /// sign, digits with at most one point and `_` between them, and an exponent (`e-3`) when a digit follows the
-    /// `e` (`"5eV"` is 5 and `"eV"`). `None` when `s` doesn't start with a number, or its digits don't fit 128 bits
-    /// (zeros after the point never count).
+    /// `e` (`"5eV"` is 5 and `"eV"`). `None` when `s` doesn't start with a number, or its significant digits don't
+    /// fit 128 bits (trailing zeros, before or after the point, never count).
     pub(crate) fn parse(s: &str) -> Option<(Decimal, &str)> {
         let b = s.as_bytes();
         let mut i = 0usize;
@@ -26,26 +26,32 @@ impl Decimal {
             i = 1;
         }
         let (mut m, mut e, mut digits, mut point) = (0u128, 0i32, false, false);
-        // zeros after the point, not yet in m: they count only when a digit other than 0 follows
-        let mut zeros = 0i32;
+        // zeros not yet in m, before and after the point: they go in only when a digit other than 0 follows, so a
+        // number's trailing zeros cost nothing (those before the point go into e)
+        let (mut int_zeros, mut frac_zeros) = (0i32, 0i32);
         while let Some(&c) = b.get(i) {
             match c {
-                b'0'..=b'9' => {
+                b'0' => {
                     digits = true;
-                    #[expect(clippy::arithmetic_side_effects, reason = "c is a digit, b'0'..=b'9'")]
-                    let d = c - b'0';
-                    if point && d == 0 {
-                        zeros = zeros.saturating_add(1);
+                    let z = if point {
+                        &mut frac_zeros
                     } else {
-                        for _ in 0..=zeros {
-                            m = m.checked_mul(10)?;
-                        }
-                        m = m.checked_add(u128::from(d))?;
-                        if point {
-                            e = e.saturating_sub(zeros.saturating_add(1));
-                        }
-                        zeros = 0;
+                        &mut int_zeros
+                    };
+                    *z = z.saturating_add(1);
+                }
+                b'1'..=b'9' => {
+                    digits = true;
+                    #[expect(clippy::arithmetic_side_effects, reason = "c is a digit, b'1'..=b'9'")]
+                    let d = c - b'0';
+                    for _ in 0..=int_zeros.saturating_add(frac_zeros) {
+                        m = m.checked_mul(10)?;
                     }
+                    m = m.checked_add(u128::from(d))?;
+                    if point {
+                        e = e.saturating_sub(frac_zeros.saturating_add(1));
+                    }
+                    (int_zeros, frac_zeros) = (0, 0);
                 }
                 b'.' if !point => point = true,
                 b'_' if digits => {}
@@ -53,6 +59,7 @@ impl Decimal {
             }
             i = i.saturating_add(1);
         }
+        e = e.saturating_add(int_zeros);
         if !digits {
             return None;
         }
@@ -231,7 +238,7 @@ mod tests {
         let long = "0.500000000000000000000000000000000000000000000000000";
         assert_eq!(Decimal::parse(long), Some((dec(false, 5, -1), "")));
         assert_eq!(
-            Decimal::parse("1234567890123456789012345678901234567890"),
+            Decimal::parse("1234567890123456789012345678901234567891"),
             None
         );
         assert_eq!(

@@ -14,6 +14,8 @@ mod literal;
 mod no_panic;
 mod reference;
 mod rounding;
+#[cfg(feature = "serde")]
+mod serde_values;
 
 /// Inputs for the proptests: integers weighted to the ends and to 0, where conversions overflow and round.
 #[cfg(not(kani))]

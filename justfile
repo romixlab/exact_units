@@ -15,7 +15,7 @@ test *flags:
 # The Kani proofs in tests/props: the properties the proptests draw inputs for, proved for every input. Needs Kani
 # (`cargo install --locked kani-verifier && cargo kani setup`); takes minutes, so it isn't part of `just test`
 verify:
-    cargo kani --tests
+    cargo kani --tests --features serde
 
 # Format, sort, spelling, clippy and rustdoc as CI runs them, warnings are errors
 lint:

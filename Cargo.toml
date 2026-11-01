@@ -81,7 +81,7 @@ shrink_wrap = { version = "0.2.0", git = "https://github.com/vhrdtech/wire_weave
 libm = { version = "0.2", default-features = false }
 # serde round trips (tests/serde.rs, tests/props): a binary format without alloc and JSON
 postcard = { version = "1.1", default-features = false }
-serde_json = { version = "1.0", default-features = false, features = ["std"] }
+serde_json = { version = "1.0", default-features = false, features = ["float_roundtrip", "std"] }
 
 # property tests (tests/props); not under Kani, which runs the same properties as proofs (`just verify`)
 [target.'cfg(not(kani))'.dev-dependencies]
