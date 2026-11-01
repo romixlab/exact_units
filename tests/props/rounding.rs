@@ -13,6 +13,7 @@ use exact_units::{
 
 /// A storage the properties read back as an exact integer.
 pub(crate) trait Int: Storage + Into<i128> + core::fmt::Debug {}
+
 impl<T: Storage + Into<i128> + core::fmt::Debug> Int for T {}
 
 /// `x` of `P` into `P2` and `T2`, rounded by `r` and settled by `o`, against `x · num / den` (the factor `P / P2`):
@@ -127,6 +128,7 @@ macro_rules! scale_pairs {
             use crate::strategy;
             use exact_units::prefix::*;
             use proptest::prelude::*;
+
             $(
                 mod $m {
                     use super::*;

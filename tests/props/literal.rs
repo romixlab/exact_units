@@ -20,12 +20,16 @@ use exact_units::{Fixed, Rounding};
 pub(crate) trait Lit {
     /// The step's numerator.
     const STEP_NUM: i128;
+
     /// The step's denominator.
     const STEP_DEN: i128;
+
     /// The storage's least value.
     const MIN: i128;
+
     /// The storage's greatest value.
     const MAX: i128;
+
     /// The stored value of `from_decimal(d)`.
     fn from_decimal(d: Decimal) -> i128;
 }
@@ -35,9 +39,13 @@ macro_rules! decimal_types {
         pub(crate) type $name = Fixed<Ratio, $p, $t>;
         impl Lit for $name {
             const STEP_NUM: i128 = $snum;
+
             const STEP_DEN: i128 = $sden;
+
             const MIN: i128 = <$t>::MIN as i128;
+
             const MAX: i128 = <$t>::MAX as i128;
+
             fn from_decimal(d: Decimal) -> i128 {
                 Self::from_decimal(d).get().into()
             }
