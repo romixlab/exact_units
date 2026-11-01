@@ -26,6 +26,22 @@ fn parses() {
     assert_eq!(Decimal::parse("0.000"), Decimal::new(0, -3));
 }
 
+/// An exponent of six digits and more, brought into range by the digits after the point: 1 · 10^(100000 − 67233).
+/// It was refused as not a decimal number once the exponent's digits passed 10⁴ (found by tests/props/text.rs).
+#[test]
+fn a_long_exponent_with_as_many_decimals() {
+    let s = format!("0.{}1e100000", "0".repeat(67_232));
+    assert_eq!(Decimal::parse(&s), Decimal::new(1, 32_767));
+    let s = format!("0.{}1e-100000", "0".repeat(67_232));
+    assert!(std::panic::catch_unwind(|| Decimal::parse(&s)).is_err());
+}
+
+#[test]
+#[should_panic(expected = "exponent is out of range")]
+fn an_exponent_past_i32_is_out_of_range() {
+    let _ = Decimal::parse("1e99999999999999999999");
+}
+
 #[test]
 #[should_panic(expected = "decimal number")]
 fn refuses_a_suffix() {

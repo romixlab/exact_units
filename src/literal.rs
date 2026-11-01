@@ -60,7 +60,7 @@ impl Decimal {
     )]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "i < b.len(), the loop bounds; b[i] is a digit there, so b[i] - b'0' is 0..=9; e < 10_000 before e * 10 + 9; num is built non-negative, so -num fits; digits, edigits and exp move by one per byte of s (exp by up to 99_999 more for the e part), so they fit i32 for any s below 2^31 - 10^5 bytes: past that they wrap, a known, accepted limit for a literal (not a TODO)"
+        reason = "i < b.len(), the loop bounds; b[i] is a digit there, so b[i] - b'0' is 0..=9; num is built non-negative, so -num fits; digits, edigits and exp move by one per byte of s, so they fit i32 for any s below 2^31 bytes: past that they wrap, a known, accepted limit for a literal (not a TODO)"
     )]
     pub const fn parse(s: &str) -> Decimal {
         const FORM: &str = "a literal is a decimal number: 0.1, -3, 2.5e-3";
@@ -114,7 +114,9 @@ impl Decimal {
             let mut edigits = 0;
             while i < b.len() {
                 match b[i] {
-                    b'0'..=b'9' if e < 10_000 => e = e * 10 + (b[i] - b'0') as i32,
+                    // saturated: an exponent past i32 is out of range for any s below 2^31 bytes, whatever
+                    // the digits after the point take off
+                    b'0'..=b'9' => e = e.saturating_mul(10).saturating_add((b[i] - b'0') as i32),
                     b'_' => {}
                     _ => panic!("{}", FORM),
                 }
@@ -124,7 +126,11 @@ impl Decimal {
                 i += 1;
             }
             assert!(edigits > 0, "{}", FORM);
-            exp += if eneg { -e } else { e };
+            exp = if eneg {
+                exp.saturating_sub(e)
+            } else {
+                exp.saturating_add(e)
+            };
         }
         assert!(
             exp >= i16::MIN as i32 && exp <= i16::MAX as i32,

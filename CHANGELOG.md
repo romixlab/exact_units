@@ -538,6 +538,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
 
 ### 🐛 Fixes
 
+* `Decimal::parse` (and so `fixed!`) reads an exponent of any length: one of six digits or more was refused as "not a decimal number" even where the digits after the point bring it into range (`0.` and 67233 decimals, `e100000`), and one past `i16` is now refused as out of range. Found by the property tests of untrusted text.
 * `Storage::div_whole` documents that an integer storage panics for a zero `d`, as integer division does.
 * `Storage::div_rounded` of an integer storage by a zero `d` panics with "division by zero" in every build, as integer division does, and says so in its docs; it panicked by subtract overflow in debug and returned a wrong number in release.
 * `requantize` and `Requantizer::apply` give `None` for a hand-built `StorageKind::Int` whose `bits` isn't 1 to 64 (`Requantizer::new` checks it); such a kind panicked by shift overflow in debug and gave a wrong number in release.
