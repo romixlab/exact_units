@@ -410,6 +410,131 @@ firmware that only needs units in its types builds without it; the bytes don't d
   Each says what is built, the bug a plain `u32` or `f32` lets through there, how the type stops it and what it
   costs at run time; each runs (`required-features`-gated, so `cargo test` builds every one it can) and shows what
   doesn't compile with the compiler's real message. Listed in the README's Examples section.
+* serde for the numbers, designed for firmware and configs (STD-94): `Fixed`, `Point`, `Index`, `IndexFrom1` and `Seq` are their stored number (`Millis<u32>` of 1500 ms is `1500`, the bytes of postcard's `u32`), `Complex` is `{ re, im }` (a tuple's bytes in postcard, `[re, im]` reads too), `Polar` `{ abs, arg }`, `Decibels` the text `"-3.01"` in JSON, TOML and RON and `(num, decimals)` in a binary format. Reading refuses what construction refuses, with an error naming the value and the bound: `6000 ms is out of 1..=5000 ms (Second, u16)`, `index 0 of a table counted from 1`. `#[serde(with = "exact_units::serde::with_unit")]` (and `with_unit::option`) writes a field as `{:#}` does, `"0.0015 s"`, and reads a number with its unit and any SI or binary prefix (`"1.5 ms"`, `"1500 us"`, `"4 KiB"`, `"25 %"`), exactly into the field's scale and storage, or fails saying why (not the unit, not a whole number of steps with the two nearest values, past the storage, out of bounds); every value round-trips, Duty16's float text included. All of it `no_std` without alloc; CI builds it for `thumbv6m-none-eabi`.
+* A book: a Zensical site in `docs/` that reads from easy to deep, for https://exact.vhrd.tech/ (not published yet). 36 pages in eleven parts (first steps, maths, fixed point, points, levels, complex, your own units, the wire, recipes, a Nomicon), each with a reading level badge (Basic, Advanced, Nomicon), formulas drawn by KaTeX served from the site itself, SVG drawings in `docs/figures` (number lines, the Q15 range, the binary-angle wheel, temperature scales, a sequence-number ring, CORDIC vectoring), Mermaid diagrams, bit layouts from a `bits` fence the build checks, and plots the crate computes when the site is built (`tools/book_plots`: rounding staircases, saturate against wrap, the CORDIC sine error, the dB step of a stored gain). Every Rust block on the site runs as a doctest (`src/book.rs`), and a "doesn't compile" block must fail to compile. `just docs` serves it, `just docs-build` builds it strict as CI does; the deploy job to GitHub Pages runs only when started by hand. `docs/customary.md` is one of its pages. The README is shorter and points to the book.
+* A logo: a dial around a cube with its three axes, over the `exact_units` wordmark. The README shows it in the light or dark version to match the viewer's theme, and rustdoc uses the icon as its logo and favicon. The Typst source and the exports (SVG, PNG from 16 to 1280 px, a 1280 × 640 social card) are in `assets/logo/`; `just logo` exports them again. The crate package leaves them out.
+* `{:#}` takes the formatter's flags: `{:#.3}` of a Q15 of 0.8 prints `0.800`, so a fixed-point value prints as a plain number without a helper. The digits are exact where the steps are a fraction of integers with a finite decimal (powers of ten, `Pow2` scales, Q15, Q31, binary angles; before, binary scales went through `f64`), and a precision rounds that exact value to the nearest, a tie to even, as Rust's float formatting does (`Rounding::NearestEven`). Width, fill, alignment, `+` and `0` apply to the whole field with the unit (`{:#10.2}` of 1500 mV is `    1.50 V`). The same for `Complex` (`{:#.3}` is `0.500-0.250j`, the precision per part), `Polar` and a `Point`'s `Display` (`{:.1}` is `25.6 °C`). Examples `07_tone_generator` and `14_iq_downconvert` print this way and lose their `as f32 / 32768.0` helpers.
+* Decimal literals as constants (STD-93): `fixed!(0.1)` is the `Fixed` its context names, holding the stored value nearest to the literal in units of its unit, worked out at compile time: `fixed!(0.1)` in Q30 is `107_374_182`, `fixed!(2.5e-3)` in `Micro` is 2500. Integer storages round the exact fraction to nearest, ties to even; float storages take the nearest float. Any scale that is a fraction of integers (`Pow2`, `Pow10`, `Rational`, products); a scale with π in it, a value that doesn't fit the storage or its bounds, or a negative value of an unsigned storage doesn't compile. `fixed!(0.5, -0.25)` is a `Complex`. `Fixed::from_decimal(Decimal)` is the same as a `const fn`. `macro_rules` and `const fn` only, no proc macro.
+* `Mac::mean_at_least(threshold, n)` (STD-93): whether the mean of a sum over `n` products is at least a typed `Fixed` threshold in the products' unit and scale (`db!(norm_sqr -10)`, `fixed!(0.1)`), one exact integer compare. Example `14_iq_downconvert` tests −10 dBFS this way: its samples are `CQ15<Per<Volt, Volt>>`, fractions of the ADC's full-scale voltage, and the hand-computed `BUSY_Q30 = 107_374_182` is gone.
+* Polar form and levels of a `Complex` (STD-90): `Polar<U, P, T, A>`, a magnitude `Fixed` and a phase angle, with `Complex::to_polar` / `from_polar` and `Polar::to_complex`. Floats: `abs` (`hypot`), `arg` (`atan2`, a `Fixed<Phase<Radian>, One, F>`) and `from_polar` (`sin`/`cos`, a phase in any angle unit), feature `std` or `libm`. Integers, no float and no feature: `abs` is the correctly rounded root of the exact `norm_sqr` in the unsigned twin (`u16` for `i16`, since |−32768 − 32768j| is 46341), `abs_rounded(r)` and `abs_saturating`; `arg` by CORDIC into a `PhaseBam16` (`i8`, `i16`) or `PhaseBam32` (`i32`), within 0.51 of a step; `from_polar` by Q31 sin/cos, `None` where a part doesn't fit (feature `angle`, and `dimensionless` for `from_polar`). `to_db` / `to_db_f32` from |z|² by the unit's level form (20·lg|z| = 10·lg|z|²), and `norm_sqr_at(Decibels)` / `db!(norm_sqr -15)`, a level as a threshold on `norm_sqr` worked out at compile time, so a firmware tests |Γ| ≤ −15 dB as one integer compare. RF helpers (feature `electrical`, `f32` and `f64`): `Impedance::reflection(z0)` gives Γ as `Complex<Per<Volt, Volt>, One, F>`, so its level is 20·lg; on Γ `vswr`, `return_loss_db` / `return_loss_db_f32` and `mismatch_loss` (1 − |Γ|² as a `Per<Watt, Watt>`, its `to_db` the loss in 10·lg); `to_admittance` / `to_impedance` into any scale. Example `13_impedance_match`.
+* IQ fixed-point DSP (STD-91): `CQ15<U = Ratio>` and `CQ31<U = Ratio>`, saturating Q15 and Q31 IQ samples.
+  `mul_round` and `mul_conj_round` multiply two complex values into their own scale and storage, each part summed
+  exactly in the wide type, rounded once and saturated: (−1 − j)² is `0 + j·(1 − 2⁻¹⁵)`. `mix` and `mix_conj`
+  multiply by a plain-ratio phasor and keep the unit. `times_conj_into` and `times_conj_requantize` are the general
+  conjugate multiply, the conjugate never formed in `T`. `Mac` sums products (`mac`, `mac_conj`, `dot`, `dot_conj`)
+  exactly in `i64` for Q15 and `i128` for Q31, with a headroom of 2³² − 1 and 2⁶⁴ − 1 products, and rounds once in
+  `result`. `Complex::from_interleaved`, `write_interleaved` and `map_interleaved` read and write interleaved
+  `[re, im, ..]` buffers without `unsafe`. `Nco` is a `Bam32` phase accumulator whose unit phasor comes from
+  CORDIC, with `mix_down` and `mix_up`. `cordic::sin_cos_32_q15` gives a Q15 sin and cos from all 32 bits of a
+  phase. Example `14_iq_downconvert`.
+* Complex power with its kinds (STD-92): `units::VoltAmpere` (`"VA"`, kind `apparent power`) and `units::Var`
+  (`"var"`, kind `reactive power`), the watt's dimension (kg·m²·s⁻³) under a kind of their own, `Watt` staying
+  plain; a product table check at compile time (`VoltAmpere` and `Var` against `Watt`, `VoltAmpere` against
+  `Volt * Ampere`). `Complex<Volt, ..>::apparent_power(i)` gives `S = V · I*` of RMS voltage and current phasors
+  (ISO 80000-6) as `Complex<VoltAmpere, ..>`; its named steps `active()` (`Re(S)` in `Watt`), `reactive()`
+  (`Im(S)` in `Var`), `apparent()` (`|S|` in VA, `None` where the root doesn't fit `T`) and `power_factor()`
+  (`P / S` as a plain `Ratio`). A reactive or apparent power never converts to a plain watt by `convert` (feature
+  `electrical` and `dimensionless`).
+* `Complex<U, P, T, B = Unbounded>` (STD-84): a complex quantity, `re` then `im` in unit `U` and scale `P`, both
+  stored as a signed `T` (`ComplexStorage`: `i8`..`i64`, `f32`, `f64`), with an overflow policy `B` (`Unbounded`,
+  `Wrapping`, `Saturating`). `#[repr(C)]`, the common interleaved layout of complex samples; on the wire a
+  `sized` struct of the two numbers. `re()` / `im()` as `Fixed`, `conj`, `mul_j`, `+ - neg` and `*` `/` by a number
+  or a real `Fixed` by the policy, `Complex * Complex` in `Times<U1, U2>` and `Product<P1, P2>` with the kind rules
+  (an `Impedance` times an `Admittance` converts to a `Ratio`), float `Complex / Complex`, `to` / `requantize` /
+  `convert` part by part, `norm_sqr` exact in a storage that always holds it (`NormStorage`: `u32` for `i16`),
+  `times_into` / `times_requantize` rounding each part once from the widened product (the Q15 complex multiply,
+  settled by an `Overflow` where a part doesn't fit), `checked_*`; `Display` `50-25j mΩ` (`{:#}` `0.05-0.025j Ω`), `Debug`, `defmt`. Aliases
+  `Impedance<P, T>` and `Admittance<P, T>` (feature `electrical`).
+* `units::Phase<A>` (STD-88): a phase angle in the angle unit `A` (`Radian`, `Degree`, `Turn`, or an API's own unit
+  that implements the new `units::PlaneAngle`), with `A`'s dimension, scale and symbol but the kind `phase angle`.
+  `Phase<Turn>` converts to `Phase<Degree>`; to or from a plane angle is a compile error, crossed by the named steps
+  `as_phase` and `as_plane_angle`. `electrical(pole_pairs)` takes a motor's mechanical angle to its electrical angle,
+  a phase, by the overflow policy (a `Bam16` wraps at a turn), so a field-oriented control that takes a phase refuses
+  the encoder's angle. Aliases `PhaseBam16` and `PhaseBam32` (feature `angle`), binary phase angles that wrap.
+* √W, the dimension of power waves, is a root-power dimension: a ratio `b/a` of power waves
+  (`Per<Sqrt<Watt>, Sqrt<Watt>>`, an S-parameter as a scalar) has a level of 20·lg, as V/V has.
+* `cordic` (STD-89): angles and square roots in integers only, `const fn`s with `const` iteration tables, for a
+  Cortex-M0 as much as a host. `atan2_16(y, x)` of `i16` into a `Bam16` and `atan2_32` of `i32` into a `Bam32` (24
+  and 40 CORDIC steps in `i32` / `i64`, the inputs normalised first so short vectors are as exact as long ones),
+  `sin_cos_16` of a `Bam16` into two `Q15` and `sin_cos_32` of a `Bam32` into two `Q31` (the gain undone in fixed
+  point; `cos 0` saturates to the largest Q value). Each is within 0.51 of a step of the exact value (tested against
+  libm over dense grids, every `Bam16`, the axes, the corners and ±full scale), the axes and the eighths of a turn
+  exact. `isqrt_u32` / `isqrt_u64` / `isqrt_u128` round √x by a `Rounding`, exactly. The results are plain
+  `Bam16` / `Bam32`; `PhaseBam16` / `PhaseBam32` and the arg of a complex number (STD-90) come on top of these.
+* `Count<Of, T>` (`Fixed<Of, One, T>`, a count of `Of`s in the bytes of a `T`), `Percent<T>` and `Permille<T>`
+  (`Fixed<Ratio, Centi | Milli, T>`, feature `dimensionless`, shown as `50 %`, `5 ‰`), `Kibibytes<T>`,
+  `Mebibytes<T>`, `Gibibytes<T>` beside `Bytes<T>` (feature `information`) and `Hz<T>` (`Fixed<Hertz, One, T>`,
+  feature `time`): aliases that cat_stack's APIs declared for themselves, now one set for every crate.
+* Counted units `units::Line` (a line of a text, a file, a log), `units::Row` (a row of a table), `units::Record`
+  and `units::Entry` (an entry of a log or a list), beside `Item`, `Sample`, `Frame` and `Packet` (feature
+  `counting`); each is a base dimension of its own, symbols `line`, `row`, `record`, `entry`.
+* `units::Minute` (60 s), `units::Hour` (3600 s), `units::Day` (86400 s) and `units::Week` (604800 s), exact scales
+  of `Second` (feature `time`), with the aliases `Secs`, `Minutes`, `Hours` and `Days` (`Fixed<.., One, T>`): a
+  retention in days, an uptime in hours, converted to and from seconds exactly.
+* `origins::UnixEpoch` (feature `time`), 1970-01-01 00:00:00 UTC: a `Point` from it is a moment in POSIX time, UTC
+  with leap seconds not counted, as `CLOCK_REALTIME` and journald count it, shown as `1700000000.123 s UTC`. Aliases
+  `origins::UnixSecs`, `UnixMillis`, `UnixMicros`, `UnixNanos` (`u64` unless named). TAI, GPS and UTC with its
+  leap-second table are clocks of their own, coming with WireWeaver's STD-65; this origin stays POSIX time.
+* `units::Nibble` (4 bit), `units::Halfword` (16 bit) and `units::Doubleword` (64 bit), exact scales of `Bit` next to
+  `Byte` and `Word` (feature `information`): with `Word`, Arm's byte, halfword, word and doubleword, for register,
+  flash program and DMA widths. `units::Nibble` is the unit, not shrink_wrap's 4-bit storage `Nibble`.
+* Products and quotients of two `Fixed` values (STD-83): `a * b` is a `Fixed<Times<U1, U2>, Product<P1, P2>, T>`,
+  `a / b` a `Fixed<Per<U1, U2>, Quotient<P1, P2>, T>`, one multiply or division of `T`. The written form is kept and
+  `convert` reaches the named unit: V · A to `Watt`, V/V · V to `Volt` (the gain's kind cancels), V/A · A to `Volt`,
+  while V/V · V/V stays a voltage gain. `prefix::Product` / `prefix::Quotient` are the exact scale of the result as a
+  type, its `Magnitude` worked out at compile time (`Product<Milli, Milli>` is `Micro`, `Product<Pow2<-15>,
+  Pow2<-15>>` is `Pow2<-30>`, fractions, full scales and π too). Overflow by the operands' policy (`Unbounded`,
+  `Wrapping`, `Saturating`; mixing two doesn't compile); two `Range`s multiply with `*` when their corners prove the
+  product fits `T`. `checked_times` / `saturating_times` / `wrapping_times` and the `_per` twins for operands of any
+  bounds. `times_into` / `per_into` (and `times_requantize` / `per_requantize` with an `Overflow`) give the result in
+  another scale and storage, rounded once and with no float for integers: mV · mA into mW, Q15 · Q15 back into Q15, 3
+  V / 2 A as 1500 mV/A. Mixed storages, a `Point` and a unit with an offset don't multiply. On a Cortex-M3 the product
+  and a Q15 multiply are the plain code's instructions (`qemu_icount`, `opt-level` `z` and `3`); the module docs have
+  the table.
+* Kinds of quantity that share a dimension (STD-68, first piece): `Unit::KIND`, a `Kind` next to `DIM` (`Plain`,
+  `Named("resistance")`, `RatioOf(dim)`), checked by `Fixed::convert` at compile time, nothing at run time. A
+  quotient of one dimension keeps what cancelled: `Per<Volt, Volt>` is a voltage gain, `Per<Ampere, Ampere>` a
+  current gain, `Per<Watt, Watt>` a power gain; a scale still converts within a kind (mV/V to V/V). A dimension-one
+  factor keeps the other side's kind, two gains of one dimension stay one (V/V · V/V), any other product is plain
+  (V/V · V is a plain V). `unit!` takes `kind "<name>"` after the dimension; `Ohm` is `resistance`, `Siemens`
+  `conductance`. Rules after ISO 80000-1's kinds as mp-units has them; the `kind` module documents them.
+* Named steps between kinds, the number unchanged: `as_resistance` / `as_transimpedance` (`Per<Volt, Ampere>` ↔
+  `Ohm`), `as_conductance` / `as_transconductance` (`Per<Ampere, Volt>` ↔ `Siemens`), `as_ratio` / `as_gain::<U>`
+  (`Per<U, U>` ↔ `Ratio`).
+* Gains in decibels (STD-67, first piece, feature `std`): `Fixed::to_db` / `from_db` take 20·lg for a ratio of
+  root-power quantities (V/V, A/A, Pa/Pa, V/m, A/m) and 10·lg for one of powers (W/W, J/J, W/m²) from the unit's
+  kind (`Kind::level_form`, `LevelForm`); any other kind, a plain `Ratio` too, doesn't compile.
+* Levels in dB without `std` (STD-67): feature `libm` takes `log10` and `10^x` from the pure-Rust `libm` crate
+  (no C), so `to_db` / `from_db` build on `no_std`; with `std` on too libm is used, so a host and a firmware compute
+  the same bits. CI builds it for `thumbv7em-none-eabihf`. The dB code moved to the new `decibel` module.
+* `Fixed::to_db_f32` / `from_db_f32`: the same in `f32` with no `f64` on the way, the float a Cortex-M4F or M33 has in
+  hardware. On a Cortex-M4F (QEMU `mps2-an386`) `to_db_f32` of a `u16` in mV/V retires 60 instructions at
+  `opt-level = 3` and 72 at `"z"`, `to_db` in `f64` 3,800 to 4,200 (software `f64`). `Storage::to_f32` /
+  `from_f32` (provided methods, so a storage outside the crate keeps compiling) do the conversion without `f64` for
+  the integers and `f32`.
+* Exact dB constants at compile time: `db!(-3.01)` is the `Fixed` its context names, holding the stored value nearest
+  to `10^(dB/20)` (or `/10` for a power gain), ties to even; `Fixed::from_db_const(Decibels)` is the same as a
+  `const fn`, for every integer storage and `f32` / `f64`. Worked out in integers (128-bit binary intervals, the
+  lower end rounded down and the upper up at every step) with no float math at run time and no feature; a level whose
+  interval straddles a rounding boundary is a compile error instead of a guess, as are a kind without a level form, a
+  gain that doesn't fit the storage or its bounds, and a scale that isn't a fraction of integers. Tested against an
+  80-digit reference (every `f64` and `f32` correctly rounded) and against libm, whose `exp10` is up to 3 ulps off on
+  the same levels. A threshold written `db!(-3)` is the same flash as the integer literal; a level costs about 0.07 s
+  of compile time at two decimals, 0.35 s at nine.
+* A repository of its own (romixlab/exact_units), with its history from wire_weaver: a standalone manifest, MIT
+  license file, CI (fmt, cargo sort, typos, clippy and rustdoc with `-D warnings`, tests, a `thumbv6m` build), a
+  justfile and `docs/customary.md`, the customary units catalogue whose tables the tests check. The `shrink_wrap`
+  feature takes shrink_wrap from the wire_weaver repository by git until shrink_wrap 0.2 is on crates.io. API
+  snapshots of this crate stay with wire_weaver (`wire_weaver_snapshots`).
+* README: what the crate covers that other unit crates leave out, zero cost, the wire side, features, no_std notes
+  and a comparison with uom, dimensioned and Numbat; its examples, including what doesn't compile, run as doctests.
+* `examples/01_timer.rs` .. `12_wire.rs`: twelve short stories in reading order, from a debounce timeout to a
+  reading sent to a PC tool (a thermostat in °C and °F, a battery monitor, a motor's shunt current and power, a
+  light sensor's kinds, an audio limiter in dB, a tone generator's wrapping phase, a data logger's indices and
+  timestamps, a capture buffer's samples and bytes, an amplifier's nV/√Hz noise, a US customer's psi and gallons).
+  Each says what is built, the bug a plain `u32` or `f32` lets through there, how the type stops it and what it
+  costs at run time; each runs (`required-features`-gated, so `cargo test` builds every one it can) and shows what
+  doesn't compile with the compiler's real message. Listed in the README's Examples section.
 
 ### 🐛 Fixes
 
