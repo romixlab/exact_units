@@ -268,3 +268,4 @@ firmware that only needs units in its types builds without it; the bytes don't d
 ### 🐛 Fixes
 
 * A product or quotient of `Ratio`s (`Ratio · Ratio`, a `CQ15` squared) prints no unit, as `Ratio` does; it printed a stray ` ·`.
+
