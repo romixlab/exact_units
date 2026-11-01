@@ -883,7 +883,15 @@ impl Conversion {
             wide,
             float,
             exact_f,
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "used only where exact_f, both at most 2⁵³ and floats exactly"
+            )]
             num_f: num as f64,
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "used only where exact_f, both at most 2⁵³ and floats exactly"
+            )]
             den_f: den as f64,
             factor: m.to_f64(),
             fixed_point,
@@ -911,6 +919,10 @@ impl Conversion {
             None => (T::MIN_INT, T::MAX_INT),
         };
         // the conversion is monotonic: its ends are those of the range, rounded outward
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "between integers num is at most i128::MAX / max_abs and den at most i128::MAX (or 1), asserted in by"
+        )]
         let (lo, hi) = match c.fixed_point {
             Some((m, shift)) => (
                 rounding::mul_fixed_point(lo, m, shift, Rounding::Floor),
@@ -939,6 +951,10 @@ impl Conversion {
     /// `x` as a float scaled by the factor.
     #[inline(always)]
     fn scale_f64<T: Storage>(self, x: T) -> f64 {
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "the nearest f64 is the float conversion's semantics"
+        )]
         let x = match x.to_repr() {
             Repr::Int(i) => i as f64,
             Repr::Float(f) => f,
@@ -965,6 +981,10 @@ impl Conversion {
             let Repr::Int(x) = x.to_repr() else {
                 return None;
             };
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "not wide: T is of up to 32 bits, x an i64 exactly"
+            )]
             return if self.wide {
                 rounding::mul_fixed_point(x, m, shift, r).settle(o)
             } else {
@@ -987,6 +1007,10 @@ impl Conversion {
             let Repr::Int(x) = x.to_repr() else {
                 return None;
             };
+            #[expect(
+                clippy::cast_possible_wrap,
+                reason = "wide: num is at most i128::MAX / max_abs, asserted in by"
+            )]
             let p = x * self.num as i128;
             let y = if self.den == 1 {
                 p
@@ -996,7 +1020,15 @@ impl Conversion {
             rounding::settle(y, o)
         } else {
             // |x| · num fits i64, checked at compile time
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "not wide: num is at most i64::MAX / max_abs, asserted in by"
+            )]
             let p = x.to_i64() * self.num as i64;
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "FINDING: den is not checked against i64::MAX; past it the low 64 bits divide (0 panics)"
+            )]
             let y = if self.den == 1 {
                 p
             } else {
@@ -1027,6 +1059,10 @@ impl Conversion {
             let Repr::Int(x) = x.to_repr() else {
                 return None;
             };
+            #[expect(
+                clippy::cast_possible_wrap,
+                reason = "wide: num is at most i128::MAX / max_abs, asserted in by"
+            )]
             let p = x * self.num as i128;
             let den = i128::try_from(self.den).ok()?;
             if den != 1 && p % den != 0 {
@@ -1035,7 +1071,15 @@ impl Conversion {
             T2::from_int(if den == 1 { p } else { p / den })
         } else {
             // |x| · num fits i64, checked at compile time
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "not wide: num is at most i64::MAX / max_abs, asserted in by"
+            )]
             let p = x.to_i64() * self.num as i64;
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "FINDING: den is not checked against i64::MAX; past it the low 64 bits divide (0 panics)"
+            )]
             let den = self.den as i64;
             if den != 1 && p % den != 0 {
                 return None;
@@ -1050,6 +1094,10 @@ impl Conversion {
 fn rescale<T: Storage>(x: Repr, scale: Magnitude) -> Option<T> {
     match x {
         Repr::Int(x) if !T::IS_FLOAT => T::from_int(scale.apply_int(x)?),
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "a float target: the nearest f64 is the float conversion"
+        )]
         Repr::Int(x) => T::from_float(scale.apply_f64(x as f64)),
         Repr::Float(x) => T::from_float(scale.apply_f64(x)),
     }
@@ -1153,6 +1201,10 @@ impl<P: prefix::SubSecond, T: UnsignedStorage, B: Bounds<T>>
     fn from(t: Fixed<crate::units::Second, P, T, B>) -> Self {
         let v = t.value.to_u64();
         let per_s = P::PER_SECOND;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the nanoseconds of a second, below 10⁹"
+        )]
         core::time::Duration::new(v / per_s, ((v % per_s) * (1_000_000_000 / per_s)) as u32)
     }
 }

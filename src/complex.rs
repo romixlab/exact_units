@@ -142,7 +142,7 @@ macro_rules! norm_int {
             type Norm = $wide;
             #[inline(always)]
             fn norm_sqr(re: Self, im: Self) -> $wide {
-                let (re, im) = (re.unsigned_abs() as $wide, im.unsigned_abs() as $wide);
+                let (re, im) = ($wide::from(re.unsigned_abs()), $wide::from(im.unsigned_abs()));
                 re * re + im * im
             }
         }

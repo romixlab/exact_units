@@ -74,7 +74,9 @@ fn settle(x: i128, min: i128, max: i128, o: Overflow) -> Option<i128> {
 )]
 fn exhaustive<P: FixedScale, P2: FixedScale, T2: Storage + Into<i128>>(num: i128, den: i128) {
     let factor = P::SCALE.div(P2::SCALE);
-    assert_eq!(factor.to_ratio(), Some((num as u128, den as u128)));
+    #[expect(clippy::cast_sign_loss, reason = "the callers pass a positive ratio")]
+    let ratio = (num as u128, den as u128);
+    assert_eq!(factor.to_ratio(), Some(ratio));
     let to = StorageKind::of::<T2>();
     let policies = [Overflow::Checked, Overflow::Saturate, Overflow::Wrap];
     let dynamic: Vec<Vec<Requantizer>> = MODES
@@ -213,9 +215,14 @@ fn floats_round_once() {
         big.to_saturating::<One, i16>(Rounding::Truncate).get(),
         i16::MAX
     );
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the expected value is the low 16 bits, as the wrapping policy keeps them"
+    )]
+    let wrapped = 10_000_000_000i64 as i16;
     assert_eq!(
         big.to_wrapping::<One, i16>(Rounding::Truncate).get(),
-        10_000_000_000i64 as i16
+        wrapped
     );
     let nan: Fixed<Volt, One, f64> = Fixed::new(f64::NAN);
     assert_eq!(nan.to_rounded::<One, i16>(Rounding::Truncate), None);

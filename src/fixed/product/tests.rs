@@ -225,10 +225,15 @@ fn times_into_rounds_once() {
             .map(Fixed::get),
         Some(i16::MAX)
     );
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the expected value is the low 16 bits, as the wrapping policy keeps them"
+    )]
+    let wrapped = 100_000i32 as i16;
     assert_eq!(
         x.times_requantize::<_, _, _, Milli, i16>(y, Rounding::Floor, Overflow::Wrap)
             .map(Fixed::get),
-        Some(100_000i32 as i16)
+        Some(wrapped)
     );
     // the full i32 range: 128-bit work, into an i64
     let m = MilliVolt::new(i32::MIN);
@@ -310,10 +315,15 @@ fn per_into_keeps_digits() {
     assert_eq!(r.as_resistance().get(), 3300);
     // i64 in 128 bits
     let a = Fixed::<Volt, One, i64>::new(i64::MAX);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "i64::MAX · 1000 / 2⁴⁰ is about 8.4·10⁹, well within i64"
+    )]
+    let expected = ((i128::from(i64::MAX) * 1000) >> 40) as i64;
     assert_eq!(
         a.per_into::<_, _, _, Milli, i64>(Fixed::<Ampere, One, i64>::new(1 << 40), Rounding::Floor)
             .map(Fixed::get),
-        Some(((i128::from(i64::MAX) * 1000) >> 40) as i64)
+        Some(expected)
     );
     // out of the storage
     assert_eq!(

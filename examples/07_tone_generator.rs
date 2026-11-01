@@ -24,6 +24,10 @@ use exact_units::units::Ratio;
 use exact_units::{Bam16, Fixed, Q15, Rounding, fixed};
 
 /// One sample of a voice: the sine of its phase at an amplitude, in Q15.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "a sine at an amplitude of at most 1 fits Q15; the cast saturates past it"
+)]
 fn sine(phase: Bam16, amplitude: f32) -> Q15 {
     use core::f32::consts::TAU;
     let turns = f32::from(phase.get()) / 65536.0;

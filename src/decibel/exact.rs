@@ -92,6 +92,11 @@ impl Num {
         if self.e >= 0 {
             return None;
         }
+        #[expect(
+            clippy::cast_sign_loss,
+            clippy::cast_possible_truncation,
+            reason = "FINDING: -e above u32::MAX wraps, so a gain below 2^-(2^32) (about -1.3e10 dB) rounds to a wrong nonzero"
+        )]
         let s = (-self.e) as u32;
         if s > 128 {
             // m · 2^-s < 2^128 · 2^-129 = 1/2
@@ -238,8 +243,13 @@ impl Interval {
     /// `10^(n/d) · den / num`, `d > 0`.
     pub(crate) const fn level(n: i64, d: u64, num: u128, den: u128) -> Interval {
         // n/d = k + r/d with 0 <= r < d
-        let k = n.div_euclid(d as i64);
-        let r = n.rem_euclid(d as i64) as u64;
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "d is 10 or 20 times 10^decimals, at most 2 · 10^10"
+        )]
+        let d_signed = d as i64;
+        let k = n.div_euclid(d_signed);
+        let r = n.rem_euclid(d_signed) as u64;
         let ten = Interval::exact(10);
         let mut x = if r == 0 {
             Interval::exact(1)
@@ -247,7 +257,9 @@ impl Interval {
             ten.pow(r).root(d)
         };
         if k >= 0 {
-            x = x.mul(ten.pow(k as u64));
+            #[expect(clippy::cast_sign_loss, reason = "k >= 0 here")]
+            let k = k as u64;
+            x = x.mul(ten.pow(k));
         } else {
             x = x.div(ten.pow(k.unsigned_abs()));
         }
@@ -272,7 +284,13 @@ impl Interval {
             self.lo.round_float(53, -1022, 1023),
             self.hi.round_float(53, -1022, 1023),
         );
-        f64::from_bits((((e + 1023) as u64) << 52) | (m as u64 & ((1 << 52) - 1)))
+        #[expect(
+            clippy::cast_sign_loss,
+            clippy::cast_possible_truncation,
+            reason = "round_float keeps e in -1022..=1023 and m below 2^53"
+        )]
+        let bits = (((e + 1023) as u64) << 52) | (m as u64 & ((1 << 52) - 1));
+        f64::from_bits(bits)
     }
 
     /// The nearest `f32`, ties to even.
@@ -281,7 +299,13 @@ impl Interval {
             self.lo.round_float(24, -126, 127),
             self.hi.round_float(24, -126, 127),
         );
-        f32::from_bits((((e + 127) as u32) << 23) | (m as u32 & ((1 << 23) - 1)))
+        #[expect(
+            clippy::cast_sign_loss,
+            clippy::cast_possible_truncation,
+            reason = "round_float keeps e in -126..=127 and m below 2^24"
+        )]
+        let bits = (((e + 127) as u32) << 23) | (m as u32 & ((1 << 23) - 1));
+        f32::from_bits(bits)
     }
 
     const fn same_float(lo: Option<(u128, i64)>, hi: Option<(u128, i64)>) -> (u128, i64) {
@@ -301,6 +325,11 @@ impl Interval {
 mod tests {
     use super::*;
 
+    #[expect(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        reason = "an approximate float to compare against; test exponents are small"
+    )]
     fn f64_of(n: Num) -> f64 {
         n.m as f64 * 2f64.powi(n.e as i32)
     }

@@ -50,6 +50,12 @@ fn lcg(seed: u64) -> impl Iterator<Item = u64> {
 
 #[test]
 #[cfg(feature = "angle")]
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    reason = "table indices are below 64; a Q48 entry is checked to 0.5 in 2⁴⁸, f64 rounds by far less"
+)]
 fn atan_table_against_libm() {
     for (i, &t) in ATAN_T48.iter().enumerate() {
         let exact = libm::atan(libm::ldexp(1.0, -(i as i32))) / TAU * libm::ldexp(1.0, 48);
@@ -66,6 +72,12 @@ fn atan_table_against_libm() {
 
 #[test]
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    reason = "iteration counts are below 64; Q60 in f64 is compared to 1e-15 relative, as the comment says"
+)]
 fn gains_against_libm() {
     let k = |n: usize| {
         (0..n)
@@ -137,6 +149,10 @@ fn atan2_16_axes_corners_full_scale() {
 
 #[test]
 #[cfg(feature = "angle")]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "random i32 inputs from the halves of a u64, truncation is the point"
+)]
 fn atan2_32_grid() {
     let ends = [i32::MIN, i32::MIN + 1, -1, 0, 1, i32::MAX];
     let random = lcg(1).take(400_000).map(|r| ((r >> 32) as i32, r as i32));
@@ -235,6 +251,10 @@ fn sin_cos_16_axes_and_eighths() {
 
 #[test]
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
+#[expect(
+    clippy::cast_sign_loss,
+    reason = "a small signed offset added to a turn angle, two's complement"
+)]
 fn sin_cos_32_grid() {
     let q31 = |v: f64| libm::ldexp(v, 31).clamp(-2147483648.0, 2147483647.0);
     let near_axes =
@@ -276,6 +296,10 @@ fn sin_cos_32_axes() {
 
 #[test]
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
+#[expect(
+    clippy::cast_sign_loss,
+    reason = "a small signed offset added to a turn angle, two's complement"
+)]
 fn sin_cos_32_q15_grid() {
     let q15 = |v: f64| (v * 32768.0).clamp(-32768.0, 32767.0);
     let near_axes =
@@ -362,6 +386,10 @@ fn isqrt_u32_dense_and_ends() {
 }
 
 #[test]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "n is below 2³², so n² + n + 1 is below 2⁶⁴"
+)]
 fn isqrt_u64_u128_squares_and_neighbours() {
     for n in lcg(4)
         .take(20_000)

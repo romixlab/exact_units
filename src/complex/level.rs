@@ -77,7 +77,9 @@ macro_rules! norm_sqr_at {
         if x > $norm::MAX as u128 {
             panic!("this level is too large for its storage");
         }
-        Fixed::new(x as $norm)
+        #[expect(clippy::cast_possible_truncation, reason = "checked against the storage's MAX above")]
+        let x = x as $norm;
+        Fixed::new(x)
     }};
     (@to_f32 $gain:expr, $norm:ident) => { Fixed::new($gain.to_f32()) };
     (@to_f64 $gain:expr, $norm:ident) => { Fixed::new($gain.to_f64()) };
@@ -112,6 +114,10 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
     pub fn to_db(self) -> f64 {
         let form = const { Fixed::<U, P, T>::LEVEL_FORM };
         let n = match T::norm_sqr(self.re, self.im).to_repr() {
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "a level in dB is an f64, rounded"
+            )]
             crate::Repr::Int(i) => i as f64,
             crate::Repr::Float(x) => x,
         };
@@ -132,8 +138,13 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
     /// # }
     /// ```
     pub fn to_db_f32(self) -> f32 {
+        #[expect(clippy::cast_possible_truncation, reason = "5 or 10, exact in f32")]
         let half = const { (Fixed::<U, P, T>::LEVEL_FORM.db_per_decade() / 2.0) as f32 };
         let n = T::norm_sqr(self.re, self.im).to_f32();
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the squared scale rounded to f32, the float this works in"
+        )]
         let s = const {
             let s = P::SCALE.to_f64() * U::EXPR.factor();
             (s * s) as f32

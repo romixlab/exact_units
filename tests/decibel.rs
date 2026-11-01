@@ -19,6 +19,10 @@ fn levels() -> impl Iterator<Item = Decibels> {
 
 /// Levels whose exponent is exact in `f64`: steps of 0.3125 dB are 1/64 decade of a root-power gain (and 1/32 of a
 /// power gain), so libm's `exp10` gets the exact input and its error is its own.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "m is at most 384 in magnitude, exact in f64"
+)]
 fn dyadic_levels() -> impl Iterator<Item = (Decibels, f64)> {
     (-384i64..=192).map(|m| (Decibels::new(m * 3125, 4), m as f64 / 64.0))
 }
@@ -898,8 +902,12 @@ fn integers_nearest() {
         if p * 1e9 < 1e17
             && let Some(r) = nearest(p * 1e9, 2.0 * y)
         {
-            let g = PowerGain::<Nano, i64>::from_db_const(db).get();
-            assert_eq!(g as f64, r, "{db:?}");
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "the gain is below 1e17 nano-units; the reference is rounded to f64 the same way"
+            )]
+            let g = PowerGain::<Nano, i64>::from_db_const(db).get() as f64;
+            assert_eq!(g, r, "{db:?}");
             checked += 1;
         }
         if p * 65535.0 < 60_000.0
@@ -949,6 +957,10 @@ mod run_time {
         for db in levels() {
             let x = db.to_f64();
             let g = VoltGain::<One, f64>::from_db(x).unwrap();
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "the f32 path takes the level rounded to f32; the check allows for it"
+            )]
             let g32 = VoltGain::<One, f32>::from_db_f32(x as f32).unwrap();
             assert!(
                 (f64::from(g32.get()) / g.get() - 1.0).abs() < 1e-5,
@@ -977,6 +989,11 @@ mod run_time {
         // the compile-time and the run-time gain agree
         let c: VoltGain<Micro, u32> = db!(-6);
         let r = VoltGain::<Micro, f32>::from_db_f32(-6.0).unwrap();
-        assert!((c.get() as f32 - r.get()).abs() <= 1.0);
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "half a million micro-units, exact in f32"
+        )]
+        let c = c.get() as f32;
+        assert!((c - r.get()).abs() <= 1.0);
     }
 }

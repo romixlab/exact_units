@@ -333,6 +333,10 @@ impl<P, T: Storage> PointArith<P, T> for Linear {
 }
 
 /// The period `S` in steps of `P`, a whole number of at most `2^bits`: a compile error otherwise.
+#[expect(
+    clippy::cast_possible_wrap,
+    reason = "n is checked to be at most 2^BITS, BITS at most 64"
+)]
 const fn period_steps<S: FixedScale, P: FixedScale>(bits: u32) -> i128 {
     let Some((n, d)) = S::SCALE.div(P::SCALE).to_ratio() else {
         panic!("the period of a Modulo origin must be a whole number of the point's steps")
@@ -352,10 +356,20 @@ const fn period_steps<S: FixedScale, P: FixedScale>(bits: u32) -> i128 {
 /// binary angle), else `rem_euclid` in `$wide`.
 macro_rules! modulo_int {
     ($($t:ty, $signed:ty, $wide:ty;)*) => {$(
+        #[expect(
+            clippy::allow_attributes,
+            reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
+        )]
         impl<S: FixedScale, P: FixedScale> PointArith<P, $t> for Modulo<S> {
             type Diff = $signed;
 
             #[inline(always)]
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_possible_wrap,
+                clippy::cast_sign_loss,
+                reason = "m is at most 2^BITS and fits $wide; a value reduced below a period of less than 2^BITS fits $t"
+            )]
             fn add(p: $t, v: $t) -> $t {
                 let m = const { period_steps::<S, P>(<$t>::BITS) };
                 if m == 1 << <$t>::BITS {
@@ -369,6 +383,12 @@ macro_rules! modulo_int {
                 Some(<Self as PointArith<P, $t>>::add(p, v))
             }
             #[inline(always)]
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_possible_wrap,
+                clippy::cast_sign_loss,
+                reason = "m is at most 2^BITS and fits $wide; a value reduced below a period of less than 2^BITS fits $t"
+            )]
             fn sub(p: $t, v: $t) -> $t {
                 let m = const { period_steps::<S, P>(<$t>::BITS) };
                 if m == 1 << <$t>::BITS {
@@ -382,6 +402,12 @@ macro_rules! modulo_int {
                 Some(<Self as PointArith<P, $t>>::sub(p, v))
             }
             #[inline(always)]
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_possible_wrap,
+                clippy::cast_sign_loss,
+                reason = "a period of 2^BITS wraps the difference to $signed in two's complement; a smaller one leaves it in [-m/2, m - m/2), which fits"
+            )]
             fn diff(a: $t, b: $t) -> $signed {
                 let m = const { period_steps::<S, P>(<$t>::BITS) };
                 if m == 1 << <$t>::BITS {
@@ -452,10 +478,15 @@ wide!(i32 i64 i128);
 
 macro_rules! modulo_float {
     ($($t:ty)*) => {$(
+        #[expect(
+            clippy::allow_attributes,
+            reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
+        )]
         impl<S: FixedScale, P: FixedScale> PointArith<P, $t> for Modulo<S> {
             type Diff = $t;
 
             #[inline(always)]
+            #[allow(clippy::cast_possible_truncation, reason = "the period rounded to the storage's float once, as any f32 value is")]
             fn add(p: $t, v: $t) -> $t {
                 wrap_float(p + v, const { S::SCALE.div(P::SCALE).to_f64() } as $t)
             }
@@ -464,6 +495,7 @@ macro_rules! modulo_float {
                 Some(<Self as PointArith<P, $t>>::add(p, v)).filter(|x| x.is_finite())
             }
             #[inline(always)]
+            #[allow(clippy::cast_possible_truncation, reason = "the period rounded to the storage's float once, as any f32 value is")]
             fn sub(p: $t, v: $t) -> $t {
                 wrap_float(p - v, const { S::SCALE.div(P::SCALE).to_f64() } as $t)
             }
@@ -472,6 +504,7 @@ macro_rules! modulo_float {
                 Some(<Self as PointArith<P, $t>>::sub(p, v)).filter(|x| x.is_finite())
             }
             #[inline(always)]
+            #[allow(clippy::cast_possible_truncation, reason = "the period rounded to the storage's float once, as any f32 value is")]
             fn diff(a: $t, b: $t) -> $t {
                 let m = const { S::SCALE.div(P::SCALE).to_f64() } as $t;
                 let mut d = (a - b) % m;
@@ -603,6 +636,10 @@ fn reduce<M: Modulus, P2: FixedScale, T2: Storage>(y: Repr) -> Option<T2> {
             let m = const {
                 match M::MODULUS {
                     Some(s) => match s.div(P2::SCALE).to_ratio() {
+                        #[expect(
+                            clippy::cast_possible_wrap,
+                            reason = "n is checked to be at most i128::MAX"
+                        )]
                         Some((n, 1)) if n <= i128::MAX as u128 => n as i128,
                         _ => panic!(
                             "the period of a Modulo origin must be a whole number of the point's steps"
@@ -783,6 +820,10 @@ impl Affine {
             offset::gcd(num.unsigned_abs(), add.unsigned_abs()),
             den.unsigned_abs(),
         );
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "g divides den, which is in 1..=i128::MAX"
+        )]
         let (num, add, den) = (num / g as i128, add / g as i128, den / g as i128);
         let max_abs = if T::MAX_INT.unsigned_abs() > T::MIN_INT.unsigned_abs() {
             T::MAX_INT.unsigned_abs()
@@ -807,6 +848,10 @@ impl Affine {
             );
             narrow = T::BITS <= 32 && T2::BITS <= 32 && top <= i64::MAX as u128;
         }
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "the float forms are approximations by design, f64 holds 53 bits"
+        )]
         let (num_f, den_f) = match factor.to_ratio() {
             Some(_) => (num as f64, den as f64),
             None => (factor.to_f64(), 1.0),
@@ -818,6 +863,10 @@ impl Affine {
             narrow,
             float,
             num_f,
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "the float form is an approximation by design, f64 holds 53 bits"
+            )]
             add_f: if factor.is_rational() {
                 add as f64
             } else {
@@ -832,6 +881,10 @@ impl Affine {
     fn apply_repr<T: Storage>(self, x: T) -> Option<Repr> {
         let x = x.to_repr();
         if self.float {
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "the float path rounds by design, f64 holds 53 bits"
+            )]
             let x = match x {
                 Repr::Int(i) => i as f64,
                 Repr::Float(f) => f,
@@ -849,8 +902,16 @@ impl Affine {
     }
 
     #[inline(always)]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "on the narrow path |num| and |add| are at most top, checked to fit i64 in of"
+    )]
     fn apply<T: Storage, T2: Storage>(self, x: T) -> Option<T2> {
         if self.float {
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "the float path rounds by design, f64 holds 53 bits"
+            )]
             let x = match x.to_repr() {
                 Repr::Int(i) => i as f64,
                 Repr::Float(f) => f,
@@ -866,6 +927,10 @@ impl Affine {
                 y += self.add as i64;
             }
             if self.den != 1 {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "FINDING: den is not bounded by top, a den above i64::MAX truncates (5^19 · 2^64 to 0)"
+                )]
                 let den = self.den as i64;
                 if y % den != 0 {
                     return None;
@@ -889,6 +954,10 @@ impl Affine {
     }
 }
 
+#[expect(
+    clippy::cast_possible_wrap,
+    reason = "p is checked to be at most i128::MAX"
+)]
 const fn mul_i(a: u128, b: u128) -> Option<i128> {
     match a.checked_mul(b) {
         Some(p) if p <= i128::MAX as u128 => Some(p as i128),
@@ -896,6 +965,10 @@ const fn mul_i(a: u128, b: u128) -> Option<i128> {
     }
 }
 
+#[expect(
+    clippy::cast_possible_wrap,
+    reason = "b is checked to be at most i128::MAX"
+)]
 const fn mul_s(a: i128, b: u128) -> Option<i128> {
     if b > i128::MAX as u128 {
         return None;
@@ -927,6 +1000,10 @@ pub(crate) fn write_ratio(n: i128, d: i128, f: &mut fmt::Formatter<'_>) -> fmt::
 impl<O: Origin<Unit = U>, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> fmt::Display
     for Point<O, Fixed<U, P, T, B>>
 {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "the float is the approximation shown where the ratio doesn't fit"
+    )]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let map = const { Affine::of::<T, f64>(P::SCALE, O::OFFSET, O::STEP, O::SHOWN) };
         let x = match self.raw().to_repr() {

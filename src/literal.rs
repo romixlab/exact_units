@@ -117,7 +117,12 @@ impl Decimal {
             exp >= i16::MIN as i32 && exp <= i16::MAX as i32,
             "a literal's exponent is out of range"
         );
-        Decimal::new(if neg { -num } else { num }, exp as i16)
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "exp is checked to be in i16's range just above"
+        )]
+        let exp = exp as i16;
+        Decimal::new(if neg { -num } else { num }, exp)
     }
 
     /// The digits, `25` for 0.025.
@@ -174,11 +179,12 @@ impl Decimal {
             x <= i128::MAX as u128,
             "this literal is too large for its storage"
         );
-        if self.num < 0 {
-            -(x as i128)
-        } else {
-            x as i128
-        }
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "x is checked to be at most i128::MAX just above"
+        )]
+        let x = x as i128;
+        if self.num < 0 { -x } else { x }
     }
 
     /// The exact `|self|` in units of `P` as an interval, for the nearest float; `None` for zero.
@@ -292,6 +298,7 @@ macro_rules! from_decimal {
             /// The stored value nearest to `x` in units of `U`, ties to even, at compile time: see the
             /// [module](crate::literal). A compile error in `const` code (a panic at run time) for a value that
             /// doesn't fit `T` or `B`, or a scale that isn't a fraction of integers.
+            #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
             pub const fn from_decimal(x: Decimal) -> Self {
                 let v = x.to_int::<P>();
                 if v < $ty::MIN as i128 {
@@ -300,7 +307,13 @@ macro_rules! from_decimal {
                 if v > $ty::MAX as i128 {
                     panic!("this literal is too large for its storage");
                 }
-                Self::bounded(v as $ty)
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss,
+                    reason = "v is checked to be in the storage's range just above"
+                )]
+                let v = v as $ty;
+                Self::bounded(v)
             }
         }
 

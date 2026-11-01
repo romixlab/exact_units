@@ -85,6 +85,10 @@ fn ties_to_even() {
 }
 
 /// The nearest integer to `num · 10^exp · 2^k`, ties to even, by plain i128 arithmetic.
+#[expect(
+    clippy::cast_sign_loss,
+    reason = "each branch casts the non-negative magnitude of the exponent"
+)]
 fn reference_pow2(num: i64, exp: i16, k: u32) -> i128 {
     let (mut p, mut q) = (i128::from(num).abs() << k, 1i128);
     if exp >= 0 {
@@ -102,6 +106,10 @@ fn reference_pow2(num: i64, exp: i16, k: u32) -> i128 {
 }
 
 #[test]
+#[expect(
+    clippy::cast_possible_wrap,
+    reason = "the seed is reduced below 2·10⁶ before the cast"
+)]
 fn integers_against_a_reference() {
     let mut seed = 0x2545_f491_4f6c_dd1du64;
     for _ in 0..5000 {
@@ -118,6 +126,10 @@ fn integers_against_a_reference() {
 }
 
 #[test]
+#[expect(
+    clippy::cast_possible_wrap,
+    reason = "the seed is reduced below 2·10⁹ before the cast"
+)]
 fn floats_against_the_parser() {
     // the standard parser rounds a decimal string correctly: the stored value in Milli is the literal times 1000
     let mut seed = 0x9e37_79b9_7f4a_7c15u64;

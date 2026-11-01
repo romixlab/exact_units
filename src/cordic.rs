@@ -105,7 +105,12 @@ const ATAN_T32: [i32; N16] = {
     let mut t = [0; N16];
     let mut i = 0;
     while i < N16 {
-        t[i] = ((ATAN_T48[i] + 0x8000) >> 16) as i32;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the table's angles are at most 2⁴⁵, so 2²⁹ once shifted"
+        )]
+        let angle = ((ATAN_T48[i] + 0x8000) >> 16) as i32;
+        t[i] = angle;
         i += 1;
     }
     t
@@ -164,6 +169,7 @@ pub const fn atan2_16(y: i16, x: i16) -> Bam16 {
     }
     // turn (x, y) onto the +x axis, adding up the angles turned
     let mut i = 0;
+    #[expect(clippy::cast_sign_loss, reason = "the table's angles are positive")]
     while i < N16 {
         let (dx, dy) = (y >> i, x >> i);
         if y >= 0 {
@@ -212,6 +218,7 @@ pub const fn atan2_32(y: i32, x: i32) -> Bam32 {
         };
     }
     let mut i = 0;
+    #[expect(clippy::cast_sign_loss, reason = "the table's angles are positive")]
     while i < N32 {
         let (dx, dy) = (y >> i, x >> i);
         if y >= 0 {
@@ -222,7 +229,12 @@ pub const fn atan2_32(y: i32, x: i32) -> Bam32 {
         i += 1;
     }
     // modulo a turn: the bits above 2⁴⁸ are whole turns
-    Bam32::of((z.wrapping_add(1 << 15) >> 16) as u32)
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the bits dropped are whole turns"
+    )]
+    let z = (z.wrapping_add(1 << 15) >> 16) as u32;
+    Bam32::of(z)
 }
 
 /// `(sin a, cos a)` of a 16-bit binary angle in Q15, as `f64::sin_cos` gives them. Error below 0.51 of a step
@@ -243,6 +255,11 @@ pub const fn sin_cos_16(a: Bam16) -> (Q15, Q15) {
     let a = a.get();
     // the nearest multiple of a quarter turn, k, and the rest in -1/8..1/8 turn
     let k = (a.wrapping_add(0x2000) >> 14) as u32;
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        reason = "k is at most 3; the rest is in -1/8..1/8 turn, read as two's complement"
+    )]
     let r = a.wrapping_sub((k as u16) << 14) as i16;
     let (c, s) = rotate_16((r as i32) << 16);
     let (s, c) = match k {
@@ -268,6 +285,10 @@ pub const fn sin_cos_16(a: Bam16) -> (Q15, Q15) {
 pub const fn sin_cos_32(a: Bam32) -> (Q31, Q31) {
     let a = a.get();
     let k = a.wrapping_add(0x2000_0000) >> 30;
+    #[expect(
+        clippy::cast_possible_wrap,
+        reason = "the rest is in -1/8..1/8 turn, read as two's complement"
+    )]
     let r = a.wrapping_sub(k << 30) as i32;
     let (c, s) = rotate_32((r as i64) << 16);
     let (s, c) = match k {
@@ -298,6 +319,10 @@ pub const fn sin_cos_32(a: Bam32) -> (Q31, Q31) {
 pub const fn sin_cos_32_q15(a: Bam32) -> (Q15, Q15) {
     let a = a.get();
     let k = a.wrapping_add(0x2000_0000) >> 30;
+    #[expect(
+        clippy::cast_possible_wrap,
+        reason = "the rest is in -1/8..1/8 turn, read as two's complement"
+    )]
     let r = a.wrapping_sub(k << 30) as i32;
     let (c, s) = rotate_16(r);
     let (s, c) = match k {
@@ -345,6 +370,10 @@ const fn rotate_32(mut z: i64) -> (i64, i64) {
 
 /// A Q30 value to Q15, to nearest, saturating: |v| is at most a little above 1.
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "q is checked to be in i16's range"
+)]
 const fn round_q30_to_q15(v: i32) -> i16 {
     let q = (v + (1 << 14)) >> 15;
     if q > i16::MAX as i32 {
@@ -358,6 +387,10 @@ const fn round_q30_to_q15(v: i32) -> i16 {
 
 /// A Q60 value to Q31, to nearest, saturating.
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "q is checked to be in i32's range"
+)]
 const fn round_q60_to_q31(v: i64) -> i32 {
     let q = (v + (1 << 28)) >> 29;
     if q > i32::MAX as i64 {

@@ -108,6 +108,11 @@ impl Decibels {
 
     /// The level as an `f64` (rounded).
     #[must_use]
+    #[expect(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_wrap,
+        reason = "rounded to f64 as documented; decimals are at most 9"
+    )]
     pub const fn to_f64(self) -> f64 {
         self.num as f64 / crate::num::pow10_f64(self.decimals as i8)
     }
@@ -121,7 +126,12 @@ impl Decibels {
         let n = self.num;
         let d = per_decade * 10u64.pow(self.decimals as u32);
         let g = gcd(n.unsigned_abs(), d);
-        (n / g as i64, d / g)
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "g divides d, at most 20 · 10^9 with at most 9 decimals"
+        )]
+        let signed_g = g as i64;
+        (n / signed_g, d / g)
     }
 }
 
@@ -227,7 +237,9 @@ macro_rules! from_db_const {
                 if x > $ty::MAX as u128 {
                     panic!("this level is too large for its storage");
                 }
-                Self::bounded(x as $ty)
+                #[expect(clippy::cast_possible_truncation, reason = "checked against the storage's MAX above")]
+                let x = x as $ty;
+                Self::bounded(x)
             }
         }
 
@@ -305,6 +317,10 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     pub fn to_db(self) -> f64 {
         let form = const { Self::LEVEL_FORM };
         let x = match self.get().to_repr() {
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "a level in dB is an f64, rounded"
+            )]
             crate::Repr::Int(i) => i as f64,
             crate::Repr::Float(x) => x,
         };
@@ -340,7 +356,12 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     /// # }
     /// ```
     pub fn to_db_f32(self) -> f32 {
+        #[expect(clippy::cast_possible_truncation, reason = "10 or 20, exact in f32")]
         let per_decade = const { Self::LEVEL_FORM.db_per_decade() as f32 };
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the scale rounded to f32, the float this works in"
+        )]
         let x = self.get().to_f32() * const { (P::SCALE.to_f64() * U::EXPR.factor()) as f32 };
         per_decade * math::log10f(x)
     }
@@ -355,8 +376,13 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     /// ```
     #[must_use]
     pub fn from_db_f32(db: f32) -> Option<Self> {
+        #[expect(clippy::cast_possible_truncation, reason = "10 or 20, exact in f32")]
         let per_decade = const { Self::LEVEL_FORM.db_per_decade() as f32 };
         // times the reciprocal: 1000.0 for Milli is exact in f32, 0.001 isn't
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the scale rounded to f32, the float this works in"
+        )]
         let x = math::exp10f(db / per_decade)
             * const { (1.0 / (P::SCALE.to_f64() * U::EXPR.factor())) as f32 };
         Self::try_new(T::from_f32(x)?).ok()

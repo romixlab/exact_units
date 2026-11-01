@@ -288,6 +288,10 @@ impl<U: Unit, P: FixedScale, T: IqStorage> Mac<U, P, T> {
     ) -> Option<Complex<U, P3, T3>> {
         let den = const {
             match P::SCALE.div(P3::SCALE).to_ratio() {
+                #[expect(
+                    clippy::cast_possible_wrap,
+                    reason = "checked against i128::MAX in the guard"
+                )]
                 Some((1, den)) if den <= i128::MAX as u128 => den as i128,
                 _ => panic!(
                     "a MAC result's scale is a whole multiple of the products' scale (Q30 to Q15, not Q15 to Q30)"
@@ -651,7 +655,12 @@ impl Nco {
     #[must_use]
     pub const fn tuned(f: u32, fs: u32) -> Self {
         let step = (((f as u64) << 32) + fs as u64 / 2) / fs as u64;
-        Self::new(Bam32::of(step as u32))
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the low 32 bits: f at or above fs aliases, as documented"
+        )]
+        let step = step as u32;
+        Self::new(Bam32::of(step))
     }
 
     /// The same NCO, now at `phase`.

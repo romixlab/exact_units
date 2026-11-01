@@ -163,6 +163,10 @@ fn q31_every_corner_and_mode_against_the_reference() {
 }
 
 #[test]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "random parts from the low bits of the LCG's output, truncation is the point"
+)]
 fn random_products_against_the_reference() {
     let mut rng = lcg(91);
     for _ in 0..50_000 {
@@ -213,6 +217,10 @@ fn mix_keeps_the_unit() {
 }
 
 #[test]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "random parts from the low bits of the LCG's output, truncation is the point"
+)]
 fn mac_sums_exactly_and_rounds_once() {
     // 1000 products of 2⁻¹⁵ · 2⁻¹⁵ each: rounded per product into Q15 they would all be 0
     let tiny = q15(1, 0);
@@ -285,6 +293,10 @@ fn f_out(x: i128) -> bool {
 }
 
 #[test]
+#[expect(
+    clippy::cast_possible_wrap,
+    reason = "i16::HEADROOM is 2³² − 1, asserted above, well within i64"
+)]
 fn mac_headroom_as_documented() {
     // the largest part of one product: (−1 − j)² = 2j, im 2³¹ (Q15) and 2⁶³ (Q31)
     let m = q15(i16::MIN, i16::MIN);

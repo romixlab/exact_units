@@ -48,6 +48,10 @@ impl Wide {
         e: -126,
     };
 
+    #[expect(
+        clippy::cast_possible_wrap,
+        reason = "a leading-zero count of a u128 is at most 128"
+    )]
     const fn int(x: u32) -> Wide {
         let z = (x as u128).leading_zeros();
         Wide {
@@ -129,6 +133,7 @@ impl Wide {
         } else {
             (rhs, self)
         };
+        #[expect(clippy::cast_sign_loss, reason = "a has the larger exponent")]
         let shift = (a.e - b.e) as u32;
         let bm = if shift >= 128 { 0 } else { b.m >> shift };
         let (s, carry) = a.m.overflowing_add(bm);
@@ -207,6 +212,11 @@ impl Magnitude {
             m >>= 1;
             e += 1;
         }
-        (m as u64, e)
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "below 2^64 after the shift above"
+        )]
+        let m = m as u64;
+        (m, e)
     }
 }

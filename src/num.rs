@@ -33,6 +33,11 @@ pub const fn powi_f64(x: f64, n: i8) -> f64 {
 /// `√x` in `const` code, rounded to nearest like `f64::sqrt` (what [UnitExpr::Sqrt](crate::UnitExpr::Sqrt)
 /// multiplies by): `sqrt` is not in `core`. An integer square root of the significand, NaN below zero.
 #[must_use]
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "the biased exponent of a normal number is in 1..=2046 and r is below 2^53"
+)]
 pub const fn sqrt_f64(x: f64) -> f64 {
     const MANT: u64 = (1 << 52) - 1;
     if x.is_nan() || x < 0.0 {
@@ -61,6 +66,7 @@ pub const fn sqrt_f64(x: f64) -> f64 {
     let n = (mant as u128) << 56;
     let mut r = n.isqrt();
     let inexact = r * r != n;
+    #[expect(clippy::cast_possible_wrap, reason = "a bit count, at most 128")]
     let extra = (128 - r.leading_zeros()) as i32 - 53;
     let low = r & ((1 << extra) - 1);
     let half = 1 << (extra - 1);
@@ -79,6 +85,10 @@ pub const fn sqrt_f64(x: f64) -> f64 {
 
 /// `x * 10^exp`, for the powers prefixes have (-60..=60 between two of them).
 #[must_use]
+#[expect(
+    clippy::cast_sign_loss,
+    reason = "the loops leave exp within the table and the branch takes its absolute value"
+)]
 pub fn scale_f64(x: f64, exp: i8) -> f64 {
     let mut x = x;
     let mut exp = i32::from(exp);
@@ -103,6 +113,10 @@ const POW10_F32: [f32; 11] = [1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 
 /// `x * 10^exp` in `f32`, without `powi` (not in `core`): one multiplication or division by an exact power of ten for
 /// the usual prefixes, so 2 m· is 0.002 rounded once, not three times.
 #[must_use]
+#[expect(
+    clippy::cast_sign_loss,
+    reason = "the loops leave exp within the table and the branch takes its absolute value"
+)]
 pub fn scale_f32(x: f32, exp: i8) -> f32 {
     let mut x = x;
     let mut exp = i32::from(exp);

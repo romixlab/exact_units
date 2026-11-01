@@ -41,6 +41,11 @@ pub trait Storage: Copy + PartialOrd + 'static {
     /// The value as an `f32`, without an `f64` on the way where the type has its own conversion (integers and `f32`):
     /// rounded for integers of more than 24 bits.
     #[inline(always)]
+    #[expect(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        reason = "the nearest f32, as documented: rounded where the value has more than 24 bits"
+    )]
     fn to_f32(self) -> f32 {
         match self.to_repr() {
             Repr::Int(i) => i as f32,
@@ -130,6 +135,12 @@ pub trait UnsignedStorage: Storage {
     clippy::float_cmp,
     reason = "a float is whole when it equals its integer exactly"
 )]
+#[expect(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    reason = "FINDING: the casts saturate and round, the checks after them catch that, except for i64 and x = 2^63, \
+              which saturates to i64::MAX, rounds back to 2^63 and passes"
+)]
 fn whole_f32(x: f32, min: i128, max: i128) -> Option<i128> {
     if x.is_nan() || x < min as f32 || x > max as f32 {
         return None;
@@ -150,6 +161,11 @@ fn whole_f32(x: f32, min: i128, max: i128) -> Option<i128> {
     clippy::float_cmp,
     reason = "a float is whole when it equals its integer exactly"
 )]
+#[expect(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    reason = "a rough range check in f64 and a truncation to i128, both checked again exactly after the cast"
+)]
 fn whole(x: f64, min: i128, max: i128) -> Option<i128> {
     // the range check is in f64 (min/max of up to 64 bits are close enough, the cast below checks again)
     if x.is_nan() || x < min as f64 || x > max as f64 {
@@ -164,6 +180,10 @@ fn whole(x: f64, min: i128, max: i128) -> Option<i128> {
 
 macro_rules! int {
     ($($ty:ident $div:ident)*) => {$(
+        #[expect(
+            clippy::allow_attributes,
+            reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
+        )]
         impl Storage for $ty {
             const NAME: &'static str = stringify!($ty);
             const IS_FLOAT: bool = false;
@@ -173,9 +193,14 @@ macro_rules! int {
             const MAX_INT: i128 = $ty::MAX as i128;
             #[inline(always)]
             fn to_repr(self) -> Repr {
-                Repr::Int(self as i128)
+                Repr::Int(i128::from(self))
             }
             #[inline(always)]
+            #[allow(
+                clippy::cast_lossless,
+                clippy::cast_possible_wrap,
+                reason = "exact for storages of up to 32 bits, the only ones Fixed::to and points call it for"
+            )]
             fn to_i64(self) -> i64 {
                 self as i64
             }
@@ -184,6 +209,11 @@ macro_rules! int {
                 $ty::try_from(x).ok()
             }
             #[inline(always)]
+            #[allow(
+                clippy::cast_lossless,
+                clippy::cast_possible_truncation,
+                reason = "d is at most the storage's MAX in the branch that casts it, so it fits"
+            )]
             fn div_whole(self, d: u128) -> Option<Self> {
                 if d == 1 {
                     Some(self)
@@ -196,6 +226,14 @@ macro_rules! int {
                 }
             }
             #[inline(always)]
+            #[allow(
+                clippy::cast_lossless,
+                clippy::cast_possible_truncation,
+                clippy::cast_possible_wrap,
+                clippy::cast_sign_loss,
+                reason = "d fits the storage where it is cast to it, d past i128::MAX is clamped first, and a quotient \
+                          by d > MAX is 0 or one step, which fits"
+            )]
             fn div_rounded(self, d: u128, r: Rounding) -> Self {
                 if d == 1 {
                     self
@@ -207,6 +245,11 @@ macro_rules! int {
                 }
             }
             #[inline(always)]
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "the documented low bits of x, two's complement"
+            )]
             fn from_int_wrapping(x: i128) -> Self {
                 x as $ty
             }
@@ -215,16 +258,31 @@ macro_rules! int {
                 $ty::try_from(x).ok()
             }
             #[inline]
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "whole checked that the integer is in the storage's range"
+            )]
             fn from_float(x: f64) -> Option<Self> {
-                Some(whole(x, $ty::MIN as i128, $ty::MAX as i128)? as $ty)
+                Some(whole(x, Self::MIN_INT, Self::MAX_INT)? as $ty)
             }
             #[inline(always)]
+            #[allow(
+                clippy::cast_lossless,
+                clippy::cast_precision_loss,
+                reason = "the nearest f32, as documented: rounded for storages of more than 24 bits"
+            )]
             fn to_f32(self) -> f32 {
                 self as f32
             }
             #[inline]
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "whole_f32 checked that the integer is in the storage's range"
+            )]
             fn from_f32(x: f32) -> Option<Self> {
-                Some(whole_f32(x, $ty::MIN as i128, $ty::MAX as i128)? as $ty)
+                Some(whole_f32(x, Self::MIN_INT, Self::MAX_INT)? as $ty)
             }
             fn fmt_number(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 fmt::Display::fmt(self, f)
@@ -256,7 +314,7 @@ macro_rules! unsigned {
         impl UnsignedStorage for $ty {
             #[inline(always)]
             fn to_u64(self) -> u64 {
-                self as u64
+                u64::from(self)
             }
             #[inline(always)]
             fn from_u64(x: u64) -> Option<Self> {
@@ -273,6 +331,10 @@ unsigned!(u8 u16 u32 u64);
 #[cfg(feature = "shrink_wrap")]
 macro_rules! newtype {
     ($($ty:ident($inner:ident))*) => {$(
+        #[expect(
+            clippy::allow_attributes,
+            reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
+        )]
         impl Storage for $ty {
             const NAME: &'static str = stringify!($ty);
             const IS_FLOAT: bool = false;
@@ -282,9 +344,14 @@ macro_rules! newtype {
             const MAX_INT: i128 = $inner::MAX as i128;
             #[inline(always)]
             fn to_repr(self) -> Repr {
-                Repr::Int(self.0 as i128)
+                Repr::Int(i128::from(self.0))
             }
             #[inline(always)]
+            #[allow(
+                clippy::cast_lossless,
+                clippy::cast_possible_wrap,
+                reason = "exact for storages of up to 32 bits, the only ones Fixed::to and points call it for"
+            )]
             fn to_i64(self) -> i64 {
                 self.0 as i64
             }
@@ -301,6 +368,11 @@ macro_rules! newtype {
                 $ty(Storage::div_rounded(self.0, d, r))
             }
             #[inline(always)]
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "the documented low bits of x, two's complement"
+            )]
             fn from_int_wrapping(x: i128) -> Self {
                 $ty(x as $inner)
             }
@@ -336,7 +408,7 @@ macro_rules! newtype {
         impl UnsignedStorage for $ty {
             #[inline(always)]
             fn to_u64(self) -> u64 {
-                self.0 as u64
+                u64::from(self.0)
             }
             #[inline(always)]
             fn from_u64(x: u64) -> Option<Self> {
@@ -379,6 +451,11 @@ impl Storage for Nibble {
         Nibble::new_masked(Storage::div_rounded(self.value(), d, r))
     }
     #[inline(always)]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "the low 8 bits of x, two's complement, of which new_masked keeps the documented low 4"
+    )]
     fn from_int_wrapping(x: i128) -> Self {
         Nibble::new_masked(x as u8)
     }
@@ -477,22 +554,29 @@ impl UnsignedStorage for Nibble {
 
 macro_rules! float {
     ($($ty:ident)*) => {$(
+        #[expect(
+            clippy::allow_attributes,
+            reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
+        )]
         impl Storage for $ty {
             const NAME: &'static str = stringify!($ty);
             const IS_FLOAT: bool = true;
             const ZERO: Self = 0.0;
+            #[expect(clippy::cast_possible_truncation, reason = "a float is 4 or 8 bytes")]
             const BITS: u32 = core::mem::size_of::<$ty>() as u32 * 8;
             const MIN_INT: i128 = 0;
             const MAX_INT: i128 = 0;
             #[inline(always)]
             fn to_repr(self) -> Repr {
-                Repr::Float(self as f64)
+                Repr::Float(f64::from(self))
             }
             #[inline(always)]
+            #[expect(clippy::cast_possible_truncation, reason = "truncated toward zero and saturating, as documented")]
             fn to_i64(self) -> i64 {
                 self as i64
             }
             #[inline(always)]
+            #[expect(clippy::cast_precision_loss, reason = "the nearest float, a float storage's own rounding")]
             fn from_i64(x: i64) -> Option<Self> {
                 Some(x as $ty)
             }
@@ -505,24 +589,28 @@ macro_rules! float {
                 self
             }
             #[inline(always)]
+            #[expect(clippy::cast_precision_loss, reason = "the nearest float, as documented")]
             fn from_int_wrapping(x: i128) -> Self {
                 x as $ty
             }
             #[inline]
+            #[expect(clippy::cast_precision_loss, reason = "the nearest float, as documented")]
             fn from_int(x: i128) -> Option<Self> {
                 Some(x as $ty)
             }
             #[inline]
+            #[allow(clippy::cast_possible_truncation, reason = "x rounded to the storage, as documented")]
             fn from_float(x: f64) -> Option<Self> {
                 Some(x as $ty)
             }
             #[inline(always)]
+            #[allow(clippy::cast_possible_truncation, reason = "the nearest f32, as documented")]
             fn to_f32(self) -> f32 {
                 self as f32
             }
             #[inline(always)]
             fn from_f32(x: f32) -> Option<Self> {
-                Some(x as $ty)
+                Some($ty::from(x))
             }
             fn fmt_number(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 fmt::Display::fmt(self, f)

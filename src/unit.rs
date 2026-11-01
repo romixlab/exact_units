@@ -120,6 +120,10 @@ const fn in_range(e: i8) -> bool {
     e >= -8 && e <= 7
 }
 
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "e is checked to be in i8's range just above"
+)]
 const fn checked_exp(e: i16) -> Option<i8> {
     if e < i8::MIN as i16 || e > i8::MAX as i16 {
         return None;

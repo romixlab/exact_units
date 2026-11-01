@@ -143,12 +143,15 @@ macro_rules! int_abs {
             pub const fn abs_rounded(self, r: Rounding) -> Fixed<U, P, $uns> {
                 let (re, im) = (self.re.unsigned_abs() as $wide, self.im.unsigned_abs() as $wide);
                 // at most 2·(2^(bits-1))² = 2^(2·bits-1): fits, and so does its root in `$uns`
-                Fixed::new(cordic::$isqrt(re * re + im * im, r) as $uns)
+                #[expect(clippy::cast_possible_truncation, reason = "the root of at most 2^(2·bits-1) fits `$uns`")]
+                let root = cordic::$isqrt(re * re + im * im, r) as $uns;
+                Fixed::new(root)
             }
 
             #[doc = concat!("|z| rounded to nearest in `", stringify!($ty), "` itself, at most `",
                 stringify!($ty), "::MAX`.")]
             #[inline(always)]
+            #[expect(clippy::cast_possible_wrap, reason = "checked against the signed MAX first")]
             pub const fn abs_saturating(self) -> Fixed<U, P, $ty> {
                 let a = self.abs().get();
                 Fixed::new(if a > $ty::MAX as $uns { $ty::MAX } else { a as $ty })
@@ -169,6 +172,10 @@ int_abs! {
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
 const fn times_q31(x: u32, s: i32) -> i64 {
     let p = x as u64 * s.unsigned_abs() as u64;
+    #[expect(
+        clippy::cast_possible_wrap,
+        reason = "p is below 2^63, so q below 2^32"
+    )]
     let q = ((p + (1 << 30)) >> 31) as i64;
     if s < 0 { -q } else { q }
 }
@@ -207,7 +214,9 @@ macro_rules! int_polar {
                 if re < $ty::MIN as i64 || re > $ty::MAX as i64 || im < $ty::MIN as i64 || im > $ty::MAX as i64 {
                     return None;
                 }
-                Some(Self::of(re as $ty, im as $ty))
+                #[expect(clippy::cast_possible_truncation, reason = "both checked against the storage's range above")]
+                let (re, im) = (re as $ty, im as $ty);
+                Some(Self::of(re, im))
             }
         }
 
@@ -257,10 +266,12 @@ macro_rules! float_polar {
             /// |z| · (cos θ + j·sin θ) for a phase θ in any angle unit and scale: `Phase<Degree>` is turned into
             /// radians by its exact factor first.
             #[inline(always)]
+            #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
             pub fn from_polar<A: PlaneAngle, PA: FixedScale, BP: Bounds<$ty>>(
                 abs: Fixed<U, P, $ty>,
                 arg: Fixed<Phase<A>, PA, $ty, BP>,
             ) -> Self {
+                #[allow(clippy::cast_possible_truncation, reason = "the factor to radians rounded to the storage's float")]
                 let rad = arg.get() * const { (PA::SCALE.to_f64() * <Phase<A>>::EXPR.factor()) as $ty };
                 let (s, c) = math::$sincos(rad);
                 Self::of(abs.get() * c, abs.get() * s)

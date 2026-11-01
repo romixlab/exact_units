@@ -196,6 +196,10 @@ impl Work {
         if prime > u32::MAX as u64 {
             return Err(MagnitudeError::PrimeTooLarge);
         }
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "checked against u32::MAX above"
+        )]
         let prime = prime as u32;
         let mut i = 0;
         while i < self.len && self.primes[i] < prime {
@@ -361,6 +365,10 @@ impl Work {
 }
 
 /// A doubled exponent as it is stored.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "checked against the i8 range first"
+)]
 const fn exp(e: i32) -> Result<i8, MagnitudeError> {
     if e < i8::MIN as i32 || e > i8::MAX as i32 {
         Err(MagnitudeError::ExponentRange)
@@ -370,6 +378,10 @@ const fn exp(e: i32) -> Result<i8, MagnitudeError> {
 }
 
 /// `a · b mod m`.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "a remainder mod a u64 fits a u64"
+)]
 const fn mul_mod(a: u64, b: u64, m: u64) -> u64 {
     ((a as u128 * b as u128) % m as u128) as u64
 }
@@ -630,6 +642,10 @@ impl Magnitude {
     /// Twice the exponent of `prime` (2 and 5 included: `Milli` is 2⁻³ · 5⁻³, so -6 for both). 0 for a number that
     /// isn't a factor.
     #[must_use]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the stored exponents are i8, so a sum of two fits i16"
+    )]
     pub const fn exp_x2(&self, prime: u32) -> i16 {
         let w = Work::of(self);
         match prime {
@@ -777,6 +793,10 @@ impl Magnitude {
     pub fn apply_f64(&self, x: f64) -> f64 {
         match self.to_ratio() {
             // exact factors through the integers, so 0.3 · 10 is 3.0 and not 3.0000000000000004
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "both at most 2^53, exact in f64"
+            )]
             Some((num, den)) if num <= 1 << 53 && den <= 1 << 53 => x * num as f64 / den as f64,
             _ => x * self.to_f64(),
         }
@@ -895,6 +915,10 @@ const fn unwrap(m: Result<Magnitude, MagnitudeError>) -> Magnitude {
 }
 
 /// `x^(e2 / 2)` in `const` code.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "e2 is a stored i8 exponent (Work::of), so its half fits i8"
+)]
 const fn pow_half(x: f64, e2: i32) -> f64 {
     let whole = crate::num::powi_f64(x, (e2 / 2) as i8);
     if e2 % 2 == 0 {

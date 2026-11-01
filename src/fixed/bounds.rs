@@ -121,12 +121,26 @@ const fn ordered<const MIN: i64, const MAX: i64>() {
 
 macro_rules! range {
     ($($ty:ident $min:expr, $max:expr, $x:ident => $wrap:expr;)*) => {$(
+        #[expect(
+            clippy::allow_attributes,
+            reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
+        )]
         impl<const MIN: i64, const MAX: i64> Bounds<$ty> for Range<MIN, MAX> {
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "fits checked at compile time that the bound is in the storage's range"
+            )]
             const MIN: Option<$ty> = {
                 ordered::<MIN, MAX>();
                 let $x = fits(MIN as i128, $min as i128, $max as i128);
                 Some($wrap)
             };
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "fits checked at compile time that the bound is in the storage's range"
+            )]
             const MAX: Option<$ty> = {
                 let $x = fits(MAX as i128, $min as i128, $max as i128);
                 Some($wrap)
@@ -175,18 +189,36 @@ impl<const MIN: u64, const MAX: u64> Bounds<UVlq64> for RangeU64<MIN, MAX> {
 }
 
 impl<const MIN: i64, const MAX: i64, const EXP: i8> Bounds<f64> for RangeDec<MIN, MAX, EXP> {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a decimal bound of a float storage, rounded to the nearest f64"
+    )]
     const MIN: Option<f64> = {
         ordered::<MIN, MAX>();
         Some(MIN as f64 * pow10_f64(EXP))
     };
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a decimal bound of a float storage, rounded to the nearest f64"
+    )]
     const MAX: Option<f64> = Some(MAX as f64 * pow10_f64(EXP));
 }
 
 impl<const MIN: i64, const MAX: i64, const EXP: i8> Bounds<f32> for RangeDec<MIN, MAX, EXP> {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the f64 bound rounded to the nearest f32"
+    )]
     const MIN: Option<f32> = match <Self as Bounds<f64>>::MIN {
         Some(x) => Some(x as f32),
         None => None,
     };
+    #[expect(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        reason = "FINDING: rounded twice, in f32 (MAX and 10^EXP each, then their product), while MIN rounds the f64 bound \
+                  once: RangeDec<-5, 5, -4> on f32 gives MIN -5e-4 and MAX 4.9999997e-4, below the f32 5e-4"
+    )]
     const MAX: Option<f32> = Some(MAX as f64 as f32 * pow10_f64(EXP) as f32);
 }
 

@@ -117,6 +117,10 @@ impl Offset {
         let Some((bn, bd)) = rhs.to_ratio() else {
             return None;
         };
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "FINDING: a den above i128::MAX wraps negative, and a + 1 can come out as a wrong Some"
+        )]
         let (Some(x), Some(y), Some(d)) = (
             an.checked_mul(bd as i128),
             bn.checked_mul(ad as i128),
@@ -146,6 +150,10 @@ impl Offset {
         if n_abs > u64::MAX as u128 || d > u64::MAX as u128 {
             return None;
         }
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "both are checked to fit u64 just above"
+        )]
         match Magnitude::checked_ratio(n_abs as u64, d as u64) {
             Ok(m) => Some(Self::new(n < 0, m)),
             Err(_) => None,
@@ -165,6 +173,10 @@ impl Offset {
         if n > i128::MAX as u128 {
             return None;
         }
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "n is checked to be at most i128::MAX just above"
+        )]
         Some((
             if self.negative {
                 -(n as i128)
@@ -237,6 +249,10 @@ impl Default for Offset {
 
 /// `273.15`, `-40`, `45967/180`: exactly, as a decimal where the denominator is one of 2 and 5 only.
 impl core::fmt::Display for Offset {
+    #[expect(
+        clippy::cast_possible_wrap,
+        reason = "FINDING: a den above i128::MAX wraps negative, so a positive offset shows as a negative number"
+    )]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         if let Some((n, d)) = self.to_ratio() {
             super::write_ratio(n, d as i128, f)

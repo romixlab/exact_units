@@ -12,7 +12,12 @@ fn spread_i32(n: usize) -> impl Iterator<Item = i32> {
         .into_iter()
         .chain((0..n).map(move |_| {
             x = x.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-            x as i32
+            #[expect(
+                clippy::cast_possible_wrap,
+                reason = "the LCG's bits read as an i32, two's complement"
+            )]
+            let x = x as i32;
+            x
         }))
 }
 
@@ -49,7 +54,9 @@ fn int_abs_against_libm() {
                 libm::ceil(exact)
             );
             let sat = z.abs_saturating().get();
-            assert_eq!(sat, z.abs().get().min(i16::MAX as u16) as i16);
+            #[expect(clippy::cast_possible_wrap, reason = "clamped to i16::MAX just before")]
+            let expected = z.abs().get().min(i16::MAX as u16) as i16;
+            assert_eq!(sat, expected);
         }
     }
     let i8s = (i8::MIN..=i8::MAX).flat_map(|re| (i8::MIN..=i8::MAX).map(move |im| (re, im)));
@@ -157,6 +164,10 @@ fn int_from_polar_against_libm() {
     assert_eq!(diag.map(Complex::get), Some((-32_768, -32_768)));
     for abs in [1u32, 1 << 20, i32::MAX as u32] {
         for a in spread_i32(5_000) {
+            #[expect(
+                clippy::cast_sign_loss,
+                reason = "the i32's bits read as a turn angle, two's complement"
+            )]
             let a = a as u32;
             let th = f64::from(a) / libm::ldexp(1.0, 32) * 2.0 * PI;
             let Some(z) =
@@ -217,8 +228,13 @@ mod float {
             let (re, im) = (f64::from(re) * 1e-3, f64::from(im) * 1e-7);
             let z = Complex::<Ratio, One, f64>::new(re, im);
             assert!(near(z.abs().get(), libm::hypot(re, im), 1.0));
-            let zf = Complex::<Ratio, One, f32>::new(re as f32, im as f32);
-            let a = libm::hypotf(re as f32, im as f32);
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "the f32 case takes the parts rounded to f32"
+            )]
+            let (re32, im32) = (re as f32, im as f32);
+            let zf = Complex::<Ratio, One, f32>::new(re32, im32);
+            let a = libm::hypotf(re32, im32);
             assert!((zf.abs().get() - a).abs() <= f32::EPSILON * a);
             #[cfg(feature = "angle")]
             assert!(near(z.arg().get(), libm::atan2(im, re), 1.0));
@@ -274,6 +290,10 @@ mod float {
     }
 
     #[test]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "levels of at most 600 tenths and gains below 2⁵³, exact in f64"
+    )]
     fn norm_sqr_at_is_the_nearest() {
         type Gamma = Complex<Per<Volt, Volt>, Pow2<-15>, i16>;
         type P = Complex<Per<Watt, Watt>, Milli, i32>;

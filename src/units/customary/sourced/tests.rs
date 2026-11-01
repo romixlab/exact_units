@@ -16,12 +16,20 @@ impl Big {
     fn from(mut v: u128) -> Big {
         let mut limbs = Vec::new();
         while v != 0 {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "the low 32 bits are the next limb"
+            )]
             limbs.push(v as u32);
             v >>= 32;
         }
         Big(limbs)
     }
 
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "every limb is masked to 32 bits above"
+    )]
     fn mul(&self, o: &Big) -> Big {
         let mut out = vec![0u64; self.0.len() + o.0.len() + 1];
         for (i, &a) in self.0.iter().enumerate() {
@@ -67,6 +75,10 @@ const PI_EXP: u32 = 29;
 type Frac = (Big, Big);
 
 /// Exact bounds of a magnitude: equal unless it has a power of π.
+#[expect(
+    clippy::cast_sign_loss,
+    reason = "each exponent is clamped to 0 or above before the cast"
+)]
 fn bounds(m: Mag) -> (Frac, Frac) {
     let ten = Big::from(10);
     let two = Big::from(2);
@@ -89,6 +101,10 @@ fn bounds(m: Mag) -> (Frac, Frac) {
 }
 
 /// Compares `n / d` with `p · 10^e`.
+#[expect(
+    clippy::cast_sign_loss,
+    reason = "each branch casts the non-negative magnitude of the exponent"
+)]
 fn cmp_dec((n, d): &Frac, p: u128, e: i32) -> Ordering {
     let ten = Big::from(10);
     let (l, r) = if e >= 0 {
@@ -100,6 +116,11 @@ fn cmp_dec((n, d): &Frac, p: u128, e: i32) -> Ordering {
 }
 
 /// `mantissa E exp10` as digits and the power of ten of the last digit: "6.894757", 3 is 6894757 · 10⁻³.
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    reason = "a printed mantissa has a few dozen digits at most"
+)]
 fn printed(mantissa: &str, exp10: i16) -> (u128, i32) {
     let (int, frac) = mantissa.split_once('.').unwrap_or((mantissa, ""));
     let digits: u128 = format!("{int}{frac}").parse().unwrap();
@@ -564,6 +585,10 @@ fn bit_sizes() {
     assert_eq!(bits(HP_MECH).0, 56, "hp");
     assert_eq!(bits(LBF.div(IN2).powi(2)).0, 87, "psi²");
     // (lbf·s)³ no longer fits u128: its num and den are the cubes of lbf's (canonical, so no gcd to take out)
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a cube of a u128 has a dozen limbs at most"
+    )]
     let cube = |n: u128| {
         32 * Big::from(n).pow(3).0.len() as u32
             - Big::from(n).pow(3).0.last().unwrap().leading_zeros()

@@ -188,6 +188,10 @@ impl FullScaleBits {
     #[must_use]
     pub fn of(m: &Magnitude) -> Option<Self> {
         match m.to_ratio() {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "a trailing-zero count of a u64 is at most 64"
+            )]
             Some((1, den)) if (den + 1).is_power_of_two() => {
                 FullScaleBits::new((den + 1).trailing_zeros() as u8)
             }
@@ -489,6 +493,7 @@ impl Prefix {
         match *self {
             Prefix::Pow10(e) => Some(e.get()),
             Prefix::Pow2(e) => Some(e.get()),
+            #[expect(clippy::cast_possible_wrap, reason = "full-scale bits are 2..=32")]
             Prefix::FullScale(n) => Some(n.get() as i8),
             _ => None,
         }
@@ -557,6 +562,10 @@ impl Prefix {
     pub fn scale_f32(&self, x: f32) -> f32 {
         match self.si_pow10() {
             Some(e) => crate::num::scale_f32(x, e),
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "rounding the f64 result to the f32 asked for"
+            )]
             None => self.scale_f64(f64::from(x)) as f32,
         }
     }
@@ -728,12 +737,18 @@ mod series_store {
     };
 
     /// The first code of a family: named prefixes are below it.
+    #[expect(clippy::cast_possible_truncation, reason = "29 named prefixes")]
     const FAMILY_CODE: u16 = (Prefix::ALL.len() as u16) << 8;
     /// The code of any `Unknown`, above every other: its high byte is no discriminant of this version.
     const UNKNOWN_CODE: u16 = u16::MAX;
 
     impl Prefix {
         #[inline(always)]
+        #[expect(
+            clippy::cast_sign_loss,
+            clippy::cast_possible_truncation,
+            reason = "an exponent's two's-complement byte, read back by from_code; discriminants are below 32"
+        )]
         fn code(self) -> u16 {
             if let Prefix::Unknown(_) = self {
                 return UNKNOWN_CODE;
@@ -752,7 +767,15 @@ mod series_store {
             if code == UNKNOWN_CODE {
                 return Prefix::Unknown(u16::MAX);
             }
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "the low byte holds the parameter"
+            )]
             let param = code as u8;
+            #[expect(
+                clippy::cast_possible_wrap,
+                reason = "an exponent's two's-complement byte, as code wrote it"
+            )]
             let family = match (code >> 8) as usize {
                 29 => Pow10Exp::new(param as i8).map(Prefix::Pow10),
                 30 => Pow2Exp::new(param as i8).map(Prefix::Pow2),

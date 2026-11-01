@@ -34,6 +34,10 @@ type Gamma<F> = Complex<Per<Volt, Volt>, One, F>;
 /// `1 / (re + j·im)` from scale `P` to scale `P2` of the reciprocal unit: `(re − j·im) / (re² + im²) / (P · P2)`.
 macro_rules! invert {
     ($z:expr, $p:ty, $p2:ty, $ty:ident) => {{
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "the scale factor rounded to the storage's float"
+        )]
         let k = const { (1.0 / (<$p>::SCALE.to_f64() * <$p2>::SCALE.to_f64())) as $ty };
         let n = $z.re * $z.re + $z.im * $z.im;
         Complex::new($z.re * k / n, -($z.im * k / n))
@@ -66,6 +70,7 @@ macro_rules! float_rf {
             /// # }
             /// ```
             #[inline(always)]
+            #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
             pub fn to_admittance<P2: FixedScale>(self) -> Complex<Siemens, P2, $ty> {
                 invert!(self, P, P2, $ty)
             }
@@ -74,6 +79,7 @@ macro_rules! float_rf {
         impl<P: FixedScale> Complex<Siemens, P, $ty> {
             /// Z = 1 / Y in ohms, in the scale `P2`, as [to_admittance](Complex::to_admittance) the other way.
             #[inline(always)]
+            #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
             pub fn to_impedance<P2: FixedScale>(self) -> Complex<Ohm, P2, $ty> {
                 invert!(self, P, P2, $ty)
             }

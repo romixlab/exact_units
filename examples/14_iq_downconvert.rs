@@ -109,6 +109,10 @@ fn main() {
     let point_one: dsp::PowerLevel = exact_units::fixed!(0.1);
     assert_eq!(dsp::BUSY.get(), point_one.get());
     assert_eq!(dsp::BUSY.get(), 107_374_182);
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a mean for printing: f64's 53 bits are plenty"
+    )]
     let mean = power.get().0 as f64 / N as f64 / (1u64 << 30) as f64;
     println!(
         "power of {N} samples: {:.4} of full scale, busy: {}",
@@ -124,11 +128,13 @@ fn main() {
     assert_eq!(sq.get(), (0, i16::MAX));
     let (a, b) = (i32::from(i16::MIN), i32::from(i16::MIN));
     let plain_im = (a * b).wrapping_add(b * a) >> 15; // a·d + b·c in int32_t, as a release build computes it
-    println!(
-        "(-1-1j)² plain int32: im = {} as int16_t = {}",
-        plain_im, plain_im as i16
-    );
-    assert_eq!(plain_im as i16, 0);
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the low 16 bits, as C's conversion to int16_t keeps them: the point of the example"
+    )]
+    let plain_i16 = plain_im as i16;
+    println!("(-1-1j)² plain int32: im = {plain_im} as int16_t = {plain_i16}");
+    assert_eq!(plain_i16, 0);
 
     // the same product, checked, says where it doesn't fit instead of clamping
     let checked: Option<Complex<_, Pow2<-15>, i16>> = m.times_into(m, Rounding::NearestEven);

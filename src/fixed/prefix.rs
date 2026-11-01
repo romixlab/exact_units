@@ -95,6 +95,10 @@ impl<V: FixedScale, const BITS: u8> FixedScale for FullScaleMax<V, BITS> {
 }
 
 /// `BITS` of a full-scale marker, a compile error above 63.
+#[expect(
+    clippy::cast_possible_wrap,
+    reason = "b is at most 63, asserted just above the cast"
+)]
 const fn bits(b: u8) -> i8 {
     assert!(b >= 1 && b <= 63, "a full scale of 1 to 63 bits");
     b as i8
