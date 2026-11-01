@@ -112,6 +112,16 @@ mod thermal {
     }
 
     #[test]
+    fn denominator_past_i64() {
+        // the factor is 1/(5¹⁹·2⁶⁴): i32s take the 64-bit path, which can't divide by it, the 128-bit one does
+        type Tiny = Point<Celsius, Fixed<Kelvin, Rational<1, 10_000_000_000_000_000_000>, i32>>;
+        let to = |x| Tiny::from_raw(x).to::<Celsius, Rational<{ 1 << 45 }, 1>, i32>();
+        assert_eq!(to(0).map(Point::raw), Some(0));
+        assert_eq!(to(1), None);
+        assert_eq!(to(i32::MAX), None);
+    }
+
+    #[test]
     fn fahrenheit_and_rankine() {
         // the fixed points of water, exactly
         assert_eq!(

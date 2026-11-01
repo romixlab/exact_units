@@ -846,7 +846,11 @@ impl Affine {
                 top <= i128::MAX as u128,
                 "the factor between these origins doesn't fit the widened multiply (128 bits)"
             );
-            narrow = T::BITS <= 32 && T2::BITS <= 32 && top <= i64::MAX as u128;
+            // a den past i64 divides only in 128 bits
+            narrow = T::BITS <= 32
+                && T2::BITS <= 32
+                && top <= i64::MAX as u128
+                && den <= i64::MAX as i128;
         }
         #[expect(
             clippy::cast_precision_loss,
@@ -929,7 +933,7 @@ impl Affine {
             if self.den != 1 {
                 #[expect(
                     clippy::cast_possible_truncation,
-                    reason = "FINDING: den is not bounded by top, a den above i64::MAX truncates (5^19 · 2^64 to 0)"
+                    reason = "on the narrow path den is at most i64::MAX, checked in of"
                 )]
                 let den = self.den as i64;
                 if y % den != 0 {
