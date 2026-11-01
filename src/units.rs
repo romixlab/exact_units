@@ -463,6 +463,7 @@ impl<A: Unit, B: Unit> Unit for Times<A, B> {
 
 /// The named unit of this crate called `name` (the marker's name, `"Volt"`), if its feature is enabled: what a
 /// dynamic client needs to show a `Quantity<Volt>` it only knows from introspection data.
+#[must_use]
 pub fn by_name(name: &str) -> Option<&'static UnitExpr> {
     let all = ALL.iter();
     #[cfg(feature = "customary")]

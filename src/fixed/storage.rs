@@ -49,6 +49,7 @@ pub trait Storage: Copy + PartialOrd + 'static {
     }
     /// [from_float](Self::from_float) for an `f32`.
     #[inline(always)]
+    #[must_use]
     fn from_f32(x: f32) -> Option<Self> {
         Self::from_float(x as f64)
     }

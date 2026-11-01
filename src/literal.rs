@@ -41,12 +41,14 @@ pub struct Decimal {
 
 impl Decimal {
     /// `num · 10^exp`: `Decimal::new(25, -3)` is 0.025.
+    #[must_use]
     pub const fn new(num: i64, exp: i16) -> Decimal {
         Decimal { num, exp }
     }
 
     /// A decimal number as written: `"0.1"`, `"-3"`, `"+2.5e-3"`, `"1_000"`. Panics (a compile error in `const`
     /// code) on anything else, a type suffix (`0.1f32`) included: the storage comes from the context.
+    #[must_use]
     pub const fn parse(s: &str) -> Decimal {
         const FORM: &str = "a literal is a decimal number: 0.1, -3, 2.5e-3";
         let b = s.as_bytes();
@@ -119,11 +121,13 @@ impl Decimal {
     }
 
     /// The digits, `25` for 0.025.
+    #[must_use]
     pub const fn num(self) -> i64 {
         self.num
     }
 
     /// The power of ten, `-3` for 0.025.
+    #[must_use]
     pub const fn exp(self) -> i16 {
         self.exp
     }

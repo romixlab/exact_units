@@ -186,6 +186,7 @@ impl Magnitude {
     /// exponent): the product `x · m` is exact in 128 bits for any `x` of up to 64 bits, so the result differs from
     /// the correctly rounded `x · magnitude` only where that lies within `|x| · 2⁻⁶⁴` of a rounding step, and then by
     /// one step.
+    #[must_use]
     pub const fn fixed_point(&self) -> (u64, i32) {
         let w = Work::of(self);
         // the doubled exponents give the square of the magnitude

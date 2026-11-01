@@ -48,6 +48,7 @@ pub enum LevelForm {
 
 impl LevelForm {
     /// Decibels per decade of the ratio: 10 or 20.
+    #[must_use]
     pub const fn db_per_decade(self) -> f64 {
         match self {
             LevelForm::Power => 10.0,
@@ -102,6 +103,7 @@ const fn same_str(a: &str, b: &str) -> bool {
 
 impl<'i> Kind<'i> {
     /// `==` in `const` code.
+    #[must_use]
     pub const fn same(self, o: Kind<'_>) -> bool {
         match (self, o) {
             (Kind::Plain, Kind::Plain) => true,
@@ -112,11 +114,13 @@ impl<'i> Kind<'i> {
     }
 
     /// The kind of `a · b`, for quantities `a` of kind `self` and dimension `a_dim`, `b` of kind `o` and `b_dim`.
+    #[must_use]
     pub const fn mul(self, a_dim: Dim<'i>, o: Kind<'i>, b_dim: Dim<'i>) -> Kind<'i> {
         Self::combine(self, a_dim, o, b_dim)
     }
 
     /// The kind of `a / b`, for quantities `a` of kind `self` and dimension `a_dim`, `b` of kind `o` and `b_dim`.
+    #[must_use]
     pub const fn div(self, a_dim: Dim<'i>, o: Kind<'i>, b_dim: Dim<'i>) -> Kind<'i> {
         // what cancels is kept: V/V is a ratio of voltage
         if !a_dim.is_one() && a_dim.same(b_dim) {
@@ -138,12 +142,14 @@ impl<'i> Kind<'i> {
     }
 
     /// The kind of `√a`: plain (`√Hz`).
+    #[must_use]
     pub const fn sqrt(self) -> Kind<'i> {
         Kind::Plain
     }
 
     /// How a quantity of this kind is put in decibels: a ratio of a power or root-power dimension (W/W, V/V, A/A),
     /// `None` for any other kind (a plain [Ratio](crate::units::Ratio) has no level form: 0.5 duty is not −3 dB).
+    #[must_use]
     pub const fn level_form(self) -> Option<LevelForm> {
         match self {
             Kind::RatioOf(d) if any_same(&POWER, d) => Some(LevelForm::Power),

@@ -20,13 +20,13 @@ fn parses() {
 #[test]
 #[should_panic(expected = "decimal number")]
 fn refuses_a_suffix() {
-    Decimal::parse("0.5f32");
+    let _ = Decimal::parse("0.5f32");
 }
 
 #[test]
 #[should_panic(expected = "decimal number")]
 fn refuses_an_empty_exponent() {
-    Decimal::parse("1e");
+    let _ = Decimal::parse("1e");
 }
 
 #[test]

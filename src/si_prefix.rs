@@ -113,6 +113,7 @@ pub struct Pow10Exp(i8);
 
 impl Pow10Exp {
     /// `None` for an SI prefix's exponent and out of -63..=63.
+    #[must_use]
     pub const fn new(e: i8) -> Option<Self> {
         if Prefix::si_from_pow10(e).is_none() && -63 <= e && e <= 63 {
             Some(Pow10Exp(e))
@@ -122,6 +123,7 @@ impl Pow10Exp {
     }
 
     /// The exponent.
+    #[must_use]
     pub const fn get(self) -> i8 {
         self.0
     }
@@ -134,6 +136,7 @@ pub struct Pow2Exp(i8);
 
 impl Pow2Exp {
     /// `None` for 0, a binary prefix's exponent and out of -63..=63.
+    #[must_use]
     pub const fn new(e: i8) -> Option<Self> {
         if !matches!(e, 0 | 10 | 20 | 30 | 40) && -63 <= e && e <= 63 {
             Some(Pow2Exp(e))
@@ -143,6 +146,7 @@ impl Pow2Exp {
     }
 
     /// The exponent.
+    #[must_use]
     pub const fn get(self) -> i8 {
         self.0
     }
@@ -155,6 +159,7 @@ pub struct FullScaleBits(u8);
 
 impl FullScaleBits {
     /// `None` out of 2..=32.
+    #[must_use]
     pub const fn new(n: u8) -> Option<Self> {
         if 2 <= n && n <= 32 {
             Some(FullScaleBits(n))
@@ -164,11 +169,13 @@ impl FullScaleBits {
     }
 
     /// The number of bits.
+    #[must_use]
     pub const fn get(self) -> u8 {
         self.0
     }
 
     /// `1/(2^n − 1)`, built from the primes of `2^n − 1` (no trial division).
+    #[must_use]
     pub const fn magnitude(self) -> Magnitude {
         let b = (self.0 - 2) as usize;
         let start = if b == 0 { 0 } else { FULL_ENDS[b - 1] as usize };
@@ -178,6 +185,7 @@ impl FullScaleBits {
     }
 
     /// The bits whose full scale step is `m`, `None` when `m` isn't one.
+    #[must_use]
     pub fn of(m: &Magnitude) -> Option<Self> {
         match m.to_ratio() {
             Some((1, den)) if (den + 1).is_power_of_two() => {
@@ -300,6 +308,7 @@ impl Prefix {
     ];
 
     /// The power of ten the scale is, for an SI prefix and `Pow10` (`Some(-4)`), `None` for any other scale.
+    #[must_use]
     pub const fn pow10(&self) -> Option<i8> {
         match self {
             Prefix::Pow10(e) => Some(e.get()),
@@ -309,6 +318,7 @@ impl Prefix {
 
     /// The power of ten of an SI prefix, `None` for any other (even `Pow10`, see [pow10](Self::pow10)): the fast path
     /// of arithmetic across prefixes, no [Magnitude] built.
+    #[must_use]
     pub const fn si_pow10(&self) -> Option<i8> {
         Some(match self {
             Prefix::Quetta => 30,
@@ -349,6 +359,7 @@ impl Prefix {
 
     /// The SI prefix that is `10^e`, `None` when there is none (`10⁻⁴`: [from_pow10](Self::from_pow10) gives it as
     /// `Pow10`).
+    #[must_use]
     pub const fn si_from_pow10(e: i8) -> Option<Prefix> {
         Some(match e {
             30 => Prefix::Quetta,
@@ -381,6 +392,7 @@ impl Prefix {
     }
 
     /// `10^e` as a prefix: the SI one, else `Pow10`. `None` for `|e| > 63`.
+    #[must_use]
     pub const fn from_pow10(e: i8) -> Option<Prefix> {
         match Self::si_from_pow10(e) {
             Some(p) => Some(p),
@@ -392,6 +404,7 @@ impl Prefix {
     }
 
     /// `2^e` as a prefix: `Unit`, a binary one, else `Pow2`. `None` for `|e| > 63`.
+    #[must_use]
     pub const fn from_pow2(e: i8) -> Option<Prefix> {
         Some(match e {
             0 => Prefix::Unit,
@@ -407,6 +420,7 @@ impl Prefix {
     }
 
     /// The scale, exact: `10⁻³` for `Milli`, `2¹⁰` for `Kibi`; `None` for [Unknown](Prefix::Unknown).
+    #[must_use]
     pub fn magnitude(&self) -> Option<Magnitude> {
         Some(match self {
             Prefix::Kibi => Magnitude::pow2(10),
@@ -423,6 +437,7 @@ impl Prefix {
     }
 
     /// The named prefix whose scale is `m`, `None` when no named one is.
+    #[must_use]
     pub fn named_of(m: &Magnitude) -> Option<Prefix> {
         if let Some(e) = m.as_pow10() {
             return Self::si_from_pow10(e);
@@ -458,6 +473,7 @@ impl Prefix {
     }
 
     /// Whether this is one of the named prefixes (not `Pow10`, `Pow2`, `FullScale` or `Unknown`).
+    #[must_use]
     pub const fn is_named(&self) -> bool {
         !matches!(
             self,
@@ -468,6 +484,7 @@ impl Prefix {
     /// The parameter of a family: the exponent of [Pow10](Prefix::Pow10) and [Pow2](Prefix::Pow2), the bits of
     /// [FullScale](Prefix::FullScale); `None` for a named prefix. With [name](Self::name), the prefix as a dynamic
     /// client sees it (`{"Pow10": -4}`).
+    #[must_use]
     pub const fn param(&self) -> Option<i8> {
         match *self {
             Prefix::Pow10(e) => Some(e.get()),
@@ -478,6 +495,7 @@ impl Prefix {
     }
 
     /// The variant's name, `"Milli"`: how a dynamic client sees it in a decoded value.
+    #[must_use]
     pub const fn name(&self) -> &'static str {
         match self {
             Prefix::Unit => "Unit",
@@ -517,6 +535,7 @@ impl Prefix {
     }
 
     /// The named prefix whose [name](Self::name) is `name`.
+    #[must_use]
     pub fn from_name(name: &str) -> Option<Prefix> {
         Self::ALL.into_iter().find(|p| p.name() == name)
     }
@@ -524,6 +543,7 @@ impl Prefix {
     /// `x` in units of this prefix as a number in the unit itself: `Prefix::Milli.scale_f64(3300.0)` is 3.3, one
     /// multiplication or division by an exact power of ten (or by the exact fraction of another scale). NaN for
     /// [Unknown](Prefix::Unknown).
+    #[must_use]
     pub fn scale_f64(&self, x: f64) -> f64 {
         match (self.si_pow10(), self.magnitude()) {
             (Some(e), _) => crate::num::scale_f64(x, e),
@@ -533,6 +553,7 @@ impl Prefix {
     }
 
     /// `x` in units of this prefix as a number in the unit itself, in `f32`, as [scale_f64](Self::scale_f64).
+    #[must_use]
     pub fn scale_f32(&self, x: f32) -> f32 {
         match self.si_pow10() {
             Some(e) => crate::num::scale_f32(x, e),
@@ -542,6 +563,7 @@ impl Prefix {
 
     /// The symbol: `m`, `µ`, `k`, `da`, `Ki`; empty for `Unit`, the families and `Unknown`, which
     /// [Display](core::fmt::Display) writes as their magnitude (`·1/65535`) or tag (`·<scale 1000>`).
+    #[must_use]
     pub const fn symbol(&self) -> &'static str {
         match self {
             Prefix::Unit => "",

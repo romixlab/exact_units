@@ -7,6 +7,7 @@ const POW10_F64: [f64; 31] = [
 ];
 
 /// `10^exp` in `const` code (what [Scale::Pow10](crate::Scale::Pow10) multiplies by).
+#[must_use]
 pub const fn pow10_f64(exp: i8) -> f64 {
     let mut x = 1.0;
     let mut i = 0;
@@ -18,6 +19,7 @@ pub const fn pow10_f64(exp: i8) -> f64 {
 }
 
 /// `x^n` in `const` code (what [UnitExpr::Pow](crate::UnitExpr::Pow) multiplies by).
+#[must_use]
 pub const fn powi_f64(x: f64, n: i8) -> f64 {
     let mut y = 1.0;
     let mut i = 0;
@@ -30,6 +32,7 @@ pub const fn powi_f64(x: f64, n: i8) -> f64 {
 
 /// `√x` in `const` code, rounded to nearest like `f64::sqrt` (what [UnitExpr::Sqrt](crate::UnitExpr::Sqrt)
 /// multiplies by): `sqrt` is not in `core`. An integer square root of the significand, NaN below zero.
+#[must_use]
 pub const fn sqrt_f64(x: f64) -> f64 {
     if x.is_nan() || x < 0.0 {
         return f64::NAN;
@@ -75,6 +78,7 @@ pub const fn sqrt_f64(x: f64) -> f64 {
 }
 
 /// `x * 10^exp`, for the powers prefixes have (-60..=60 between two of them).
+#[must_use]
 pub fn scale_f64(x: f64, exp: i8) -> f64 {
     let mut x = x;
     let mut exp = exp as i32;
@@ -98,6 +102,7 @@ const POW10_F32: [f32; 11] = [1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 
 
 /// `x * 10^exp` in `f32`, without `powi` (not in `core`): one multiplication or division by an exact power of ten for
 /// the usual prefixes, so 2 m· is 0.002 rounded once, not three times.
+#[must_use]
 pub fn scale_f32(x: f32, exp: i8) -> f32 {
     let mut x = x;
     let mut exp = exp as i32;

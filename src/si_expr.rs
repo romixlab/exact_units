@@ -47,12 +47,14 @@ pub enum SIExpr<'i> {
 
 impl SIExpr<'static> {
     /// The unit `U` on the wire: `SIExpr::of::<units::Volt>()`, [Unit::SI_EXPR].
+    #[must_use]
     pub fn of<U: Unit>() -> SIExpr<'static> {
         U::SI_EXPR.clone()
     }
 
     /// The run-time form of a named [UnitExpr], in `const` code. Panics (a compile error in `const` code) for a
     /// compound one: those have no `'static` children to point to, [Unit::SI_EXPR] of `Per` / `Times` has them.
+    #[must_use]
     pub const fn named(e: &'static UnitExpr) -> SIExpr<'static> {
         match *e {
             UnitExpr::Named {
@@ -75,39 +77,46 @@ impl SIExpr<'static> {
 impl<'i> SIExpr<'i> {
     /// SI base-unit exponents of the whole tree; `None` when one leaves -8..=7, a part doesn't decode or the tree is
     /// deeper than [MAX_UNIT_DEPTH](crate::MAX_UNIT_DEPTH).
+    #[must_use]
     pub fn dim(&self) -> Option<Dim<'i>> {
         tree::dim(self)
     }
 
     /// The factor to coherent SI of the whole tree (offsets left out, as in [UnitExpr::factor]); `None` like
     /// [dim](Self::dim).
+    #[must_use]
     pub fn factor(&self) -> Option<f64> {
         tree::factor(self)
     }
 
     /// The exact factor to coherent SI of the whole tree, as [UnitExpr::magnitude]; `None` like [dim](Self::dim),
     /// with an `Affine` or `Factor` scale in it, or a product a [Magnitude](crate::Magnitude) doesn't hold.
+    #[must_use]
     pub fn magnitude(&self) -> Option<crate::Magnitude> {
         tree::magnitude(self)
     }
 
     /// The offset to coherent SI: only a named unit with an `Affine` scale (°C) has one.
+    #[must_use]
     pub fn offset(&self) -> f64 {
         tree::offset(self)
     }
 
     /// The symbol as written after a number: `V`, `N·m/(rad/s)`, empty for a ratio. Same as `Display`.
+    #[must_use]
     pub fn symbol(&self) -> impl fmt::Display + '_ {
         self
     }
 
     /// The type name, as the typed unit is called: `Volt`, `Per<Torque, AngularVelocity>`.
+    #[must_use]
     pub fn name(&self) -> impl fmt::Display + '_ {
         tree::name(self)
     }
 
     /// The named unit of this crate this is, if it is one (same name, symbol, dimension and scale as in
     /// [by_name](crate::units::by_name)).
+    #[must_use]
     pub fn known(&self) -> Option<&'static UnitExpr> {
         let SIExpr::Named { name, .. } = self else {
             return None;
@@ -206,31 +215,37 @@ mod owned {
 
     impl SIExprOwned {
         /// Like [SIExpr::dim].
+        #[must_use]
         pub fn dim(&self) -> Option<Dim<'_>> {
             tree::dim(&self)
         }
 
         /// Like [SIExpr::factor].
+        #[must_use]
         pub fn factor(&self) -> Option<f64> {
             tree::factor(&self)
         }
 
         /// Like [SIExpr::magnitude].
+        #[must_use]
         pub fn magnitude(&self) -> Option<crate::Magnitude> {
             tree::magnitude(&self)
         }
 
         /// Like [SIExpr::offset].
+        #[must_use]
         pub fn offset(&self) -> f64 {
             tree::offset(&self)
         }
 
         /// Like [SIExpr::name].
+        #[must_use]
         pub fn name(&self) -> impl fmt::Display + '_ {
             tree::name_of(self)
         }
 
         /// Like [SIExpr::known].
+        #[must_use]
         pub fn known(&self) -> Option<&'static UnitExpr> {
             let SIExprOwned::Named { name, .. } = self else {
                 return None;

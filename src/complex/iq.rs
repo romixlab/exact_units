@@ -255,6 +255,7 @@ pub struct Mac<U, P, T: IqStorage> {
 impl<U, P, T: IqStorage> Mac<U, P, T> {
     /// An empty sum.
     #[inline(always)]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -479,6 +480,7 @@ impl<U, P, T: ComplexStorage + fmt::Debug, B: Unlimited<T>> fmt::Debug
 impl<'a, U, P, T: ComplexStorage, B: Unlimited<T>> Interleaved<'a, U, P, T, B> {
     /// The number left over at the end of an odd buffer, or nothing.
     #[inline(always)]
+    #[must_use]
     pub fn remainder(&self) -> &'a [T] {
         self.rest
     }
@@ -624,6 +626,7 @@ impl Nco {
     /// An NCO at phase 0 that advances by `step` (a turn is 2³² steps) per sample. A negative frequency is the step
     /// negated, modulo a turn.
     #[inline(always)]
+    #[must_use]
     pub const fn new(step: Bam32) -> Self {
         Nco {
             phase: Bam32::of(0),
@@ -642,6 +645,7 @@ impl Nco {
     /// # }
     /// ```
     #[inline]
+    #[must_use]
     pub const fn tuned(f: u32, fs: u32) -> Self {
         let step = (((f as u64) << 32) + fs as u64 / 2) / fs as u64;
         Self::new(Bam32::of(step as u32))
@@ -649,24 +653,28 @@ impl Nco {
 
     /// The same NCO, now at `phase`.
     #[inline(always)]
+    #[must_use]
     pub const fn with_phase(self, phase: Bam32) -> Self {
         Nco { phase, ..self }
     }
 
     /// The phase of the next sample.
     #[inline(always)]
+    #[must_use]
     pub const fn phase(&self) -> Bam32 {
         self.phase
     }
 
     /// The step per sample.
     #[inline(always)]
+    #[must_use]
     pub const fn step(&self) -> Bam32 {
         self.step
     }
 
     /// e^(jθ) of the current phase θ, `cos θ + j·sin θ`, in `T`'s Q format; the phase stays.
     #[inline(always)]
+    #[must_use]
     pub fn phasor<T: IqStorage>(&self) -> Complex<Ratio, T::Q, T, Saturating> {
         let (c, s) = T::unit_phasor(self.phase);
         Complex::of(c, s)

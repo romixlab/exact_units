@@ -177,6 +177,46 @@ unused_lifetimes = "warn"
 rust_2018_idioms = { level = "warn", priority = -1 }
 
 [lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+# pedantic, but for these: the house style writes names and formulas in prose (Q15, SIExpr, dB)
+doc_markdown = "allow"
+# #[inline(always)] on the small const fns a firmware calls in its loop is deliberate
+inline_always = "allow"
+# reference values are written digit for digit as their source prints them (NIST SP 811, libm)
+unreadable_literal = "allow"
+# the docs say when a function panics or errs in their first sentences, not under a heading
+missing_panics_doc = "allow"
+missing_errors_doc = "allow"
+# NEXT STEP (strict-lints session, not landed): fixed or narrowed before the branch is ready
+return_self_not_must_use = "allow"
+many_single_char_names = "allow"
+items_after_statements = "allow"
+semicolon_if_nothing_returned = "allow"
+uninlined_format_args = "allow"
+redundant_closure_for_method_calls = "allow"
+manual_let_else = "allow"
+manual_assert = "allow"
+wildcard_imports = "allow"
+single_match_else = "allow"
+used_underscore_binding = "allow"
+manual_assert_eq = "allow"
+trivially_copy_pass_by_ref = "allow"
+too_many_lines = "allow"
+if_not_else = "allow"
+verbose_bit_mask = "allow"
+unsafe_derive_deserialize = "allow"
+struct_field_names = "allow"
+similar_names = "allow"
+should_panic_without_expect = "allow"
+match_wild_err_arm = "allow"
+match_same_arms = "allow"
+assert_is_empty = "allow"
+cast_lossless = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
 absolute_paths = "warn"
 # every suppression is an #[expect(.., reason = "..")]
 allow_attributes = "warn"

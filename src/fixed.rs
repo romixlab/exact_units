@@ -442,6 +442,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// The value `x · scale` (in the unit `U` itself) in this prefix and storage, if it is exact (as [to](Self::to))
     /// and within `B`: how a number with a run-time scale becomes a `Fixed`, `Repr::Int(3)` with `Pow10(-3)` is
     /// 3000 of `Micro`.
+    #[must_use]
     pub fn from_scaled(x: Repr, scale: Magnitude) -> Option<Self> {
         Self::try_new(rescale(x, scale.div(P::SCALE))?).ok()
     }

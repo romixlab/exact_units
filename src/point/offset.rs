@@ -30,6 +30,7 @@ impl Offset {
     };
 
     /// `±magnitude`.
+    #[must_use]
     pub const fn new(negative: bool, magnitude: Magnitude) -> Self {
         Offset {
             negative,
@@ -38,11 +39,13 @@ impl Offset {
     }
 
     /// The whole number `n`.
+    #[must_use]
     pub const fn int(n: i64) -> Self {
         Self::ratio(n, 1)
     }
 
     /// `num / den`. Panics (at compile time in a `const`) for `den == 0` or a prime factor above `u32::MAX`.
+    #[must_use]
     pub const fn ratio(num: i64, den: u64) -> Self {
         if num == 0 {
             assert!(den != 0, "an offset of 0/0");
@@ -52,26 +55,31 @@ impl Offset {
     }
 
     /// `num · 10^exp`: `decimal(27315, -2)` is 273.15.
+    #[must_use]
     pub const fn decimal(num: i64, exp: i8) -> Self {
         Self::int(num).mul(Magnitude::pow10(exp))
     }
 
     /// Whether it is 0.
+    #[must_use]
     pub const fn is_zero(&self) -> bool {
         self.magnitude.is_none()
     }
 
     /// Whether it is below 0.
+    #[must_use]
     pub const fn is_negative(&self) -> bool {
         self.negative
     }
 
     /// `|self|`, `None` for 0.
+    #[must_use]
     pub const fn magnitude(&self) -> Option<Magnitude> {
         self.magnitude
     }
 
     /// `-self`.
+    #[must_use]
     pub const fn neg(self) -> Self {
         match self.magnitude {
             None => self,
@@ -80,6 +88,7 @@ impl Offset {
     }
 
     /// `self · m`.
+    #[must_use]
     pub const fn mul(self, m: Magnitude) -> Self {
         match self.magnitude {
             None => self,
@@ -89,6 +98,7 @@ impl Offset {
 
     /// `self + rhs`. Both must be fractions of integers (no π) and the sum's numerator and denominator fit a `u64`,
     /// else it panics (at compile time in a `const`).
+    #[must_use]
     pub const fn add(self, rhs: Self) -> Self {
         match self.checked_add(rhs) {
             Some(sum) => sum,
@@ -99,6 +109,7 @@ impl Offset {
     }
 
     /// `self + rhs`, `None` where [add](Self::add) panics: for offsets read from data (an API model).
+    #[must_use]
     pub const fn checked_add(self, rhs: Self) -> Option<Self> {
         let Some((an, ad)) = self.to_ratio() else {
             return None;
@@ -120,6 +131,7 @@ impl Offset {
     }
 
     /// `self - rhs`, as [add](Self::add).
+    #[must_use]
     pub const fn sub(self, rhs: Self) -> Self {
         self.add(rhs.neg())
     }
@@ -142,6 +154,7 @@ impl Offset {
 
     /// `(num, den)` without a common factor, if the offset is a fraction of integers that fits: `(5463, 20)` for
     /// 273.15.
+    #[must_use]
     pub const fn to_ratio(&self) -> Option<(i128, u128)> {
         let Some(m) = self.magnitude else {
             return Some((0, 1));
@@ -163,6 +176,7 @@ impl Offset {
     }
 
     /// The offset as an `f64` (rounded, unlike the offset itself).
+    #[must_use]
     pub const fn to_f64(&self) -> f64 {
         match self.magnitude {
             None => 0.0,

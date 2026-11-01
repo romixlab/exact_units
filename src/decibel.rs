@@ -38,6 +38,7 @@ pub const MAX_DECIMALS: u8 = 9;
 
 impl Decibels {
     /// `num · 10^-decimals` dB: `Decibels::new(-301, 2)` is −3.01 dB. Up to [MAX_DECIMALS] decimals.
+    #[must_use]
     pub const fn new(num: i64, decimals: u8) -> Decibels {
         assert!(
             decimals <= MAX_DECIMALS,
@@ -48,6 +49,7 @@ impl Decibels {
 
     /// A decimal number as written: `"-3.01"`, `"6"`, `"+0.5"`. Panics (a compile error in `const` code) on
     /// anything else.
+    #[must_use]
     pub const fn parse(s: &str) -> Decibels {
         let b = s.as_bytes();
         let mut i = 0;
@@ -93,16 +95,19 @@ impl Decibels {
     }
 
     /// The digits, `-301` for −3.01 dB.
+    #[must_use]
     pub const fn num(self) -> i64 {
         self.num
     }
 
     /// The decimals, `2` for −3.01 dB.
+    #[must_use]
     pub const fn decimals(self) -> u8 {
         self.decimals
     }
 
     /// The level as an `f64` (rounded).
+    #[must_use]
     pub const fn to_f64(self) -> f64 {
         self.num as f64 / crate::num::pow10_f64(self.decimals as i8)
     }
@@ -319,6 +324,7 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::from_db(30.0), Some(Fixed::new(1000.0)));
     /// # }
     /// ```
+    #[must_use]
     pub fn from_db(db: f64) -> Option<Self> {
         let form = const { Self::LEVEL_FORM };
         let x = math::exp10(db / form.db_per_decade());
@@ -349,6 +355,7 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     /// assert_eq!(Fixed::<Per<Watt, Watt>, Milli, u32>::from_db_f32(20.0), Some(Fixed::new(100_000)));
     /// # }
     /// ```
+    #[must_use]
     pub fn from_db_f32(db: f32) -> Option<Self> {
         let per_decade = const { Self::LEVEL_FORM.db_per_decade() as f32 };
         // times the reciprocal: 1000.0 for Milli is exact in f32, 0.001 isn't

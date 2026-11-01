@@ -109,6 +109,7 @@ const _: () = assert!(MAX_COUNTED == 4, "the array length in Dim");
 const FIXED: usize = 9;
 
 /// An exponent in `const` code, a compile error (a panic at run time) when out of -8..=7.
+#[must_use]
 pub const fn exp(e: i8) -> i8 {
     if !in_range(e) {
         panic!("exponent of a dimension out of -8..=7");
@@ -176,6 +177,7 @@ impl<'i> Dim<'i> {
     /// From the exponents of s, m, kg, A, K, mol, cd, without angle, information or counted bases (add them with
     /// [with_rad](Self::with_rad), [with_bit](Self::with_bit), [mul](Self::mul) by [counted](Self::counted)). Panics
     /// (a compile error in `const` code) when one is out of -8..=7, [checked_new](Self::checked_new) doesn't.
+    #[must_use]
     pub const fn new(s: i8, m: i8, kg: i8, a: i8, k: i8, mol: i8, cd: i8) -> Dim<'i> {
         Dim {
             s: exp(s),
@@ -193,6 +195,7 @@ impl<'i> Dim<'i> {
     }
 
     /// From the exponents of s, m, kg, A, K, mol, cd, rad, bit, `None` when one is out of -8..=7.
+    #[must_use]
     pub const fn checked_new(exps: [i8; FIXED]) -> Option<Dim<'i>> {
         let mut i = 0;
         while i < FIXED {
@@ -212,6 +215,7 @@ impl<'i> Dim<'i> {
 
     /// A count of the marker `name` of `crate_name` to the 1st power: the dimension of a counted unit marker
     /// (`Dim::counted("exact_units", "Sample")`). In an API crate, [counted!](crate::counted) fills in the crate.
+    #[must_use]
     pub const fn counted(crate_name: &'i str, name: &'i str) -> Dim<'i> {
         let mut d = Dim::new(0, 0, 0, 0, 0, 0, 0);
         d.counted[0] = Some(Counted {
@@ -223,12 +227,14 @@ impl<'i> Dim<'i> {
     }
 
     /// The same with the exponent of angle (rad) set to `e`.
+    #[must_use]
     pub const fn with_rad(mut self, e: i8) -> Dim<'i> {
         self.rad = exp(e);
         self
     }
 
     /// The same with the exponent of information (bit) set to `e`.
+    #[must_use]
     pub const fn with_bit(mut self, e: i8) -> Dim<'i> {
         self.bit = exp(e);
         self
@@ -237,11 +243,13 @@ impl<'i> Dim<'i> {
     /// The same without angle, as SI writes it (rad = 1): `Torque` (kg·m²·s⁻²·rad⁻¹) becomes the joule's
     /// kg·m²·s⁻², `AngularVelocity` s⁻¹. The explicit bridge for exports to systems without an angle dimension
     /// (UCUM, UNECE, Pint, uom) and for formulas like v = ωr; never applied implicitly.
+    #[must_use]
     pub const fn strip_radian(self) -> Dim<'i> {
         self.with_rad(0)
     }
 
     /// The exponents of s, m, kg, A, K, mol, cd, rad, bit.
+    #[must_use]
     pub const fn exps(&self) -> [i8; FIXED] {
         [
             self.s, self.m, self.kg, self.a, self.k, self.mol, self.cd, self.rad, self.bit,
@@ -257,6 +265,7 @@ impl<'i> Dim<'i> {
     }
 
     /// Without any exponent: a ratio.
+    #[must_use]
     pub const fn is_one(&self) -> bool {
         self.same(Dim::ONE)
     }
@@ -391,22 +400,26 @@ impl<'i> Dim<'i> {
 
     /// The dimension of a product: exponents added. `None` when one leaves -8..=7 or there are more than
     /// [MAX_COUNTED] counted bases.
+    #[must_use]
     pub const fn checked_mul(self, o: Dim<'i>) -> Option<Dim<'i>> {
         self.combine(o, 1, 1)
     }
 
     /// The dimension of a quotient: exponents subtracted. `None` like [checked_mul](Self::checked_mul).
+    #[must_use]
     pub const fn checked_div(self, o: Dim<'i>) -> Option<Dim<'i>> {
         self.combine(o, -1, 1)
     }
 
     /// The dimension of a power: exponents multiplied by `n`. `None` when one leaves -8..=7.
+    #[must_use]
     pub const fn checked_pow(self, n: i8) -> Option<Dim<'i>> {
         self.combine(Dim::new(0, 0, 0, 0, 0, 0, 0), 0, n as i16)
     }
 
     /// The dimension of a square root: halved exponents when they are all even, else the same exponents with
     /// `root`. `None` for the root of a root (a fourth root isn't a `Dim`).
+    #[must_use]
     pub const fn checked_sqrt(self) -> Option<Dim<'i>> {
         if self.root {
             return None;
@@ -419,6 +432,7 @@ impl<'i> Dim<'i> {
 
     /// The dimension of a square root, for unit markers: V/√Hz is `Volt.div(Hertz.sqrt())`. Panics (a compile
     /// error in `const` code) where [checked_sqrt](Self::checked_sqrt) is `None`.
+    #[must_use]
     pub const fn sqrt(self) -> Dim<'i> {
         match self.checked_sqrt() {
             Some(d) => d,
@@ -428,6 +442,7 @@ impl<'i> Dim<'i> {
 
     /// The dimension of a product, for unit markers: panics (a compile error in `const` code) when an exponent leaves
     /// -8..=7 or there are more than [MAX_COUNTED] counted bases.
+    #[must_use]
     pub const fn mul(self, o: Dim<'i>) -> Dim<'i> {
         match self.checked_mul(o) {
             Some(d) => d,
@@ -436,6 +451,7 @@ impl<'i> Dim<'i> {
     }
 
     /// The dimension of a quotient, for unit markers: panics like [mul](Self::mul).
+    #[must_use]
     pub const fn div(self, o: Dim<'i>) -> Dim<'i> {
         match self.checked_div(o) {
             Some(d) => d,
@@ -444,6 +460,7 @@ impl<'i> Dim<'i> {
     }
 
     /// `==` in `const` code.
+    #[must_use]
     pub const fn same(self, o: Dim<'_>) -> bool {
         let a = self.exps();
         let b = o.exps();
@@ -479,6 +496,7 @@ impl<'i> Dim<'i> {
 
     /// Whether the dimension is as it must be on the wire: counted bases in used slots first, sorted by crate and
     /// name without duplicates, exponents not 0; `root` only with an odd exponent.
+    #[must_use]
     pub const fn is_canonical(&self) -> bool {
         if self.root {
             let mut odd = false;
@@ -582,6 +600,7 @@ impl DimOwned {
     }
 
     /// The same dimension, borrowing the names of counted bases.
+    #[must_use]
     pub fn as_dim(&self) -> Dim<'_> {
         let mut counted = [None; MAX_COUNTED];
         for (slot, c) in counted.iter_mut().zip(&self.counted) {
@@ -681,6 +700,7 @@ pub enum Scale {
 
 impl Scale {
     /// The factor, without the offset of an `Affine` scale.
+    #[must_use]
     pub const fn factor(&self) -> f64 {
         match *self {
             Scale::Coherent => 1.0,
@@ -691,6 +711,7 @@ impl Scale {
     }
 
     /// The factor exactly: `None` for an `Affine` scale.
+    #[must_use]
     pub const fn magnitude(&self) -> Option<crate::Magnitude> {
         match *self {
             Scale::Coherent => Some(crate::Magnitude::ONE),
@@ -701,6 +722,7 @@ impl Scale {
     }
 
     /// The offset of an `Affine` scale, `0.0` for the others.
+    #[must_use]
     pub const fn offset(&self) -> f64 {
         match *self {
             Scale::Affine { offset, .. } => offset,
@@ -791,7 +813,9 @@ pub enum UnitExpr {
 }
 
 impl UnitExpr {
-    /// The dimension of the whole expression.
+    /// The dimension of the whole expression. Panics (a compile error in `const` code) when an exponent leaves
+    /// -8..=7, like [Dim::mul].
+    #[must_use]
     pub const fn dim(&self) -> Dim<'static> {
         match self {
             UnitExpr::Named { dim, .. } => *dim,
@@ -806,6 +830,7 @@ impl UnitExpr {
     }
 
     /// The factor to coherent SI of the whole expression (offsets left out: a product with °C is not affine).
+    #[must_use]
     pub const fn factor(&self) -> f64 {
         match self {
             UnitExpr::Named { scale, .. } => scale.factor(),
@@ -819,6 +844,7 @@ impl UnitExpr {
     /// The exact factor to coherent SI of the whole expression: `None` when a named unit in it has an
     /// `Affine` scale, or a product leaves what a [Magnitude](crate::Magnitude) holds. A pound-force second is
     /// 0.45359237 · 9.80665 N·s.
+    #[must_use]
     pub const fn magnitude(&self) -> Option<crate::Magnitude> {
         use crate::Magnitude;
         match self {
@@ -859,6 +885,7 @@ impl UnitExpr {
     }
 
     /// The offset to coherent SI: only a named unit with an `Affine` scale has one.
+    #[must_use]
     pub const fn offset(&self) -> f64 {
         match self {
             UnitExpr::Named { scale, .. } => scale.offset(),
@@ -867,6 +894,7 @@ impl UnitExpr {
     }
 
     /// Whether a named unit in the expression has an `Affine` scale (°C).
+    #[must_use]
     pub const fn has_offset(&self) -> bool {
         match self {
             UnitExpr::Named { scale, .. } => matches!(scale, Scale::Affine { .. }),
@@ -876,11 +904,13 @@ impl UnitExpr {
     }
 
     /// The symbol as written after a number: `V`, `N·m/(rad/s)`, empty for a ratio. Same as `Display`.
+    #[must_use]
     pub fn symbol(&self) -> impl fmt::Display + '_ {
         self
     }
 
     /// The type name: `Volt`, `Per<Torque, AngularVelocity>`.
+    #[must_use]
     pub fn name(&self) -> impl fmt::Display + '_ {
         tree::name_of(self)
     }

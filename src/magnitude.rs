@@ -484,6 +484,7 @@ impl Magnitude {
     }
 
     /// `10^e`: a decimal prefix. Panics (at compile time in a `const`) for `|e| > 63`.
+    #[must_use]
     pub const fn pow10(e: i8) -> Self {
         match Self::checked_pow10(e) {
             Some(m) => m,
@@ -492,6 +493,7 @@ impl Magnitude {
     }
 
     /// `10^e`, `None` for `|e| > 63`.
+    #[must_use]
     pub const fn checked_pow10(e: i8) -> Option<Self> {
         match exp(2 * e as i32) {
             Ok(pow10) => Some(Magnitude { pow10, rest: None }),
@@ -500,6 +502,7 @@ impl Magnitude {
     }
 
     /// `2^e`: a binary prefix, a Q format. Panics (at compile time in a `const`) for `|e| > 63`.
+    #[must_use]
     pub const fn pow2(e: i8) -> Self {
         let mut w = Work::ONE;
         w.pow2 = 2 * e as i32;
@@ -508,6 +511,7 @@ impl Magnitude {
 
     /// `num / den`, factored into primes. Panics (at compile time in a `const`) where [checked_ratio](Self::checked_ratio)
     /// is an error.
+    #[must_use]
     pub const fn ratio(num: u64, den: u64) -> Self {
         unwrap(Self::checked_ratio(num, den))
     }
@@ -527,6 +531,7 @@ impl Magnitude {
 
     /// `num / den · 10^pow10 · 2^pow2 · π^pi`: how the scales of unit definitions are written (`°` is
     /// `new(1, 180, 0, 0, 1)`). Panics (at compile time in a `const`) when that isn't a magnitude.
+    #[must_use]
     pub const fn new(num: u64, den: u64, pow10: i8, pow2: i8, pi: i8) -> Self {
         Self::ratio(num, den)
             .mul(Self::pow10(pow10))
@@ -549,6 +554,7 @@ impl Magnitude {
     }
 
     /// `self · rhs`. Panics (at compile time in a `const`) where [checked_mul](Self::checked_mul) is `None`.
+    #[must_use]
     pub const fn mul(self, rhs: Self) -> Self {
         unwrap(self.checked_mul(rhs))
     }
@@ -562,6 +568,7 @@ impl Magnitude {
     }
 
     /// `self / rhs`. Panics (at compile time in a `const`) where [checked_div](Self::checked_div) is `None`.
+    #[must_use]
     pub const fn div(self, rhs: Self) -> Self {
         unwrap(self.checked_div(rhs))
     }
@@ -575,17 +582,20 @@ impl Magnitude {
     }
 
     /// `1 / self`.
+    #[must_use]
     pub const fn recip(self) -> Self {
         Self::ONE.div(self)
     }
 
     /// `self^n`. Panics (at compile time in a `const`) when an exponent leaves ±63½.
+    #[must_use]
     pub const fn powi(self, n: i8) -> Self {
         unwrap(Work::of(&self).scale(n as i32).pack())
     }
 
     /// `√self`: exact, the exponents halved (√2, `10^(3/2)`). Panics (at compile time in a `const`) where
     /// [checked_sqrt](Self::checked_sqrt) is an error.
+    #[must_use]
     pub const fn sqrt(self) -> Self {
         unwrap(self.checked_sqrt())
     }
@@ -619,6 +629,7 @@ impl Magnitude {
 
     /// Twice the exponent of `prime` (2 and 5 included: `Milli` is 2⁻³ · 5⁻³, so -6 for both). 0 for a number that
     /// isn't a factor.
+    #[must_use]
     pub const fn exp_x2(&self, prime: u32) -> i16 {
         let w = Work::of(self);
         match prime {
@@ -638,6 +649,7 @@ impl Magnitude {
     }
 
     /// Twice the exponents of π, ln 2 and ln 10.
+    #[must_use]
     pub const fn irrational_x2(&self) -> Irrational {
         match &self.rest {
             Some(MagnitudeRest {
@@ -653,6 +665,7 @@ impl Magnitude {
     }
 
     /// Twice the exponent of 10 and of 2 as stored (`10^a · 2^b`, the 5s are in `a`).
+    #[must_use]
     pub const fn pow10_pow2_x2(&self) -> (i8, i8) {
         match &self.rest {
             Some(rest) => (self.pow10, rest.pow2),
@@ -668,6 +681,7 @@ impl Magnitude {
     }
 
     /// The power of ten when the magnitude is one alone (`Some(-6)` for µ), `None` otherwise.
+    #[must_use]
     pub const fn as_pow10(&self) -> Option<i8> {
         if self.rest.is_none() && self.pow10 % 2 == 0 {
             Some(self.pow10 / 2)
@@ -677,11 +691,13 @@ impl Magnitude {
     }
 
     /// Whether the magnitude is a fraction of integers: no power of π, ln 2 or ln 10, no half exponent.
+    #[must_use]
     pub const fn is_rational(&self) -> bool {
         self.to_ratio().is_some()
     }
 
     /// `(num, den)` without a common factor, if the magnitude is a fraction of integers that both fit a `u128`.
+    #[must_use]
     pub const fn to_ratio(&self) -> Option<(u128, u128)> {
         let w = Work::of(self);
         if w.irr[0] != 0 || w.irr[1] != 0 || w.irr[2] != 0 {
@@ -728,6 +744,7 @@ impl Magnitude {
     }
 
     /// The factor as an `f64` (rounded, unlike the magnitude itself).
+    #[must_use]
     pub const fn to_f64(&self) -> f64 {
         use core::f64::consts::{LN_2, LN_10, PI};
         let w = Work::of(self);
@@ -745,6 +762,7 @@ impl Magnitude {
 
     /// `x · self` in integers, exactly: `None` when the result is not whole, doesn't fit `i128`, or the magnitude
     /// isn't a fraction of integers.
+    #[must_use]
     pub fn apply_int(&self, x: i128) -> Option<i128> {
         let (num, den) = self.to_ratio()?;
         let (num, den) = (i128::try_from(num).ok()?, i128::try_from(den).ok()?);
@@ -756,6 +774,7 @@ impl Magnitude {
     }
 
     /// `x · self` in floats.
+    #[must_use]
     pub fn apply_f64(&self, x: f64) -> f64 {
         match self.to_ratio() {
             // exact factors through the integers, so 0.3 · 10 is 3.0 and not 3.0000000000000004

@@ -386,6 +386,7 @@ pub enum StorageKind {
 
 impl StorageKind {
     /// The kind of a storage type.
+    #[must_use]
     pub const fn of<T: Storage>() -> StorageKind {
         if T::IS_FLOAT {
             if T::BITS == 32 {
@@ -442,6 +443,7 @@ impl StorageKind {
 /// typed conversion, bit for bit (the conformance corpus checks both). `None` where `o` is [Overflow::Checked] and
 /// the result doesn't fit, where `x · num` of a fraction factor doesn't fit 128 bits (the typed conversion doesn't
 /// compile there), and for an integer `x` of more than 64 bits with a factor that isn't a fraction of integers.
+#[must_use]
 pub fn requantize(
     x: Repr,
     factor: &Magnitude,
@@ -478,6 +480,7 @@ enum Exact {
 
 impl Requantizer {
     /// The requantizer by `factor` into `to`, rounded by `r`, overflowing by `o`: [requantize] of each value.
+    #[must_use]
     pub fn new(factor: &Magnitude, to: StorageKind, r: Rounding, o: Overflow) -> Self {
         let exact = match factor.to_ratio() {
             Some((num, den)) => Exact::Ratio {
