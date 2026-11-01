@@ -279,7 +279,7 @@ mod thermal {
         let bytes = t.to_ww_bytes(&mut buf).unwrap().to_vec();
         assert_eq!(bytes, (-1234i16).to_ww_bytes(&mut [0u8; 8]).unwrap());
         assert_eq!(DegC::from_ww_bytes(&bytes).unwrap(), t);
-        assert_eq!(core::mem::size_of::<DegC>(), 2);
+        assert_eq!(size_of::<DegC>(), 2);
         type Room = Point<Celsius, Fixed<Kelvin, Centi, i16, crate::Range<0, 4000>>>;
         assert_eq!(
             Room::from_ww_bytes(&bytes),

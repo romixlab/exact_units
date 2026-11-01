@@ -23,57 +23,57 @@ const ANGLE: Dim = dim(0, 0, 0, 0, 1);
 
 // The defining relations.
 /// 1959: 1 yd = 0.9144 m.
-pub const YD: Mag = Mag::dec(9144, -4);
-pub const FT: Mag = YD.over(3);
-pub const IN: Mag = YD.over(36);
-pub const MI: Mag = FT.times(5280);
-pub const THOU: Mag = IN.mul(Mag::dec(1, -3));
+pub(super) const YD: Mag = Mag::dec(9144, -4);
+pub(super) const FT: Mag = YD.over(3);
+pub(super) const IN: Mag = YD.over(36);
+pub(super) const MI: Mag = FT.times(5280);
+pub(super) const THOU: Mag = IN.mul(Mag::dec(1, -3));
 /// 1959 (and 1893 before it): the US survey foot, 1200/3937 m.
-pub const SFT: Mag = Mag::ratio(1200, 3937);
+pub(super) const SFT: Mag = Mag::ratio(1200, 3937);
 /// 1959: 1 lb = 0.45359237 kg.
-pub const LB: Mag = Mag::dec(45359237, -8);
-pub const GR: Mag = LB.over(7000);
-pub const OZ: Mag = LB.over(16);
-pub const OZ_T: Mag = GR.times(480);
+pub(super) const LB: Mag = Mag::dec(45359237, -8);
+pub(super) const GR: Mag = LB.over(7000);
+pub(super) const OZ: Mag = LB.over(16);
+pub(super) const OZ_T: Mag = GR.times(480);
 /// 3rd CGPM 1901: g_n = 980.665 cm/s².
-pub const GN: Mag = Mag::dec(980665, -5);
-pub const LBF: Mag = LB.mul(GN);
+pub(super) const GN: Mag = Mag::dec(980665, -5);
+pub(super) const LBF: Mag = LB.mul(GN);
 /// lb · ft/s²
-pub const PDL: Mag = LB.mul(FT);
-pub const IN2: Mag = IN.powi(2);
-pub const FT2: Mag = FT.powi(2);
-pub const YD2: Mag = YD.powi(2);
-pub const IN3: Mag = IN.powi(3);
-pub const FT3: Mag = FT.powi(3);
-pub const SFT2: Mag = SFT.powi(2);
+pub(super) const PDL: Mag = LB.mul(FT);
+pub(super) const IN2: Mag = IN.powi(2);
+pub(super) const FT2: Mag = FT.powi(2);
+pub(super) const YD2: Mag = YD.powi(2);
+pub(super) const IN3: Mag = IN.powi(3);
+pub(super) const FT3: Mag = FT.powi(3);
+pub(super) const SFT2: Mag = SFT.powi(2);
 /// HB 44: 1 gal = 231 in³.
-pub const GAL_US: Mag = IN3.times(231);
-pub const PT_US: Mag = GAL_US.over(8);
-pub const FLOZ_US: Mag = PT_US.over(16);
+pub(super) const GAL_US: Mag = IN3.times(231);
+pub(super) const PT_US: Mag = GAL_US.over(8);
+pub(super) const FLOZ_US: Mag = PT_US.over(16);
 /// HB 44: 1 bu = 2150.42 in³.
-pub const BU_US: Mag = IN3.mul(Mag::dec(215042, -2));
+pub(super) const BU_US: Mag = IN3.mul(Mag::dec(215042, -2));
 /// WMA 1985: 1 gallon = 4.54609 dm³.
-pub const GAL_IMP: Mag = Mag::dec(454609, -8);
-pub const PT_IMP: Mag = GAL_IMP.over(8);
-pub const FLOZ_IMP: Mag = PT_IMP.over(20);
+pub(super) const GAL_IMP: Mag = Mag::dec(454609, -8);
+pub(super) const PT_IMP: Mag = GAL_IMP.over(8);
+pub(super) const FLOZ_IMP: Mag = PT_IMP.over(20);
 /// 1 mL
-pub const ML: Mag = Mag::dec(1, -6);
+pub(super) const ML: Mag = Mag::dec(1, -6);
 /// 5th International Conference on the Properties of Steam, 1956: cal_IT = 4.1868 J.
-pub const CAL_IT: Mag = Mag::dec(41868, -4);
-pub const CAL_TH: Mag = Mag::dec(4184, -3);
+pub(super) const CAL_IT: Mag = Mag::dec(41868, -4);
+pub(super) const CAL_TH: Mag = Mag::dec(4184, -3);
 /// 1 °F (interval) = 5/9 K.
-pub const DEG_F: Mag = Mag::ratio(5, 9);
+pub(super) const DEG_F: Mag = Mag::ratio(5, 9);
 /// cal/(g·°C) · lb · °F: the heat for one pound of water by one degree Fahrenheit.
-pub const BTU_IT: Mag = CAL_IT.times(1000).mul(LB).mul(DEG_F);
-pub const BTU_TH: Mag = CAL_TH.times(1000).mul(LB).mul(DEG_F);
+pub(super) const BTU_IT: Mag = CAL_IT.times(1000).mul(LB).mul(DEG_F);
+pub(super) const BTU_TH: Mag = CAL_TH.times(1000).mul(LB).mul(DEG_F);
 /// Conventional mercury density, 13 595.1 kg/m³ (ISO 80000-4, not fetched).
-pub const HG: Mag = Mag::dec(135951, -1);
+pub(super) const HG: Mag = Mag::dec(135951, -1);
 /// Conventional water density, 1000 kg/m³ (SP 811 B.8 prints mmH2O conventional = 9.80665 Pa, bold).
-pub const WATER: Mag = Mag::int(1000);
-pub const HOUR: Mag = Mag::int(3600);
-pub const HP_MECH: Mag = FT.mul(LBF).times(550);
-pub const DEG: Mag = Mag::PI.over(180);
-pub const TURN: Mag = Mag::PI.times(2);
+pub(super) const WATER: Mag = Mag::int(1000);
+pub(super) const HOUR: Mag = Mag::int(3600);
+pub(super) const HP_MECH: Mag = FT.mul(LBF).times(550);
+pub(super) const DEG: Mag = Mag::PI.over(180);
+pub(super) const TURN: Mag = Mag::PI.times(2);
 
 const C_1959_YD: Cite = Cite(Yd1959, "1 yd = 0.9144 m exactly");
 const C_1959_LB: Cite = Cite(Yd1959, "1 lb = 0.453 592 37 kg exactly");
@@ -133,7 +133,7 @@ const C_SP_FN9: Cite = Cite(
 
 // one row per unit, read as a table
 #[rustfmt::skip]
-pub static UNITS: &[Unit] = &[
+pub(crate) static UNITS: &[Unit] = &[
     // ---- length, international (1959) ----
     Unit::new("inch", "inch", "in", LEN, IN, "1/36 yd", &[C_1959_YD, C_WMA6, C_SP_B8]).bold("2.54", -2),
     Unit::new("foot_international", "foot (international)", "ft", LEN, FT, "1/3 yd = 0.3048 m", &[C_1959_YD, C_FR2020, C_WMA6, C_SP_B8]).bold("3.048", -1),
@@ -329,7 +329,7 @@ pub static UNITS: &[Unit] = &[
 ];
 
 /// Absolute temperature scales on the customary intervals.
-pub static ORIGINS: &[Origin] = &[
+pub(crate) static ORIGINS: &[Origin] = &[
     Origin {
         id: "fahrenheit",
         unit: "degree_fahrenheit",
@@ -352,7 +352,7 @@ pub static ORIGINS: &[Origin] = &[
 ];
 
 /// Names (and symbols) that mean more than one unit: never an id or a symbol of the table.
-pub static AMBIGUOUS: &[Ambiguous] = &[
+pub(crate) static AMBIGUOUS: &[Ambiguous] = &[
     Ambiguous {
         bare: "gallon",
         symbols: &["gal"],

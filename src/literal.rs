@@ -209,6 +209,7 @@ const fn gcd(mut a: u128, mut b: u128) -> u128 {
 
 /// A decimal literal as a type, `NUM · 10^EXP`: what [fixed!](crate::fixed) names, so the scale and storage of the
 /// [Fixed] can come from the context. A pair of them is a [Complex]'s.
+#[derive(Debug)]
 pub struct Literal<const NUM: i64, const EXP: i16>;
 
 /// The stored value of literal `L` as an associated const, worked out at compile time ([Fixed::from_decimal]): what

@@ -7,7 +7,7 @@
 /// 1`), so equal magnitudes are equal structs however they were spelled. Every operation is a `const fn`: an overflow
 /// of `num` or `den` panics, which in a `const` is a compile error, never a rounding.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Mag {
+pub(crate) struct Mag {
     pub num: u128,
     pub den: u128,
     pub pow10: i16,
@@ -32,8 +32,8 @@ const fn checked(v: Option<u128>) -> u128 {
 }
 
 impl Mag {
-    pub const ONE: Mag = Mag::int(1);
-    pub const PI: Mag = Mag {
+    pub(crate) const ONE: Mag = Mag::int(1);
+    pub(crate) const PI: Mag = Mag {
         num: 1,
         den: 1,
         pow10: 0,
@@ -42,7 +42,13 @@ impl Mag {
     };
 
     /// `num / den · 10^pow10 · 2^pow2 · π^pi`, brought into canonical form.
-    pub const fn new(mut num: u128, mut den: u128, mut pow10: i16, mut pow2: i16, pi: i8) -> Mag {
+    pub(crate) const fn new(
+        mut num: u128,
+        mut den: u128,
+        mut pow10: i16,
+        mut pow2: i16,
+        pi: i8,
+    ) -> Mag {
         assert!(num != 0 && den != 0, "a magnitude is positive");
         while num.is_multiple_of(2) {
             num /= 2;
@@ -72,20 +78,20 @@ impl Mag {
         }
     }
 
-    pub const fn int(n: u128) -> Mag {
+    pub(crate) const fn int(n: u128) -> Mag {
         Mag::new(n, 1, 0, 0, 0)
     }
 
-    pub const fn ratio(num: u128, den: u128) -> Mag {
+    pub(crate) const fn ratio(num: u128, den: u128) -> Mag {
         Mag::new(num, den, 0, 0, 0)
     }
 
     /// A decimal as written in a source: `dec(45359237, -8)` is 0.45359237.
-    pub const fn dec(digits: u128, exp10: i16) -> Mag {
+    pub(crate) const fn dec(digits: u128, exp10: i16) -> Mag {
         Mag::new(digits, 1, exp10, 0, 0)
     }
 
-    pub const fn mul(self, o: Mag) -> Mag {
+    pub(crate) const fn mul(self, o: Mag) -> Mag {
         // cross-reduce first, so a product that fits is never refused for an intermediate that doesn't
         let g1 = gcd(self.num, o.den);
         let g2 = gcd(o.num, self.den);
@@ -100,7 +106,7 @@ impl Mag {
         }
     }
 
-    pub const fn recip(self) -> Mag {
+    pub(crate) const fn recip(self) -> Mag {
         Mag {
             num: self.den,
             den: self.num,
@@ -110,19 +116,19 @@ impl Mag {
         }
     }
 
-    pub const fn div(self, o: Mag) -> Mag {
+    pub(crate) const fn div(self, o: Mag) -> Mag {
         self.mul(o.recip())
     }
 
-    pub const fn times(self, n: u128) -> Mag {
+    pub(crate) const fn times(self, n: u128) -> Mag {
         self.mul(Mag::int(n))
     }
 
-    pub const fn over(self, n: u128) -> Mag {
+    pub(crate) const fn over(self, n: u128) -> Mag {
         self.div(Mag::int(n))
     }
 
-    pub const fn powi(self, n: i32) -> Mag {
+    pub(crate) const fn powi(self, n: i32) -> Mag {
         let mut out = Mag::ONE;
         let base = if n < 0 { self.recip() } else { self };
         let mut i = 0;
@@ -134,12 +140,12 @@ impl Mag {
     }
 
     /// Bits of `num` (2 and 5 already taken out).
-    pub const fn num_bits(self) -> u32 {
+    pub(crate) const fn num_bits(self) -> u32 {
         128 - self.num.leading_zeros()
     }
 
     /// Bits of `den` (2 and 5 already taken out).
-    pub const fn den_bits(self) -> u32 {
+    pub(crate) const fn den_bits(self) -> u32 {
         128 - self.den.leading_zeros()
     }
 }

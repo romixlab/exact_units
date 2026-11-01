@@ -88,7 +88,7 @@ pub struct PrimePower {
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for PrimePower {
-    fn format(&self, f: defmt::Formatter) {
+    fn format(&self, f: defmt::Formatter<'_>) {
         let (prime, exp) = (self.prime, self.exp);
         defmt::write!(f, "PrimePower {{ prime: {}, exp: {} }}", prime, exp)
     }

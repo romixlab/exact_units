@@ -36,24 +36,25 @@ mod dsp {
     use exact_units::{CQ15, Fixed, Mac, Nco, Rounding, db};
 
     /// The ADC's full scale is 1: a sample is a fraction of its full-scale voltage, so −10 dBFS is a level.
-    pub type FullScale = Per<Volt, Volt>;
+    pub(crate) type FullScale = Per<Volt, Volt>;
 
     /// An IQ sample in Q15 of full scale.
-    pub type Sample = CQ15<FullScale>;
+    pub(crate) type Sample = CQ15<FullScale>;
 
     /// The sum of |x|² over a block: Q30 in an `i64`.
-    pub type Power = Mac<Times<FullScale, FullScale>, Product<Pow2<-15>, Pow2<-15>>, i16>;
+    pub(crate) type Power = Mac<Times<FullScale, FullScale>, Product<Pow2<-15>, Pow2<-15>>, i16>;
 
     /// One |x|² in Q30: the threshold the mean power is compared with.
-    pub type PowerLevel = Fixed<Times<FullScale, FullScale>, Product<Pow2<-15>, Pow2<-15>>, u32>;
+    pub(crate) type PowerLevel =
+        Fixed<Times<FullScale, FullScale>, Product<Pow2<-15>, Pow2<-15>>, u32>;
 
     /// −10 dBFS, a power of 0.1 of full scale: busy when the mean power of a block is at or above it. Worked out at
     /// compile time, compared as integers: no square root and no logarithm at run time.
-    pub const BUSY: PowerLevel = db!(norm_sqr - 10);
+    pub(crate) const BUSY: PowerLevel = db!(norm_sqr - 10);
 
     /// Mixes an interleaved Q15 IQ buffer down by the NCO's frequency, in place, and sums the power of what comes
     /// out.
-    pub fn downconvert(buf: &mut [i16], nco: &mut Nco) -> Power {
+    pub(crate) fn downconvert(buf: &mut [i16], nco: &mut Nco) -> Power {
         let mut power = Power::new();
         Sample::map_interleaved(buf, |x| {
             let y = nco.mix_down(x, Rounding::NearestEven);
@@ -63,7 +64,7 @@ mod dsp {
         power
     }
 
-    pub fn busy(power: &Power, samples: usize) -> bool {
+    pub(crate) fn busy(power: &Power, samples: usize) -> bool {
         power.mean_at_least(BUSY, samples)
     }
 }

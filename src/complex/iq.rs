@@ -462,6 +462,18 @@ pub struct Interleaved<'a, U, P, T: ComplexStorage, B: Unlimited<T> = Unbounded>
     _value: PhantomData<(U, P, B)>,
 }
 
+/// `Interleaved { pairs: 3, rest: [] }`: the samples left and the odd number at the end, without the unit.
+impl<U, P, T: ComplexStorage + fmt::Debug, B: Unlimited<T>> fmt::Debug
+    for Interleaved<'_, U, P, T, B>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Interleaved")
+            .field("pairs", &self.pairs.len())
+            .field("rest", &self.rest)
+            .finish()
+    }
+}
+
 impl<'a, U, P, T: ComplexStorage, B: Unlimited<T>> Interleaved<'a, U, P, T, B> {
     /// The number left over at the end of an odd buffer, or nothing.
     #[inline(always)]

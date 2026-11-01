@@ -1,7 +1,7 @@
 //! The documents the catalogue cites, each read in full on 27 Oct 2026 (copies kept with the STD-72 design notes).
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Src {
+pub(crate) enum Src {
     /// The 1959 international yard and pound: 1 yd = 0.9144 m, 1 lb = 0.45359237 kg, US survey foot 1200/3937 m.
     Yd1959,
     /// NIST SP 811 (2008 ed., web version updated 2025) Appendix B (B.6 survey foot, B.8 factors, footnotes).
@@ -26,7 +26,7 @@ pub enum Src {
 
 impl Src {
     /// Every document cited (all but `Unsourced`), in the order of the docs page.
-    pub const CITED: [Src; 9] = [
+    pub(crate) const CITED: [Src; 9] = [
         Src::Yd1959,
         Src::Sp811,
         Src::Hb44,
@@ -38,7 +38,7 @@ impl Src {
         Src::Cfr21_101_9,
     ];
 
-    pub fn title(self) -> &'static str {
+    pub(crate) fn title(self) -> &'static str {
         match self {
             Src::Yd1959 => {
                 "Refinement of values for the yard and the pound, Federal Register 24 FR 5348 (1 Jul 1959), reprinted in NBS Misc. Publ. 233 (1960)"
@@ -63,7 +63,7 @@ impl Src {
         }
     }
 
-    pub fn url(self) -> &'static str {
+    pub(crate) fn url(self) -> &'static str {
         match self {
             Src::Yd1959 => "https://nvlpubs.nist.gov/nistpubs/Legacy/MP/nbsmiscellaneouspub233.pdf",
             Src::Sp811 => {

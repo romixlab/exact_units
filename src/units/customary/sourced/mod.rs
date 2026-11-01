@@ -12,31 +12,31 @@ mod markers;
 mod sources;
 mod tests;
 
-pub use catalogue::{AMBIGUOUS, ORIGINS, UNITS};
-pub use mag::Mag;
-pub use sources::Src;
+pub(super) use catalogue::{AMBIGUOUS, ORIGINS, UNITS};
+pub(super) use mag::Mag;
+pub(super) use sources::Src;
 
 /// Exponents of s, m, kg, A, K, mol, cd, rad (si-in's order; angle is a base, D15).
-pub type Dim = [i8; 8];
+pub(super) type Dim = [i8; 8];
 
-pub const fn dim(s: i8, m: i8, kg: i8, k: i8, rad: i8) -> Dim {
+pub(super) const fn dim(s: i8, m: i8, kg: i8, k: i8, rad: i8) -> Dim {
     [s, m, kg, 0, k, 0, 0, rad]
 }
 
 /// Where a definition or a value is stated: the document and the place in it.
 #[derive(Clone, Copy, Debug)]
-pub struct Cite(pub Src, pub &'static str);
+pub(super) struct Cite(pub Src, pub &'static str);
 
 /// A value as NIST SP 811 Appendix B.8 prints it: mantissa text and power of ten, bold (exact) or rounded.
 #[derive(Clone, Copy, Debug)]
-pub struct Printed {
+pub(super) struct Printed {
     pub mantissa: &'static str,
     pub exp10: i16,
     pub bold: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Exact {
+pub(super) enum Exact {
     /// Fixed by definition: the magnitude is the exact value.
     Defined,
     /// A physical property (water or mercury at a temperature, a calorie at a temperature): the magnitude is the
@@ -45,7 +45,7 @@ pub enum Exact {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Status {
+pub(super) enum Status {
     Current,
     /// Kept for old data, with why.
     Legacy(&'static str),
@@ -53,7 +53,7 @@ pub enum Status {
 
 /// One unit: `1 <unit> = mag · (coherent SI unit of dim)`; radians for angles, kelvin for temperature intervals.
 #[derive(Clone, Copy, Debug)]
-pub struct Unit {
+pub(super) struct Unit {
     /// Unique, never a bare ambiguous name.
     pub id: &'static str,
     pub name: &'static str,
@@ -70,7 +70,7 @@ pub struct Unit {
 }
 
 impl Unit {
-    pub const fn new(
+    pub(super) const fn new(
         id: &'static str,
         name: &'static str,
         symbol: &'static str,
@@ -94,7 +94,7 @@ impl Unit {
     }
 
     /// SP 811 B.8 prints `mantissa E exp10`, rounded.
-    pub const fn sp(mut self, mantissa: &'static str, exp10: i16) -> Unit {
+    pub(super) const fn sp(mut self, mantissa: &'static str, exp10: i16) -> Unit {
         self.sp811 = Some(Printed {
             mantissa,
             exp10,
@@ -104,7 +104,7 @@ impl Unit {
     }
 
     /// SP 811 B.8 prints `mantissa E exp10` in bold: exact.
-    pub const fn bold(mut self, mantissa: &'static str, exp10: i16) -> Unit {
+    pub(super) const fn bold(mut self, mantissa: &'static str, exp10: i16) -> Unit {
         self.sp811 = Some(Printed {
             mantissa,
             exp10,
@@ -113,25 +113,25 @@ impl Unit {
         self
     }
 
-    pub const fn measured(mut self) -> Unit {
+    pub(super) const fn measured(mut self) -> Unit {
         self.exact = Exact::Measured;
         self
     }
 
-    pub const fn legacy(mut self, why: &'static str) -> Unit {
+    pub(super) const fn legacy(mut self, why: &'static str) -> Unit {
         self.status = Status::Legacy(why);
         self
     }
 
     /// No fetched source states this unit's definition (the reason is in its `Unsourced` cite).
-    pub fn unsourced(&self) -> bool {
+    pub(super) fn unsourced(&self) -> bool {
         self.sources.iter().any(|c| c.0 == Src::Unsourced)
     }
 }
 
 /// The zero of an absolute temperature scale whose interval is the unit `unit`: `T/K = (t/unit) · mag + zero`.
 #[derive(Clone, Copy, Debug)]
-pub struct Origin {
+pub(super) struct Origin {
     pub id: &'static str,
     pub unit: &'static str,
     /// The scale's zero above 0 K, in kelvin (`None`: at 0 K).
@@ -141,7 +141,7 @@ pub struct Origin {
 
 /// A name that means different units: it is never an id or a symbol, only a pointer to the qualified ones.
 #[derive(Clone, Copy, Debug)]
-pub struct Ambiguous {
+pub(super) struct Ambiguous {
     pub bare: &'static str,
     /// Symbols (and abbreviations) used for more than one member.
     pub symbols: &'static [&'static str],

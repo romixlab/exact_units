@@ -23,7 +23,7 @@ fn dim_bytes() {
         volt
     );
     assert_eq!(
-        <Dim as SerializeShrinkWrap>::ELEMENT_SIZE,
+        <Dim<'_> as SerializeShrinkWrap>::ELEMENT_SIZE,
         ElementSize::UnsizedFinalStructure
     );
     let edge = Dim::new(-8, 7, 0, 0, 0, 0, -1).with_rad(7).with_bit(-8);
@@ -31,7 +31,7 @@ fn dim_bytes() {
     assert_eq!(bytes, [0x87, 0x00, 0x00, 0xf7, 0x80, 0x00]);
     assert_eq!(Dim::from_ww_bytes(&bytes).unwrap(), edge);
     // samples per second: one counted slot, its name and exponent
-    let rate = <units::Per<units::Sample, units::Second> as Unit>::DIM;
+    let rate = <Per<units::Sample, units::Second> as Unit>::DIM;
     let mut buf = [0u8; 32];
     let bytes = rate.to_ww_bytes(&mut buf).unwrap().to_vec();
     // s -1 and eight 0 nibbles, no root, slot 1 used: crate "exact_units", "Sample" and exponent 1, three empty slots
@@ -186,7 +186,7 @@ fn compound_round_trip() {
 
     // a different tree of the same dimension is not the same unit
     assert_ne!(back, *<Fan as Unit>::EXPR);
-    assert_ne!(back, *<units::Torque as Unit>::EXPR);
+    assert_ne!(back, *<Torque as Unit>::EXPR);
 }
 
 #[test]
@@ -337,7 +337,7 @@ fn sqrt_marker() {
         <Sqrt<Times<units::Meter, units::Meter>> as Unit>::DIM,
         <units::Meter as Unit>::DIM
     );
-    assert_eq!(<Sqrt<units::Hertz> as Unit>::EXPR.factor(), 1.0);
+    assert_eq!(<Sqrt<Hertz> as Unit>::EXPR.factor(), 1.0);
     assert_eq!(exact_units::num::sqrt_f64(4.0), 2.0);
     assert_eq!(exact_units::num::sqrt_f64(1e6), 1e3);
     // rounded like std's sqrt

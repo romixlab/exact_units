@@ -1491,9 +1491,9 @@ mod tests {
     fn exact_angles() {
         use crate::units::{Degree, Turn};
         use core::f64::consts::{PI, TAU};
-        let deg: &crate::UnitExpr = <Degree as crate::Unit>::EXPR;
+        let deg: &UnitExpr = <Degree as Unit>::EXPR;
         assert!((deg.factor() - PI / 180.0).abs() < 1e-18);
-        assert!((<Turn as crate::Unit>::EXPR.factor() - TAU).abs() < 1e-15);
+        assert!((<Turn as Unit>::EXPR.factor() - TAU).abs() < 1e-15);
     }
 
     #[test]
@@ -1525,7 +1525,7 @@ mod tests {
             .unwrap(),
             t
         );
-        assert_eq!(core::mem::size_of::<Micros<u64>>(), 8);
+        assert_eq!(size_of::<Micros<u64>>(), 8);
     }
 
     #[test]
@@ -1591,7 +1591,7 @@ mod tests {
         );
         // a turn is 360 °: only through the unit's own scale, Turn and Degree are different markers
         assert_eq!(
-            <Turn as crate::Unit>::EXPR.factor() / <Degree as crate::Unit>::EXPR.factor(),
+            <Turn as Unit>::EXPR.factor() / <Degree as Unit>::EXPR.factor(),
             360.0
         );
     }

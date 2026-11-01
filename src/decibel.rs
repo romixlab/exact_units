@@ -180,10 +180,12 @@ macro_rules! db {
 
 /// The |z|² of a complex value at a level in dB as a type: what `db!(norm_sqr -15)` names, a threshold for
 /// [Complex::norm_sqr](crate::Complex::norm_sqr) ([Complex::norm_sqr_at](crate::Complex::norm_sqr_at)).
+#[derive(Debug)]
 pub struct NormSqrLevel<const NUM: i64, const DECIMALS: u8>;
 
 /// A level in dB as a type, `NUM · 10^-DECIMALS` dB: what [db!](crate::db) names, so the storage of the [Fixed] can
 /// come from the context.
+#[derive(Debug)]
 pub struct Level<const NUM: i64, const DECIMALS: u8>;
 
 /// The gain at level `L` as an associated const, worked out at compile time ([Fixed::from_db_const]): what

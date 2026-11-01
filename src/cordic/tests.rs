@@ -1,5 +1,6 @@
 use super::*;
 use core::f64::consts::TAU;
+use std::vec::Vec;
 
 /// The bound the module docs state, in steps of the result.
 #[cfg(feature = "angle")]
@@ -24,11 +25,11 @@ fn grid_16() -> impl Iterator<Item = (i16, i16)> {
     let coarse = (i16::MIN..=i16::MAX)
         .step_by(61)
         .chain([i16::MAX, i16::MIN + 1, -1, 0, 1]);
-    let coarse: std::vec::Vec<i16> = coarse.collect();
-    let small: std::vec::Vec<(i16, i16)> = (-40..=40)
+    let coarse: Vec<i16> = coarse.collect();
+    let small: Vec<(i16, i16)> = (-40..=40)
         .flat_map(|y| (-40..=40).map(move |x| (y, x)))
         .collect();
-    let pairs: std::vec::Vec<(i16, i16)> = coarse
+    let pairs: Vec<(i16, i16)> = coarse
         .iter()
         .flat_map(|&y| coarse.iter().map(move |&x| (y, x)))
         .collect();

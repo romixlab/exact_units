@@ -18,7 +18,7 @@ fn parts() {
     assert_eq!(z.mul_j(), Complex::new(4, 3));
     assert_eq!(-z, Complex::new(-3, 4));
     assert_eq!(Complex::<Ratio, One, i8>::default().get(), (0, 0));
-    assert_eq!(core::mem::size_of::<Complex<Ratio, One, i16>>(), 4);
+    assert_eq!(size_of::<Complex<Ratio, One, i16>>(), 4);
 }
 
 #[test]

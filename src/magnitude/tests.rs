@@ -221,8 +221,8 @@ fn display() {
 #[test]
 fn sizes() {
     // what a `&'static Magnitude` costs a firmware that holds one at run time
-    assert_eq!(core::mem::size_of::<PrimePower>(), 6);
-    assert_eq!(core::mem::size_of::<Magnitude>(), 104);
+    assert_eq!(size_of::<PrimePower>(), 6);
+    assert_eq!(size_of::<Magnitude>(), 104);
 }
 
 #[cfg(feature = "shrink_wrap")]
