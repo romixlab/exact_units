@@ -1,4 +1,5 @@
 use super::*;
+use core::f64::consts::{FRAC_PI_2, LN_10, LOG2_10, PI};
 use std::string::ToString;
 use std::vec::Vec;
 
@@ -111,9 +112,9 @@ fn irrational_and_roots() {
     assert!((sqrt_milli.to_f64() - 0.001f64.sqrt()).abs() < 1e-17);
     // a decibel in neper: ln10 / 20; a decade in octaves: ln10 / ln2
     let db = Magnitude::LN10.div(Magnitude::ratio(20, 1));
-    assert!((db.to_f64() - core::f64::consts::LN_10 / 20.0).abs() < 1e-16);
+    assert!((db.to_f64() - LN_10 / 20.0).abs() < 1e-16);
     let decade = Magnitude::LN10.div(Magnitude::LN2);
-    assert!((decade.to_f64() - core::f64::consts::LOG2_10).abs() < 1e-15);
+    assert!((decade.to_f64() - LOG2_10).abs() < 1e-15);
     assert_eq!(
         decade.irrational_x2(),
         Irrational {
@@ -185,8 +186,8 @@ fn apply() {
     assert_eq!(Magnitude::pow10(-3).apply_int(-3000), Some(-3));
     assert_eq!(Magnitude::PI.apply_int(1), None);
     let deg = Magnitude::new(1, 180, 0, 0, 1);
-    assert!((deg.apply_f64(90.0) - core::f64::consts::FRAC_PI_2).abs() < 1e-15);
-    assert!((deg.to_f64() - core::f64::consts::PI / 180.0).abs() < 1e-18);
+    assert!((deg.apply_f64(90.0) - FRAC_PI_2).abs() < 1e-15);
+    assert!((deg.to_f64() - PI / 180.0).abs() < 1e-18);
     assert_eq!(Magnitude::pow10(-1).apply_f64(30.0), 3.0);
     assert_eq!(LB.to_ratio(), Some((45359237, 100_000_000)));
     assert_eq!(Magnitude::pow10(-3).as_pow10(), Some(-3));

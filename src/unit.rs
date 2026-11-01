@@ -888,9 +888,10 @@ impl fmt::Display for UnitExpr {
 ///     pub struct Rpm = "rpm", [rad 1, s -1], Exact(1 / 30, pi 1);
 /// }
 ///
+/// # use core::f64::consts::TAU;
 /// let speed = Fixed::<Rpm, One, u8>::new(60);
 /// assert_eq!(format!("{speed}"), "60 rpm");
-/// assert!((<Rpm as Unit>::EXPR.factor() * 60.0 - core::f64::consts::TAU).abs() < 1e-12); // rad/s
+/// assert!((<Rpm as Unit>::EXPR.factor() * 60.0 - TAU).abs() < 1e-12); // rad/s
 /// ```
 ///
 /// A hand-written impl compiles too, but WireWeaver refuses an API that uses such a marker: its walker reads a unit's

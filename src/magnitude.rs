@@ -724,11 +724,12 @@ impl Magnitude {
 
     /// The factor as an `f64` (rounded, unlike the magnitude itself).
     pub const fn to_f64(&self) -> f64 {
+        use core::f64::consts::{LN_2, LN_10, PI};
         let w = Work::of(self);
         let mut x = pow_half(10.0, w.pow10) * pow_half(2.0, w.pow2);
-        x *= pow_half(core::f64::consts::PI, w.irr[0]);
-        x *= pow_half(core::f64::consts::LN_2, w.irr[1]);
-        x *= pow_half(core::f64::consts::LN_10, w.irr[2]);
+        x *= pow_half(PI, w.irr[0]);
+        x *= pow_half(LN_2, w.irr[1]);
+        x *= pow_half(LN_10, w.irr[2]);
         let mut i = 0;
         while i < w.len {
             x *= pow_half(w.primes[i] as f64, w.exps[i]);

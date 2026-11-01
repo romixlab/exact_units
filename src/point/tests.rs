@@ -390,11 +390,11 @@ mod angle {
 
     #[test]
     fn float_angles() {
+        use core::f64::consts::TAU;
         type Rad = Point<Angle<Radian>, Fixed<Radian, One, f64>>;
-        let tau = core::f64::consts::TAU;
         let p = Rad::from_raw(3.0) + Fixed::new(4.0);
-        assert!((p.raw() - (7.0 - tau)).abs() < 1e-12);
-        let d = Rad::from_raw(0.1) - Rad::from_raw(tau - 0.1);
+        assert!((p.raw() - (7.0 - TAU)).abs() < 1e-12);
+        let d = Rad::from_raw(0.1) - Rad::from_raw(TAU - 0.1);
         assert!((d.get() - 0.2).abs() < 1e-12);
         type Deg = Point<Angle<Degree>, Fixed<Degree, One, f32>>;
         assert_eq!((Deg::from_raw(350.0) + Fixed::new(20.0)).raw(), 10.0);

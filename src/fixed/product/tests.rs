@@ -1,6 +1,7 @@
 use crate::prefix::*;
 use crate::units::{Ampere, Ohm, Per, Ratio, Times, Volt, Watt};
 use crate::{Fixed, FixedScale, Magnitude, Overflow, Q15, Range, Rounding, Saturating, Wrapping};
+use core::f64::consts::PI;
 use std::string::ToString;
 
 type MilliVolt = Fixed<Volt, Milli, i32>;
@@ -65,7 +66,7 @@ fn powers_of_pi_multiply_exactly() {
     let p = a * b; // 6 π² rad
     assert_eq!(p.get(), 6);
     let f = p.convert::<Radian, One, f64>().unwrap().get();
-    assert!((f - 6.0 * core::f64::consts::PI * core::f64::consts::PI).abs() < 1e-12);
+    assert!((f - 6.0 * PI * PI).abs() < 1e-12);
     // in a float storage the rounding forms scale
     let x: Fixed<_, One, f64> = a.times_into(b, Rounding::Floor).unwrap();
     assert!((x.get() - f).abs() < 1e-12);

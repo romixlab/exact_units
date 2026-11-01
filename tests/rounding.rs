@@ -249,10 +249,11 @@ fn fixed_points() {
 
 #[test]
 fn degrees_to_radians() {
+    use core::f64::consts::PI;
     // an integer of m° to µrad and back: a factor with π, rounded, never a compile error with to_rounded
     for x in (-360_000i32..=360_000).step_by(7) {
         let deg: Fixed<Radian, MilliDegree, i32> = Fixed::new(x);
-        let urad = x as f64 * core::f64::consts::PI / 180_000.0 * 1e6;
+        let urad = x as f64 * PI / 180_000.0 * 1e6;
         for r in MODES {
             let got = deg.to_rounded::<Micro, i32>(r).unwrap().get();
             let want = match r {

@@ -1510,9 +1510,10 @@ mod tests {
     #[test]
     fn exact_angles() {
         use crate::units::{Degree, Turn};
+        use core::f64::consts::{PI, TAU};
         let deg: &crate::UnitExpr = <Degree as crate::Unit>::EXPR;
-        assert!((deg.factor() - core::f64::consts::PI / 180.0).abs() < 1e-18);
-        assert!((<Turn as crate::Unit>::EXPR.factor() - core::f64::consts::TAU).abs() < 1e-15);
+        assert!((deg.factor() - PI / 180.0).abs() < 1e-18);
+        assert!((<Turn as crate::Unit>::EXPR.factor() - TAU).abs() < 1e-15);
     }
 
     #[test]

@@ -19,9 +19,10 @@ use exact_units::{Bam16, Fixed, Q15, Rounding, fixed};
 
 /// One sample of a voice: the sine of its phase at an amplitude, in Q15.
 fn sine(phase: Bam16, amplitude: f32) -> Q15 {
+    use core::f32::consts::TAU;
     let turns = phase.get() as f32 / 65536.0;
     // a real firmware looks this up in a table indexed by the top bits of the phase
-    Fixed::of(((turns * core::f32::consts::TAU).sin() * amplitude * 32767.0) as i16)
+    Fixed::of(((turns * TAU).sin() * amplitude * 32767.0) as i16)
 }
 
 /// A Q15 as a number, for printing.

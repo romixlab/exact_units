@@ -16,9 +16,10 @@
 /// }
 /// use exact_units::{Fixed, Unit, prefix::One};
 ///
+/// # use core::f64::consts::TAU;
 /// let speed = Fixed::<Rpm, One, u8>::new(60);
 /// assert_eq!(format!("{speed}"), "60 rpm");
-/// assert!((Rpm::EXPR.factor() * 60.0 - core::f64::consts::TAU).abs() < 1e-12); // rad/s
+/// assert!((Rpm::EXPR.factor() * 60.0 - TAU).abs() < 1e-12); // rad/s
 /// assert_eq!(Bucket::DIM, exact_units::counted!(Bucket));
 /// ```
 ///
