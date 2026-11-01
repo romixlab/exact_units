@@ -57,4 +57,20 @@ A fix comes with a property, or an input for one, that fails before the fix. A b
 
 ## Fuzzing
 
-Parsing and decoding (`Decibels::parse`, the wire format) take untrusted input. Their properties are the place a fuzzer starts; fuzz targets are being added.
+Text, wire bytes and serde input come from outside. Their properties take strings and bytes, which Kani can't reason about, so `fuzz/` runs the same property functions under cargo-fuzz, coverage-guided:
+
+| Target | Input |
+|---|---|
+| `decimal` | any text into `Decimal::parse`, what `fixed!` runs |
+| `decibels` | any text into `Decibels::parse` and `from_db_const`, what `db!` runs |
+| `names` | any text into `Prefix::from_name` and `units::by_name` |
+| `wire_bytes` | any bytes decoded as one of the wire types, a unit tree walked to its end |
+| `wire_values` | values built from the fuzzer's data, encoded and decoded to themselves |
+| `serde_json` | any text read with serde as `Magnitude`, `Offset`, `DimOwned` and `ProvenanceOwned` |
+
+`just fuzz TARGET SECONDS` runs one target, from the hand-written seeds in `fuzz/seeds/TARGET` (a nightly toolchain and `cargo-fuzz`, not in CI). A crash becomes a unit test and a fix.
+
+Two bugs it found:
+
+- serde read a `DimOwned` with its counted bases out of order, so one dimension had two values that compared unequal. serde now refuses a dimension that isn't canonical, as the wire reader does.
+- A unit tree could be built and written deeper than any reader follows. A typed unit of more than `MAX_UNIT_DEPTH` (32) levels is now a compile error.

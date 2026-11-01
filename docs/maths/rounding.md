@@ -39,7 +39,17 @@ Over a whole range each mode is a staircase. Here the crate's `to_rounded` turns
 <figcaption>Computed by <code>tools/book_plots</code> with <code>Fixed::to_rounded</code> when the site is built.</figcaption>
 </figure>
 
-`NearestEven` has no bias: over many values its ties go up as often as down. `NearestAway` and `Floor` drift, which matters when values are summed.
+Each mode has its own bias: the average error per rounding, in steps $q$ of the result, when the dropped bits are spread evenly:
+
+| `Rounding` | Average error per step | Why |
+|---|---|---|
+| `Floor` | $-q/2$ | always down |
+| `Ceil` | $+q/2$ | always up |
+| `Truncate` | $-q/2$ for positive values, $+q/2$ for negative | `Floor` above 0, `Ceil` below: magnitudes shrink |
+| `NearestAway` | $+q/4$ with one bit dropped, near 0 with many | biased on ties only, and ties get rare as more bits are dropped |
+| `NearestEven` | 0 | ties go up as often as down |
+
+A bias adds up: a sum of $n$ rounded values is off by $n$ times it, while unbiased errors grow only as $\sqrt{n}$.
 
 ## Exact, once
 
