@@ -769,5 +769,11 @@ pub use polar::Polar;
 #[cfg(all(feature = "electrical", feature = "dimensionless"))]
 mod power;
 
+#[cfg(feature = "electrical")]
+pub mod rf;
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod polar_tests;

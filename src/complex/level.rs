@@ -29,13 +29,13 @@
 //! Volt>>` is still a voltage ratio by the [kind](crate::kind) rules, so its level form is 20·lg. `norm_sqr` in the
 //! macro says which is meant.
 
-use super::{Complex, NormStorage};
-#[cfg(any(feature = "std", feature = "libm"))]
-use crate::Storage;
+use super::Complex;
 use crate::decibel::{Decibels, gain};
 use crate::prefix::Product;
 use crate::units::Times;
 use crate::{Fixed, FixedScale, LevelForm, Unit, Unlimited};
+#[cfg(any(feature = "std", feature = "libm"))]
+use {super::NormStorage, crate::Storage};
 
 /// The exact |z|² at level `db` for `|z|` of unit `U` in scale `P`: 10^(dB/10) of a root-power kind, 10^(dB/5) of a
 /// power kind, in units of `P · P`.
