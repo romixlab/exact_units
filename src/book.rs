@@ -31,4 +31,9 @@ pages! {
     Wrapping = "points/wrapping.md";
     Registers = "points/registers.md";
     Indices = "points/indices.md";
+    Decibels = "levels/decibels.md";
+    Thresholds = "levels/thresholds.md";
+    Complex = "complex/complex.md";
+    Iq = "complex/iq.md";
+    Cordic = "complex/cordic.md";
 }
