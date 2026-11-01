@@ -69,7 +69,8 @@ const CUTOFF: Fixed<Volt, Milli, u16> = Fixed::new(2500);
 
 assert!(Cell::try_new(65535).is_err());
 let cell = Cell::try_new(2400).unwrap();
-let headroom = cell.unbounded().checked_sub(CUTOFF); // below the cutoff: no headroom, not 65436 mV
+// below the cutoff: no headroom, not 65436 mV
+let headroom = cell.unbounded().checked_sub(CUTOFF);
 assert_eq!(headroom, None);
 ```
 

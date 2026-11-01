@@ -30,7 +30,8 @@ use exact_units::{Fixed, Point, origins::Angle, prefix::Centi, units::Degree};
 
 type CentiDeg = Point<Angle<Degree>, Fixed<Degree, Centi, u16>>;
 
-assert_eq!((CentiDeg::from_raw(35_000) + Fixed::new(2_000)).raw(), 1_000); // 350° + 20° = 10°
+// 350° + 20° = 10°
+assert_eq!((CentiDeg::from_raw(35_000) + Fixed::new(2_000)).raw(), 1_000);
 ```
 
 How it wraps, for an $n$-bit storage and a period of $M$ steps:

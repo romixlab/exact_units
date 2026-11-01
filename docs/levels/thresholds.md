@@ -15,7 +15,8 @@ level: advanced
 ```rust,compile_fail
 use exact_units::{Fixed, db, prefix::Milli, units::{Per, Volt}};
 
-let _: Fixed<Per<Volt, Volt>, Milli, u16> = db!(40); // 100 V/V is 100 000 mV/V: too big for a u16
+// 100 V/V is 100 000 mV/V: too big for a u16
+let _: Fixed<Per<Volt, Volt>, Milli, u16> = db!(40);
 ```
 
 `Fixed::from_db_const` is the same as a `const fn`, for a level that isn't a literal:

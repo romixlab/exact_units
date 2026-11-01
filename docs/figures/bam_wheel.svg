@@ -23,8 +23,8 @@
   <line x1="224.0" y1="286.2" x2="227.8" y2="295.5" class="thin"/>
   <line x1="261.3" y1="261.3" x2="268.4" y2="268.4" class="thin"/>
   <line x1="286.2" y1="224.0" x2="295.5" y2="227.8" class="thin"/>
-  <text x="322.0" y="185.0" text-anchor="start" class="mono">0</text>
-  <text x="322.0" y="200.0" text-anchor="start" class="soft">0°</text>
+  <text x="318.0" y="214.0" text-anchor="start" class="mono">0</text>
+  <text x="318.0" y="229.0" text-anchor="start" class="soft">0°</text>
   <text x="180.0" y="36.0" text-anchor="middle" class="mono">16384</text>
   <text x="180.0" y="51.0" text-anchor="middle" class="soft">90°</text>
   <text x="38.0" y="185.0" text-anchor="end" class="mono">32768</text>

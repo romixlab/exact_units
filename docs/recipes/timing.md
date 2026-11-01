@@ -12,7 +12,8 @@ use exact_units::{Fixed, Micros, Range, prefix::Milli, units::Second};
 type ConfigTimeout = Fixed<Second, Milli, u16, Range<1, 60_000>>;
 
 let cfg = ConfigTimeout::try_new(250).unwrap();
-let arm: Micros<u32> = cfg.into(); // 60 000 ms is 6·10⁷ µs: always fits, so a plain From
+// 60 000 ms is 6·10⁷ µs: always fits, so a plain From
+let arm: Micros<u32> = cfg.into();
 assert_eq!(arm.get(), 250_000);
 ```
 
@@ -60,7 +61,8 @@ use exact_units::{Fixed, Millis};
 
 let t: Millis<u32> = Fixed::new(1_500);
 assert_eq!(Duration::from(t), Duration::from_millis(1_500));
-assert!(Millis::<u16>::try_from(Duration::from_secs(70)).is_err()); // 70 000 ms doesn't fit a u16
+// 70 000 ms doesn't fit a u16
+assert!(Millis::<u16>::try_from(Duration::from_secs(70)).is_err());
 ```
 
 ## A sample rate is not a frequency

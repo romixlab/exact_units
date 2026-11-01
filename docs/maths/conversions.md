@@ -64,7 +64,8 @@ use exact_units::{Fixed, Range, prefix::{Micro, Milli}, units::Volt};
 
 type Rail = Fixed<Volt, Milli, i16, Range<0, 3300>>;
 
-let uv: Fixed<Volt, Micro, i32> = Rail::bounded(1250).into(); // 3 300 000 µV fits an i32
+// 3 300 000 µV fits an i32
+let uv: Fixed<Volt, Micro, i32> = Rail::bounded(1250).into();
 assert_eq!(uv.get(), 1_250_000);
 ```
 

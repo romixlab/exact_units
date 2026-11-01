@@ -85,7 +85,8 @@ use exact_units::{Fixed, Range, prefix::Milli, units::{Ampere, Volt}};
 type Bus = Fixed<Volt, Milli, i64, Range<0, 60_000>>;
 type Phase = Fixed<Ampere, Milli, i64, Range<-60_000, 60_000>>;
 
-let p = Bus::bounded(48_000) * Phase::bounded(-12_500); // braking: power back into the bus
+// braking: power back into the bus
+let p = Bus::bounded(48_000) * Phase::bounded(-12_500);
 assert_eq!(p.get(), -600_000_000);
 ```
 

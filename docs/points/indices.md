@@ -79,7 +79,8 @@ let a = Seq::<Frame, u8>::new(250);
 let b = a.wrapping_add(10);
 assert_eq!(b.get(), 4);
 assert!(a.is_before(b));
-assert_eq!(a.distance(b).get(), 10); // 10 frames forward, a Fixed<Frame, One, u8, Wrapping>
+// 10 frames forward, a Fixed<Frame, One, u8, Wrapping>
+assert_eq!(a.distance(b).get(), 10);
 ```
 
 A `Seq` has no `<`: serial order isn't transitive, and two numbers exactly half the ring apart have no order at all (`serial_cmp` returns `None`).

@@ -57,7 +57,8 @@ exact_units::scale! {
     pub struct MilliDegree = "m°", Exact(1 / 180000, pi 1);
 }
 
-let a: Fixed<Radian, MilliDegree, i32> = Fixed::new(90_000); // 90°, to() would not compile
+// 90°; to() would not compile: π is no fraction
+let a: Fixed<Radian, MilliDegree, i32> = Fixed::new(90_000);
 let r = a.to_rounded::<Micro, i32>(Rounding::NearestEven).unwrap();
 assert_eq!(r.get(), 1_570_796);                               // π/2 rad in µrad
 ```

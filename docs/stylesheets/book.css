@@ -411,3 +411,10 @@
   background: var(--eu-bg);
   color: var(--eu-fg);
 }
+
+/* A wider text column on large screens, so code examples rarely scroll */
+@media screen and (min-width: 76.25em) {
+  .md-grid {
+    max-width: 68rem;
+  }
+}

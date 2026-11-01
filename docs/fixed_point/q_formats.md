@@ -86,8 +86,8 @@ assert_eq!(format!("{v:#}"), "0.25 V");
 Any other Q format is a `Fixed` with a `Pow2` scale. `UQ16_16` has 16 integer bits and 16 fraction bits; 1.5 is `0x0001_8000`:
 
 ```bits
-int  0000000000000001  1
-frac 1000000000000000  2⁻¹
+int  0000000000000001  the integer part: 1
+frac 1000000000000000  the fraction: 2⁻¹
 hex  00018000
 ```
 

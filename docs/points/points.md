@@ -75,9 +75,10 @@ use exact_units::{Fixed, Point, origins::Celsius, prefix::{Centi, Rational}, uni
 
 type DegC = Point<Celsius, Fixed<Kelvin, Centi, i32>>;
 
-let setpoint = DegC::from_raw(2100);                                // 21 °C
-let one_f: Fixed<Kelvin, Rational<5, 9>, i32> = Fixed::new(9);      // 9 °F of difference
-let band = one_f.to::<Centi, i32>().unwrap();                       // is exactly 5 K
+let setpoint = DegC::from_raw(2100); // 21 °C
+// a difference of 9 °F, in steps of 5/9 K
+let nine_f: Fixed<Kelvin, Rational<5, 9>, i32> = Fixed::new(9);
+let band = nine_f.to::<Centi, i32>().unwrap(); // exactly 5 K
 assert_eq!((setpoint + band).to_string(), "26 °C");
 ```
 
@@ -92,7 +93,8 @@ type DegC = Point<Celsius, Fixed<Kelvin, Centi, i16>>;
 type MilliK = Point<AbsoluteZero, Fixed<Kelvin, Milli, u32>>;
 
 assert_eq!(DegC::from_raw(2500).to::<AbsoluteZero, Milli, u32>(), Some(MilliK::from_raw(298_150)));
-assert_eq!(MilliK::from_raw(298_155).to::<Celsius, Centi, i16>(), None); // not whole in 0.01 °C
+// not whole in 0.01 °C
+assert_eq!(MilliK::from_raw(298_155).to::<Celsius, Centi, i16>(), None);
 ```
 
 The factor and the offset are worked out at compile time: at run time a multiply, an add and a divide by constants.

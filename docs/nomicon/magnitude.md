@@ -49,7 +49,8 @@ use exact_units::Magnitude;
 let milli = Magnitude::pow10(-3);
 assert_eq!(milli.mul(milli), Magnitude::pow10(-6));   // mV · mA is µW
 assert_eq!(Magnitude::pow2(3).sqrt().powi(2), Magnitude::pow2(3)); // √(2³)² = 2³
-assert_eq!(Magnitude::PI.div(Magnitude::ratio(180, 1)).to_ratio(), None); // π/180 is no fraction
+// π/180 is no fraction
+assert_eq!(Magnitude::PI.div(Magnitude::ratio(180, 1)).to_ratio(), None);
 ```
 
 Two things are refused: a compile error in a `const`, a `MagnitudeError` from the `checked_` forms at run time.

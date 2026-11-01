@@ -54,7 +54,7 @@ let mut phase = Bam16::of(0);
 for _ in 0..48 {
     phase += STEP; // wraps every turn, never overflows
 }
-assert_eq!(phase.get(), 65520); // 48 · 1365: 16 steps short of a turn, as 1365 is rounded
+assert_eq!(phase.get(), 65520); // 16 steps short of a turn: 1365 is rounded
 ```
 
 Sine and cosine of a binary angle without a float are [CORDIC](../complex/cordic.md)'s `sin_cos_16`.

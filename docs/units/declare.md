@@ -29,7 +29,8 @@ use exact_units::{Fixed, Unit, prefix::One};
 
 let speed = Fixed::<Rpm, One, u8>::new(60);
 assert_eq!(speed.to_string(), "60 rpm");
-assert!((Rpm::EXPR.factor() * 60.0 - core::f64::consts::TAU).abs() < 1e-12); // 60 rpm in rad/s
+// 60 rpm in rad/s
+assert!((Rpm::EXPR.factor() * 60.0 - core::f64::consts::TAU).abs() < 1e-12);
 assert_eq!(Bucket::DIM, exact_units::counted!(Bucket));
 ```
 
@@ -74,7 +75,8 @@ origin! {
 }
 
 type DegRo = Point<Romer, Fixed<Kelvin, exact_units::prefix::Rational<40, 21>, i16>>;
-assert_eq!(DegRo::from_raw(60).to::<Celsius, One, i16>().map(|p| p.raw()), Some(100)); // water boils
+// water boils
+assert_eq!(DegRo::from_raw(60).to::<Celsius, One, i16>().map(|p| p.raw()), Some(100));
 ```
 
 After `offset` come, in this order and each optional: `step` (1), `reference` (the unit's zero) and `modulus` (`Linear`, or `Modulo<..>` for an angle that wraps).
