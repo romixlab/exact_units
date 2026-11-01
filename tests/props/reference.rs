@@ -98,3 +98,65 @@ pub(crate) fn range(bits: u32, signed: bool) -> (i128, i128) {
         (0, (1 << bits) - 1)
     }
 }
+
+/// A decimal literal as `Decimal::parse` documents it, read without the crate: an optional sign, spaces, digits with
+/// `_` between them and at most one `.`, then an optional `e` or `E` with a signed exponent of digits and `_`. The
+/// digits as one integer and the power of ten, each in a wide integer; `None` for anything else.
+pub(crate) fn decimal(s: &str) -> Option<(i128, i128)> {
+    let (neg, rest) = sign(s);
+    let rest = rest.trim_start_matches(' ');
+    let (mantissa, exponent) = match rest.find(['e', 'E']) {
+        Some(at) => (&rest[..at], Some(&rest[at + 1..])),
+        None => (rest, None),
+    };
+    let (int, frac) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    let num = digits(&format!("{int}{frac}"))?;
+    let frac_digits = i128::try_from(frac.bytes().filter(u8::is_ascii_digit).count()).ok()?;
+    let e = match exponent {
+        None => 0,
+        Some(x) => {
+            let (eneg, x) = sign(x);
+            let e = digits(x)?;
+            if eneg { -e } else { e }
+        }
+    };
+    Some((if neg { -num } else { num }, e - frac_digits))
+}
+
+/// A level in dB as `Decibels::parse` documents it: an optional sign, spaces, digits with `_` and at most one `.`.
+/// The digits as one integer and the count of digits after the point; `None` for anything else.
+pub(crate) fn decibels(s: &str) -> Option<(i128, usize)> {
+    let (neg, rest) = sign(s);
+    let rest = rest.trim_start_matches(' ');
+    let (int, frac) = rest.split_once('.').unwrap_or((rest, ""));
+    let num = digits(&format!("{int}{frac}"))?;
+    let decimals = frac.bytes().filter(u8::is_ascii_digit).count();
+    Some((if neg { -num } else { num }, decimals))
+}
+
+/// A leading `-` or `+` taken off.
+fn sign(s: &str) -> (bool, &str) {
+    match s.as_bytes().first() {
+        Some(b'-') => (true, &s[1..]),
+        Some(b'+') => (false, &s[1..]),
+        _ => (false, s),
+    }
+}
+
+/// Decimal digits and `_`, at least one digit, as an integer: saturated at 10³⁰, far past any `i64` or `i16` the
+/// parsers keep; `None` for any other character or no digit.
+fn digits(s: &str) -> Option<i128> {
+    let mut n: i128 = 0;
+    let mut any = false;
+    for c in s.bytes() {
+        match c {
+            b'0'..=b'9' => {
+                n = (n * 10 + i128::from(c - b'0')).min(10i128.pow(30));
+                any = true;
+            }
+            b'_' => {}
+            _ => return None,
+        }
+    }
+    any.then_some(n)
+}

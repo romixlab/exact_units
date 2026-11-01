@@ -1,7 +1,9 @@
 //! Properties of the crate, each against an exact reference, checked two ways from one function: a proptest draws
 //! its inputs (`just test`), a Kani proof takes them symbolic, all of them at once (`just verify`). A property is a
 //! plain `pub fn` that takes its inputs and asserts; the proptests and proofs beside it only call it. Where an input
-//! space is small and cheap (every i8, every i16), a test walks it whole.
+//! space is small and cheap (every i8, every i16), a test walks it whole. Properties of input from outside (text, wire
+//! bytes, serde) take strings and bytes, which Kani can't reason about: a proptest draws them here, and the fuzz targets
+//! of `fuzz/` (`just fuzz TARGET SECONDS`) call the same functions, coverage-guided.
 #![cfg(feature = "quantities")]
 #![expect(
     clippy::as_conversions,
@@ -12,13 +14,21 @@ mod arith;
 mod format;
 mod literal;
 mod no_panic;
+#[cfg(not(kani))]
+mod panics;
 mod reference;
 mod rounding;
+#[cfg(all(not(kani), feature = "serde", feature = "std", feature = "shrink_wrap"))]
+mod serde_input;
 #[cfg(feature = "serde")]
 mod serde_values;
+#[cfg(not(kani))]
+mod text;
+#[cfg(all(not(kani), feature = "std", feature = "shrink_wrap"))]
+mod wire;
 
 /// Inputs for the proptests: integers weighted to the ends and to 0, where conversions overflow and round.
-#[cfg(not(kani))]
+#[cfg(not(any(kani, fuzzing)))]
 mod strategy {
     use super::reference::{MODES, POLICIES};
     use exact_units::{Overflow, Rounding};
