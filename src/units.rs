@@ -9,10 +9,10 @@
 //! compiler gets their [Unit] impls from it, and the snapshot of this crate (WireWeaver's walker reads the same
 //! lines) their docs and definitions, so clients know them without a table (INT-13).
 
-use crate::{Kind, MAX_UNIT_DEPTH};
 #[cfg(feature = "shrink_wrap")]
 use crate::SIExpr;
 use crate::unit::{Dim, Unit, UnitExpr};
+use crate::{Kind, MAX_UNIT_DEPTH};
 use core::marker::PhantomData;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::RefBox;

@@ -360,7 +360,10 @@ pub(crate) fn any_bytes(which: u8, bytes: &[u8]) {
                 let _ = d.to_string();
             }
             if let Ok(d) = exact_units::DimOwned::from_ww_bytes_owned(bytes) {
-                assert!(d.as_dim().is_canonical(), "{d:?} decodes owned, not canonical");
+                assert!(
+                    d.as_dim().is_canonical(),
+                    "{d:?} decodes owned, not canonical"
+                );
                 #[cfg(feature = "serde")]
                 super::serde_input::dim(&d);
                 let _ = d.as_dim().to_string();

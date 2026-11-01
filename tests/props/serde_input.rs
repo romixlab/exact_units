@@ -37,7 +37,10 @@ pub(crate) fn any_json(s: &str) {
     }
     if let Some(d) = read::<DimOwned>(s) {
         // serde keeps only a canonical dimension, as the wire reader does: every one read goes on the wire
-        assert!(d.as_dim().is_canonical(), "{s:?}: {d:?} reads, not canonical");
+        assert!(
+            d.as_dim().is_canonical(),
+            "{s:?}: {d:?} reads, not canonical"
+        );
         dim(&d);
     }
     if let Some(p) = read::<ProvenanceOwned>(s) {
@@ -139,16 +142,31 @@ mod tests {
         ];
         let e = -8i8..=7;
         (
-            [e.clone(), e.clone(), e.clone(), e.clone(), e.clone(), e.clone(), e],
+            [
+                e.clone(),
+                e.clone(),
+                e.clone(),
+                e.clone(),
+                e.clone(),
+                e.clone(),
+                e,
+            ],
             (-8i8..=7, -8i8..=7),
             proptest::collection::vec((proptest::sample::select(&BASES[..]), any::<bool>()), 0..8),
             any::<bool>(),
         )
             .prop_map(|([s, m, kg, a, k, mol, cd], (rad, bit), counted, root)| {
-                let mut d = Dim::new(s, m, kg, a, k, mol, cd).with_rad(rad).with_bit(bit);
+                let mut d = Dim::new(s, m, kg, a, k, mol, cd)
+                    .with_rad(rad)
+                    .with_bit(bit);
                 for ((c, n), up) in counted {
                     let b = Dim::counted(c, n);
-                    d = if up { d.checked_mul(b) } else { d.checked_div(b) }.unwrap_or(d);
+                    d = if up {
+                        d.checked_mul(b)
+                    } else {
+                        d.checked_div(b)
+                    }
+                    .unwrap_or(d);
                 }
                 if root {
                     d = d.checked_sqrt().unwrap_or(d);

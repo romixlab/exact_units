@@ -438,7 +438,9 @@ fn dim_reads_only_canonical() {
             r#"{{"s":{s},"m":0,"kg":0,"a":0,"k":0,"mol":0,"cd":0,"rad":0,"bit":0,"root":{root},"counted":[{counted}]}}"#
         )
     };
-    let base = |name: &str, exp: i8| format!(r#"{{"crate_name":"exact_units","name":"{name}","exp":{exp}}}"#);
+    let base = |name: &str, exp: i8| {
+        format!(r#"{{"crate_name":"exact_units","name":"{name}","exp":{exp}}}"#)
+    };
     let (frame, sample) = (base("Frame", 1), base("Sample", 1));
 
     let good = json(-1, false, &format!("{frame},{sample},null,null"));
