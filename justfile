@@ -64,3 +64,38 @@ cov: _cov-collect
 # Test coverage as a browsable HTML report
 cov-html: _cov-collect
     cargo llvm-cov report --html --open
+
+# Export the logo from assets/logo/logo.typ: SVG of each variant, PNG files at fixed sizes. Needs typst 0.13 or
+# newer and the Audiowide font installed (SIL OFL, Google Fonts; not in the repo)
+logo: logo-vector logo-png
+
+logo-vector:
+    just _logo exact_units-light.svg lockup light
+    just _logo exact_units-dark.svg lockup dark
+    just _logo mark-light.svg mark light
+    just _logo mark-dark.svg mark dark
+    just _logo wordmark-light.svg wordmark light
+    just _logo wordmark-dark.svg wordmark dark
+    just _logo icon.svg icon dark
+    just _logo icon-small.svg icon-small dark
+
+logo-png:
+    just _logo png/exact_units-light-640.png lockup light 640
+    just _logo png/exact_units-light-1280.png lockup light 1280
+    just _logo png/exact_units-dark-640.png lockup dark 640
+    just _logo png/exact_units-dark-1280.png lockup dark 1280
+    just _logo png/mark-light-256.png mark light 256
+    just _logo png/mark-light-512.png mark light 512
+    just _logo png/mark-dark-256.png mark dark 256
+    just _logo png/mark-dark-512.png mark dark 512
+    just _logo png/icon-small-16.png icon-small dark 16
+    just _logo png/icon-small-32.png icon-small dark 32
+    just _logo png/icon-small-48.png icon-small dark 48
+    just _logo png/icon-128.png icon dark 128
+    just _logo png/icon-256.png icon dark 256
+    just _logo png/icon-512.png icon dark 512
+    just _logo png/social.png social dark
+
+# One variant: the output's extension picks the format, size is the longer side in pixels (empty: natural size)
+_logo out kind theme size="":
+    typst compile --ppi 72 --input kind={{kind}} --input theme={{theme}} --input size={{size}} assets/logo/render.typ assets/logo/{{out}}

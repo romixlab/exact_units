@@ -28,6 +28,7 @@ just lint            # fmt, cargo sort, typos, clippy and rustdoc with -D warnin
 just check           # cargo check of the feature sets firmware uses
 just cov             # test coverage as CI computes it, lcov.info plus a printed summary
 just customary-docs  # regenerate docs/customary.md's tables from the catalogue
+just logo            # export the logo from assets/logo/logo.typ (typst and the Audiowide font installed)
 ```
 
 CI (`.github/workflows/ci.yml`) fails on any warning and also builds for `thumbv6m-none-eabi`. Run `just lint` and

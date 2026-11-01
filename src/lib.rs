@@ -1,4 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/romixlab/exact_units/main/assets/logo/icon.svg",
+    html_favicon_url = "https://raw.githubusercontent.com/romixlab/exact_units/main/assets/logo/icon-small.svg"
+)]
 //! Units of measure fixed at compile time, exact: a number with its unit, scale and storage in the type, on the wire
 //! exactly the number.
 //!

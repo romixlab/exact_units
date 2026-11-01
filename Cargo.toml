@@ -8,6 +8,8 @@ license = "MIT"
 repository = "https://github.com/romixlab/exact_units"
 keywords = ["units", "no_std", "embedded", "dimensional-analysis", "fixed-point"]
 categories = ["no-std", "embedded", "science"]
+# the logo's sources and exports are for the README and rustdoc, which link them from GitHub
+exclude = ["assets/"]
 
 [workspace]
 

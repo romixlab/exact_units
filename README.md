@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/exact_units-dark.svg">
+    <img alt="exact_units" src="assets/logo/exact_units-light.svg" width="420">
+  </picture>
+</p>
+
 ![Crates.io Version](https://img.shields.io/crates/v/exact_units)
 [![CI](https://github.com/romixlab/exact_units/actions/workflows/ci.yml/badge.svg)](https://github.com/romixlab/exact_units/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/romixlab/exact_units/graph/badge.svg)](https://codecov.io/gh/romixlab/exact_units)
