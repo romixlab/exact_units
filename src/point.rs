@@ -129,15 +129,21 @@ pub trait Origin: Copy + Default + 'static {
 /// An [Origin] as data: what a client needs to read and show points of an origin it only knows from the API model.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OriginDef {
+    /// The marker's name: `"Celsius"`.
     pub name: &'static str,
+    /// As written after a number: `"°C"`.
     pub symbol: &'static str,
+    /// The unit of the points' numbers.
     pub unit: &'static UnitExpr,
     /// The [Reference]'s name, `""` for the unit's zero.
     pub reference: &'static str,
+    /// The origin above the reference, in the unit: [Origin::OFFSET].
     pub offset: Offset,
     /// The period in the unit, `None` when points don't wrap.
     pub modulus: Option<Magnitude>,
+    /// [Origin::STEP].
     pub step: Magnitude,
+    /// [Origin::SHOWN].
     pub shown: Offset,
 }
 
@@ -269,7 +275,9 @@ macro_rules! origin {
 )]
 #[repr(transparent)]
 pub struct Point<O, F> {
+    /// The point's number: the amount from the origin.
     coord: F,
+    /// The origin, in the type only.
     _origin: PhantomData<O>,
 }
 
@@ -284,12 +292,15 @@ pub trait PointArith<P, T: Storage>: Modulus {
     type Diff: Storage;
     /// The number of `p` moved by `v`: panics on overflow in debug builds for [Linear], like `T`'s `+`.
     fn add(p: T, v: T) -> T;
+    /// [add](Self::add), `None` on overflow.
     fn checked_add(p: T, v: T) -> Option<T>;
     /// The number of `p` moved back by `v`.
     fn sub(p: T, v: T) -> T;
+    /// [sub](Self::sub), `None` on overflow.
     fn checked_sub(p: T, v: T) -> Option<T>;
     /// The vector from `b` to `a`.
     fn diff(a: T, b: T) -> Self::Diff;
+    /// [diff](Self::diff), `None` on overflow.
     fn checked_diff(a: T, b: T) -> Option<Self::Diff>;
 }
 

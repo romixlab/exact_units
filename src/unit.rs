@@ -34,6 +34,7 @@ pub struct Counted<'i> {
     pub crate_name: &'i str,
     /// The marker's name: `Sample`.
     pub name: &'i str,
+    /// The exponent: `Sample/s` has 1.
     #[cfg_attr(feature = "shrink_wrap", wire(I4))]
     pub exp: i8,
 }
@@ -69,18 +70,25 @@ pub struct Counted<'i> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Dim<'i> {
+    /// Time, second.
     #[cfg_attr(feature = "shrink_wrap", wire(I4))]
     pub s: i8,
+    /// Length, metre.
     #[cfg_attr(feature = "shrink_wrap", wire(I4))]
     pub m: i8,
+    /// Mass, kilogram.
     #[cfg_attr(feature = "shrink_wrap", wire(I4))]
     pub kg: i8,
+    /// Electric current, ampere.
     #[cfg_attr(feature = "shrink_wrap", wire(I4))]
     pub a: i8,
+    /// Thermodynamic temperature, kelvin.
     #[cfg_attr(feature = "shrink_wrap", wire(I4))]
     pub k: i8,
+    /// Amount of substance, mole.
     #[cfg_attr(feature = "shrink_wrap", wire(I4))]
     pub mol: i8,
+    /// Luminous intensity, candela.
     #[cfg_attr(feature = "shrink_wrap", wire(I4))]
     pub cd: i8,
     /// Plane angle, radian.
@@ -660,7 +668,12 @@ pub enum Scale {
     /// A power of ten: g is 10⁻³ kg, L is 10⁻³ m³.
     Pow10(i8),
     /// A factor and an offset: °C is K − 273.15, `Affine { factor: 1.0, offset: 273.15 }`.
-    Affine { factor: f64, offset: f64 },
+    Affine {
+        /// SI per unit.
+        factor: f64,
+        /// SI at the unit's zero.
+        offset: f64,
+    },
     /// An exact factor, integers and a power of π: ° is π/180 rad, a turn 2π rad, rpm π/30 rad/s, eV
     /// 1.602176634·10⁻¹⁹ J. Every reader computes the same value.
     Exact(crate::Magnitude),
@@ -747,17 +760,22 @@ impl Default for ProvenanceOwned {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq)]
 pub enum UnitExpr {
+    /// A unit with a marker of its own.
     Named {
         /// The marker's name: `"Volt"`.
         name: &'static str,
         /// `"V"`, empty for [Ratio](crate::units::Ratio).
         symbol: &'static str,
+        /// The unit's dimension.
         dim: Dim<'static>,
+        /// How a value in the unit becomes coherent SI.
         scale: Scale,
         /// Whether the scale is the unit's definition or a measured value written down by convention.
         provenance: Provenance<'static>,
     },
+    /// `A · B`, [Times](crate::units::Times).
     Mul(&'static UnitExpr, &'static UnitExpr),
+    /// `A / B`, [Per](crate::units::Per).
     Div(&'static UnitExpr, &'static UnitExpr),
     /// A unit to an integer power: m³ as `Pow(Meter, 3)`. No marker of this crate is one, a user's marker can be.
     Pow(&'static UnitExpr, i8),
@@ -915,11 +933,13 @@ pub trait Unit: Copy + Default + 'static {
 /// `Self · R` is a `Self::Output`: filled in by this crate's product table (`Volt · Ampere = Watt`), and for any unit
 /// times a [Ratio](crate::units::Ratio).
 pub trait UnitMul<R: Unit>: Unit {
+    /// The unit of the product.
     type Output: Unit;
 }
 
 /// `Self / R` is a `Self::Output`: filled in by this crate's product table (`Watt / Volt = Ampere`), and for any unit
 /// divided by a [Ratio](crate::units::Ratio).
 pub trait UnitDiv<R: Unit>: Unit {
+    /// The unit of the quotient.
     type Output: Unit;
 }

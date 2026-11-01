@@ -74,8 +74,11 @@ use shrink_wrap::prelude::*;
 )]
 #[repr(transparent)]
 pub struct Index<Of, T: UnsignedStorage, B: Bounds<T> = Unbounded> {
+    /// The position, 0 the first.
     index: T,
+    /// What is counted, in the type only.
     _of: PhantomData<Of>,
+    /// The bounds, in the type only.
     _bounds: PhantomData<B>,
 }
 
@@ -232,8 +235,11 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> Sub for Index<Of, T, B> {
 )]
 #[repr(transparent)]
 pub struct IndexFrom1<Of, T: UnsignedStorage, B: Bounds<T> = Unbounded> {
+    /// The number, 1 the first.
     number: T,
+    /// What is counted, in the type only.
     _of: PhantomData<Of>,
+    /// The bounds, in the type only.
     _bounds: PhantomData<B>,
 }
 
@@ -316,7 +322,9 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> IndexFrom1<Of, T, B> {
 )]
 #[repr(transparent)]
 pub struct Seq<Of, T: UnsignedStorage> {
+    /// The sequence number.
     seq: T,
+    /// What is counted, in the type only.
     _of: PhantomData<Of>,
 }
 

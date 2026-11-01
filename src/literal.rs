@@ -215,6 +215,7 @@ pub struct Literal<const NUM: i64, const EXP: i16>;
 /// The stored value of literal `L` as an associated const, worked out at compile time ([Fixed::from_decimal]): what
 /// [fixed!](crate::fixed) reads, for every [Fixed] with an integer or float storage and every [Complex].
 pub trait AtLiteral<L>: Sized {
+    /// The stored value nearest to literal `L`.
     const AT: Self;
 }
 

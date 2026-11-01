@@ -32,32 +32,57 @@ use shrink_wrap::prelude::*;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Prefix {
+    /// 1, no prefix.
     Unit,
+    /// m, 10⁻³.
     Milli,
+    /// µ, 10⁻⁶.
     Micro,
+    /// n, 10⁻⁹.
     Nano,
+    /// p, 10⁻¹².
     Pico,
+    /// k, 10³.
     Kilo,
+    /// M, 10⁶.
     Mega,
+    /// G, 10⁹.
     Giga,
 
+    /// da, 10¹.
     Deca,
+    /// h, 10².
     Hecto,
+    /// T, 10¹².
     Tera,
+    /// P, 10¹⁵.
     Peta,
+    /// E, 10¹⁸.
     Exa,
+    /// Z, 10²¹.
     Zetta,
+    /// Y, 10²⁴.
     Yotta,
+    /// R, 10²⁷.
     Ronna,
+    /// Q, 10³⁰.
     Quetta,
 
+    /// d, 10⁻¹.
     Deci,
+    /// c, 10⁻².
     Centi,
+    /// f, 10⁻¹⁵.
     Femto,
+    /// a, 10⁻¹⁸.
     Atto,
+    /// z, 10⁻²¹.
     Zepto,
+    /// y, 10⁻²⁴.
     Yocto,
+    /// r, 10⁻²⁷.
     Ronto,
+    /// q, 10⁻³⁰.
     Quecto,
 
     /// 2¹⁰
@@ -96,6 +121,7 @@ impl Pow10Exp {
         }
     }
 
+    /// The exponent.
     pub const fn get(self) -> i8 {
         self.0
     }
@@ -116,6 +142,7 @@ impl Pow2Exp {
         }
     }
 
+    /// The exponent.
     pub const fn get(self) -> i8 {
         self.0
     }
@@ -136,6 +163,7 @@ impl FullScaleBits {
         }
     }
 
+    /// The number of bits.
     pub const fn get(self) -> u8 {
         self.0
     }

@@ -16,6 +16,7 @@ use shrink_wrap::prelude::*;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Offset {
+    /// Below the reference; never for zero.
     negative: bool,
     /// `None` for zero.
     magnitude: Option<Magnitude>,

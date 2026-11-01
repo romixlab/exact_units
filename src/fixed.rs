@@ -80,9 +80,13 @@ pub(crate) use format::Number;
 )]
 #[repr(transparent)]
 pub struct Fixed<U, P, T: Storage, B: Bounds<T> = Unbounded> {
+    /// The number of steps of `P`.
     value: T,
+    /// The unit, in the type only.
     _unit: PhantomData<U>,
+    /// The scale, in the type only.
     _prefix: PhantomData<P>,
+    /// The bounds, in the type only.
     _bounds: PhantomData<B>,
 }
 

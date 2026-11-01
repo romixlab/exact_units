@@ -8,7 +8,9 @@ use shrink_wrap::{Nibble, UNib32, UVlq32, UVlq64};
 /// A number as an exact integer or a float, for conversions between storages and prefixes.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Repr {
+    /// An integer, exactly.
     Int(i128),
+    /// A float.
     Float(f64),
 }
 
@@ -18,13 +20,16 @@ pub enum Repr {
 pub trait Storage: Copy + PartialOrd + 'static {
     /// The type's name: `"u32"`, `"UNib32"`.
     const NAME: &'static str;
+    /// `f32` and `f64`.
     const IS_FLOAT: bool;
+    /// 0.
     const ZERO: Self;
     /// Width in bits: what [Fixed::to](super::Fixed::to) picks its widened multiply by (64-bit up to 32 bits, else
     /// 128-bit).
     const BITS: u32;
     /// The smallest and largest value as integers (0 for floats).
     const MIN_INT: i128;
+    /// See [MIN_INT](Self::MIN_INT).
     const MAX_INT: i128;
 
     /// The value as an exact integer or a float.
@@ -62,28 +67,45 @@ pub trait Storage: Copy + PartialOrd + 'static {
     /// The number as stored: integers exactly, `f32` as `f32`.
     fn fmt_number(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
+    /// `self + rhs`, `None` on overflow.
     fn checked_add(self, rhs: Self) -> Option<Self>;
+    /// `self - rhs`, `None` on overflow.
     fn checked_sub(self, rhs: Self) -> Option<Self>;
+    /// `self · rhs`, `None` on overflow.
     fn checked_mul(self, rhs: Self) -> Option<Self>;
+    /// `self / rhs`, `None` on overflow and for a zero `rhs` (integers).
     fn checked_div(self, rhs: Self) -> Option<Self>;
+    /// `self + rhs`, wrapping on overflow.
     fn wrapping_add(self, rhs: Self) -> Self;
+    /// `self - rhs`, wrapping on overflow.
     fn wrapping_sub(self, rhs: Self) -> Self;
+    /// `self · rhs`, wrapping on overflow.
     fn wrapping_mul(self, rhs: Self) -> Self;
+    /// `self / rhs`, wrapping on overflow (`MIN / -1`); panics for a zero `rhs` (integers).
     fn wrapping_div(self, rhs: Self) -> Self;
+    /// `self + rhs`, saturating at the type's ends.
     fn saturating_add(self, rhs: Self) -> Self;
+    /// `self - rhs`, saturating at the type's ends.
     fn saturating_sub(self, rhs: Self) -> Self;
+    /// `self · rhs`, saturating at the type's ends.
     fn saturating_mul(self, rhs: Self) -> Self;
+    /// `self / rhs`, saturating at the type's ends; panics for a zero `rhs` (integers).
     fn saturating_div(self, rhs: Self) -> Self;
     /// `+` as the type's own operator: panics on overflow in debug builds.
     fn add(self, rhs: Self) -> Self;
+    /// `-` as the type's own operator: panics on overflow in debug builds.
     fn sub(self, rhs: Self) -> Self;
+    /// `*` as the type's own operator: panics on overflow in debug builds.
     fn mul(self, rhs: Self) -> Self;
+    /// `/` as the type's own operator: panics for a zero `rhs` (integers) and on overflow in debug builds.
     fn div(self, rhs: Self) -> Self;
 }
 
 /// An unsigned integer storage of up to 64 bits: what a [core::time::Duration] converts from.
 pub trait UnsignedStorage: Storage {
+    /// The value as a `u64`, exactly.
     fn to_u64(self) -> u64;
+    /// `x` if it fits.
     fn from_u64(x: u64) -> Option<Self>;
 }
 

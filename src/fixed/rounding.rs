@@ -368,10 +368,14 @@ pub enum StorageKind {
     /// An integer of `bits` (1 to 64), two's complement when `signed`: `u16` is `{ bits: 16, signed: false }`,
     /// `Nibble` 4 bits unsigned, `UNib32` and `UVlq32` 32.
     Int {
+        /// Width in bits.
         bits: u32,
+        /// Two's complement when `true`.
         signed: bool,
     },
+    /// `f32`.
     F32,
+    /// `f64`.
     F64,
 }
 
@@ -468,6 +472,7 @@ enum Exact {
 }
 
 impl Requantizer {
+    /// The requantizer by `factor` into `to`, rounded by `r`, overflowing by `o`: [requantize] of each value.
     pub fn new(factor: &Magnitude, to: StorageKind, r: Rounding, o: Overflow) -> Self {
         let exact = match factor.to_ratio() {
             Some((num, den)) => Exact::Ratio {

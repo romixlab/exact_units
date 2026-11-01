@@ -191,6 +191,7 @@ pub struct Level<const NUM: i64, const DECIMALS: u8>;
 /// The gain at level `L` as an associated const, worked out at compile time ([Fixed::from_db_const]): what
 /// [db!](crate::db) reads, for every [Fixed] with an integer or float storage.
 pub trait AtLevel<L>: Sized {
+    /// The gain at level `L`.
     const AT: Self;
 }
 

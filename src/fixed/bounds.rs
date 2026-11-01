@@ -12,7 +12,9 @@ use shrink_wrap::{Nibble, UNib32, UVlq32, UVlq64};
 /// [RangeDec] (floats). An API's own marker works in Rust, but introspection sees only its name, while dynamic clients
 /// read the limits of these three from their parameters.
 pub trait Bounds<T: Storage>: Copy + Default + 'static {
+    /// The lowest value allowed, `None` for no limit.
     const MIN: Option<T>;
+    /// The highest value allowed, `None` for no limit.
     const MAX: Option<T>;
     /// `MIN ..= MAX` as integers, for `const` code: what [into_rounded](super::Fixed::into_rounded) proves its result
     /// range from. `None` (the default) proves from the whole range of `T`, which is never narrower.

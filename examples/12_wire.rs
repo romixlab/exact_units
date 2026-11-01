@@ -23,7 +23,9 @@ use shrink_wrap::prelude::*;
 /// What the node sends, from the crate the node and the PC tool share.
 #[derive_shrink_wrap(borrowed, derive(Debug, PartialEq))]
 struct Reading {
+    /// Since boot.
     t: Micros<u32>,
+    /// The cell's voltage.
     cell: Fixed<Volt, Milli, u16>,
 }
 

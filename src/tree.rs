@@ -49,7 +49,9 @@ pub enum Node<'a, E> {
         name: &'a str,
         /// As written after a number: `V`; a unit known by name only has its name here.
         symbol: &'a str,
+        /// The unit's dimension, `None` for a unit known by name only.
         dim: Option<Dim<'a>>,
+        /// How a value in the unit becomes coherent SI, `None` for a unit known by name only.
         scale: Option<Scale>,
     },
     /// `A · B`

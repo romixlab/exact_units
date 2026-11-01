@@ -26,9 +26,13 @@ use shrink_wrap::prelude::*;
 pub enum SIExpr<'i> {
     /// A named unit: `name` is the marker's (`"Volt"`, a device's own `"Rpm"`), `symbol` as written after a number.
     Named {
+        /// The marker's name.
         name: &'i str,
+        /// As written after a number.
         symbol: &'i str,
+        /// The unit's dimension.
         dim: Dim<'i>,
+        /// How a value in the unit becomes coherent SI.
         scale: Scale,
     },
     /// `A · B`, [Times](crate::units::Times).

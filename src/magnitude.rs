@@ -66,8 +66,11 @@ pub struct MagnitudeRest {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Irrational {
+    /// Twice the exponent of π.
     pub pi: i8,
+    /// Twice the exponent of ln 2.
     pub ln2: i8,
+    /// Twice the exponent of ln 10.
     pub ln10: i8,
 }
 
@@ -81,8 +84,10 @@ pub struct Irrational {
 // (a derive would take references to its fields).
 #[repr(C, packed(2))]
 pub struct PrimePower {
+    /// The prime: 3, 7, 11, ..
     #[cfg_attr(feature = "shrink_wrap", wire(UNib32))]
     pub prime: u32,
+    /// Twice its exponent.
     pub exp: i8,
 }
 

@@ -12,15 +12,21 @@ fn within_bound<T: for<'i> shrink_wrap::series::SeriesColumns<'i>>(n: usize, byt
 
 #[derive_shrink_wrap(borrowed, owned, series, derive(Clone, Copy, Debug, PartialEq))]
 struct PlainSample {
+    /// µs
     t_us: u32,
+    /// mV
     v_mv: i16,
+    /// %
     duty_pct: u8,
 }
 
 #[derive_shrink_wrap(borrowed, owned, series, derive(Clone, Copy, Debug, PartialEq))]
 struct FixedSample {
+    /// The same µs.
     t: exact_units::Micros<u32>,
+    /// The same mV.
     v: exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Milli, i16>,
+    /// The same %.
     duty: exact_units::Fixed<exact_units::units::Ratio, exact_units::prefix::Centi, u8>,
 }
 

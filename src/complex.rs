@@ -89,8 +89,11 @@ use shrink_wrap::prelude::*;
 pub trait ComplexStorage: Storage {
     /// `-self`, panicking on overflow (`MIN`) in debug builds as the operator does.
     fn neg(self) -> Self;
+    /// `-self`, `MIN` for `MIN`.
     fn wrapping_neg(self) -> Self;
+    /// `-self`, `MAX` for `MIN`.
     fn saturating_neg(self) -> Self;
+    /// `-self`, `None` for `MIN`.
     fn checked_neg(self) -> Option<Self>;
 }
 
@@ -124,6 +127,7 @@ complex_float!(f32 f64);
 /// 2³¹j|² is 2⁶³), the float itself for `f32` and `f64`. `i64` has none (|z|² reaches 2¹²⁷): take
 /// it after [to](Complex::to) or [requantize](Complex::requantize) into `i32` or a float.
 pub trait NormStorage: ComplexStorage {
+    /// The type |z|² is stored as.
     type Norm: Storage;
     /// `re² + im²`, exact for integers.
     fn norm_sqr(re: Self, im: Self) -> Self::Norm;
@@ -168,10 +172,15 @@ impl NormStorage for f64 {
 )]
 #[repr(C)]
 pub struct Complex<U, P, T: ComplexStorage, B: Unlimited<T> = Unbounded> {
+    /// The real part, in steps of `P`.
     re: T,
+    /// The imaginary part, in steps of `P`.
     im: T,
+    /// The unit, in the type only.
     _unit: PhantomData<U>,
+    /// The scale, in the type only.
     _prefix: PhantomData<P>,
+    /// The bounds, in the type only.
     _bounds: PhantomData<B>,
 }
 
