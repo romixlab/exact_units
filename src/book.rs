@@ -41,4 +41,7 @@ pages! {
     Declare = "units/declare.md";
     #[cfg(feature = "shrink_wrap")]
     Wire = "wire/shrink_wrap.md";
+    Sensors = "recipes/sensors.md";
+    Timing = "recipes/timing.md";
+    Magnitude = "nomicon/magnitude.md";
 }
