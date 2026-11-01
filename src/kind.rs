@@ -253,7 +253,7 @@ struct KindsInConversions;
 /// assert_eq!(p.convert::<Phase<Degree>, One, u32>(), Some(Fixed::new(90)));
 /// let _: Option<Fixed<Phase<Radian>, One, f64>> = p.convert();
 /// // the named steps, the same number
-/// let mechanical: Bam16 = Fixed::of(16384);
+/// let mechanical: Bam16 = exact_units::fixed!(0.25); // a quarter turn
 /// let phase: PhaseBam16 = mechanical.as_phase();
 /// assert_eq!(phase.as_plane_angle(), mechanical);
 /// // electrical angle = pole pairs · mechanical angle, wrapping at a turn

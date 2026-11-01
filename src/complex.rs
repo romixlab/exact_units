@@ -374,8 +374,8 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
     /// # #[cfg(feature = "dimensionless")] {
     /// use exact_units::{Complex, Rounding, Saturating, prefix::Pow2, units::Ratio};
     /// type Iq = Complex<Ratio, Pow2<-15>, i16, Saturating>;
-    /// let a = Iq::of(16384, 16384); // 0.5 + 0.5j
-    /// let b = Iq::of(16384, -16384); // 0.5 − 0.5j
+    /// let a: Iq = exact_units::fixed!(0.5, 0.5);
+    /// let b: Iq = exact_units::fixed!(0.5, -0.5);
     /// let p: Complex<_, Pow2<-15>, i16> = a.times_into(b, Rounding::NearestEven).unwrap();
     /// assert_eq!(p.get(), (16384, 0)); // 0.5
     /// # }
@@ -423,8 +423,8 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
     ///
     /// ```
     /// # #[cfg(feature = "dimensionless")] {
-    /// use exact_units::{CQ15, Complex, Rounding, prefix::Pow2};
-    /// let a: CQ15 = Complex::of(0, 16384); // 0.5j
+    /// use exact_units::{CQ15, Complex, Rounding, fixed, prefix::Pow2};
+    /// let a: CQ15 = fixed!(0, 0.5);
     /// let p: Complex<_, Pow2<-15>, i16> = a.times_conj_into(a, Rounding::NearestEven).unwrap();
     /// assert_eq!(p.get(), (8192, 0)); // |a|² = 0.25
     /// # }

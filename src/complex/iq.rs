@@ -105,10 +105,10 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
     ///
     /// ```
     /// # #[cfg(feature = "dimensionless")] {
-    /// use exact_units::{CQ15, Complex, Rounding};
-    /// let a: CQ15 = Complex::of(16384, 16384); // 0.5 + 0.5j
+    /// use exact_units::{CQ15, Rounding, fixed};
+    /// let a: CQ15 = fixed!(0.5, 0.5);
     /// assert_eq!(a.mul_round(a, Rounding::NearestEven).get(), (0, 16384)); // 0.5j
-    /// let m: CQ15 = Complex::of(-32768, -32768); // −1 − j
+    /// let m: CQ15 = fixed!(-1, -1);
     /// assert_eq!(m.mul_round(m, Rounding::NearestEven).get(), (0, 32767)); // 2j, saturated
     /// # }
     /// ```
@@ -128,9 +128,9 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
     ///
     /// ```
     /// # #[cfg(feature = "dimensionless")] {
-    /// use exact_units::{CQ15, Complex, Rounding};
-    /// let a: CQ15 = Complex::of(0, -32768); // −j: its conjugate j isn't a Q15 value, the product is exact anyway
-    /// let b: CQ15 = Complex::of(0, 16384); // 0.5j
+    /// use exact_units::{CQ15, Rounding, fixed};
+    /// let a: CQ15 = fixed!(0, -1); // −j: its conjugate j isn't a Q15 value, the product is exact anyway
+    /// let b: CQ15 = fixed!(0, 0.5);
     /// assert_eq!(b.mul_conj_round(a, Rounding::NearestEven).get(), (-16384, 0)); // 0.5j · j = −0.5
     /// # }
     /// ```
@@ -168,9 +168,9 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
     ///
     /// ```
     /// # #[cfg(feature = "dimensionless")] {
-    /// use exact_units::{CQ15, Complex, Rounding, units::Volt};
-    /// let x: CQ15<Volt> = Complex::of(16384, 0); // 0.5 V of full scale, in phase
-    /// let j: CQ15 = Complex::of(0, 32767); // a quarter turn, as close to j as Q15 gets
+    /// use exact_units::{CQ15, Complex, Rounding, fixed, units::Volt};
+    /// let x: CQ15<Volt> = fixed!(0.5, 0); // 0.5 V of full scale, in phase
+    /// let j: CQ15 = Complex::of(0, i16::MAX); // a quarter turn, as close to j as Q15 gets
     /// let y: CQ15<Volt> = x.mix(j, Rounding::NearestEven);
     /// assert_eq!(y.get(), (0, 16384));
     /// # }
@@ -312,10 +312,10 @@ impl<U: Unit, P: FixedScale, T: IqStorage> Mac<U, P, T> {
     ///
     /// ```
     /// # #[cfg(feature = "dimensionless")] {
-    /// use exact_units::{CQ15, Complex, Fixed, Mac, fixed, prefix::{Pow2, Product}, units::{Ratio, Times}};
+    /// use exact_units::{CQ15, Fixed, Mac, fixed, prefix::{Pow2, Product}, units::{Ratio, Times}};
     /// type PowerQ30 = Fixed<Times<Ratio, Ratio>, Product<Pow2<-15>, Pow2<-15>>, u32>;
     /// const BUSY: PowerQ30 = fixed!(0.1);
-    /// let y: CQ15 = Complex::of(16384, 0); // 0.5, a power of 0.25
+    /// let y: CQ15 = fixed!(0.5, 0); // a power of 0.25
     /// let mut power = Mac::new();
     /// power.mac_conj(y, y);
     /// power.mac_conj(y, y);

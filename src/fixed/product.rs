@@ -342,7 +342,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// assert_eq!(p.get(), 4952); // 4951.5 mW, to even
     ///
     /// // a Q15 multiply: 0.5 · 0.5 is 0.25, back in steps of 2⁻¹⁵
-    /// let half: Q15 = Fixed::of(16384);
+    /// let half: Q15 = exact_units::fixed!(0.5);
     /// let q: Fixed<_, Pow2<-15>, i16> = half.times_into(half, Rounding::Floor).unwrap();
     /// assert_eq!(q.get(), 8192);
     /// # }

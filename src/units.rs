@@ -414,7 +414,7 @@ impl PlaneAngle for Turn {}
 /// let half = Fixed::<Phase<Turn>, One, f32>::new(0.5);
 /// assert_eq!(half.convert::<Phase<Degree>, One, f32>(), Some(Fixed::new(180.0)));
 /// // a rotor at 0.3 turn with 7 pole pairs is at 2.1 turns electrical, 0.1 turn of phase
-/// let mechanical: Bam16 = Fixed::of(19661);
+/// let mechanical: Bam16 = exact_units::fixed!(0.3);
 /// let phase: PhaseBam16 = mechanical.electrical(7);
 /// assert_eq!(phase.get(), 19661u16.wrapping_mul(7));
 /// # }

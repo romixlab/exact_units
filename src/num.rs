@@ -121,9 +121,10 @@ pub fn scale_f32(x: f32, exp: i8) -> f32 {
 #[cfg(any(feature = "std", feature = "libm"))]
 pub(crate) mod math {
     #[cfg(feature = "libm")]
-    pub(crate) use libm::{
-        atan2, atan2f, exp10, exp10f, hypot, hypotf, log10, log10f, sincos, sincosf,
-    };
+    pub(crate) use libm::{exp10, exp10f, hypot, hypotf, log10, log10f};
+    // the polar form's arg and from_polar, angles only
+    #[cfg(all(feature = "libm", feature = "angle"))]
+    pub(crate) use libm::{atan2, atan2f, sincos, sincosf};
 
     #[cfg(not(feature = "libm"))]
     mod from_std {

@@ -15,7 +15,7 @@
 
 use exact_units::prefix::Pow2;
 use exact_units::units::Ratio;
-use exact_units::{Bam16, Fixed, Q15, Rounding};
+use exact_units::{Bam16, Fixed, Q15, Rounding, fixed};
 
 /// One sample of a voice: the sine of its phase at an amplitude, in Q15.
 fn sine(phase: Bam16, amplitude: f32) -> Q15 {
@@ -43,8 +43,8 @@ fn main() {
     assert_eq!(phase.get(), 829); // 65000 + 1365 − 65536
 
     // the mix: two voices near their peaks
-    let a: Q15 = Fixed::of(26214); // 0.8
-    let b: Q15 = Fixed::of(16384); // 0.5
+    let a: Q15 = fixed!(0.8);
+    let b: Q15 = fixed!(0.5);
     let mixed = a + b; // saturates at the top of Q15
     println!(
         "{:.3} + {:.3} = {:.3} (Q15 saturates)",
@@ -77,7 +77,7 @@ fn main() {
 
     // volume: Q15 · Q15 is a product in 2⁻³⁰ (`Product<Pow2<-15>, Pow2<-15>>`), back into Q15 is one rounding,
     // named; Ratio · Ratio is a Ratio by `convert`
-    let volume: Q15 = Fixed::of(16384); // 0.5
+    let volume: Q15 = fixed!(0.5);
     let quiet: Fixed<_, Pow2<-15>, i16> = mixed.times_into(volume, Rounding::Floor).unwrap();
     let quiet = quiet.convert::<Ratio, Pow2<-15>, i16>().unwrap();
     println!(
