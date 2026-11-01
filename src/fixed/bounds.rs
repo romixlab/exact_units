@@ -214,12 +214,13 @@ impl<const MIN: i64, const MAX: i64, const EXP: i8> Bounds<f32> for RangeDec<MIN
         None => None,
     };
     #[expect(
-        clippy::cast_precision_loss,
         clippy::cast_possible_truncation,
-        reason = "FINDING: rounded twice, in f32 (MAX and 10^EXP each, then their product), while MIN rounds the f64 bound \
-                  once: RangeDec<-5, 5, -4> on f32 gives MIN -5e-4 and MAX 4.9999997e-4, below the f32 5e-4"
+        reason = "the f64 bound rounded to the nearest f32"
     )]
-    const MAX: Option<f32> = Some(MAX as f64 as f32 * pow10_f64(EXP) as f32);
+    const MAX: Option<f32> = match <Self as Bounds<f64>>::MAX {
+        Some(x) => Some(x as f32),
+        None => None,
+    };
 }
 
 /// `bounded(value)`: a `const fn` constructor per integer storage, a compile error for a value outside `B` in `const`
@@ -268,4 +269,19 @@ bounded! {
     UVlq32 x => x.0;
     UVlq64 x => x.0;
     Nibble x => x.value();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Bounds, RangeDec};
+
+    #[test]
+    fn range_dec_f32_bounds_are_the_nearest_f32() {
+        // MAX used to round twice (5 and 10^-4 each to f32, then their product): 4.9999997e-4
+        type B = RangeDec<-5, 5, -4>;
+        assert_eq!(<B as Bounds<f32>>::MIN, Some(-5e-4));
+        assert_eq!(<B as Bounds<f32>>::MAX, Some(5e-4));
+        assert_eq!(<RangeDec<-7, 13, -3> as Bounds<f32>>::MAX, Some(0.013));
+        assert_eq!(<RangeDec<0, 25, -1> as Bounds<f32>>::MAX, Some(2.5));
+    }
 }
