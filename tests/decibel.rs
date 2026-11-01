@@ -949,6 +949,14 @@ fn round_levels_are_exact() {
 }
 
 #[test]
+#[should_panic(expected = "a level in dB takes up to 9 decimals")]
+fn parse_refuses_past_255_decimals() {
+    // 256 zeros and a 1 after the point: 257 decimals, not the 1 a u8 count wraps to
+    let s = std::format!("0.{}1", "0".repeat(256));
+    let _ = Decibels::parse(&s);
+}
+
+#[test]
 fn in_comparisons() {
     // a threshold in firmware: integers only at run time
     const MINUS_3: VoltGain<Milli, u16> = db!(-3);

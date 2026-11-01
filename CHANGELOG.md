@@ -277,6 +277,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
 
 ### 🐛 Fixes
 
+* `Decibels::parse` (and so `db!`) refuses a level with more than 255 decimals with its "up to 9 decimals" panic; the count wrapped, so `0.` and 256 zeros and a `1` parsed as 0.1 dB in release (an overflow panic in debug).
 * `Magnitude::from_parts_x2` (and so a `Magnitude` read with serde) refuses entries of one prime whose exponents sum past `i32` with `ExponentRange`; it panicked in debug and returned a wrong magnitude in release (2³²/127 + 1 entries of `3¹²⁷ᐟ²` gave `3¹¹¹ᐟ²`).
 * `Magnitude`'s `Display` of a factor whose square roots multiply past `u128` (five primes near 2³² under one `√`) writes the prime powers; it panicked in debug and printed a wrong root in release.
 * A product or quotient of `Ratio`s (`Ratio · Ratio`, a `CQ15` squared) prints no unit, as `Ratio` does; it printed a stray ` ·`.
