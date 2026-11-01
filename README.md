@@ -197,6 +197,9 @@ real message.
     a unit's value comes from.
 12. `12_wire` (`shrink_wrap,time,electrical`): a sensor reading sent to a PC tool; the same bytes as plain integers,
     read back with its unit.
+13. `13_impedance_match` (`electrical,angle,dimensionless,libm`): an antenna against 50 Ω; Γ, VSWR, return and
+    mismatch loss, and the firmware's |Γ| ≤ −15 dB as one integer compare on |Γ|², not the 20·lg slip that passes
+    −7.5 dB.
 14. `14_iq_downconvert` (`angle,dimensionless,electrical`): Q15 IQ samples mixed down by an NCO on a Cortex-M0; a
     complex multiply that saturates at (−1 − j)² where plain `int32_t` products wrap to 0, and an exact power sum.
 

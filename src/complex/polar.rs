@@ -253,9 +253,9 @@ macro_rules! float_polar {
             /// |z| · (cos θ + j·sin θ) for a phase θ in any angle unit and scale: `Phase<Degree>` is turned into
             /// radians by its exact factor first.
             #[inline(always)]
-            pub fn from_polar<A: PlaneAngle, PA: FixedScale, BA: Bounds<$ty>>(
+            pub fn from_polar<A: PlaneAngle, PA: FixedScale, BP: Bounds<$ty>>(
                 abs: Fixed<U, P, $ty>,
-                arg: Fixed<Phase<A>, PA, $ty, BA>,
+                arg: Fixed<Phase<A>, PA, $ty, BP>,
             ) -> Self {
                 let rad = arg.get() * const { (PA::SCALE.to_f64() * <Phase<A>>::EXPR.factor()) as $ty };
                 let (s, c) = math::$sincos(rad);
@@ -264,7 +264,7 @@ macro_rules! float_polar {
         }
 
         #[cfg(feature = "angle")]
-        impl<U, P, A: PlaneAngle, PA: FixedScale, BA: Bounds<$ty>> Polar<U, P, $ty, Fixed<Phase<A>, PA, $ty, BA>> {
+        impl<U, P, A: PlaneAngle, PA: FixedScale, BP: Bounds<$ty>> Polar<U, P, $ty, Fixed<Phase<A>, PA, $ty, BP>> {
             /// The rectangular form ([Complex::from_polar]).
             #[inline(always)]
             pub fn to_complex(self) -> Complex<U, P, $ty> {

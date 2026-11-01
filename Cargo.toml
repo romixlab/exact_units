@@ -147,6 +147,11 @@ name = "12_wire"
 required-features = ["shrink_wrap", "time", "electrical"]
 
 [[example]]
+# Γ, VSWR and return loss of an antenna; the firmware's |Γ| ≤ −15 dB as one integer compare
+name = "13_impedance_match"
+required-features = ["electrical", "angle", "dimensionless", "libm"]
+
+[[example]]
 # Q15 IQ: an NCO mixer, a complex multiply that saturates, an exact power sum
 name = "14_iq_downconvert"
 required-features = ["angle", "dimensionless", "electrical"]
