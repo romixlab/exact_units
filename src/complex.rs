@@ -27,8 +27,8 @@
 //!   and an impedance in mΩ needs no float.
 //! - **Signed storage only** ([ComplexStorage]: `i8`..`i64`, `f32`, `f64`), and **`B` is an overflow policy only**
 //!   ([Unbounded], [Wrapping], [Saturating]): a range has no single meaning for a complex value.
-//! - **Memory and wire: `re`, then `im`.** `#[repr(C)]`, the layout of CMSIS-DSP's interleaved complex buffers and of
-//!   `num_complex::Complex`; on the wire the two numbers and nothing else.
+//! - **Memory and wire: `re`, then `im`.** `#[repr(C)]`, the common interleaved layout of complex sample buffers; on the
+//!   wire the two numbers and nothing else.
 //! - **Products keep the written unit and an exact scale, as `Fixed`'s do.** `z * y` of an [Impedance] and an
 //!   [Admittance] is `Complex<Times<Ohm, Siemens>, Product<P1, P2>, T>`, of dimension one and plain
 //!   [kind](crate::kind), so it [converts](Complex::convert) to a [Ratio](crate::units::Ratio). A real `Fixed`
@@ -398,7 +398,7 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
     }
 
     /// As [times_into](Self::times_into), each part settled by `o` where it doesn't fit `T3`: [Overflow::Saturate]
-    /// is the CMSIS-DSP behaviour, (−1 − j)² = 2j at the top of Q15. `None` only for [Overflow::Checked].
+    /// puts a part past `T3` at its nearest end: (−1 − j)² = 2j is `0 + j·(1 − 2⁻¹⁵)` in Q15. `None` only for [Overflow::Checked].
     #[inline(always)]
     pub fn times_requantize<
         U2: Unit,
