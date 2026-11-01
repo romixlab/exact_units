@@ -157,7 +157,7 @@ fn large_and_refused() {
     );
     assert_eq!(u64::MAX, 3 * 5 * 17 * 257 * 641 * 65537 * 6700417);
     let m = Magnitude::ratio(u64::MAX, 1);
-    assert_eq!(m.to_ratio(), Some((u64::MAX as u128, 1)));
+    assert_eq!(m.to_ratio(), Some((u128::from(u64::MAX), 1)));
 }
 
 #[test]

@@ -235,7 +235,7 @@ fn times_into_rounds_once() {
     assert_eq!(
         m.times_into::<_, _, _, Micro, i64>(m, Rounding::Floor)
             .map(Fixed::get),
-        Some((i32::MIN as i64) * (i32::MIN as i64))
+        Some(i64::from(i32::MIN) * i64::from(i32::MIN))
     );
     // a factor above 1: mV · mA into nW multiplies by 1000
     assert_eq!(
@@ -313,7 +313,7 @@ fn per_into_keeps_digits() {
     assert_eq!(
         a.per_into::<_, _, _, Milli, i64>(Fixed::<Ampere, One, i64>::new(1 << 40), Rounding::Floor)
             .map(Fixed::get),
-        Some(((i64::MAX as i128 * 1000) >> 40) as i64)
+        Some(((i128::from(i64::MAX) * 1000) >> 40) as i64)
     );
     // out of the storage
     assert_eq!(

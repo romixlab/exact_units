@@ -195,7 +195,7 @@ items_after_statements = "allow"
 # fires in the code derive_shrink_wrap generates for Complex, out of reach of an #[expect]
 used_underscore_binding = "allow"
 # NEXT STEP (strict-lints session, not landed): the cast lints, fixed or narrowed before the branch is ready
-cast_lossless = "allow"
+cast_lossless = "allow" # NEXT: 18 left, in macros
 cast_possible_truncation = "allow"
 cast_possible_wrap = "allow"
 cast_precision_loss = "allow"

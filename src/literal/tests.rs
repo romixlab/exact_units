@@ -86,7 +86,7 @@ fn ties_to_even() {
 
 /// The nearest integer to `num · 10^exp · 2^k`, ties to even, by plain i128 arithmetic.
 fn reference_pow2(num: i64, exp: i16, k: u32) -> i128 {
-    let (mut p, mut q) = ((num as i128).abs() << k, 1i128);
+    let (mut p, mut q) = (i128::from(num).abs() << k, 1i128);
     if exp >= 0 {
         p *= 10i128.pow(exp as u32);
     } else {
@@ -111,9 +111,9 @@ fn integers_against_a_reference() {
         let num = (seed % 2_000_000) as i64 - 1_000_000;
         let exp = -(((seed >> 32) % 7) as i16);
         let got = Fixed::<Ratio, Pow2<-30>, i64>::from_decimal(Decimal::new(num, exp)).get();
-        assert_eq!(got as i128, reference_pow2(num, exp, 30), "{num}e{exp}");
+        assert_eq!(i128::from(got), reference_pow2(num, exp, 30), "{num}e{exp}");
         let got = Fixed::<Ratio, Pow2<-15>, i64>::from_decimal(Decimal::new(num, exp)).get();
-        assert_eq!(got as i128, reference_pow2(num, exp, 15), "{num}e{exp}");
+        assert_eq!(i128::from(got), reference_pow2(num, exp, 15), "{num}e{exp}");
     }
 }
 

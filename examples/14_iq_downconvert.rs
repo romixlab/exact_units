@@ -102,7 +102,7 @@ fn main() {
     for y in Sample::from_interleaved(&buf).take(3) {
         let (re, im) = y.get();
         println!("mixed down: {y:#.4}");
-        assert!((re as i32 - 16384).abs() <= 2 && im.abs() <= 2);
+        assert!((i32::from(re) - 16384).abs() <= 2 && im.abs() <= 2);
     }
 
     // the detector: the mean power is 0.25 (−6 dBFS), above the −10 dBFS threshold, 0.1 · 2³⁰ rounded
@@ -122,7 +122,7 @@ fn main() {
     let sq = m.mul_round(m, Rounding::NearestEven);
     println!("(-1-1j)² typed: {sq:#.4}");
     assert_eq!(sq.get(), (0, i16::MAX));
-    let (a, b) = (i16::MIN as i32, i16::MIN as i32);
+    let (a, b) = (i32::from(i16::MIN), i32::from(i16::MIN));
     let plain_im = (a * b).wrapping_add(b * a) >> 15; // a·d + b·c in int32_t, as a release build computes it
     println!(
         "(-1-1j)² plain int32: im = {} as int16_t = {}",

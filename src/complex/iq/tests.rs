@@ -21,7 +21,7 @@ fn round_shift(x: i128, s: u32, r: Rounding) -> i128 {
         Rounding::NearestEven => rem > d / 2 || (rem == d / 2 && q % 2 != 0),
         Rounding::NearestAway => rem > d / 2 || (rem == d / 2 && x >= 0),
     };
-    q + up as i128
+    q + i128::from(up)
 }
 
 /// The exact `(a + jb)(c + jd)` (or `· conj`) of `n`-bit parts in Q(n−1), in Q(n−1) again: rounded by `r`, clamped.
@@ -118,8 +118,9 @@ fn q15_every_corner_and_mode_against_the_reference() {
                 for &d in &CORNERS_16 {
                     let (x, y) = (q15(a, b), q15(c, d));
                     for r in MODES {
-                        let w = |v: (i16, i16)| (v.0 as i128, v.1 as i128);
-                        let (a, b, c, d) = (a as i128, b as i128, c as i128, d as i128);
+                        let w = |v: (i16, i16)| (i128::from(v.0), i128::from(v.1));
+                        let (a, b, c, d) =
+                            (i128::from(a), i128::from(b), i128::from(c), i128::from(d));
                         assert_eq!(
                             w(x.mul_round(y, r).get()),
                             reference(a, b, c, d, false, r, 16)
@@ -143,8 +144,9 @@ fn q31_every_corner_and_mode_against_the_reference() {
                 for &d in &CORNERS_32 {
                     let (x, y) = (q31(a, b), q31(c, d));
                     for r in MODES {
-                        let w = |v: (i32, i32)| (v.0 as i128, v.1 as i128);
-                        let (a, b, c, d) = (a as i128, b as i128, c as i128, d as i128);
+                        let w = |v: (i32, i32)| (i128::from(v.0), i128::from(v.1));
+                        let (a, b, c, d) =
+                            (i128::from(a), i128::from(b), i128::from(c), i128::from(d));
                         assert_eq!(
                             w(x.mul_round(y, r).get()),
                             reference(a, b, c, d, false, r, 32)
@@ -168,8 +170,8 @@ fn random_products_against_the_reference() {
         let r = MODES[(v[0] % 5) as usize];
         let (a, b, c, d) = (v[0] as i16, v[1] as i16, v[2] as i16, v[3] as i16);
         let (x, y) = (q15(a, b), q15(c, d));
-        let w = |v: (i16, i16)| (v.0 as i128, v.1 as i128);
-        let (a, b, c, d) = (a as i128, b as i128, c as i128, d as i128);
+        let w = |v: (i16, i16)| (i128::from(v.0), i128::from(v.1));
+        let (a, b, c, d) = (i128::from(a), i128::from(b), i128::from(c), i128::from(d));
         assert_eq!(
             w(x.mul_round(y, r).get()),
             reference(a, b, c, d, false, r, 16)
@@ -181,8 +183,8 @@ fn random_products_against_the_reference() {
 
         let (a, b, c, d) = (v[0] as i32, v[1] as i32, v[2] as i32, v[3] as i32);
         let (x, y) = (q31(a, b), q31(c, d));
-        let w = |v: (i32, i32)| (v.0 as i128, v.1 as i128);
-        let (a, b, c, d) = (a as i128, b as i128, c as i128, d as i128);
+        let w = |v: (i32, i32)| (i128::from(v.0), i128::from(v.1));
+        let (a, b, c, d) = (i128::from(a), i128::from(b), i128::from(c), i128::from(d));
         assert_eq!(
             w(x.mul_round(y, r).get()),
             reference(a, b, c, d, false, r, 32)
@@ -241,22 +243,25 @@ fn mac_sums_exactly_and_rounds_once() {
         .collect();
     let (mut re, mut im, mut cre, mut cim) = (0i128, 0i128, 0i128, 0i128);
     for (x, y) in a.iter().zip(&b) {
-        let (p, q) = (x.get().0 as i128, x.get().1 as i128);
-        let (r, s) = (y.get().0 as i128, y.get().1 as i128);
+        let (p, q) = (i128::from(x.get().0), i128::from(x.get().1));
+        let (r, s) = (i128::from(y.get().0), i128::from(y.get().1));
         re += p * r - q * s;
         im += p * s + q * r;
         cre += p * r + q * s;
         cim += q * r - p * s;
     }
     let d = Mac::dot(&a, &b).get();
-    assert_eq!((d.0 as i128, d.1 as i128), (re, im));
+    assert_eq!((i128::from(d.0), i128::from(d.1)), (re, im));
     let d = Mac::dot_conj(&a, &b).get();
-    assert_eq!((d.0 as i128, d.1 as i128), (cre, cim));
+    assert_eq!((i128::from(d.0), i128::from(d.1)), (cre, cim));
     // rounded once into Q15, saturated where the sum is past ±1
     for r in MODES {
         let q: Complex<_, Pow2<-15>, i16> = Mac::dot(&a, &b).result(r, Overflow::Saturate).unwrap();
         let f = |x: i128| round_shift(x, 15, r).clamp(-32768, 32767);
-        assert_eq!((q.get().0 as i128, q.get().1 as i128), (f(re), f(im)));
+        assert_eq!(
+            (i128::from(q.get().0), i128::from(q.get().1)),
+            (f(re), f(im))
+        );
     }
     let checked: Option<Complex<_, Pow2<-15>, i16>> =
         Mac::dot(&a, &b).result(Rounding::Floor, Overflow::Checked);
@@ -268,7 +273,7 @@ fn mac_sums_exactly_and_rounds_once() {
         .collect();
     let mut re = 0i128;
     for x in &a {
-        let (p, q) = (x.get().0 as i128, x.get().1 as i128);
+        let (p, q) = (i128::from(x.get().0), i128::from(x.get().1));
         re += p * p + q * q;
     }
     assert_eq!(Mac::dot_conj(&a, &a).get(), (re, 0));
@@ -287,10 +292,10 @@ fn mac_headroom_as_documented() {
     one.mac(m, m);
     assert_eq!(one.get(), (0, 1 << 31));
     // HEADROOM such products fit, one more doesn't
-    let top = i16::HEADROOM as i128 * (1 << 31);
-    assert!(top <= i64::MAX as i128 && top + (1 << 31) > i64::MAX as i128);
+    let top = i128::from(i16::HEADROOM) * (1 << 31);
+    assert!(top <= i128::from(i64::MAX) && top + (1 << 31) > i128::from(i64::MAX));
     assert_eq!(i16::HEADROOM, (1 << 32) - 1);
-    let top31 = (i32::HEADROOM as i128).checked_mul(1 << 63).unwrap();
+    let top31 = i128::from(i32::HEADROOM).checked_mul(1 << 63).unwrap();
     assert!(top31.checked_add(1 << 63).is_none());
     assert_eq!(i32::HEADROOM, u64::MAX);
 
@@ -308,12 +313,12 @@ fn mac_headroom_as_documented() {
     acc.mac(m, m);
     assert!(acc.get().1 < 0);
     acc.mac(m, q15(i16::MAX, i16::MAX)); // im −2 · 2¹⁵ · (2¹⁵ − 1)
-    assert_eq!(acc.get().1 as i128, top + (1 << 31) - 2 * 32768 * 32767);
+    assert_eq!(i128::from(acc.get().1), top + (1 << 31) - 2 * 32768 * 32767);
 
     // Q31 at its bound
     let m = q31(i32::MIN, i32::MIN);
     let mut acc: Mac<_, _, i32> = Mac::new();
-    acc.im = (i32::HEADROOM - 1) as i128 * (1i128 << 63);
+    acc.im = i128::from(i32::HEADROOM - 1) * (1i128 << 63);
     acc.mac(m, m);
     assert_eq!(acc.get(), (0, top31));
     let q: Complex<_, Pow2<-31>, i32> = acc.result(Rounding::Floor, Overflow::Saturate).unwrap();
@@ -396,16 +401,16 @@ mod nco {
                 phase,
                 (u32::MAX - 5).wrapping_add(i.wrapping_mul(0x9e37_79b9))
             );
-            let t = phase as f64 / 4294967296.0 * TAU;
+            let t = f64::from(phase) / 4294967296.0 * TAU;
             let q15 = nco.phasor::<i16>();
             let q31 = nco.phasor::<i32>();
             let p = nco.tick::<i16>();
             assert_eq!(p, q15);
             let ex = |v: f64, s: f64| (v * s).clamp(-s, s - 1.0);
-            assert!((q15.get().0 as f64 - ex(libm::cos(t), 32768.0)).abs() < 0.51);
-            assert!((q15.get().1 as f64 - ex(libm::sin(t), 32768.0)).abs() < 0.51);
-            assert!((q31.get().0 as f64 - ex(libm::cos(t), 2147483648.0)).abs() < 0.51);
-            assert!((q31.get().1 as f64 - ex(libm::sin(t), 2147483648.0)).abs() < 0.51);
+            assert!((f64::from(q15.get().0) - ex(libm::cos(t), 32768.0)).abs() < 0.51);
+            assert!((f64::from(q15.get().1) - ex(libm::sin(t), 32768.0)).abs() < 0.51);
+            assert!((f64::from(q31.get().0) - ex(libm::cos(t), 2147483648.0)).abs() < 0.51);
+            assert!((f64::from(q31.get().1) - ex(libm::sin(t), 2147483648.0)).abs() < 0.51);
         }
     }
 
@@ -420,11 +425,11 @@ mod nco {
             let x = tone.mix_up(a, Rounding::NearestEven);
             let dc = down.mix_down(x, Rounding::NearestEven);
             // two roundings of half a step, two phasors 0.51 off: within 2 steps of 0.6
-            assert!((dc.get().0 as i32 - 19661).abs() <= 2, "{dc:?}");
+            assert!((i32::from(dc.get().0) - 19661).abs() <= 2, "{dc:?}");
             assert!(dc.get().1.abs() <= 2, "{dc:?}");
             let y = up.mix_up(dc, Rounding::NearestEven);
-            assert!((y.get().0 as i32 - x.get().0 as i32).abs() <= 3);
-            assert!((y.get().1 as i32 - x.get().1 as i32).abs() <= 3);
+            assert!((i32::from(y.get().0) - i32::from(x.get().0)).abs() <= 3);
+            assert!((i32::from(y.get().1) - i32::from(x.get().1)).abs() <= 3);
         }
     }
 

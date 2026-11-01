@@ -890,7 +890,7 @@ fn integers_nearest() {
         // micro-units: 0.000001 to 1000 V/V
         if let Some(r) = nearest(v * 1e6, y) {
             let g = VoltGain::<Micro, u32>::from_db_const(db).get();
-            assert_eq!(g as f64, r, "{db:?}");
+            assert_eq!(f64::from(g), r, "{db:?}");
             checked += 1;
         }
         // a power gain in nano-units of i64, and in 1/65535
@@ -906,7 +906,7 @@ fn integers_nearest() {
             && let Some(r) = nearest(p * 65535.0, 2.0 * y)
         {
             let g = PowerGain::<Rational<1, 65535>, u16>::from_db_const(db).get();
-            assert_eq!(g as f64, r, "{db:?}");
+            assert_eq!(f64::from(g), r, "{db:?}");
             checked += 1;
         }
     }
@@ -950,12 +950,15 @@ mod run_time {
             let x = db.to_f64();
             let g = VoltGain::<One, f64>::from_db(x).unwrap();
             let g32 = VoltGain::<One, f32>::from_db_f32(x as f32).unwrap();
-            assert!((g32.get() as f64 / g.get() - 1.0).abs() < 1e-5, "{x} dB");
+            assert!(
+                (f64::from(g32.get()) / g.get() - 1.0).abs() < 1e-5,
+                "{x} dB"
+            );
             let back = g.to_db();
             assert!((back - x).abs() < 1e-9, "{x} dB: {back}");
             let back32 = g32.to_db_f32();
             assert!(
-                (back32 as f64 - x).abs() < 1e-3 + x.abs() * 1e-6,
+                (f64::from(back32) - x).abs() < 1e-3 + x.abs() * 1e-6,
                 "{x} dB: {back32}"
             );
         }

@@ -72,7 +72,7 @@ fn gains_against_libm() {
             .map(|i| 1.0 / libm::sqrt(1.0 + libm::ldexp(1.0, -2 * i as i32)))
             .product::<f64>()
     };
-    assert!((K16_Q30 as f64 - k(N16) * libm::ldexp(1.0, 30)).abs() <= 0.5 + 1e-3);
+    assert!((f64::from(K16_Q30) - k(N16) * libm::ldexp(1.0, 30)).abs() <= 0.5 + 1e-3);
     // f64 holds 53 of Q60's 60 bits
     assert!((K32_Q60 as f64 / libm::ldexp(k(N32), 60) - 1.0).abs() < 1e-15);
 }
@@ -86,8 +86,8 @@ fn atan2_16_grid() {
             continue;
         }
         let e = angle_error(
-            atan2_16(y, x).get() as f64,
-            exact_angle(y as f64, x as f64, 65536.0),
+            f64::from(atan2_16(y, x).get()),
+            exact_angle(f64::from(y), f64::from(x), 65536.0),
             65536.0,
         );
         if e.abs() > worst.0.abs() {
@@ -122,8 +122,8 @@ fn atan2_16_axes_corners_full_scale() {
     // the corners with both ends: one step off the diagonal is 2⁻¹⁶ of 1/(2π·32768) turn, below half a step
     for (y, x) in [(min, max), (max, min)] {
         let e = angle_error(
-            a(y, x) as f64,
-            exact_angle(y as f64, x as f64, 65536.0),
+            f64::from(a(y, x)),
+            exact_angle(f64::from(y), f64::from(x), 65536.0),
             65536.0,
         );
         assert!(e.abs() < BOUND, "({y}, {x}): {e}");
@@ -157,8 +157,8 @@ fn atan2_32_grid() {
         for (y, x) in [(y, x), (x, y)] {
             let steps = libm::ldexp(1.0, 32);
             let e = angle_error(
-                atan2_32(y, x).get() as f64,
-                exact_angle(y as f64, x as f64, steps),
+                f64::from(atan2_32(y, x).get()),
+                exact_angle(f64::from(y), f64::from(x), steps),
                 steps,
             );
             if e.abs() > worst.0.abs() {
@@ -201,10 +201,10 @@ fn sin_cos_16_every_angle() {
     let mut worst = (0.0f64, 0);
     for a in 0..=u16::MAX {
         let (s, c) = sin_cos_16(Bam16::of(a));
-        let t = a as f64 / 65536.0 * TAU;
+        let t = f64::from(a) / 65536.0 * TAU;
         for e in [
-            s.get() as f64 - q15(libm::sin(t)),
-            c.get() as f64 - q15(libm::cos(t)),
+            f64::from(s.get()) - q15(libm::sin(t)),
+            f64::from(c.get()) - q15(libm::cos(t)),
         ] {
             if e.abs() > worst.0.abs() {
                 worst = (e, a);
@@ -247,10 +247,10 @@ fn sin_cos_32_grid() {
     let mut worst = (0.0f64, 0);
     for a in angles {
         let (s, c) = sin_cos_32(Bam32::of(a));
-        let t = a as f64 / libm::ldexp(1.0, 32) * TAU;
+        let t = f64::from(a) / libm::ldexp(1.0, 32) * TAU;
         for e in [
-            s.get() as f64 - q31(libm::sin(t)),
-            c.get() as f64 - q31(libm::cos(t)),
+            f64::from(s.get()) - q31(libm::sin(t)),
+            f64::from(c.get()) - q31(libm::cos(t)),
         ] {
             if e.abs() > worst.0.abs() {
                 worst = (e, a);
@@ -285,14 +285,14 @@ fn sin_cos_32_q15_grid() {
         .map(|r| (r >> 32) as u32)
         .chain(near_axes)
         // every 16-bit angle, where it must agree with sin_cos_16
-        .chain((0..=u16::MAX as u32).map(|a| a << 16));
+        .chain((0..=u32::from(u16::MAX)).map(|a| a << 16));
     let mut worst = (0.0f64, 0);
     for a in angles {
         let (s, c) = sin_cos_32_q15(Bam32::of(a));
-        let t = a as f64 / libm::ldexp(1.0, 32) * TAU;
+        let t = f64::from(a) / libm::ldexp(1.0, 32) * TAU;
         for e in [
-            s.get() as f64 - q15(libm::sin(t)),
-            c.get() as f64 - q15(libm::cos(t)),
+            f64::from(s.get()) - q15(libm::sin(t)),
+            f64::from(c.get()) - q15(libm::cos(t)),
         ] {
             if e.abs() > worst.0.abs() {
                 worst = (e, a);
@@ -319,7 +319,7 @@ fn check_isqrt(x: u128, n: u128, r: Rounding) {
     let sq = |n: u128| n.saturating_mul(n);
     let ok = match r {
         Rounding::Truncate | Rounding::Floor => {
-            sq(n) <= x && (n == u64::MAX as u128 || sq(n + 1) > x)
+            sq(n) <= x && (n == u128::from(u64::MAX) || sq(n + 1) > x)
         }
         Rounding::Ceil => sq(n) >= x && (n == 0 || sq(n - 1) < x),
         // (n - ½)² < x < (n + ½)², for whole numbers n² - n < x ≤ n² + n
@@ -351,7 +351,7 @@ fn isqrt_u32_dense_and_ends() {
     ];
     for x in (0..1 << 20).chain((0..u32::MAX).step_by(4093)).chain(ends) {
         for r in ROUNDINGS {
-            check_isqrt(x as u128, isqrt_u32(x, r) as u128, r);
+            check_isqrt(u128::from(x), u128::from(isqrt_u32(x, r)), r);
         }
     }
     assert_eq!(isqrt_u32(u32::MAX, Rounding::Ceil), 1 << 16);
@@ -366,9 +366,9 @@ fn isqrt_u64_u128_squares_and_neighbours() {
     for n in lcg(4)
         .take(20_000)
         .map(|r| r >> (r % 64))
-        .chain([0, 1, 2, u32::MAX as u64])
+        .chain([0, 1, 2, u64::from(u32::MAX)])
     {
-        let n = n as u128 & 0xffff_ffff;
+        let n = u128::from(n) & 0xffff_ffff;
         for x in [
             n * n,
             (n * n).saturating_sub(1),
@@ -377,7 +377,7 @@ fn isqrt_u64_u128_squares_and_neighbours() {
             n * n + n + 1,
         ] {
             for r in ROUNDINGS {
-                check_isqrt(x, isqrt_u64(x as u64, r) as u128, r);
+                check_isqrt(x, u128::from(isqrt_u64(x as u64, r)), r);
             }
         }
     }
@@ -386,7 +386,7 @@ fn isqrt_u64_u128_squares_and_neighbours() {
         .map(|r| r >> (r % 64))
         .chain([0, 1, u64::MAX])
     {
-        let n = n as u128;
+        let n = u128::from(n);
         for x in [
             n * n,
             (n * n).saturating_sub(1),
@@ -400,10 +400,13 @@ fn isqrt_u64_u128_squares_and_neighbours() {
         }
     }
     for r in ROUNDINGS {
-        check_isqrt(u64::MAX as u128, isqrt_u64(u64::MAX, r) as u128, r);
+        check_isqrt(u128::from(u64::MAX), u128::from(isqrt_u64(u64::MAX, r)), r);
     }
     assert_eq!(isqrt_u64(u64::MAX, Rounding::Ceil), 1 << 32);
     assert_eq!(isqrt_u128(u128::MAX, Rounding::Ceil), 1 << 64);
     assert_eq!(isqrt_u128(u128::MAX, Rounding::NearestAway), 1 << 64);
-    assert_eq!(isqrt_u128(u128::MAX, Rounding::Truncate), u64::MAX as u128);
+    assert_eq!(
+        isqrt_u128(u128::MAX, Rounding::Truncate),
+        u128::from(u64::MAX)
+    );
 }

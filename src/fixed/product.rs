@@ -639,7 +639,7 @@ fn settle_narrow<T3: Storage>(y: i64, o: Overflow) -> Option<T3> {
     if T3::BITS <= 32 {
         rounding::settle_i64(y, o)
     } else {
-        rounding::settle(y as i128, o)
+        rounding::settle(i128::from(y), o)
     }
 }
 

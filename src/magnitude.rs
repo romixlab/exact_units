@@ -793,18 +793,18 @@ impl Magnitude {
         primes: impl IntoIterator<Item = PrimePower>,
     ) -> Result<Self, MagnitudeError> {
         let mut w = Work::ONE;
-        w.pow10 = pow10_x2 as i32;
-        w.pow2 = pow2_x2 as i32;
+        w.pow10 = i32::from(pow10_x2);
+        w.pow2 = i32::from(pow2_x2);
         w.irr = [
-            irrational_x2.pi as i32,
-            irrational_x2.ln2 as i32,
-            irrational_x2.ln10 as i32,
+            i32::from(irrational_x2.pi),
+            i32::from(irrational_x2.ln2),
+            i32::from(irrational_x2.ln10),
         ];
         for f in primes {
-            if f.prime == 2 || f.prime == 5 || !is_prime(f.prime as u64) {
+            if f.prime == 2 || f.prime == 5 || !is_prime(u64::from(f.prime)) {
                 return Err(MagnitudeError::NotPrime);
             }
-            w.add_prime(f.prime as u64, f.exp as i32)?;
+            w.add_prime(u64::from(f.prime), i32::from(f.exp))?;
         }
         w.pack()
     }
@@ -922,7 +922,7 @@ impl core::fmt::Display for Magnitude {
         // a power alone: 10⁻⁴, 2¹⁰
         if let Some(e) = self.as_pow10() {
             f.write_str("·10")?;
-            return write_superscript(f, e as i32);
+            return write_superscript(f, i32::from(e));
         }
         if self
             .rest
@@ -931,7 +931,7 @@ impl core::fmt::Display for Magnitude {
             && p2 % 2 == 0
         {
             f.write_str("·2")?;
-            return write_superscript(f, (p2 / 2) as i32);
+            return write_superscript(f, i32::from(p2 / 2));
         }
         f.write_str("·")?;
         let w = Work::of(self);
@@ -945,7 +945,7 @@ impl core::fmt::Display for Magnitude {
             (bases[i + 2], exps[i + 2]) = (w.primes[i], w.exps[i]);
         }
         for i in 0..w.len + 2 {
-            let (p, e) = (bases[i] as u128, exps[i]);
+            let (p, e) = (u128::from(bases[i]), exps[i]);
             let (whole, half) = (e.unsigned_abs() / 2, e % 2 != 0);
             let (n, r) = if e > 0 {
                 (&mut num, &mut root_num)
@@ -960,7 +960,7 @@ impl core::fmt::Display for Magnitude {
                 *r *= p;
             }
         }
-        if !fits || num > u64::MAX as u128 || den > u64::MAX as u128 {
+        if !fits || num > u128::from(u64::MAX) || den > u128::from(u64::MAX) {
             // too long as a fraction: the prime powers
             return write_powers(&bases[..w.len + 2], &exps[..w.len + 2], &w.irr, f);
         }

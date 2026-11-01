@@ -557,7 +557,7 @@ impl Prefix {
     pub fn scale_f32(&self, x: f32) -> f32 {
         match self.si_pow10() {
             Some(e) => crate::num::scale_f32(x, e),
-            None => self.scale_f64(x as f64) as f32,
+            None => self.scale_f64(f64::from(x)) as f32,
         }
     }
 
@@ -744,7 +744,7 @@ mod series_store {
                 Prefix::FullScale(n) => n.get(),
                 _ => 0,
             };
-            ((self.discriminant() as u16) << 8) | param as u16
+            ((self.discriminant() as u16) << 8) | u16::from(param)
         }
 
         #[inline(always)]
@@ -800,7 +800,7 @@ mod series_store {
             _level: Level,
         ) -> Result<(), Error> {
             // a named prefix is a unit variant: its tag run is all there is
-            let tag = (u16::get::<N>(store, rows.start) >> 8) as u32;
+            let tag = u32::from(u16::get::<N>(store, rows.start) >> 8);
             write_enum_tags(sink, core::iter::repeat_n(tag, rows.len()))
         }
     }

@@ -80,7 +80,7 @@ fn main() {
         let slip = if n <= SLIP { "matched" } else { "retune" };
         // for the display only: |Γ| and arg Γ in integers, CORDIC into a 16-bit binary angle
         let p = g.to_polar();
-        let deg = p.arg().get() as f32 * 360.0 / 65_536.0;
+        let deg = f32::from(p.arg().get()) * 360.0 / 65_536.0;
         println!(
             "  Γ = {g}: |Γ| = {} ({:.1} dB) ∠ {deg:.1}°: {verdict} (with the slip: {slip})",
             p.abs(),

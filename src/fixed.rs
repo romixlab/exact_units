@@ -1167,7 +1167,7 @@ impl<P: prefix::SubSecond, T: UnsignedStorage, B: Bounds<T>> TryFrom<core::time:
     fn try_from(d: core::time::Duration) -> Result<Self, OutOfBounds> {
         let per_s = P::PER_SECOND;
         let ns_per = 1_000_000_000 / per_s;
-        let nanos = d.subsec_nanos() as u64;
+        let nanos = u64::from(d.subsec_nanos());
         if !nanos.is_multiple_of(ns_per) {
             return Err(OutOfBounds);
         }
@@ -1630,7 +1630,7 @@ mod tests {
             Fixed::<Second, One, u32>::new(u32::MAX)
                 .to::<Nano, u64>()
                 .map(Fixed::get),
-            Some(u32::MAX as u64 * 1_000_000_000)
+            Some(u64::from(u32::MAX) * 1_000_000_000)
         );
         // a large divisor in a narrow type: only 0 is whole
         assert_eq!(

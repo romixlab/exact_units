@@ -81,7 +81,7 @@ pub const fn sqrt_f64(x: f64) -> f64 {
 #[must_use]
 pub fn scale_f64(x: f64, exp: i8) -> f64 {
     let mut x = x;
-    let mut exp = exp as i32;
+    let mut exp = i32::from(exp);
     while exp > 30 {
         x *= 1e30;
         exp -= 30;
@@ -105,7 +105,7 @@ const POW10_F32: [f32; 11] = [1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 
 #[must_use]
 pub fn scale_f32(x: f32, exp: i8) -> f32 {
     let mut x = x;
-    let mut exp = exp as i32;
+    let mut exp = i32::from(exp);
     while exp > 10 {
         x *= 1e10;
         exp -= 10;

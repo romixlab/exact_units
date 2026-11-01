@@ -38,14 +38,14 @@ fn int_abs_against_libm() {
     for re in grid_i16(97) {
         for im in grid_i16(89) {
             let z = Complex::<Ratio, One, i16>::new(re, im);
-            let exact = libm::hypot(re as f64, im as f64);
-            assert!((z.abs().get() as f64 - exact).abs() <= 0.5, "{re} {im}");
+            let exact = libm::hypot(f64::from(re), f64::from(im));
+            assert!((f64::from(z.abs().get()) - exact).abs() <= 0.5, "{re} {im}");
             assert_eq!(
-                z.abs_rounded(Rounding::Floor).get() as f64,
+                f64::from(z.abs_rounded(Rounding::Floor).get()),
                 libm::floor(exact)
             );
             assert_eq!(
-                z.abs_rounded(Rounding::Ceil).get() as f64,
+                f64::from(z.abs_rounded(Rounding::Ceil).get()),
                 libm::ceil(exact)
             );
             let sat = z.abs_saturating().get();
@@ -54,22 +54,22 @@ fn int_abs_against_libm() {
     }
     let i8s = (i8::MIN..=i8::MAX).flat_map(|re| (i8::MIN..=i8::MAX).map(move |im| (re, im)));
     for (re, im) in i8s {
-        let exact = libm::hypot(re as f64, im as f64);
+        let exact = libm::hypot(f64::from(re), f64::from(im));
         let a = Complex::<Ratio, One, i8>::new(re, im).abs().get();
-        assert!((a as f64 - exact).abs() <= 0.5, "{re} {im}");
+        assert!((f64::from(a) - exact).abs() <= 0.5, "{re} {im}");
     }
     // i32: an f64 root is not exact near 2³², so the bracket is checked in integers
     for (re, im) in pairs_i32(20_000) {
-        let n = (re as i128).pow(2) as u128 + (im as i128).pow(2) as u128;
+        let n = i128::from(re).pow(2) as u128 + i128::from(im).pow(2) as u128;
         let z = Complex::<Ratio, One, i32>::new(re, im);
-        let floor = z.abs_rounded(Rounding::Floor).get() as u128;
+        let floor = u128::from(z.abs_rounded(Rounding::Floor).get());
         assert!(
             floor * floor <= n && (floor + 1) * (floor + 1) > n,
             "{re} {im}"
         );
-        let a = z.abs().get() as f64;
+        let a = f64::from(z.abs().get());
         assert!(
-            (a - libm::hypot(re as f64, im as f64)).abs() <= 0.5 + 1e-6,
+            (a - libm::hypot(f64::from(re), f64::from(im))).abs() <= 0.5 + 1e-6,
             "{re} {im}"
         );
     }
@@ -97,8 +97,8 @@ fn int_arg_against_libm() {
             if (re, im) == (0, 0) {
                 continue;
             }
-            let got = Complex::<Ratio, One, i16>::new(re, im).arg().get() as f64;
-            let off = steps_off(got, libm::atan2(im as f64, re as f64), 16);
+            let got = f64::from(Complex::<Ratio, One, i16>::new(re, im).arg().get());
+            let off = steps_off(got, libm::atan2(f64::from(im), f64::from(re)), 16);
             assert!(off < 0.51, "{re} {im}: {off}");
         }
     }
@@ -107,8 +107,8 @@ fn int_arg_against_libm() {
             if (re, im) == (0, 0) {
                 continue;
             }
-            let got = Complex::<Ratio, One, i8>::new(re, im).arg().get() as f64;
-            let off = steps_off(got, libm::atan2(im as f64, re as f64), 16);
+            let got = f64::from(Complex::<Ratio, One, i8>::new(re, im).arg().get());
+            let off = steps_off(got, libm::atan2(f64::from(im), f64::from(re)), 16);
             assert!(off < 0.51, "{re} {im}: {off}");
         }
     }
@@ -116,8 +116,8 @@ fn int_arg_against_libm() {
         if (re, im) == (0, 0) {
             continue;
         }
-        let got = Complex::<Ratio, One, i32>::new(re, im).arg().get() as f64;
-        let off = steps_off(got, libm::atan2(im as f64, re as f64), 32);
+        let got = f64::from(Complex::<Ratio, One, i32>::new(re, im).arg().get());
+        let off = steps_off(got, libm::atan2(f64::from(im), f64::from(re)), 32);
         assert!(off < 0.51, "{re} {im}: {off}");
     }
     assert_eq!(Complex::<Ratio, One, i16>::new(0, 0).arg().get(), 0);
@@ -132,17 +132,17 @@ fn int_from_polar_against_libm() {
     use crate::{PhaseBam16, PhaseBam32};
     for abs in [0u16, 1, 2, 100, 1000, 23_170, 32_767] {
         for a in (0..=u16::MAX).step_by(37) {
-            let th = a as f64 / 65_536.0 * 2.0 * PI;
+            let th = f64::from(a) / 65_536.0 * 2.0 * PI;
             let z =
                 Complex::<Ratio, One, i16>::from_polar(crate::Fixed::new(abs), PhaseBam16::of(a))
                     .unwrap();
             let (re, im) = z.get();
             assert!(
-                (re as f64 - abs as f64 * libm::cos(th)).abs() < 0.51,
+                (f64::from(re) - f64::from(abs) * libm::cos(th)).abs() < 0.51,
                 "{abs} {a}"
             );
             assert!(
-                (im as f64 - abs as f64 * libm::sin(th)).abs() < 0.51,
+                (f64::from(im) - f64::from(abs) * libm::sin(th)).abs() < 0.51,
                 "{abs} {a}"
             );
         }
@@ -158,7 +158,7 @@ fn int_from_polar_against_libm() {
     for abs in [1u32, 1 << 20, i32::MAX as u32] {
         for a in spread_i32(5_000) {
             let a = a as u32;
-            let th = a as f64 / libm::ldexp(1.0, 32) * 2.0 * PI;
+            let th = f64::from(a) / libm::ldexp(1.0, 32) * 2.0 * PI;
             let Some(z) =
                 Complex::<Ratio, One, i32>::from_polar(crate::Fixed::new(abs), PhaseBam32::of(a))
             else {
@@ -166,11 +166,11 @@ fn int_from_polar_against_libm() {
             };
             let (re, im) = z.get();
             assert!(
-                (re as f64 - abs as f64 * libm::cos(th)).abs() < 1.52,
+                (f64::from(re) - f64::from(abs) * libm::cos(th)).abs() < 1.52,
                 "{abs} {a}"
             );
             assert!(
-                (im as f64 - abs as f64 * libm::sin(th)).abs() < 1.52,
+                (f64::from(im) - f64::from(abs) * libm::sin(th)).abs() < 1.52,
                 "{abs} {a}"
             );
         }
@@ -190,10 +190,10 @@ fn int_round_trip() {
                 continue;
             };
             // |z| within ½, the angle within 0.51 of 2π/2¹⁶ at |z|, each part rounded once
-            let tol = 0.5 + 0.51 * 2.0 * PI / 65_536.0 * p.abs().get() as f64 + 0.51;
+            let tol = 0.5 + 0.51 * 2.0 * PI / 65_536.0 * f64::from(p.abs().get()) + 0.51;
             let (r, i) = back.get();
             assert!(
-                libm::hypot((r - re) as f64, (i - im) as f64) <= tol,
+                libm::hypot(f64::from(r - re), f64::from(i - im)) <= tol,
                 "{re} {im} -> {r} {i}"
             );
         }
@@ -214,7 +214,7 @@ mod float {
     #[test]
     fn abs_and_arg_are_libms() {
         for (re, im) in pairs_i32(2_000) {
-            let (re, im) = (re as f64 * 1e-3, im as f64 * 1e-7);
+            let (re, im) = (f64::from(re) * 1e-3, f64::from(im) * 1e-7);
             let z = Complex::<Ratio, One, f64>::new(re, im);
             assert!(near(z.abs().get(), libm::hypot(re, im), 1.0));
             let zf = Complex::<Ratio, One, f32>::new(re as f32, im as f32);
@@ -264,9 +264,9 @@ mod float {
                 continue;
             }
             let z = Complex::<Per<Volt, Volt>, Pow2<-15>, i16>::new(r, i);
-            let exact = 20.0 * libm::log10(libm::hypot(r as f64, i as f64) / 32_768.0);
+            let exact = 20.0 * libm::log10(libm::hypot(f64::from(r), f64::from(i)) / 32_768.0);
             assert!((z.to_db() - exact).abs() < 1e-12, "{r} {i}");
-            assert!((z.to_db_f32() as f64 - exact).abs() < 1e-4, "{r} {i}");
+            assert!((f64::from(z.to_db_f32()) - exact).abs() < 1e-4, "{r} {i}");
             // a power ratio: 10·lg|z|
             let p = Complex::<Per<Watt, Watt>, Pow2<-15>, i16>::new(r, i);
             assert!((p.to_db() - exact / 2.0).abs() < 1e-12, "{r} {i}");
@@ -280,7 +280,7 @@ mod float {
         for tenth in -600..=0 {
             let db = Decibels::new(tenth, 1);
             let exact = libm::pow(10.0, tenth as f64 / 100.0) * libm::ldexp(1.0, 30);
-            let got = Gamma::norm_sqr_at(db).get() as f64;
+            let got = f64::from(Gamma::norm_sqr_at(db).get());
             assert!((got - exact).abs() <= 0.5 + 1e-6, "{tenth}: {got} {exact}");
         }
         // 10·lg|z| of a power kind: |z|² is 10^(dB/5)
@@ -318,7 +318,7 @@ mod float {
             let m = libm::sqrt(0.2);
             assert!(near(g.vswr().get(), (1.0 + m) / (1.0 - m), 4.0));
             assert!(near(g.return_loss_db(), -10.0 * libm::log10(0.2), 4.0));
-            assert!((g.return_loss_db_f32() as f64 - g.return_loss_db()).abs() < 1e-5);
+            assert!((f64::from(g.return_loss_db_f32()) - g.return_loss_db()).abs() < 1e-5);
         }
 
         #[test]
@@ -341,7 +341,7 @@ mod float {
         #[test]
         fn admittance_round_trip() {
             for (re, im) in pairs_i32(1_000).filter(|&p| p != (0, 0)) {
-                let z = Impedance::<Milli, f64>::new(re as f64, im as f64);
+                let z = Impedance::<Milli, f64>::new(f64::from(re), f64::from(im));
                 let y: Admittance<Pow2<-20>, f64> = z.to_admittance();
                 let (zr, zi) = (z.re().get() * 1e-3, z.im().get() * 1e-3);
                 let n = zr * zr + zi * zi;

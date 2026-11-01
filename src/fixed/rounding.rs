@@ -135,10 +135,10 @@ pub(crate) fn settle<T: Storage>(x: i128, o: Overflow) -> Option<T> {
 pub(crate) fn settle_i64<T: Storage>(x: i64, o: Overflow) -> Option<T> {
     match o {
         Overflow::Checked => T::from_i64(x),
-        Overflow::Saturate => Some(T::from_int_wrapping(
-            x.clamp(T::MIN_INT as i64, T::MAX_INT as i64) as i128,
-        )),
-        Overflow::Wrap => Some(T::from_int_wrapping(x as i128)),
+        Overflow::Saturate => Some(T::from_int_wrapping(i128::from(
+            x.clamp(T::MIN_INT as i64, T::MAX_INT as i64),
+        ))),
+        Overflow::Wrap => Some(T::from_int_wrapping(i128::from(x))),
     }
 }
 
@@ -281,7 +281,7 @@ impl Scaled64 {
     #[inline(always)]
     pub(crate) fn settle<T: Storage>(self, o: Overflow) -> Option<T> {
         match (o, self.exact) {
-            (Overflow::Wrap, _) => Some(T::from_int_wrapping(self.value as i128)),
+            (Overflow::Wrap, _) => Some(T::from_int_wrapping(i128::from(self.value))),
             (_, true) => settle_i64(self.value, o),
             (Overflow::Checked, false) => None,
             (Overflow::Saturate, false) => Some(T::from_int_wrapping(if self.neg {
@@ -514,10 +514,10 @@ impl Requantizer {
             }
             (StorageKind::F64, Repr::Float(f)) => return Some(Repr::Float(factor.apply_f64(f))),
             (StorageKind::F32, Repr::Int(i)) => {
-                return Some(Repr::Float(factor.apply_f64(i as f64) as f32 as f64));
+                return Some(Repr::Float(f64::from(factor.apply_f64(i as f64) as f32)));
             }
             (StorageKind::F32, Repr::Float(f)) => {
-                return Some(Repr::Float(factor.apply_f64(f) as f32 as f64));
+                return Some(Repr::Float(f64::from(factor.apply_f64(f) as f32)));
             }
             (StorageKind::Int { bits, signed }, _) => (bits, signed),
         };

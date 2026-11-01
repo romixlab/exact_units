@@ -60,12 +60,12 @@ impl IqStorage for i16 {
     #[inline(always)]
     fn mac(acc: i64, (a, b): (i16, i16), (c, d): (i16, i16), neg: bool) -> i64 {
         // |a·b ± c·d| ≤ 2³¹, an i64 holds it
-        let (ab, cd) = (a as i64 * b as i64, c as i64 * d as i64);
+        let (ab, cd) = (i64::from(a) * i64::from(b), i64::from(c) * i64::from(d));
         acc.wrapping_add(if neg { ab - cd } else { ab + cd })
     }
     #[inline(always)]
     fn acc_to_i128(acc: i64) -> i128 {
-        acc as i128
+        i128::from(acc)
     }
     #[cfg(all(feature = "angle", feature = "dimensionless"))]
     #[inline(always)]
@@ -82,7 +82,10 @@ impl IqStorage for i32 {
     #[inline(always)]
     fn mac(acc: i128, (a, b): (i32, i32), (c, d): (i32, i32), neg: bool) -> i128 {
         // each product fits an i64 (|a·b| ≤ 2⁶²), their sum (2⁶³) only an i128
-        let (ab, cd) = ((a as i64 * b as i64) as i128, (c as i64 * d as i64) as i128);
+        let (ab, cd) = (
+            i128::from(i64::from(a) * i64::from(b)),
+            i128::from(i64::from(c) * i64::from(d)),
+        );
         acc.wrapping_add(if neg { ab - cd } else { ab + cd })
     }
     #[inline(always)]

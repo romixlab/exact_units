@@ -51,7 +51,7 @@ pub trait Storage: Copy + PartialOrd + 'static {
     #[inline(always)]
     #[must_use]
     fn from_f32(x: f32) -> Option<Self> {
-        Self::from_float(x as f64)
+        Self::from_float(f64::from(x))
     }
     /// The value as an `i64`: exact for integers of up to 32 bits (the widened multiply of [Fixed::to](super::Fixed::to)),
     /// truncated for floats.
@@ -134,8 +134,8 @@ fn whole_f32(x: f32, min: i128, max: i128) -> Option<i128> {
     if x.is_nan() || x < min as f32 || x > max as f32 {
         return None;
     }
-    let i = if max <= i64::MAX as i128 {
-        x as i64 as i128
+    let i = if max <= i128::from(i64::MAX) {
+        i128::from(x as i64)
     } else {
         x as i128
     };
@@ -360,11 +360,11 @@ impl Storage for Nibble {
     const MAX_INT: i128 = 15;
     #[inline(always)]
     fn to_repr(self) -> Repr {
-        Repr::Int(self.value() as i128)
+        Repr::Int(i128::from(self.value()))
     }
     #[inline(always)]
     fn to_i64(self) -> i64 {
-        self.value() as i64
+        i64::from(self.value())
     }
     #[inline(always)]
     fn from_i64(x: i64) -> Option<Self> {
@@ -467,7 +467,7 @@ impl Storage for Nibble {
 impl UnsignedStorage for Nibble {
     #[inline(always)]
     fn to_u64(self) -> u64 {
-        self.value() as u64
+        u64::from(self.value())
     }
     #[inline(always)]
     fn from_u64(x: u64) -> Option<Self> {

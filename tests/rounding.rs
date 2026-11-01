@@ -89,12 +89,12 @@ fn exhaustive<P: FixedScale, P2: FixedScale, T2: Storage + Into<i128>>(num: i128
     for x in i16::MIN..=i16::MAX {
         let v: Fixed<Volt, P, i16> = Fixed::new(x);
         for (ri, r) in MODES.into_iter().enumerate() {
-            let q = reference(x as i128 * num, den, r);
+            let q = reference(i128::from(x) * num, den, r);
             for (oi, o) in policies.into_iter().enumerate() {
                 let want = settle(q, T2::MIN_INT, T2::MAX_INT, o);
                 let got = v.requantize::<P2, T2>(r, o).map(|f| f.get().into());
                 assert_eq!(got, want, "{x} {r:?} {o:?}");
-                let dynamic = dynamic[ri][oi].apply(Repr::Int(x as i128));
+                let dynamic = dynamic[ri][oi].apply(Repr::Int(i128::from(x)));
                 assert_eq!(dynamic, want.map(Repr::Int), "run time: {x} {r:?} {o:?}");
             }
             if x % 61 == 0 {
@@ -167,14 +167,20 @@ fn wide_storages() {
     assert_eq!(s(Rounding::NearestEven), 18_446_744_073_710); // .551615
     // i64 by 7/3 in 128 bits
     let x: Fixed<Ratio, Rational<7, 3>, i64> = Fixed::new(i64::MIN);
-    let want = reference(i64::MIN as i128 * 7, 3, Rounding::NearestEven);
+    let want = reference(i128::from(i64::MIN) * 7, 3, Rounding::NearestEven);
     assert_eq!(
         x.to_saturating::<One, i64>(Rounding::NearestEven).get(),
         i64::MIN
     );
     assert_eq!(
-        x.to_wrapping::<One, i64>(Rounding::NearestEven).get() as i128,
-        settle(want, i64::MIN as i128, i64::MAX as i128, Overflow::Wrap).unwrap()
+        i128::from(x.to_wrapping::<One, i64>(Rounding::NearestEven).get()),
+        settle(
+            want,
+            i128::from(i64::MIN),
+            i128::from(i64::MAX),
+            Overflow::Wrap
+        )
+        .unwrap()
     );
     assert_eq!(x.to_rounded::<One, i64>(Rounding::NearestEven), None);
 }
@@ -257,7 +263,7 @@ fn degrees_to_radians() {
     // an integer of m° to µrad and back: a factor with π, rounded, never a compile error with to_rounded
     for x in (-360_000i32..=360_000).step_by(7) {
         let deg: Fixed<Radian, MilliDegree, i32> = Fixed::new(x);
-        let urad = x as f64 * PI / 180_000.0 * 1e6;
+        let urad = f64::from(x) * PI / 180_000.0 * 1e6;
         for r in MODES {
             let got = deg.to_rounded::<Micro, i32>(r).unwrap().get();
             let want = match r {
@@ -268,7 +274,7 @@ fn degrees_to_radians() {
                 Rounding::NearestAway => urad.round(),
             };
             // f64 is within 1e-9 of the truth here, nowhere near a rounding step for x != 0
-            assert_eq!(got as f64, want, "{x} m° {r:?}");
+            assert_eq!(f64::from(got), want, "{x} m° {r:?}");
         }
         let back: Fixed<Radian, MilliDegree, i32> = deg
             .to_rounded::<Micro, i32>(Rounding::NearestEven)
@@ -280,13 +286,13 @@ fn degrees_to_radians() {
     }
     // the run-time path takes the same fixed point
     let factor = MilliDegree::SCALE.div(Micro::SCALE);
-    for x in [-1_000_000i64, -1, 0, 1, 45_000, 90_000, i32::MAX as i64] {
+    for x in [-1_000_000i64, -1, 0, 1, 45_000, 90_000, i64::from(i32::MAX)] {
         for r in MODES {
             let typed = Fixed::<Radian, MilliDegree, i64>::new(x)
                 .to_rounded::<Micro, i64>(r)
-                .map(|f| Repr::Int(f.get() as i128));
+                .map(|f| Repr::Int(i128::from(f.get())));
             let dynamic = requantize(
-                Repr::Int(x as i128),
+                Repr::Int(i128::from(x)),
                 &factor,
                 StorageKind::of::<i64>(),
                 r,
@@ -314,7 +320,7 @@ fn narrow_against_wide<P: FixedScale, P2: FixedScale>() {
                 let narrow = Fixed::<Radian, P, i32>::new(x)
                     .requantize::<P2, i32>(r, o)
                     .map(Fixed::get);
-                let wide = Fixed::<Radian, P, i64>::new(x as i64)
+                let wide = Fixed::<Radian, P, i64>::new(i64::from(x))
                     .requantize::<P2, i32>(r, o)
                     .map(Fixed::get);
                 assert_eq!(narrow, wide, "{x} {r:?} {o:?}");

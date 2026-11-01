@@ -27,7 +27,7 @@ impl Big {
         for (i, &a) in self.0.iter().enumerate() {
             let mut carry = 0u64;
             for (j, &b) in o.0.iter().enumerate() {
-                let t = out[i + j] + a as u64 * b as u64 + carry;
+                let t = out[i + j] + u64::from(a) * u64::from(b) + carry;
                 out[i + j] = t & 0xffff_ffff;
                 carry = t >> 32;
             }
@@ -76,7 +76,7 @@ fn bounds(m: Mag) -> (Frac, Frac) {
     let mut d = Big::from(m.den)
         .mul(&ten.pow((-m.pow10).max(0) as u32))
         .mul(&two.pow((-m.pow2).max(0) as u32));
-    let k = m.pi.unsigned_abs() as u32;
+    let k = u32::from(m.pi.unsigned_abs());
     let scale = ten.pow(PI_EXP * k);
     let (lo, hi) = (Big::from(PI_LO).pow(k), Big::from(PI_HI).pow(k));
     if m.pi >= 0 {
@@ -103,7 +103,7 @@ fn cmp_dec((n, d): &Frac, p: u128, e: i32) -> Ordering {
 fn printed(mantissa: &str, exp10: i16) -> (u128, i32) {
     let (int, frac) = mantissa.split_once('.').unwrap_or((mantissa, ""));
     let digits: u128 = format!("{int}{frac}").parse().unwrap();
-    (digits, exp10 as i32 - frac.len() as i32)
+    (digits, i32::from(exp10) - frac.len() as i32)
 }
 
 /// The magnitude rounds to `mantissa E exp10` (half a unit of the last digit either way), or equals it.
