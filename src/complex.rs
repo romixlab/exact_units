@@ -103,7 +103,12 @@ pub trait ComplexStorage: Storage {
 macro_rules! complex_int {
     ($($ty:ident)*) => {$(
         impl ComplexStorage for $ty {
-            #[inline(always)] fn neg(self) -> Self { -self }
+            #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "-MIN panics in debug and wraps in release, as `T`'s `-` does; documented on the trait"
+            )]
+            fn neg(self) -> Self { -self }
             #[inline(always)] fn wrapping_neg(self) -> Self { $ty::wrapping_neg(self) }
             #[inline(always)] fn saturating_neg(self) -> Self { $ty::saturating_neg(self) }
             #[inline(always)] fn checked_neg(self) -> Option<Self> { $ty::checked_neg(self) }
@@ -141,6 +146,10 @@ macro_rules! norm_int {
         impl NormStorage for $ty {
             type Norm = $wide;
             #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "|re|, |im| ≤ 2^(bits-1), so re² + im² ≤ 2^(2·bits-1) fits $wide"
+            )]
             fn norm_sqr(re: Self, im: Self) -> $wide {
                 let (re, im) = ($wide::from(re.unsigned_abs()), $wide::from(im.unsigned_abs()));
                 re * re + im * im
@@ -625,6 +634,10 @@ mod arith {
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> AddAssign for Complex<U, P, T, B> {
         #[inline(always)]
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "the same op as Complex's `+`, whose policy B says what overflow does"
+        )]
         fn add_assign(&mut self, rhs: Self) {
             *self = *self + rhs;
         }
@@ -632,6 +645,10 @@ mod arith {
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> SubAssign for Complex<U, P, T, B> {
         #[inline(always)]
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "the same op as Complex's `-`, whose policy B says what overflow does"
+        )]
         fn sub_assign(&mut self, rhs: Self) {
             *self = *self - rhs;
         }
@@ -639,6 +656,10 @@ mod arith {
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> MulAssign<T> for Complex<U, P, T, B> {
         #[inline(always)]
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "the same op as Complex's `*`, whose policy B says what overflow does"
+        )]
         fn mul_assign(&mut self, n: T) {
             *self = *self * n;
         }
@@ -646,12 +667,21 @@ mod arith {
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> DivAssign<T> for Complex<U, P, T, B> {
         #[inline(always)]
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "the same op as Complex's `/`, whose policy B says what overflow does (division by 0 panics as \
+                      for `T`)"
+        )]
         fn div_assign(&mut self, n: T) {
             *self = *self / n;
         }
     }
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Sum for Complex<U, P, T, B> {
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "Complex's `+`, whose policy B says what overflow does"
+        )]
         fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
             iter.fold(Self::default(), |a, b| a + b)
         }

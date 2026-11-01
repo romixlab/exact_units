@@ -39,6 +39,11 @@ macro_rules! round_div {
         #[inline(always)]
         #[expect(clippy::allow_attributes, reason = "the comparison is unused for the unsigned types only")]
         #[allow(unused_comparisons, reason = "`p < 0` is always false for an unsigned type")]
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "d > 0, the precondition (a d of 0 underflows): d - 1 doesn't wrap; up \
+                      needs rem != 0, then d >= 2 and q < p / d, so q + 1 doesn't overflow"
+        )]
         pub(crate) const fn $name(p: $t, d: $t, r: Rounding) -> $t {
             // floor quotient and a remainder in 0..d: an arithmetic shift and a mask where d is a power of 2 (LLVM
             // doesn't always see that in `div_euclid` at opt-level 3)
@@ -221,6 +226,11 @@ fn wrap_f64(y: f64) -> i128 {
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
 )]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "|x| < 2⁶⁴ (the precondition) and m < 2⁶⁴: |x| · m fits u128; k is 1 to 128 where shifted by k - 1, \
+              1 to 127 in the mask; q < 2¹²⁷ (k >= 1), so q + 1 fits"
+)]
 pub(crate) const fn mul_fixed_point(x: i128, m: u64, shift: i32, r: Rounding) -> Scaled {
     let neg = x < 0;
     let p = x.unsigned_abs() * m as u128;
@@ -266,6 +276,10 @@ pub(crate) const fn mul_fixed_point(x: i128, m: u64, shift: i32, r: Rounding) ->
 #[expect(
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "|x| < 2³² and m < 2⁶⁴: |x| · m < 2⁹⁶; k is 34 to 96 here, so k - 1 >= 33; q < 2⁶², so q + 1 and -y fit"
 )]
 pub(crate) const fn mul_fixed_point_narrow(x: i64, m: u64, shift: i32, r: Rounding) -> Scaled64 {
     if shift <= -34 && shift >= -96 {
@@ -464,6 +478,11 @@ impl StorageKind {
         }
     }
 
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "bits is 1 to 64 as StorageKind documents, so the ends fit i128; a hand-built kind outside 1..=64 \
+                  overflows here"
+    )]
     const fn range(bits: u32, signed: bool) -> (i128, i128) {
         if signed {
             (-(1 << (bits - 1)), (1 << (bits - 1)) - 1)
@@ -473,6 +492,11 @@ impl StorageKind {
     }
 
     /// `x` in this integer kind by `o`: wrapping keeps the low `bits` (sign-extended when signed).
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "bits is 1 to 64 as StorageKind documents: the mask fits u128, and with the top bit set v - 2^bits is \
+                  in -2^(bits - 1)..0; a hand-built kind outside 1..=64 overflows here"
+    )]
     fn settle_int(
         bits: u32,
         signed: bool,

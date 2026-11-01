@@ -190,6 +190,10 @@ impl<Of, T: UnsignedStorage> Add<Fixed<Of, One, T>> for Index<Of, T> {
 
 impl<Of, T: UnsignedStorage> AddAssign<Fixed<Of, One, T>> for Index<Of, T> {
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the same op as Index's `+`: panics past the end of T in debug builds, as documented there"
+    )]
     fn add_assign(&mut self, n: Fixed<Of, One, T>) {
         *self = *self + n;
     }
@@ -206,6 +210,10 @@ impl<Of, T: UnsignedStorage> Sub<Fixed<Of, One, T>> for Index<Of, T> {
 
 impl<Of, T: UnsignedStorage> SubAssign<Fixed<Of, One, T>> for Index<Of, T> {
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the same op as Index's `-`: panics before 0 in debug builds, as documented there"
+    )]
     fn sub_assign(&mut self, n: Fixed<Of, One, T>) {
         *self = *self - n;
     }
@@ -382,6 +390,10 @@ impl<Of, T: UnsignedStorage> Seq<Of, T> {
     /// `self` comes before `other` in serial number order (RFC 1982): `other` is ahead by more than 0 and less than
     /// half the range. Two numbers exactly half the range apart are neither before nor after each other.
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "an unsigned storage has 1 to 64 bits: BITS - 1 doesn't wrap and the shift fits u64"
+    )]
     pub fn is_before(self, other: Self) -> bool {
         let d = self.distance(other).get().to_u64();
         d != 0 && d < 1u64 << (T::BITS - 1)
@@ -420,6 +432,10 @@ impl<Of, T: UnsignedStorage, B: Unlimited<T>> Add<Fixed<Of, One, T, B>> for Seq<
 
 impl<Of, T: UnsignedStorage, B: Unlimited<T>> AddAssign<Fixed<Of, One, T, B>> for Seq<Of, T> {
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the same op as Seq's `+`, which wraps"
+    )]
     fn add_assign(&mut self, n: Fixed<Of, One, T, B>) {
         *self = *self + n;
     }
@@ -436,6 +452,10 @@ impl<Of, T: UnsignedStorage, B: Unlimited<T>> Sub<Fixed<Of, One, T, B>> for Seq<
 
 impl<Of, T: UnsignedStorage, B: Unlimited<T>> SubAssign<Fixed<Of, One, T, B>> for Seq<Of, T> {
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the same op as Seq's `-`, which wraps"
+    )]
     fn sub_assign(&mut self, n: Fixed<Of, One, T, B>) {
         *self = *self - n;
     }

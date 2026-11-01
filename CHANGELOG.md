@@ -268,6 +268,10 @@ firmware that only needs units in its types builds without it; the bytes don't d
 * A strict lint policy in `Cargo.toml`'s `[lints]` and `clippy.toml`: `clippy::pedantic` and `clippy::cargo`, the
   cast lints, `unsafe_code` denied, `missing_docs`, `unreachable_pub` and restriction lints against panics, `std` where
   `core` does and silent suppressions. Every suppression is an `#[expect(.., reason = "..")]` at the narrowest scope.
+  `as_conversions`: a cast is `From`/`TryFrom`, `as` only in a const fn or item, between float and integer, or in a
+  macro over several storages. `indexing_slicing` and `panic`: slices are read with `get` or an iterator, an index
+  only in a const fn under its invariant. `arithmetic_side_effects`: every operation that can overflow is
+  `wrapping_`, `saturating_` or `checked_` where that is what it means, else it states why it can't overflow.
   For users: every public item is documented and has `Debug`, and 141 pure functions and the `self`-returning
   builders are `#[must_use]` (a dropped result now warns).
 

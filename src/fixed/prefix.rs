@@ -109,6 +109,10 @@ const fn bits(b: u8) -> i8 {
 }
 
 /// `2^BITS - 1`.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "b is in 1..=63, asserted in bits(): 2^b fits u64 and is at least 2"
+)]
 const fn max_code(b: u8) -> u64 {
     (1u64 << bits(b)) - 1
 }

@@ -184,6 +184,10 @@ impl FullScaleBits {
         clippy::indexing_slicing,
         reason = "self.0 is in 2..=32 (FullScaleBits::new): b and b - 1 index FULL_ENDS, one end per n"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "self.0 is in 2..=32 (FullScaleBits::new), b - 1 only for b >= 1, and FULL_ENDS ascends, so an end minus start doesn't wrap"
+    )]
     pub const fn magnitude(self) -> Magnitude {
         let b = (self.0 - 2) as usize;
         let start = if b == 0 { 0 } else { FULL_ENDS[b - 1] as usize };
@@ -194,6 +198,10 @@ impl FullScaleBits {
 
     /// The bits whose full scale step is `m`, `None` when `m` isn't one.
     #[must_use]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "den < u128::MAX: that has the prime factor 67280421310721, above the u32 primes of a magnitude"
+    )]
     pub fn of(m: &Magnitude) -> Option<Self> {
         match m.to_ratio() {
             Some((1, den)) if (den + 1).is_power_of_two() => {

@@ -283,6 +283,10 @@ mod owned {
                 if depth >= crate::MAX_UNIT_DEPTH {
                     return unknown();
                 }
+                #[expect(
+                    clippy::arithmetic_side_effects,
+                    reason = "depth < MAX_UNIT_DEPTH, checked above"
+                )]
                 let child = |r: &RefBox<'_, SIExpr<'_>>| match r.read() {
                     Ok(e) => Box::new(conv(&e, depth + 1)),
                     Err(_) => Box::new(unknown()),
@@ -324,6 +328,10 @@ struct DefmtExpr<'a, 'i>(&'a SIExpr<'i>, usize);
 #[cfg(feature = "defmt")]
 impl defmt::Format for DefmtExpr<'_, '_> {
     fn format(&self, f: defmt::Formatter<'_>) {
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "self.1 <= MAX_UNIT_DEPTH: 0 at the root, a child made only below the limit"
+        )]
         let depth = self.1 + 1;
         if depth > crate::MAX_UNIT_DEPTH {
             return defmt::write!(f, "…");

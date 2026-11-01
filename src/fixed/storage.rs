@@ -226,6 +226,11 @@ macro_rules! int {
                 clippy::cast_possible_truncation,
                 reason = "d is at most the storage's MAX in the branch that casts it, so it fits"
             )]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "d is 2 to MAX where it divides (the crate's callers pass a positive den), so neither % nor / \
+                          overflows; a d of 0 panics as division by 0 does"
+            )]
             fn div_whole(self, d: u128) -> Option<Self> {
                 if d == 1 {
                     Some(self)
@@ -311,9 +316,29 @@ macro_rules! int {
             #[inline(always)] fn saturating_sub(self, rhs: Self) -> Self { $ty::saturating_sub(self, rhs) }
             #[inline(always)] fn saturating_mul(self, rhs: Self) -> Self { $ty::saturating_mul(self, rhs) }
             #[inline(always)] fn saturating_div(self, rhs: Self) -> Self { $ty::saturating_div(self, rhs) }
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "the type's own operator, as Storage documents: overflow panics in debug builds and wraps \
+                          in release"
+            )]
             #[inline(always)] fn add(self, rhs: Self) -> Self { self + rhs }
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "the type's own operator, as Storage documents: overflow panics in debug builds and wraps \
+                          in release"
+            )]
             #[inline(always)] fn sub(self, rhs: Self) -> Self { self - rhs }
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "the type's own operator, as Storage documents: overflow panics in debug builds and wraps \
+                          in release"
+            )]
             #[inline(always)] fn mul(self, rhs: Self) -> Self { self * rhs }
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "the type's own operator, as Storage documents: panics for a zero rhs, and MIN / -1 panics in \
+                          debug builds and wraps in release"
+            )]
             #[inline(always)] fn div(self, rhs: Self) -> Self { self / rhs }
         }
     )*};
@@ -410,14 +435,41 @@ macro_rules! newtype {
             #[inline(always)] fn wrapping_add(self, rhs: Self) -> Self { $ty(self.0.wrapping_add(rhs.0)) }
             #[inline(always)] fn wrapping_sub(self, rhs: Self) -> Self { $ty(self.0.wrapping_sub(rhs.0)) }
             #[inline(always)] fn wrapping_mul(self, rhs: Self) -> Self { $ty(self.0.wrapping_mul(rhs.0)) }
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "unsigned division, as Storage documents: panics for a zero rhs, never overflows"
+            )]
             #[inline(always)] fn wrapping_div(self, rhs: Self) -> Self { $ty(self.0 / rhs.0) }
             #[inline(always)] fn saturating_add(self, rhs: Self) -> Self { $ty(self.0.saturating_add(rhs.0)) }
             #[inline(always)] fn saturating_sub(self, rhs: Self) -> Self { $ty(self.0.saturating_sub(rhs.0)) }
             #[inline(always)] fn saturating_mul(self, rhs: Self) -> Self { $ty(self.0.saturating_mul(rhs.0)) }
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "unsigned division, as Storage documents: panics for a zero rhs, never overflows"
+            )]
             #[inline(always)] fn saturating_div(self, rhs: Self) -> Self { $ty(self.0 / rhs.0) }
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "the inner integer's own operator, as Storage documents: overflow panics in debug builds \
+                          and wraps in release"
+            )]
             #[inline(always)] fn add(self, rhs: Self) -> Self { $ty(self.0 + rhs.0) }
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "the inner integer's own operator, as Storage documents: overflow panics in debug builds \
+                          and wraps in release"
+            )]
             #[inline(always)] fn sub(self, rhs: Self) -> Self { $ty(self.0 - rhs.0) }
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "the inner integer's own operator, as Storage documents: overflow panics in debug builds \
+                          and wraps in release"
+            )]
             #[inline(always)] fn mul(self, rhs: Self) -> Self { $ty(self.0 * rhs.0) }
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "unsigned division, as Storage documents: panics for a zero rhs, never overflows"
+            )]
             #[inline(always)] fn div(self, rhs: Self) -> Self { $ty(self.0 / rhs.0) }
         }
 
@@ -483,6 +535,10 @@ impl Storage for Nibble {
         fmt::Display::fmt(&self.value(), f)
     }
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a nibble is at most 15: the sum is at most 30, a u8"
+    )]
     fn checked_add(self, rhs: Self) -> Option<Self> {
         Nibble::new(self.value() + rhs.value())
     }
@@ -491,6 +547,10 @@ impl Storage for Nibble {
         Nibble::new(self.value().checked_sub(rhs.value())?)
     }
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a nibble is at most 15: the product is at most 225, a u8"
+    )]
     fn checked_mul(self, rhs: Self) -> Option<Self> {
         Nibble::new(self.value() * rhs.value())
     }
@@ -499,6 +559,10 @@ impl Storage for Nibble {
         Nibble::new(self.value().checked_div(rhs.value())?)
     }
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a nibble is at most 15: the sum is at most 30, a u8"
+    )]
     fn wrapping_add(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value() + rhs.value())
     }
@@ -507,14 +571,26 @@ impl Storage for Nibble {
         Nibble::new_masked(self.value().wrapping_sub(rhs.value()))
     }
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a nibble is at most 15: the product is at most 225, a u8"
+    )]
     fn wrapping_mul(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value() * rhs.value())
     }
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "u8 division: panics for a zero rhs, never overflows"
+    )]
     fn wrapping_div(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value() / rhs.value())
     }
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a nibble is at most 15: the sum is at most 30, a u8"
+    )]
     fn saturating_add(self, rhs: Self) -> Self {
         Nibble::new(self.value() + rhs.value()).unwrap_or(Nibble::max())
     }
@@ -523,30 +599,54 @@ impl Storage for Nibble {
         Nibble::new_masked(self.value().saturating_sub(rhs.value()))
     }
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a nibble is at most 15: the product is at most 225, a u8"
+    )]
     fn saturating_mul(self, rhs: Self) -> Self {
         Nibble::new(self.value() * rhs.value()).unwrap_or(Nibble::max())
     }
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "u8 division: panics for a zero rhs, never overflows"
+    )]
     fn saturating_div(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value() / rhs.value())
     }
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a nibble is at most 15: the sum is at most 30, a u8"
+    )]
     fn add(self, rhs: Self) -> Self {
         let x = self.value() + rhs.value();
         debug_assert!(x <= 15, "attempt to add with overflow");
         Nibble::new_masked(x)
     }
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "as u8's `-`: underflow panics in debug builds and wraps in release, then the low 4 bits, modulo 16"
+    )]
     fn sub(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value() - rhs.value())
     }
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a nibble is at most 15: the product is at most 225, a u8"
+    )]
     fn mul(self, rhs: Self) -> Self {
         let x = self.value() * rhs.value();
         debug_assert!(x <= 15, "attempt to multiply with overflow");
         Nibble::new_masked(x)
     }
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "u8 division: panics for a zero rhs, never overflows"
+    )]
     fn div(self, rhs: Self) -> Self {
         Nibble::new_masked(self.value() / rhs.value())
     }

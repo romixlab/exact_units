@@ -18,6 +18,10 @@
     clippy::unwrap_used,
     reason = "an example prints what it shows and unwraps values it knows are there"
 )]
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "an example writes the typed operators as a firmware would; each type's bound says what overflow does"
+)]
 
 use exact_units::prefix::Pow2;
 use exact_units::units::Ratio;

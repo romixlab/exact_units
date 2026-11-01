@@ -682,6 +682,10 @@ mod arith {
             }
 
             impl<U, P, T: Storage> AddAssign for Fixed<U, P, T, $b> {
+                #[expect(
+                    clippy::arithmetic_side_effects,
+                    reason = "the same op as this bound's `+`, which wraps or saturates"
+                )]
                 #[inline(always)]
                 fn add_assign(&mut self, rhs: Self) {
                     *self = *self + rhs;
@@ -689,6 +693,10 @@ mod arith {
             }
 
             impl<U, P, T: Storage> SubAssign for Fixed<U, P, T, $b> {
+                #[expect(
+                    clippy::arithmetic_side_effects,
+                    reason = "the same op as this bound's `-`, which wraps or saturates"
+                )]
                 #[inline(always)]
                 fn sub_assign(&mut self, rhs: Self) {
                     *self = *self - rhs;
@@ -696,6 +704,10 @@ mod arith {
             }
 
             impl<U, P, T: Storage> MulAssign<T> for Fixed<U, P, T, $b> {
+                #[expect(
+                    clippy::arithmetic_side_effects,
+                    reason = "the same op as this bound's `*`, which wraps or saturates"
+                )]
                 #[inline(always)]
                 fn mul_assign(&mut self, n: T) {
                     *self = *self * n;
@@ -703,6 +715,10 @@ mod arith {
             }
 
             impl<U, P, T: Storage> DivAssign<T> for Fixed<U, P, T, $b> {
+                #[expect(
+                    clippy::arithmetic_side_effects,
+                    reason = "the same op as this bound's `/`, which wraps or saturates; a zero n panics as for `T`"
+                )]
                 #[inline(always)]
                 fn div_assign(&mut self, n: T) {
                     *self = *self / n;
@@ -710,6 +726,7 @@ mod arith {
             }
 
             impl<U, P, T: Storage> Sum for Fixed<U, P, T, $b> {
+                #[expect(clippy::arithmetic_side_effects, reason = "this bound's `+`, which wraps or saturates")]
                 fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
                     iter.fold(Self::of(T::ZERO), |a, b| a + b)
                 }
@@ -755,6 +772,11 @@ mod arith {
     }
 
     impl<U, P, T: Storage> AddAssign for Fixed<U, P, T> {
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "the same op as Fixed's `+`: overflow panics in debug and wraps in release, as `T`'s `+`; \
+                      documented on mod arith"
+        )]
         #[inline(always)]
         fn add_assign(&mut self, rhs: Self) {
             *self = *self + rhs;
@@ -762,6 +784,11 @@ mod arith {
     }
 
     impl<U, P, T: Storage> SubAssign for Fixed<U, P, T> {
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "the same op as Fixed's `-`: overflow panics in debug and wraps in release, as `T`'s `-`; \
+                      documented on mod arith"
+        )]
         #[inline(always)]
         fn sub_assign(&mut self, rhs: Self) {
             *self = *self - rhs;
@@ -769,6 +796,11 @@ mod arith {
     }
 
     impl<U, P, T: Storage> MulAssign<T> for Fixed<U, P, T> {
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "the same op as Fixed's `*`: overflow panics in debug and wraps in release, as `T`'s `*`; \
+                      documented on mod arith"
+        )]
         #[inline(always)]
         fn mul_assign(&mut self, n: T) {
             *self = *self * n;
@@ -776,6 +808,11 @@ mod arith {
     }
 
     impl<U, P, T: Storage> DivAssign<T> for Fixed<U, P, T> {
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "the same op as Fixed's `/`: overflow panics in debug and wraps in release, as `T`'s `/`; \
+                      documented on mod arith (division by 0 panics as for `T`)"
+        )]
         #[inline(always)]
         fn div_assign(&mut self, n: T) {
             *self = *self / n;
@@ -783,6 +820,11 @@ mod arith {
     }
 
     impl<U, P, T: Storage> Sum for Fixed<U, P, T> {
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "Fixed's `+`: overflow panics in debug and wraps in release, as `T`'s `+`; documented on \
+                      mod arith"
+        )]
         fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
             iter.fold(Self::new(T::ZERO), |a, b| a + b)
         }
@@ -854,6 +896,11 @@ impl Conversion {
     #[expect(
         clippy::panic,
         reason = "a compile error in const code (a panic at run time), as documented: a factor that is not a fraction of integers"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "evaluated at compile time only (Conversion is built in const blocks), where overflow is a compile \
+                  error; max_abs is at least 1 for an integer storage"
     )]
     const fn by<T: Storage, T2: Storage>(m: Magnitude, rounding: bool) -> Self {
         let ratio = m.to_ratio();
@@ -931,6 +978,11 @@ impl Conversion {
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "evaluated at compile time only, where overflow is a compile error; |lo|, |hi| are at most max_abs \
+                  and num at most i128::MAX / max_abs, asserted in by"
     )]
     const fn proven<P: FixedScale, P2: FixedScale, T: Storage, T2: Storage, B: Bounds<T>>(
         exact: bool,
@@ -1036,6 +1088,10 @@ impl Conversion {
             let Repr::Int(x) = x.to_repr() else {
                 return None;
             };
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "|x| is at most max_abs and num at most i128::MAX / max_abs, asserted in by"
+            )]
             let p = x * self.num128;
             let y = if self.den == 1 {
                 p
@@ -1045,6 +1101,10 @@ impl Conversion {
             rounding::settle(y, o)
         } else {
             // |x| · num fits i64, checked at compile time
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "|x| is at most max_abs and num at most i64::MAX / max_abs where not wide, asserted in by"
+            )]
             let p = x.to_i64() * self.num64;
             let y = if self.den == 1 {
                 p
@@ -1056,6 +1116,11 @@ impl Conversion {
     }
 
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "|x| is at most max_abs and num at most i128::MAX / max_abs (i64::MAX / max_abs where not wide), \
+                  asserted in by; den is at least 1, so % and / don't overflow"
+    )]
     fn apply<T: Storage, T2: Storage>(self, x: T) -> Option<T2> {
         if self.float {
             return T2::from_float(self.scale_f64(x));
@@ -1207,6 +1272,10 @@ impl<P: prefix::SubSecond, T: UnsignedStorage, B: Bounds<T>>
     From<Fixed<crate::units::Second, P, T, B>> for core::time::Duration
 {
     #[inline]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "per_s is a SubSecond's PER_SECOND, 1 to 10⁹ and a divisor of 10⁹: the nanoseconds stay below 10⁹"
+    )]
     fn from(t: Fixed<crate::units::Second, P, T, B>) -> Self {
         let v = t.value.to_u64();
         let per_s = P::PER_SECOND;
@@ -1228,6 +1297,10 @@ impl<P: prefix::SubSecond, T: UnsignedStorage, B: Bounds<T>> TryFrom<core::time:
 
     fn try_from(d: core::time::Duration) -> Result<Self, OutOfBounds> {
         let per_s = P::PER_SECOND;
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "per_s is a SubSecond's PER_SECOND, 1 to 10⁹ and a divisor of 10⁹"
+        )]
         let ns_per = 1_000_000_000 / per_s;
         let nanos = u64::from(d.subsec_nanos());
         if !nanos.is_multiple_of(ns_per) {
@@ -1236,7 +1309,14 @@ impl<P: prefix::SubSecond, T: UnsignedStorage, B: Bounds<T>> TryFrom<core::time:
         let v = d
             .as_secs()
             .checked_mul(per_s)
-            .and_then(|s| s.checked_add(nanos / ns_per))
+            .and_then(|s| {
+                #[expect(
+                    clippy::arithmetic_side_effects,
+                    reason = "ns_per is 10⁹ / PER_SECOND, at least 1"
+                )]
+                let whole = nanos / ns_per;
+                s.checked_add(whole)
+            })
             .ok_or(OutOfBounds)?;
         Self::try_new(T::from_u64(v).ok_or(OutOfBounds)?)
     }

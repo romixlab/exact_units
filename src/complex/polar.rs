@@ -142,6 +142,10 @@ macro_rules! int_abs {
             /// the smallest not below.
             #[inline(always)]
             #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "re² + im² is at most 2^(2·bits-1), which fits `$wide`"
+            )]
             pub const fn abs_rounded(self, r: Rounding) -> Fixed<U, P, $uns> {
                 let (re, im) = (self.re.unsigned_abs() as $wide, self.im.unsigned_abs() as $wide);
                 // at most 2·(2^(bits-1))² = 2^(2·bits-1): fits, and so does its root in `$uns`
@@ -176,6 +180,10 @@ int_abs! {
 #[expect(
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "x < 2³² and |s| ≤ 2³¹, so p < 2⁶³, p + 2³⁰ fits u64 and q < 2³² negates in i64"
 )]
 const fn times_q31(x: u32, s: i32) -> i64 {
     let p = x as u64 * s.unsigned_abs() as u64;

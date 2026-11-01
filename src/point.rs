@@ -366,7 +366,7 @@ macro_rules! modulo_int {
     ($($t:ty, $signed:ty, $wide:ty;)*) => {$(
         #[expect(
             clippy::allow_attributes,
-            reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
+            reason = "the casts and the widened sums differ per storage: an #[expect] is unfulfilled where one is exact"
         )]
         impl<S: FixedScale, P: FixedScale> PointArith<P, $t> for Modulo<S> {
             type Diff = $signed;
@@ -378,6 +378,7 @@ macro_rules! modulo_int {
                 clippy::cast_sign_loss,
                 reason = "m is at most 2^BITS and fits $wide; a value reduced below a period of less than 2^BITS fits $t"
             )]
+            #[allow(clippy::arithmetic_side_effects, reason = "two $t add in $wide, which has more bits (not flagged for every storage)")]
             fn add(p: $t, v: $t) -> $t {
                 let m = const { period_steps::<S, P>(<$t>::BITS) };
                 if m == 1 << <$t>::BITS {
@@ -397,6 +398,7 @@ macro_rules! modulo_int {
                 clippy::cast_sign_loss,
                 reason = "m is at most 2^BITS and fits $wide; a value reduced below a period of less than 2^BITS fits $t"
             )]
+            #[allow(clippy::arithmetic_side_effects, reason = "two $t subtract in $wide, which has more bits (not flagged for every storage)")]
             fn sub(p: $t, v: $t) -> $t {
                 let m = const { period_steps::<S, P>(<$t>::BITS) };
                 if m == 1 << <$t>::BITS {
@@ -415,6 +417,10 @@ macro_rules! modulo_int {
                 clippy::cast_possible_wrap,
                 clippy::cast_sign_loss,
                 reason = "a period of 2^BITS wraps the difference to $signed in two's complement; a smaller one leaves it in [-m/2, m - m/2), which fits"
+            )]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "two $t subtract in $wide, which has more bits; m ≤ 2^BITS fits $wide, and d - m with 0 ≤ d < m"
             )]
             fn diff(a: $t, b: $t) -> $signed {
                 let m = const { period_steps::<S, P>(<$t>::BITS) };
@@ -471,6 +477,10 @@ macro_rules! wide {
                 <$t>::rem_euclid(self, m)
             }
             #[inline(always)]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "canonical's m - m/2 and r - m, with 0 < m and 0 ≤ r < m"
+            )]
             fn minus(self, rhs: Self) -> Self {
                 self - rhs
             }
@@ -533,6 +543,10 @@ modulo_float!(f32 f64);
 
 /// `x` in `[0, m)`.
 #[inline(always)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "F is f32 or f64 (modulo_float): float arithmetic, no overflow panic, IEEE semantics"
+)]
 fn wrap_float<
     F: Copy + PartialOrd + core::ops::Rem<Output = F> + core::ops::Add<Output = F> + Default,
 >(
@@ -758,6 +772,10 @@ mod arith {
         B: Bounds<T>,
     {
         #[inline(always)]
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "the same op as Point's `+`, whose modulus and bounds say what overflow does"
+        )]
         fn add_assign(&mut self, v: Fixed<U, P, T>) {
             *self = *self + v;
         }
@@ -771,6 +789,10 @@ mod arith {
         B: Bounds<T>,
     {
         #[inline(always)]
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "the same op as Point's `-`, whose modulus and bounds say what overflow does"
+        )]
         fn sub_assign(&mut self, v: Fixed<U, P, T>) {
             *self = *self - v;
         }
@@ -850,6 +872,10 @@ impl Affine {
             clippy::cast_possible_wrap,
             reason = "g divides den, which is in 1..=i128::MAX"
         )]
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "g ≥ 1 divides den, which is in 1..=i128::MAX: no division by 0, and g as i128 is positive"
+        )]
         let (num, add, den) = (num / g as i128, add / g as i128, den / g as i128);
         let max_abs = if T::MAX_INT.unsigned_abs() > T::MIN_INT.unsigned_abs() {
             T::MAX_INT.unsigned_abs()
@@ -916,6 +942,10 @@ impl Affine {
 
     /// `y` before it is fitted into a storage: what a modulo origin reduces first.
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "|x · num| + |add| ≤ i128::MAX for every x of T, checked in of(); den ≥ 1"
+    )]
     fn apply_repr<T: Storage>(self, x: T) -> Option<Repr> {
         let x = x.to_repr();
         if self.float {
@@ -941,6 +971,11 @@ impl Affine {
     }
 
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "|x · num| + |add| fits i128 for every x of T, and i64 on the narrow path, both checked in of(); \
+                  den ≥ 1"
+    )]
     fn apply<T: Storage, T2: Storage>(self, x: T) -> Option<T2> {
         if self.float {
             #[expect(
@@ -1017,6 +1052,10 @@ const fn mul_s(a: i128, b: u128) -> Option<i128> {
 }
 
 /// `n / d` without a common factor, to write as a decimal: exactly when `d` has no prime but 2 and 5.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "g ≥ 1 (the max), and an unsigned division by it cannot overflow"
+)]
 pub(crate) fn ratio(n: i128, d: i128) -> Number {
     let g = offset::gcd(n.unsigned_abs(), d.unsigned_abs()).max(1);
     Number::ratio(

@@ -57,6 +57,11 @@ impl Number {
 
     /// The digits without the sign: with `prec` that many after the point, rounded to the nearest, a tie to even;
     /// without, the shortest exact form (a float's shortest form when the decimal doesn't end).
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "d is in 1..=u128::MAX / 10 (Number::ratio) and r < d, so 10·r and 2·r fit; n and nines count digits, \
+                  at most prec"
+    )]
     pub(crate) fn write_abs(self, prec: Option<usize>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (m, d) = match self {
             Number::Float(x) => {
@@ -135,10 +140,13 @@ impl Number {
 }
 
 /// The integer part or a held digit; one more when rounded up.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "up needs a remainder, so d >= 2 and int + 1 fits; a held digit is 0 to 8 (9s wait as nines)"
+)]
 fn write_held(f: &mut fmt::Formatter<'_>, int: u128, held: Option<u8>, up: bool) -> fmt::Result {
     let up = u8::from(up);
     match held {
-        // m / d < u128::MAX / 10: int + 1 fits
         None if up == 1 => write!(f, "{}", int + 1),
         None => write!(f, "{int}"),
         Some(digit) => write!(f, "{}", digit + up),
@@ -189,6 +197,7 @@ pub(crate) fn pad(
     }
     let (before, after) = match f.align() {
         Some(fmt::Alignment::Left) => (0, fill),
+        #[expect(clippy::arithmetic_side_effects, reason = "fill / 2 is at most fill")]
         Some(fmt::Alignment::Center) => (fill / 2, fill - fill / 2),
         Some(fmt::Alignment::Right) | None => (fill, 0),
     };
@@ -216,6 +225,10 @@ impl<F: Fn(&mut fmt::Formatter<'_>) -> fmt::Result> fmt::Display for Body<F> {
 struct Count(usize);
 
 impl fmt::Write for Count {
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the characters of one formatted number, far below usize::MAX"
+    )]
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.0 += s.chars().count();
         Ok(())

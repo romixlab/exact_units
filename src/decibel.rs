@@ -59,6 +59,10 @@ impl Decibels {
         clippy::panic,
         reason = "every b[i] is read after i < b.len(); a malformed level is a compile error in const code (a panic at run time), as documented"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < b.len(), the loop bound; b[i] is a digit, so b[i] - b'0' is 0..=9; num is built non-negative, so -num fits; digits counts bytes of s; decimals (u8) can overflow past 255 decimals, a panic in debug and in const code and a wrap in release"
+    )]
     pub const fn parse(s: &str) -> Decibels {
         let b = s.as_bytes();
         let mut i = 0;
@@ -135,6 +139,10 @@ impl Decibels {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "decimals <= MAX_DECIMALS (asserted in new), so d is at most 20 * 10^9; g = gcd(|n|, d) with d > 0, so g >= 1: no division by 0 or by -1"
+    )]
     const fn exponent(self, form: LevelForm) -> (i64, u64) {
         let per_decade = match form {
             LevelForm::Power => 10,
@@ -152,6 +160,7 @@ impl Decibels {
     }
 }
 
+#[expect(clippy::arithmetic_side_effects, reason = "b != 0, the loop condition")]
 const fn gcd(mut a: u64, mut b: u64) -> u64 {
     while b != 0 {
         let t = a % b;

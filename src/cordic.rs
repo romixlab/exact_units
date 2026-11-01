@@ -157,6 +157,11 @@ const QUARTER_T48: u64 = 1 << 46;
     reason = "const fn: From is not const on stable"
 )]
 #[expect(clippy::indexing_slicing, reason = "i < N16, the length of ATAN_T32")]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "0 < m ≤ 2¹⁵ has at least 16 leading zeros; the largest part shifted to 2²⁸..2²⁹ keeps x and y below \
+              2³¹ with the CORDIC gain (1.65 · √2); i < N16, the loop bound"
+)]
 pub const fn atan2_16(y: i16, x: i16) -> Bam16 {
     if x == 0 && y == 0 {
         return Bam16::of(0);
@@ -212,6 +217,11 @@ pub const fn atan2_16(y: i16, x: i16) -> Bam16 {
     reason = "const fn: From is not const on stable"
 )]
 #[expect(clippy::indexing_slicing, reason = "i < N32, the length of ATAN_T48")]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "0 < m ≤ 2³¹ has at least 32 leading zeros; the largest part shifted to 2⁶⁰..2⁶¹ keeps x and y below \
+              2⁶³ with the CORDIC gain (1.65 · √2); i < N32, the loop bound"
+)]
 pub const fn atan2_32(y: i32, x: i32) -> Bam32 {
     if x == 0 && y == 0 {
         return Bam32::of(0);
@@ -273,6 +283,10 @@ pub const fn atan2_32(y: i32, x: i32) -> Bam32 {
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
 )]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "the negations are of rotate's sin and cos, at most a little above 2³⁰ in magnitude"
+)]
 pub const fn sin_cos_16(a: Bam16) -> (Q15, Q15) {
     let a = a.get();
     // the nearest multiple of a quarter turn, k, and the rest in -1/8..1/8 turn
@@ -307,6 +321,10 @@ pub const fn sin_cos_16(a: Bam16) -> (Q15, Q15) {
 #[expect(
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "the negations are of rotate's sin and cos, at most a little above 2⁶⁰ in magnitude"
 )]
 pub const fn sin_cos_32(a: Bam32) -> (Q31, Q31) {
     let a = a.get();
@@ -346,6 +364,10 @@ pub const fn sin_cos_32(a: Bam32) -> (Q31, Q31) {
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
 )]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "the negations are of rotate's sin and cos, at most a little above 2³⁰ in magnitude"
+)]
 pub const fn sin_cos_32_q15(a: Bam32) -> (Q15, Q15) {
     let a = a.get();
     let k = a.wrapping_add(0x2000_0000) >> 30;
@@ -367,6 +389,11 @@ pub const fn sin_cos_32_q15(a: Bam32) -> (Q15, Q15) {
 /// (cos z, sin z) in Q30 for `z` in -1/8..1/8 turn in steps of 2⁻³²: (K, 0) turned by `z`.
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
 #[expect(clippy::indexing_slicing, reason = "i < N16, the length of ATAN_T32")]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "x and y stay at most a little above K · gain = 2³⁰, |z| below 2³⁰ (|z| ≤ 2²⁹ in, each step at most \
+              2²⁹); i < N16, the loop bound"
+)]
 const fn rotate_16(mut z: i32) -> (i32, i32) {
     let (mut x, mut y) = (K16_Q30, 0);
     let mut i = 0;
@@ -385,6 +412,11 @@ const fn rotate_16(mut z: i32) -> (i32, i32) {
 /// (cos z, sin z) in Q60 for `z` in -1/8..1/8 turn in steps of 2⁻⁴⁸.
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
 #[expect(clippy::indexing_slicing, reason = "i < N32, the length of ATAN_T48")]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "x and y stay at most a little above K · gain = 2⁶⁰, |z| below 2⁴⁶ (|z| ≤ 2⁴⁵ in, each step at most \
+              2⁴⁵); i < N32, the loop bound"
+)]
 const fn rotate_32(mut z: i64) -> (i64, i64) {
     let (mut x, mut y) = (K32_Q60, 0);
     let mut i = 0;
@@ -411,6 +443,10 @@ const fn rotate_32(mut z: i64) -> (i64, i64) {
     reason = "const fn: From is not const on stable"
 )]
 const fn round_q30_to_q15(v: i32) -> i16 {
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "v is a rotate_16 part, at most a little above 2³⁰, so v + 2¹⁴ fits i32"
+    )]
     let q = (v + (1 << 14)) >> 15;
     if q > i16::MAX as i32 {
         i16::MAX
@@ -432,6 +468,10 @@ const fn round_q30_to_q15(v: i32) -> i16 {
     reason = "const fn: From is not const on stable"
 )]
 const fn round_q60_to_q31(v: i64) -> i32 {
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "v is a rotate_32 part, at most a little above 2⁶⁰, so v + 2²⁸ fits i64"
+    )]
     let q = (v + (1 << 28)) >> 29;
     if q > i32::MAX as i64 {
         i32::MAX
@@ -456,6 +496,10 @@ macro_rules! isqrt {
         #[doc = concat!("assert_eq!(cordic::", stringify!($name), "(5, Rounding::Ceil), 3);")]
         #[doc = concat!("assert_eq!(cordic::", stringify!($name), "(9, Rounding::Ceil), 3);")]
         /// ```
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "n = ⌊√x⌋ ≤ 2^(bits/2) - 1, so n² ≤ x, x - n² ≥ 0 and n + 1 fit"
+        )]
         pub const fn $name(x: $t, r: Rounding) -> $t {
             let n = x.isqrt();
             // n² ≤ x < (n + 1)²; n + 1 fits, n ≤ 2^(bits/2) - 1

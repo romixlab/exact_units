@@ -8,6 +8,10 @@ const POW10_F64: [f64; 31] = [
 
 /// `10^exp` in `const` code (what [Scale::Pow10](crate::Scale::Pow10) multiplies by).
 #[must_use]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "i < exp.unsigned_abs() <= 128, the loop bound: i + 1 fits u8"
+)]
 pub const fn pow10_f64(exp: i8) -> f64 {
     let mut x = 1.0;
     let mut i = 0;
@@ -20,6 +24,10 @@ pub const fn pow10_f64(exp: i8) -> f64 {
 
 /// `x^n` in `const` code (what [UnitExpr::Pow](crate::UnitExpr::Pow) multiplies by).
 #[must_use]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "i < n.unsigned_abs() <= 128, the loop bound: i + 1 fits u8"
+)]
 pub const fn powi_f64(x: f64, n: i8) -> f64 {
     let mut y = 1.0;
     let mut i = 0;
@@ -41,6 +49,11 @@ pub const fn powi_f64(x: f64, n: i8) -> f64 {
 #[expect(
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "the exponents stay near the f64 range (biased in 0..=2047, exp >= -1127); n < 2¹¹⁰, so r < 2⁵⁵ and \
+              r · r < 2¹¹⁰; r has 55 bits, so extra is 2; r + 1 <= 2⁵³"
 )]
 pub const fn sqrt_f64(x: f64) -> f64 {
     const MANT: u64 = (1 << 52) - 1;
@@ -89,6 +102,10 @@ pub const fn sqrt_f64(x: f64) -> f64 {
 
 /// `x * 10^exp`, for the powers prefixes have (-60..=60 between two of them).
 #[must_use]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "exp starts in the i8 range and each step moves it toward 0"
+)]
 pub fn scale_f64(x: f64, exp: i8) -> f64 {
     let mut x = x;
     let mut exp = i32::from(exp);
@@ -114,6 +131,10 @@ const POW10_F32: [f32; 11] = [1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 
 /// `x * 10^exp` in `f32`, without `powi` (not in `core`): one multiplication or division by an exact power of ten for
 /// the usual prefixes, so 2 m· is 0.002 rounded once, not three times.
 #[must_use]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "exp starts in the i8 range and each step moves it toward 0"
+)]
 pub fn scale_f32(x: f32, exp: i8) -> f32 {
     let mut x = x;
     let mut exp = i32::from(exp);

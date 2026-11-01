@@ -58,6 +58,10 @@ impl Decimal {
         clippy::panic,
         reason = "every b[i] is read after i < b.len(); a malformed literal is a compile error in const code (a panic at run time), as documented"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < b.len(), the loop bounds; b[i] is a digit there, so b[i] - b'0' is 0..=9; e < 10_000 before e * 10 + 9; num is built non-negative, so -num fits; digits, edigits and exp move by one per byte of s (exp by up to 99_999 more for the e part), so they fit i32 for any s below 2^31 - 10^5 bytes"
+    )]
     pub const fn parse(s: &str) -> Decimal {
         const FORM: &str = "a literal is a decimal number: 0.1, -3, 2.5e-3";
         let b = s.as_bytes();
@@ -156,6 +160,10 @@ impl Decimal {
         clippy::panic,
         reason = "a compile error in const code (a panic at run time), as documented: a scale that is not a fraction of integers, or a fraction past u128"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "every g is a gcd with one side at least 1 (q starts at 1 or 10^k, p at |num| >= 1: both callers return early for 0), so g >= 1"
+    )]
     const fn over<P: FixedScale>(self) -> (u128, u128) {
         let Some((snum, sden)) = P::SCALE.to_ratio() else {
             panic!(
@@ -186,6 +194,10 @@ impl Decimal {
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "q >= 1: a product of factors at least 1 (to_ratio's num is a product of prime powers); rem < q, so q - rem fits; up only when rem > 0, so q >= 2 and int + 1 fits; 0 <= x <= i128::MAX, so -x fits"
     )]
     const fn to_int<P: FixedScale>(self) -> i128 {
         if self.num == 0 {
@@ -232,6 +244,7 @@ const fn mul(a: u128, b: u128) -> u128 {
     }
 }
 
+#[expect(clippy::arithmetic_side_effects, reason = "b != 0, the loop condition")]
 const fn gcd(mut a: u128, mut b: u128) -> u128 {
     while b != 0 {
         let t = a % b;

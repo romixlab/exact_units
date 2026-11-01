@@ -86,6 +86,10 @@ impl<P: FixedScale, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Complex<Volt
     /// ratio. A peak-phasor convention takes ½ of this; see the [module](crate::complex) for the assumed
     /// convention.
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "Complex's `*` by the policy B, which says what overflow does"
+    )]
     pub fn apparent_power<P2: FixedScale>(
         self,
         i: Complex<Ampere, P2, T, B>,

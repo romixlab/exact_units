@@ -15,6 +15,7 @@ pub(crate) struct Mag {
     pub pi: i8,
 }
 
+#[expect(clippy::arithmetic_side_effects, reason = "b != 0, the loop condition")]
 const fn gcd(mut a: u128, mut b: u128) -> u128 {
     while b != 0 {
         let t = a % b;
@@ -46,6 +47,10 @@ impl Mag {
     };
 
     /// `num / den · 10^pow10 · 2^pow2 · π^pi`, brought into canonical form.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "num, den != 0 (asserted), so g >= 1; a u128 has at most 127 factors 2 and 55 factors 5, so pow2 moves by at most 182 and pow10 by 55 from the catalogue's small exponents; this module is cfg(test): an overflow fails the catalogue's tests"
+    )]
     pub(crate) const fn new(
         mut num: u128,
         mut den: u128,
@@ -95,6 +100,10 @@ impl Mag {
         Mag::new(digits, 1, exp10, 0, 0)
     }
 
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "num and den of a Mag are at least 1 (Mag::new asserts it), so g1, g2 >= 1; the exponents add up from the catalogue's small ones; this module is cfg(test): an overflow fails the catalogue's tests"
+    )]
     pub(crate) const fn mul(self, o: Mag) -> Mag {
         // cross-reduce first, so a product that fits is never refused for an intermediate that doesn't
         let g1 = gcd(self.num, o.den);
@@ -110,6 +119,10 @@ impl Mag {
         }
     }
 
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the negated exponents are the catalogue's small ones, never i16::MIN or i8::MIN; this module is cfg(test): an overflow fails the catalogue's tests"
+    )]
     pub(crate) const fn recip(self) -> Mag {
         Mag {
             num: self.den,
@@ -132,6 +145,10 @@ impl Mag {
         self.div(Mag::int(n))
     }
 
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < n.unsigned_abs(), the loop bound"
+    )]
     pub(crate) const fn powi(self, n: i32) -> Mag {
         let mut out = Mag::ONE;
         let base = if n < 0 { self.recip() } else { self };
@@ -144,11 +161,19 @@ impl Mag {
     }
 
     /// Bits of `num` (2 and 5 already taken out).
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "leading_zeros of a u128 is at most 128"
+    )]
     pub(crate) const fn num_bits(self) -> u32 {
         128 - self.num.leading_zeros()
     }
 
     /// Bits of `den` (2 and 5 already taken out).
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "leading_zeros of a u128 is at most 128"
+    )]
     pub(crate) const fn den_bits(self) -> u32 {
         128 - self.den.leading_zeros()
     }

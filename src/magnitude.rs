@@ -174,6 +174,10 @@ impl Work {
         clippy::indexing_slicing,
         reason = "i < MAX_FACTORS; w.len counts the factors written so far, below MAX_FACTORS <= WORK"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < MAX_FACTORS, the loop bound; w.len at most MAX_FACTORS, the factors written"
+    )]
     const fn of(m: &Magnitude) -> Work {
         let mut w = Work::ONE;
         w.pow10 = m.pow10 as i32;
@@ -203,6 +207,10 @@ impl Work {
     #[expect(
         clippy::indexing_slicing,
         reason = "every index is below self.len, at most WORK (a full Work refuses another prime)"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "indices stay below self.len <= WORK, len below WORK before += 1 and at least 1 before -= 1; exponent sums fit i32 from add_int (±2, at most 64 times a prime for num and for den), mul (i8 + i8) and recip_of_primes, but from_parts_x2 can overflow with over 2^24 entries of one prime"
     )]
     const fn add_prime(&mut self, prime: u64, exp2: i32) -> Result<(), MagnitudeError> {
         if prime == 2 {
@@ -256,6 +264,10 @@ impl Work {
     }
 
     /// `n^(exp2 / 2)` multiplied in, `n` factored into primes.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "d <= 0xffff + 4, so d * d and d + 4 fit u64; d >= 2 divides"
+    )]
     const fn add_int(&mut self, n: u64, exp2: i32) -> Result<(), MagnitudeError> {
         if n == 0 {
             return Err(MagnitudeError::Zero);
@@ -289,6 +301,10 @@ impl Work {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "f = rho(n) is a factor of n other than 1, so not 0"
+    )]
     const fn add_large(&mut self, n: u64, exp2: i32) -> Result<(), MagnitudeError> {
         if n <= u32::MAX as u64 || is_prime(n) {
             return self.add_prime(n, exp2);
@@ -307,6 +323,10 @@ impl Work {
     #[expect(
         clippy::indexing_slicing,
         reason = "i < 3 for irr, i < rhs.len <= WORK for the primes"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "sign is ±1 and both sides hold stored i8 exponents (Work::of), so products and sums fit i32; i < 3, i < rhs.len, the loop bounds"
     )]
     const fn mul(mut self, rhs: &Work, sign: i32) -> Result<Work, MagnitudeError> {
         self.pow10 += sign * rhs.pow10;
@@ -331,6 +351,10 @@ impl Work {
         clippy::indexing_slicing,
         reason = "i < 3 for irr, i < self.len <= WORK for the exponents"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "n is an i8 (powi) and the exponents stored i8s (Work::of), so the products fit i32; i < 3, i < self.len, the loop bounds"
+    )]
     const fn scale(mut self, n: i32) -> Work {
         self.pow10 *= n;
         self.pow2 *= n;
@@ -350,6 +374,10 @@ impl Work {
     #[expect(
         clippy::indexing_slicing,
         reason = "i < 3 for irr, i < self.len <= MAX_FACTORS (checked first) for the factors"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < 3, i < self.len, the loop bounds"
     )]
     const fn pack(&self) -> Result<Magnitude, MagnitudeError> {
         if self.len > MAX_FACTORS {
@@ -432,10 +460,18 @@ const fn exp(e: i32) -> Result<i8, MagnitudeError> {
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
 )]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "u64 · u64 fits u128; m is the n of is_prime or rho, at least 2"
+)]
 const fn mul_mod(a: u64, b: u64, m: u64) -> u64 {
     ((a as u128 * b as u128) % m as u128) as u64
 }
 
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "m != 0: the n of is_prime, above 37 here"
+)]
 const fn pow_mod(mut b: u64, mut e: u64, m: u64) -> u64 {
     let mut r = 1 % m;
     b %= m;
@@ -451,6 +487,10 @@ const fn pow_mod(mut b: u64, mut e: u64, m: u64) -> u64 {
 
 /// Miller-Rabin with the bases that decide every `u64`.
 #[expect(clippy::indexing_slicing, reason = "i < BASES.len(), the loop bound")]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "n >= 41 past the base checks, so n - 1 doesn't wrap; i < BASES.len(), s and r below 64, the bits of n"
+)]
 pub(crate) const fn is_prime(n: u64) -> bool {
     const BASES: [u64; 12] = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37];
     if n < 2 {
@@ -492,6 +532,7 @@ pub(crate) const fn is_prime(n: u64) -> bool {
     true
 }
 
+#[expect(clippy::arithmetic_side_effects, reason = "b != 0, the loop condition")]
 const fn gcd64(mut a: u64, mut b: u64) -> u64 {
     while b != 0 {
         let t = a % b;
@@ -502,6 +543,10 @@ const fn gcd64(mut a: u64, mut b: u64) -> u64 {
 }
 
 /// A factor of the odd composite `n` other than 1 and `n` (Pollard's rho with Brent's cycle finding).
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "mul_mod(..) < n, so + c overflows only for n > 2^64 - c, c the retry count: the composites without a factor below 2^16 nearest u64::MAX (2^64 - 39, - 113, ..) take c = 1, but no bound is proven"
+)]
 const fn rho(n: u64) -> u64 {
     let mut c = 1;
     loop {
@@ -561,6 +606,7 @@ impl Magnitude {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(clippy::arithmetic_side_effects, reason = "2 · an i8 fits i32")]
     pub const fn checked_pow10(e: i8) -> Option<Self> {
         match exp(2 * e as i32) {
             Ok(pow10) => Some(Magnitude { pow10, rest: None }),
@@ -574,6 +620,7 @@ impl Magnitude {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(clippy::arithmetic_side_effects, reason = "2 · an i8 fits i32")]
     pub const fn pow2(e: i8) -> Self {
         let mut w = Work::ONE;
         w.pow2 = 2 * e as i32;
@@ -617,6 +664,10 @@ impl Magnitude {
         reason = "const fn: From is not const on stable"
     )]
     #[expect(clippy::indexing_slicing, reason = "i < primes.len(), the loop bound")]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < primes.len(), the loop bound"
+    )]
     pub(crate) const fn recip_of_primes(primes: &[u32]) -> Self {
         let mut w = Work::ONE;
         let mut i = 0;
@@ -685,6 +736,10 @@ impl Magnitude {
         clippy::indexing_slicing,
         reason = "i < 3 for irr, i < MAX_FACTORS for the factors, the loop bounds"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < 3, i < w.len, the loop bounds"
+    )]
     pub const fn checked_sqrt(self) -> Result<Self, MagnitudeError> {
         let mut w = Work::of(&self);
         if w.pow10 % 2 != 0 || w.pow2 % 2 != 0 {
@@ -723,6 +778,10 @@ impl Magnitude {
         reason = "const fn: From is not const on stable"
     )]
     #[expect(clippy::indexing_slicing, reason = "i < MAX_FACTORS, the loop bound")]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the stored exponents are i8, so a sum of two fits i32; i < w.len, the loop bound"
+    )]
     pub const fn exp_x2(&self, prime: u32) -> i16 {
         let w = Work::of(self);
         match prime {
@@ -796,6 +855,10 @@ impl Magnitude {
         reason = "const fn: From is not const on stable"
     )]
     #[expect(clippy::indexing_slicing, reason = "i < MAX_FACTORS, the loop bound")]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the stored exponents are i8, so a sum of two fits i32; i < w.len <= MAX_FACTORS, so i + 2 < WORK + 2"
+    )]
     pub const fn to_ratio(&self) -> Option<(u128, u128)> {
         let w = Work::of(self);
         if w.irr[0] != 0 || w.irr[1] != 0 || w.irr[2] != 0 {
@@ -847,6 +910,7 @@ impl Magnitude {
         reason = "const fn: From is not const on stable"
     )]
     #[expect(clippy::indexing_slicing, reason = "i < MAX_FACTORS, the loop bound")]
+    #[expect(clippy::arithmetic_side_effects, reason = "i < w.len, the loop bound")]
     pub const fn to_f64(&self) -> f64 {
         use core::f64::consts::{LN_2, LN_10, PI};
         let w = Work::of(self);
@@ -865,6 +929,10 @@ impl Magnitude {
     /// `x · self` in integers, exactly: `None` when the result is not whole, doesn't fit `i128`, or the magnitude
     /// isn't a fraction of integers.
     #[must_use]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "den >= 1, a magnitude's denominator: x % den and x / den can't overflow"
+    )]
     pub fn apply_int(&self, x: i128) -> Option<i128> {
         let (num, den) = self.to_ratio()?;
         let (num, den) = (i128::try_from(num).ok()?, i128::try_from(den).ok()?);
@@ -1030,6 +1098,10 @@ impl Default for Magnitude {
 
 /// `·10⁻⁴`, `·2¹⁰`, `·1/65535`, `·π/180`, `·2π`, `·√2`, `·ln10/20`: the factor as written after a number. Empty for 1.
 impl core::fmt::Display for Magnitude {
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the stored exponents are i8, so w.pow10 + w.pow2 fits i32; but *r *= p can overflow u128 when the primes with a half exponent multiply past 2^128 (a panic in debug, a wrong root in release)"
+    )]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let (p10, p2) = self.pow10_pow2_x2();
         if *self == Self::ONE {
@@ -1113,6 +1185,10 @@ fn write_symbols(
     f: &mut core::fmt::Formatter<'_>,
 ) -> core::fmt::Result {
     for (s, e) in irr {
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "sign is ±1 and e a stored i8 exponent"
+        )]
         let e = e * sign;
         if e <= 0 {
             continue;

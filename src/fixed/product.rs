@@ -243,6 +243,10 @@ where
     reason = "const fn: From is not const on stable"
 )]
 #[expect(clippy::indexing_slicing, reason = "i < 4, the length of c")]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "i64 · i64 fits i128; i < 4, the loop bound"
+)]
 const fn proven_product<T: Storage>(a0: i64, a1: i64, b0: i64, b1: i64) {
     let c = [
         a0 as i128 * b0 as i128,
@@ -552,6 +556,10 @@ impl Requant {
     }
 
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "|a|, |b| are at most max and max² · num fits i128 (i64 where narrow), asserted in of_terms"
+    )]
     fn times<T: Storage, T3: Storage>(self, a: T, b: T, r: Rounding, o: Overflow) -> Option<T3> {
         if self.float {
             return self.finish_f64(to_f64(a) * to_f64(b), r, o);
@@ -581,6 +589,11 @@ impl Requant {
 
     /// `a · b + c · d` (`d` negated by the caller where it is a difference), scaled and rounded once into `T3`.
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "|a · b ± c · d| is at most 2 · max² and 2 · max² · num fits i128 (i64 where narrow), asserted in \
+                  of_terms with terms 2, as complex's multiply builds it"
+    )]
     pub(crate) fn sum2<T: Storage, T3: Storage>(
         self,
         (a, b): (T, T),
@@ -622,6 +635,11 @@ impl Requant {
     }
 
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "max · num and max · den fit i128 (i64 where narrow), asserted in of_terms, so n, d and their \
+                  negations fit"
+    )]
     fn per<T: Storage, T3: Storage>(self, a: T, b: T, r: Rounding, o: Overflow) -> Option<T3> {
         if self.float {
             let d = to_f64(b);

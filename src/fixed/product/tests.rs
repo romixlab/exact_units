@@ -2,6 +2,11 @@
     clippy::as_conversions,
     reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"
 )]
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "a test computes with the values it chose, which fit; an overflow fails the test"
+)]
+
 use crate::prefix::*;
 use crate::units::{Ampere, Ohm, Per, Ratio, Times, Volt, Watt};
 use crate::{Fixed, FixedScale, Magnitude, Overflow, Q15, Range, Rounding, Saturating, Wrapping};

@@ -62,6 +62,10 @@ impl IqStorage for i16 {
     )]
     const HEADROOM: u64 = u32::MAX as u64;
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "|a·b|, |c·d| ≤ 2³⁰, so the products and their sum or difference fit i64"
+    )]
     fn mac(acc: i64, (a, b): (i16, i16), (c, d): (i16, i16), neg: bool) -> i64 {
         // |a·b ± c·d| ≤ 2³¹, an i64 holds it
         let (ab, cd) = (i64::from(a) * i64::from(b), i64::from(c) * i64::from(d));
@@ -84,6 +88,10 @@ impl IqStorage for i32 {
     type Acc = i128;
     const HEADROOM: u64 = u64::MAX;
     #[inline(always)]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "|a·b|, |c·d| ≤ 2⁶², so each product fits i64 and their sum or difference i128"
+    )]
     fn mac(acc: i128, (a, b): (i32, i32), (c, d): (i32, i32), neg: bool) -> i128 {
         // each product fits an i64 (|a·b| ≤ 2⁶²), their sum (2⁶³) only an i128
         let (ab, cd) = (
@@ -571,6 +579,10 @@ impl<U, P, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T, B> {
     /// # }
     /// ```
     #[inline]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "n counts pairs of a slice, at most out.len() / 2"
+    )]
     pub fn write_interleaved(src: &[Self], out: &mut [T]) -> usize {
         let mut n = 0;
         for (o, s) in out.as_chunks_mut::<2>().0.iter_mut().zip(src) {
@@ -592,6 +604,10 @@ impl<U, P, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T, B> {
     /// # }
     /// ```
     #[inline]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "n counts pairs of a slice, at most buf.len() / 2"
+    )]
     pub fn map_interleaved(buf: &mut [T], mut f: impl FnMut(Self) -> Self) -> usize {
         let mut n = 0;
         for c in buf.as_chunks_mut::<2>().0 {
@@ -661,6 +677,10 @@ impl Nco {
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "(f << 32) + fs / 2 is below 2⁶⁴ for 32-bit f and fs; fs of 0 panics, as documented"
     )]
     pub const fn tuned(f: u32, fs: u32) -> Self {
         let step = (((f as u64) << 32) + fs as u64 / 2) / fs as u64;

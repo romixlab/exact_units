@@ -144,6 +144,10 @@ const fn checked_exp(e: i16) -> Option<i8> {
     clippy::indexing_slicing,
     reason = "i < the shorter length, the loop bound"
 )]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "i < the shorter length, the loop bound, so i + 1 fits usize"
+)]
 const fn cmp_names(a: &str, b: &str) -> core::cmp::Ordering {
     use core::cmp::Ordering;
     let (a, b) = (a.as_bytes(), b.as_bytes());
@@ -207,6 +211,7 @@ impl<'i> Dim<'i> {
     /// From the exponents of s, m, kg, A, K, mol, cd, rad, bit, `None` when one is out of -8..=7.
     #[must_use]
     #[expect(clippy::indexing_slicing, reason = "i < FIXED, the loop bound")]
+    #[expect(clippy::arithmetic_side_effects, reason = "i < FIXED, the loop bound")]
     pub const fn checked_new(exps: [i8; FIXED]) -> Option<Dim<'i>> {
         let mut i = 0;
         while i < FIXED {
@@ -295,6 +300,10 @@ impl<'i> Dim<'i> {
     #[expect(
         clippy::indexing_slicing,
         reason = "indices below FIXED and below the slot counts, the loop bounds"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "counters below FIXED, MAX_COUNTED and MERGED (n grows at most once per step of i or j); sign is -1, 0 or 1 and times is 1 but in checked_pow, where o's exponents are 0 and fa is 1: i8 * 2 + i8 * 2 and i8 * i8 fit i16"
     )]
     const fn combine(self, o: Dim<'i>, sign: i16, times: i16) -> Option<Dim<'i>> {
         // with only one side a root, the other is squared so both describe the square of what they are
@@ -508,6 +517,10 @@ impl<'i> Dim<'i> {
         clippy::indexing_slicing,
         reason = "indices below FIXED and below the slot counts, the loop bounds"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < FIXED and i < MAX_COUNTED, the loop bounds"
+    )]
     pub const fn same(self, o: Dim<'_>) -> bool {
         let a = self.exps();
         let b = o.exps();
@@ -547,6 +560,10 @@ impl<'i> Dim<'i> {
     #[expect(
         clippy::indexing_slicing,
         reason = "indices below FIXED and below the slot counts, the loop bounds"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < FIXED and i < MAX_COUNTED, the loop bounds; i - 1 only after i > 0"
     )]
     pub const fn is_canonical(&self) -> bool {
         if self.root {
@@ -703,6 +720,10 @@ impl From<Dim<'_>> for DimOwned {
 }
 
 /// `exp` in superscript digits, `⁻` before a negative one.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "p * 10 only while p <= exp / 10, so it stays at most exp; p is at least 1, so never a division by 0"
+)]
 pub(crate) fn write_superscript(f: &mut fmt::Formatter<'_>, exp: i32) -> fmt::Result {
     if exp < 0 {
         f.write_str("⁻")?;
@@ -925,6 +946,10 @@ impl UnitExpr {
     /// `Affine` scale, or a product leaves what a [Magnitude](crate::Magnitude) holds. A pound-force second is
     /// 0.45359237 · 9.80665 N·s.
     #[must_use]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < n.unsigned_abs(), at most 128, the loop bound"
+    )]
     pub const fn magnitude(&self) -> Option<crate::Magnitude> {
         use crate::Magnitude;
         match self {

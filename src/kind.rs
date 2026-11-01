@@ -75,6 +75,10 @@ const ROOT_POWER: [Dim<'static>; 6] = [
 ];
 
 #[expect(clippy::indexing_slicing, reason = "i < dims.len(), the loop bound")]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "i < dims.len(), the loop bound"
+)]
 const fn any_same(dims: &[Dim<'static>], d: Dim<'_>) -> bool {
     let mut i = 0;
     while i < dims.len() {
@@ -90,6 +94,10 @@ const fn any_same(dims: &[Dim<'static>], d: Dim<'_>) -> bool {
 #[expect(
     clippy::indexing_slicing,
     reason = "i < a.len() == b.len(), the loop bound"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "i < a.len(), the loop bound"
 )]
 const fn same_str(a: &str, b: &str) -> bool {
     let (a, b) = (a.as_bytes(), b.as_bytes());
@@ -326,6 +334,10 @@ mod phase {
         /// The electrical angle of a motor with `pole_pairs` pole pairs at this mechanical (rotor) angle:
         /// `pole_pairs · self`, multiplied by the overflow policy of `B` (a [Bam16](crate::Bam16) wraps at a turn, as
         /// an electrical angle does). Feed this, not the encoder's angle, to a field-oriented control.
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "the `*` of B's overflow policy, as documented: a Bam16 wraps at a turn"
+        )]
         pub fn electrical(self, pole_pairs: T) -> Fixed<Phase<A>, P, T, B>
         where
             Self: Mul<T, Output = Self>,

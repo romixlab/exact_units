@@ -164,6 +164,10 @@ fn is_compound<E>(node: &Node<'_, E>) -> bool {
 }
 
 /// The symbol: `V`, `N·m/(rad/s)`, `(rad/s)·(rad/s)`, `m²`.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "depth < MAX_UNIT_DEPTH, checked first"
+)]
 fn write_symbol<'t, E: Tree<'t>>(e: &E, f: &mut fmt::Formatter<'_>, depth: usize) -> fmt::Result {
     if depth >= MAX_UNIT_DEPTH {
         return f.write_str("…");
@@ -209,6 +213,10 @@ fn write_symbol<'t, E: Tree<'t>>(e: &E, f: &mut fmt::Formatter<'_>, depth: usize
 }
 
 /// The type name: `Volt`, `Per<Torque, AngularVelocity>`, `Pow<Meter, 2>`.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "depth < MAX_UNIT_DEPTH, checked first"
+)]
 fn write_name<'t, E: Tree<'t>>(e: &E, f: &mut fmt::Formatter<'_>, depth: usize) -> fmt::Result {
     if depth >= MAX_UNIT_DEPTH {
         return f.write_str("…");
@@ -241,6 +249,10 @@ fn write_name<'t, E: Tree<'t>>(e: &E, f: &mut fmt::Formatter<'_>, depth: usize) 
 }
 
 /// SI exponents of the whole tree, `None` when an exponent leaves -8..=7, a part doesn't decode or it is too deep.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "depth < MAX_UNIT_DEPTH, checked first"
+)]
 fn dim_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<Dim<'t>> {
     if depth >= MAX_UNIT_DEPTH {
         return None;
@@ -256,6 +268,10 @@ fn dim_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<Dim<'t>> {
 }
 
 /// Factor to coherent SI of the whole tree (offsets left out), `None` when a part doesn't decode or it is too deep.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "depth < MAX_UNIT_DEPTH, checked first"
+)]
 fn factor_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<f64> {
     if depth >= MAX_UNIT_DEPTH {
         return None;
@@ -276,6 +292,10 @@ pub fn magnitude<'t, E: Tree<'t>>(e: &E) -> Option<crate::Magnitude> {
     magnitude_at(e, 0)
 }
 
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "depth < MAX_UNIT_DEPTH, checked first"
+)]
 fn magnitude_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<crate::Magnitude> {
     if depth >= MAX_UNIT_DEPTH {
         return None;
@@ -317,6 +337,10 @@ pub fn is_ratio<'t, E: Tree<'t>>(e: &E) -> bool {
     ratio_at(e, 0)
 }
 
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "depth < MAX_UNIT_DEPTH, checked first"
+)]
 fn ratio_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> bool {
     if depth >= MAX_UNIT_DEPTH {
         return false;
@@ -336,6 +360,10 @@ fn is_named<'t, E: Tree<'t>>(e: &E) -> bool {
     matches!(e.node(), Some(Node::Named { .. }))
 }
 
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "depth < MAX_UNIT_DEPTH, checked first"
+)]
 fn same_at<'s, 't, A: Tree<'s>, B: Tree<'t>>(a: &A, b: &B, depth: usize) -> bool {
     if depth >= MAX_UNIT_DEPTH {
         return false;

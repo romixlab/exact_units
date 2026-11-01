@@ -40,6 +40,15 @@ crate-wide for convenience; a suppression is `#[expect(lint, reason = "why it is
 or statement (`allow_attributes` forbids `#[allow]`). In a macro over several storages, where a cast is lossy for some
 and not others, `#[allow(lint, reason)]` sits inside under one `#[expect(clippy::allow_attributes, reason)]`. A cast
 that loses information is `From`/`TryFrom`, or its reason says why the value fits; a reason that can't say so is a bug.
+`as` (`as_conversions`) only where nothing else fits: in a const fn, const item or `const { .. }` block (`From` is not
+const on stable), between float and integer, and in a macro over several storages; each with its reason. Slices and
+arrays are read with `get`, `split_at_checked` or an iterator (`indexing_slicing`); an index or a `panic!` only in a
+const fn, its reason the invariant. Every operation that can overflow, divide by zero or wrap says what it means
+(`arithmetic_side_effects`): `wrapping_*` where wrapping is the semantics (BAM phases, the `Wrapping` bound, sequence
+numbers), `saturating_*` for the `Saturating` bound, `checked_*` where the API returns `Option`/`Result`, otherwise an
+`#[expect]` stating the invariant (`i16 * i16 fits in i32`) or the documented overflow (`like T's +`). None of these
+may add work on Cortex-M where the old operation could not overflow. Tests, test modules and examples carry one
+file-level `#![expect]` per lint clippy.toml can't exempt for tests.
 
 ## Changelog, commits, landing
 

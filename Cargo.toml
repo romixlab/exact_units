@@ -218,6 +218,8 @@ unreachable = "warn"
 panic = "warn"
 # a slice or an array is read with get, split_at_checked or an iterator; an index only where a const fn needs it
 indexing_slicing = "warn"
+# every overflowable op says what it means: checked_, wrapping_, saturating_, or an #[expect] with its invariant
+arithmetic_side_effects = "warn"
 todo = "warn"
 unimplemented = "warn"
 undocumented_unsafe_blocks = "warn"

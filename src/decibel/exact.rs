@@ -17,6 +17,10 @@ impl Num {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "z = x.leading_zeros() <= 127, so -z fits i64"
+    )]
     pub(crate) const fn of(x: u128) -> Num {
         assert!(x != 0);
         let z = x.leading_zeros();
@@ -32,6 +36,10 @@ impl Num {
     }
 
     /// `m + 1` (rounding up), carrying into the exponent.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "exponents stay below 2^62 in size: the largest power is 10^(i64::MAX / 10) in Interval::level, about 2^(3.1 * 10^18)"
+    )]
     const fn bump(m: u128, e: i64, up: bool) -> Num {
         if !up {
             return Num { m, e };
@@ -43,6 +51,10 @@ impl Num {
     }
 
     /// `self · rhs`, rounded down or up.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "exponents stay below 2^62 in size: the largest power is 10^(i64::MAX / 10) in Interval::level, about 2^(3.1 * 10^18)"
+    )]
     const fn mul(self, rhs: Num, up: bool) -> Num {
         let (hi, lo) = mul_wide(self.m, rhs.m);
         let e = self.e + rhs.e;
@@ -55,6 +67,10 @@ impl Num {
     }
 
     /// `self / rhs`, rounded down or up: restoring division until the quotient has its top bit.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "self.m - rhs.m only when self.m >= rhs.m; shifts < 128, the loop ends once q has its top bit; exponents stay below 2^62 in size: the largest power is 10^(i64::MAX / 10) in Interval::level, about 2^(3.1 * 10^18)"
+    )]
     const fn div(self, rhs: Num, up: bool) -> Num {
         let (mut q, mut r) = if self.m >= rhs.m {
             (1u128, self.m - rhs.m)
@@ -96,6 +112,10 @@ impl Num {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "-e is 1..=128 here: s - 1 >= 0, (1 << s) - 1 with 1 <= s < 128, and int = m >> s is below 2^127, so int + 1 fits"
+    )]
     const fn round_int(self) -> Option<u128> {
         if self.e >= 0 {
             return None;
@@ -127,6 +147,10 @@ impl Num {
     /// The nearest binary float with `bits` of mantissa (the hidden one included) and exponents down to `min_exp`
     /// for its leading bit and up to `max_exp`, ties to even: `(mantissa, exponent of its leading bit)`. `None`
     /// outside the normal range.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "bits is 24 or 53 (to_f32, to_f64), so s is 75..=104; mant = m >> s is below 2^bits; exponents stay below 2^62 in size: the largest power is 10^(i64::MAX / 10) in Interval::level, about 2^(3.1 * 10^18)"
+    )]
     const fn round_float(self, bits: u32, min_exp: i64, max_exp: i64) -> Option<(u128, i64)> {
         let s = 128 - bits;
         let mut mant = self.m >> s;
@@ -149,6 +173,10 @@ impl Num {
 }
 
 /// `a · b` as `(high, low)` 128-bit halves.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "a product of two 64-bit halves fits u128; mid is at most 3 * (2^64 - 1), hi the top half of a 256-bit product"
+)]
 const fn mul_wide(a: u128, b: u128) -> (u128, u128) {
     #[expect(
         clippy::as_conversions,
@@ -207,6 +235,10 @@ impl Interval {
     /// The `d`-th root of a value in `[1, 10^d)`, which is in `[1, 10)`: for the lower end the largest `y` whose
     /// `y^d` rounded up is still at most `lo`, for the upper end the smallest whose `y^d` rounded down is at least
     /// `hi`, both searched over `y = Y · 2^-124`.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a < b <= 10 * 2^124 < 2^128 throughout the search, so b - a and a + (b - a) / 2 fit"
+    )]
     const fn root(self, d: u64) -> Interval {
         const ONE: u128 = 1 << 124;
         // y_lo: the largest Y with at(Y)^d (up) <= lo; a qualifies throughout (1 <= lo), b never does (lo < 10^d)
@@ -239,6 +271,7 @@ impl Interval {
     }
 
     /// `Y · 2^-124`.
+    #[expect(clippy::arithmetic_side_effects, reason = "n.e is -127..=0 (Num::of)")]
     const fn at(y: u128) -> Num {
         let n = Num::of(y);
         Num {
@@ -303,6 +336,10 @@ impl Interval {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "round_float keeps e in -1022..=1023, so e + 1023 is 1..=2046"
+    )]
     pub(crate) const fn to_f64(self) -> f64 {
         let (m, e) = Interval::same_float(
             self.lo.round_float(53, -1022, 1023),
@@ -321,6 +358,10 @@ impl Interval {
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "round_float keeps e in -126..=127, so e + 127 is 1..=254"
     )]
     pub(crate) const fn to_f32(self) -> f32 {
         let (m, e) = Interval::same_float(

@@ -162,6 +162,10 @@ impl Offset {
             return Some(Self::ZERO);
         }
         let g = gcd(n.unsigned_abs(), d);
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "n != 0, so g = gcd(|n|, d) ≥ 1"
+        )]
         let (n_abs, d) = (n.unsigned_abs() / g, d / g);
         if n_abs > u64::MAX as u128 || d > u64::MAX as u128 {
             return None;
@@ -182,6 +186,10 @@ impl Offset {
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "n is checked to be at most i128::MAX, so its negation fits"
     )]
     pub const fn to_ratio(&self) -> Option<(i128, u128)> {
         let Some(m) = self.magnitude else {
@@ -285,6 +293,7 @@ impl core::fmt::Display for Offset {
     }
 }
 
+#[expect(clippy::arithmetic_side_effects, reason = "b != 0, the loop condition")]
 pub(crate) const fn gcd(mut a: u128, mut b: u128) -> u128 {
     while b != 0 {
         let t = a % b;

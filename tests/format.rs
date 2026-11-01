@@ -1,5 +1,9 @@
 //! `{:#}`: the value in the unit itself, exact for powers of ten and binary scales, with the formatter's precision
 //! (rounded to the nearest, a tie to even), width, fill, alignment, `+` and `0`.
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "a test computes with the values it chose, which fit; an overflow fails the test"
+)]
 
 use exact_units::origins::Celsius;
 use exact_units::prefix::{Centi, Micro, Milli, One, Pow2, Rational};

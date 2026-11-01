@@ -23,6 +23,10 @@ const LOW: u128 = u64::MAX as u128;
 const TOP: u128 = 1 << 127;
 
 /// The 256-bit product `a · b` as `(high, low)` halves.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "64-bit halves: each product fits u128, mid is below 3 · 2^64, and hi is the top half of a · b < 2^256"
+)]
 const fn mul_256(a: u128, b: u128) -> (u128, u128) {
     let (a1, a0) = (a >> 64, a & LOW);
     let (b1, b0) = (b >> 64, b & LOW);
@@ -60,6 +64,10 @@ impl Wide {
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "-z, z <= 128 a leading-zero count"
+    )]
     const fn int(x: u32) -> Wide {
         let z = (x as u128).leading_zeros();
         Wide {
@@ -69,6 +77,10 @@ impl Wide {
     }
 
     /// `m` rounded to nearest at bit `drop` (`m` has `128 + drop` significant bits in `hi`, `lo`).
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "|e| < 2^16 (see fixed_point)"
+    )]
     const fn round_top(hi: u128, lo: u128, e: i32) -> Wide {
         let (mut m, mut e) = if hi & TOP != 0 {
             (hi, e + 128)
@@ -87,6 +99,10 @@ impl Wide {
     }
 
     /// `m`, plus one when `up`, carried into the exponent.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "|e| < 2^16 (see fixed_point)"
+    )]
     const fn bump(m: u128, up: bool, e: i32) -> Wide {
         if !up {
             return Wide { m, e };
@@ -97,6 +113,10 @@ impl Wide {
         }
     }
 
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "|e| < 2^16 (see fixed_point)"
+    )]
     const fn mul(self, rhs: Wide) -> Wide {
         let (hi, lo) = mul_256(self.m, rhs.m);
         Wide::round_top(hi, lo, self.e + rhs.e)
@@ -106,6 +126,10 @@ impl Wide {
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < 256, the loop bound, and 127 - i only for i < 128; |e| < 2^16 (see fixed_point)"
     )]
     const fn div(self, rhs: Wide) -> Wide {
         // quotient bits of (self.m · 2¹²⁸) / rhs.m: 128 or 129 of them
@@ -142,6 +166,10 @@ impl Wide {
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a.e >= b.e; |e| < 2^16 (see fixed_point)"
     )]
     const fn add(self, rhs: Wide) -> Wide {
         let (a, b) = if self.e >= rhs.e {
@@ -184,6 +212,10 @@ impl Wide {
     }
 
     /// The square root by Newton's method from a power of two within a factor of 2.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < 10, the loop bound; |e| < 2^16 (see fixed_point)"
+    )]
     const fn sqrt(self) -> Wide {
         let exp = self.e + 127; // self is in [2^exp, 2^(exp + 1))
         let mut y = Wide {
@@ -213,6 +245,10 @@ impl Magnitude {
         reason = "const fn: From is not const on stable"
     )]
     #[expect(clippy::indexing_slicing, reason = "i < MAX_FACTORS, the loop bound")]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "|e| < 2^16: the squared magnitude lies within 2^±50200 (12 primes below 2^32 to at most the 128th, 10^128, π^128), powi's last square within 2^±8192; r.m >> 64 is below 2^64, so + 1 fits; i < w.len, the loop bound"
+    )]
     pub const fn fixed_point(&self) -> (u64, i32) {
         let w = Work::of(self);
         // the doubled exponents give the square of the magnitude
