@@ -142,15 +142,17 @@ fn saturate_wrap() -> String {
     s.path(&p, &wrap[..cut], "blue-line");
     s.path(&p, &wrap[cut..], "blue-line");
     s.path(&p, &sat, "accent-line");
+    // under the flat end, right-aligned to the panel so it stays inside the figure
     s.text(
-        p.px(0.55),
+        p.px(1.0),
         p.py(0.88),
-        "start",
+        "end",
         "accent",
         "Saturating: stays at 1 − 2⁻¹⁵",
     );
+    // left of where the wrapped line comes back in at -1, clear of both curves
     s.text(
-        p.px(0.32),
+        p.px(-0.95),
         p.py(-0.82),
         "start",
         "blue",
