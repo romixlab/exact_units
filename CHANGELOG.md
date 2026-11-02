@@ -598,4 +598,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
 * `Offset::checked_add` of an offset with a denominator past `i128::MAX` is `None` (the denominator wrapped negative and
   a sum could come out as a wrong `Some`), and `Offset`'s `Display` shows such an offset by its magnitude (it printed a
   positive offset as a negative number).
+* The minim's docs symbol (customary catalogue, "minim" group) is `♏︎`, U+264F with the U+FE0E text-presentation
+  selector appended, instead of bare U+264F: unqualified, most browsers and terminals render it as the Scorpio
+  emoji rather than the apothecaries' minim sign it actually is.
 

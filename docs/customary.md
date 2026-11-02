@@ -50,7 +50,7 @@ Fahrenheit" or "degree Celsius".
 | dram | `dr` | `DramAvdp`, `DramApothecaries`, `FluidDramUs` | avdp 1/16 oz (27.34 gr) vs apothecaries 60 gr vs the US fluid dram |
 | drachm |  | `DramApothecaries`, `FluidDrachmImperial` | British spelling of the apothecaries dram; also the imperial fluid drachm |
 | fluid dram | `fl dr` | `FluidDramUs`, `FluidDrachmImperial` | 1/8 US fl oz vs 1/8 imperial fl oz |
-| minim | `min`, `♏` | `MinimUs`, `MinimImperial` | 1/480 US fl oz vs 1/480 imperial fl oz; "min" is also the minute |
+| minim | `min`, `♏︎` | `MinimUs`, `MinimImperial` | 1/480 US fl oz vs 1/480 imperial fl oz; "min" is also the minute |
 | scruple |  | `ScrupleApothecaries`, `FluidScrupleImperial` | 20 gr (mass) vs the British fluid scruple (volume) |
 | bushel | `bu` | `BushelUs`, `BushelImperial` | US 2150.42 in³ vs imperial 8 gal (3 % larger); heaped bushels are customs, not here |
 | peck | `pk` | `PeckUs`, `PeckImperial` | 1/4 of the respective bushel |

@@ -119,6 +119,18 @@
   unicode-range: U+2071, U+207A-207F;
 }
 
+/* U+264F (minim's symbol, docs/customary.md's ambiguous-units table): some browsers render it as the Scorpio
+   emoji regardless of the U+FE0E text-presentation selector the catalogue appends. Noto Sans Symbols has a
+   plain text glyph for it, so the `<code>` cell (IBM Plex Mono) never falls through to an emoji font. */
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("../vendor/fonts/NotoSansSymbols-Minim.woff2") format("woff2");
+  unicode-range: U+264F;
+}
+
 [data-md-color-scheme="default"] {
   --md-primary-fg-color: #c25400;
   --md-primary-fg-color--light: #ff7100;

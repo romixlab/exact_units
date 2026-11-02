@@ -50,6 +50,16 @@ FALLBACK_MONO_URL = (
     "QhiWsixuLlH1PMpMfxX39FDGIEQ&skey=41eaca710d6906c9&v=v37"
 )
 FALLBACK_MONO_SHA256 = "7b28f5333f4f0d334e32c758ec05a412ce1060c4f2bf6ba87e3d948bf44fa64f"
+
+# U+264F (the minim's symbol, catalogue.rs) renders as the Scorpio emoji in some browsers even with the U+FE0E
+# text-presentation selector appended (Firefox and older WebKit ignore it): Noto Sans Symbols has a plain text
+# glyph for it (checked with fontTools: no COLR/CPAL/SVG table, one outline contour), so docs/customary.md's
+# `<code>` cell (IBM Plex Mono) gets it from there instead of whatever emoji font the browser would fall back to.
+FALLBACK_MINIM_URL = (
+    "https://fonts.gstatic.com/l/font?kit=rP2up3q65FkAtHfwd-eIS2brbDN6gxP34F9jRRCe4W3gfQ8gb-1CrNR8"
+    "&skey=e59169fb45ece077&v=v47"
+)
+FALLBACK_MINIM_SHA256 = "5a00cc5c87afe8ae4bbf0da86f47d63c4b79a957a282df34b4966428617238ea"
 FALLBACK_LICENSE_URL = "https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/LICENSE"
 FALLBACK_LICENSE_SHA256 = "f2095b08bed08b23a6fe26112fcd679a2bee3f002eef077eb05d215ed1051bd8"
 
@@ -82,7 +92,10 @@ def fetch(docs: Path) -> None:
 def fetch_fonts(docs: Path) -> None:
     out = docs / "vendor" / "fonts"
     stamp = out / "VERSION"
-    want_stamp = f"sans-{FONT_SANS_VERSION} mono-{FONT_MONO_VERSION} fallback-{FALLBACK_SANS_SHA256[:8]}"
+    want_stamp = (
+        f"sans-{FONT_SANS_VERSION} mono-{FONT_MONO_VERSION} "
+        f"fallback-{FALLBACK_SANS_SHA256[:8]} minim-{FALLBACK_MINIM_SHA256[:8]}"
+    )
     if stamp.exists() and stamp.read_text().strip() == want_stamp:
         return
     out.mkdir(parents=True, exist_ok=True)
@@ -104,6 +117,7 @@ def fetch_fonts(docs: Path) -> None:
     for name, url, sha256 in (
         ("NotoSans-Superscripts.woff2", FALLBACK_SANS_URL, FALLBACK_SANS_SHA256),
         ("NotoSansMono-Superscripts.woff2", FALLBACK_MONO_URL, FALLBACK_MONO_SHA256),
+        ("NotoSansSymbols-Minim.woff2", FALLBACK_MINIM_URL, FALLBACK_MINIM_SHA256),
         ("LICENSE-noto.txt", FALLBACK_LICENSE_URL, FALLBACK_LICENSE_SHA256),
     ):
         with urllib.request.urlopen(url, timeout=60) as r:

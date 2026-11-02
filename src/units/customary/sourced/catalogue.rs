@@ -451,7 +451,9 @@ pub(crate) static AMBIGUOUS: &[Ambiguous] = &[
     },
     Ambiguous {
         bare: "minim",
-        symbols: &["min", "♏"],
+        // U+264F with U+FE0E (text presentation selector): plain ♏ renders as the Scorpio emoji in most
+        // browsers and terminals, and some (Firefox, older WebKit) ignore FE0E too, but it's the correct fix.
+        symbols: &["min", "♏\u{fe0e}"],
         members: &["minim_us", "minim_imperial"],
         note: "1/480 US fl oz vs 1/480 imperial fl oz; \"min\" is also the minute",
     },
