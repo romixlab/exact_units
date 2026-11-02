@@ -11,8 +11,11 @@ graph TD
   L["lints<br/>every cast, index, overflow named"] --> T["unit tests and doctests<br/>every example on this site"]
   T --> P["properties<br/>against an exact i128 reference"]
   P --> PT["proptest<br/>inputs drawn, weighted to the ends"]
+  PT --> PTG["the gate: a fixed seed<br/>same code, same result"]
+  PT --> PTH["props-hunt: a random seed<br/>many cases, a spare PC overnight"]
   P --> K["Kani<br/>every input, proved"]
   P --> W["whole walks<br/>every i8, every i16"]
+  T --> M["mutation testing<br/>a missed mutant names an untested line"]
 ```
 
 ## Lints
@@ -48,6 +51,16 @@ Each property is checked three ways from the same function:
 - **Whole walks**: where the space is small (every `i8`, every `i16`, every Q15 pair) a plain test tries all of it.
 
 A fix comes with a property, or an input for one, that fails before the fix. A bug in a narrow window, like a cast that wraps at $2^{32}$, gets a strategy aimed at that window: random inputs never hit it.
+
+`just test` runs proptest with a fixed seed: the same code gives the same result, so neither the land gate nor a mutation-testing run turns on which cases a draw happened to land on. `just props-hunt` hunts instead, with proptest's own random seed and many more cases, meant for a spare PC overnight rather than the gate. A case it finds is pinned to `tests/proptest-regressions/`, the same file the gate replays, so a found regression stays caught from then on.
+
+## Mutation testing
+
+A test suite can pass while checking nothing: a line nobody's test depends on can be wrong and no test notices. cargo-mutants checks for that: it changes the library one line at a time (a mutant) and runs the tests after each change (`just mutants`). A mutant the tests catch is fine. A mutant that survives (MISSED) names a line that could hide a bug.
+
+`.cargo/mutants.toml` leaves out Debug and defmt output and the test-only customary catalogue, each with a reason: no test should pin those. It is a dev tool, not a dependency, and not in CI; a full run takes hours.
+
+The first run (2 Nov 2026) tested 3920 mutants and missed 422. Closing the gaps it found brought several modules to zero: `fixed/rounding.rs` from 51 missed to 0, `magnitude/approx.rs` from 47 to 0, the wire's `validate` functions from 3 to 0. It also found a real bug: `Requantizer::apply` rounded a quotient wrongly for a factor whose denominator is above `i128::MAX`, now fixed with a property against the exact case.
 
 ## Coverage and targets
 

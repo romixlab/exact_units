@@ -36,6 +36,7 @@ just logo            # export the logo from assets/logo/logo.typ (typst and the 
 just verify          # the Kani proofs of tests/props (minutes; needs cargo-kani, not in CI)
 just fuzz T SECS     # one cargo-fuzz target of fuzz/ for SECS seconds (nightly and cargo-fuzz; not in CI)
 just mutants         # cargo-mutants over the library (.cargo/mutants.toml; hours; needs cargo-mutants, not in CI)
+just props-hunt      # tests/props with a random seed and many cases; for a spare PC overnight, not the gate
 ```
 
 CI (`.github/workflows/ci.yml`) fails on any warning and also builds for `thumbv6m-none-eabi`. Run `just lint` and
@@ -73,6 +74,13 @@ Kani proofs use storages of 16 bits or less: a proof over an `i32` or a pair of 
 (SAT on 64-bit products), one over `i16` in seconds. A proof with a loop sets `#[kani::unwind(n)]`. proptest is a
 dev-dependency only where `cfg(not(kani))`; proptest writes failing seeds to `tests/proptest-regressions/`, commit
 those of a real bug with its fix.
+
+`just test` and `just mutants` run proptest with a fixed seed (`PROPTEST_RNG_SEED`, set in the justfile): the same
+code gives the same result, so neither the land gate nor a cargo-mutants verdict turns on which cases a run
+happened to draw. `just props-hunt [CASES] [SECONDS]` hunts instead, with proptest's own random seed and a high
+case count (10000 by default): for a spare PC overnight, not the gate. A case it finds persists the same way, to
+`tests/proptest-regressions/<module>.txt` (one file per `tests/props/*.rs`, named after it); commit that file with
+the fix, as above.
 
 Input from outside (text, wire bytes, serde) is strings and bytes, which Kani can't reason about: those properties
 are also called from the cargo-fuzz targets of `fuzz/`, a crate of its own that compiles the `tests/props` modules in
