@@ -599,7 +599,7 @@ impl Magnitude {
         }
     }
 
-    /// `10^e`: a decimal prefix. Panics (at compile time in a `const`) for `|e| > 63`.
+    /// `10^e`: a decimal prefix. Panics (at compile time in a `const`) for `e` outside `-64..=63` (the doubled exponent is an `i8`).
     #[must_use]
     pub const fn pow10(e: i8) -> Self {
         match Self::checked_pow10(e) {
@@ -608,7 +608,7 @@ impl Magnitude {
         }
     }
 
-    /// `10^e`, `None` for `|e| > 63`.
+    /// `10^e`, `None` for `e` outside `-64..=63`.
     #[must_use]
     #[expect(
         clippy::as_conversions,
@@ -622,7 +622,7 @@ impl Magnitude {
         }
     }
 
-    /// `2^e`: a binary prefix, a Q format. Panics (at compile time in a `const`) for `|e| > 63`.
+    /// `2^e`: a binary prefix, a Q format. Panics (at compile time in a `const`) for `e` outside `-64..=63`.
     #[must_use]
     #[expect(
         clippy::as_conversions,
