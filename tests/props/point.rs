@@ -57,14 +57,14 @@ fn fraction(x: i128, from: Side, to: Side) -> (i128, i128) {
     (num, d1 * b1 * b2 * n2)
 }
 
-/// `y` reduced into the period `(pn, pd)` of `to`'s unit, as `canonical` has it for a storage that is `signed` or not.
+/// `y` reduced into the period `(p_num, p_den)` of `to`'s unit, as `canonical` has it for a storage that is `signed` or not.
 fn reduce(y: i128, period: Option<(i128, i128)>, to: Side, signed: bool) -> i128 {
-    let Some((pn, pd)) = period else {
+    let Some((p_num, p_den)) = period else {
         return y;
     };
     let (n2, d2) = to.step;
-    assert_eq!((pn * d2) % (pd * n2), 0, "the period is whole steps");
-    let m = pn * d2 / (pd * n2);
+    assert_eq!((p_num * d2) % (p_den * n2), 0, "the period is whole steps");
+    let m = p_num * d2 / (p_den * n2);
     let r = y.rem_euclid(m);
     if signed && r >= m - m / 2 { r - m } else { r }
 }
@@ -93,6 +93,10 @@ pub(crate) fn converts<O1, P1, T1, O2, P2, T2>(
 }
 
 /// The same conversion for floats: within the error of the arithmetic, reduced into `[0, m)` for a modulo origin.
+#[expect(
+    clippy::expect_used,
+    reason = "a float point always converts to a float"
+)]
 pub(crate) fn converts_float<O1, P1, T1, O2, P2>(
     x: f64,
     from: Side,
@@ -108,18 +112,20 @@ pub(crate) fn converts_float<O1, P1, T1, O2, P2>(
     let p = Point::<O1, Fixed<Ratio, P1, T1>>::from_raw(T1::from_f64(x));
     let x = T1::to_f64(T1::from_f64(x));
     let got = p.to::<O2, P2, f64>().map(Point::raw);
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "the fractions of the cases are small: exact in f64"
+    )]
     let f = |(n, d): (i128, i128)| n as f64 / d as f64;
     let (a1, a2) = (f(from.off), f(to.off));
     let (s1, s2) = (f(from.step), f(to.step));
     let want = (x * s1 + a1 - a2) / s2;
-    let Some(got) = got else {
-        panic!("{x}: no float");
-    };
+    let got = got.expect("a float point converts");
     let tolerance = 1e-9 * (want.abs() + (a1 - a2).abs() / s2 + 1.0);
     match period {
         None => assert!((got - want).abs() <= tolerance, "{x}: {got} vs {want}"),
-        Some((pn, pd)) => {
-            let m = f((pn, pd)) / s2;
+        Some((p_num, p_den)) => {
+            let m = f((p_num, p_den)) / s2;
             assert!((0.0..m).contains(&got), "{x}: {got} not in 0..{m}");
             let off = (got - want).rem_euclid(m);
             assert!(

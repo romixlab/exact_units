@@ -102,6 +102,7 @@ pub(crate) fn from_decimal_rounds<L: Lit>(num: i64, exp: i16) {
 /// wherever that is a normal number. The ends (the largest and smallest normal numbers) are in, subnormals and
 /// overflow are a compile error, left out here.
 #[cfg(not(kani))]
+#[expect(clippy::expect_used, reason = "the text is digits and an exponent")]
 pub(crate) fn float_from_decimal_is_nearest(num: i64, exp: i16) {
     // a literal whose whole value needs more than 128 bits is refused, as documented
     if exp > 0

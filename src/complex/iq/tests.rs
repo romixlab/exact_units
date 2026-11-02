@@ -496,7 +496,7 @@ fn mean_at_least_compares_exactly() {
 
 #[test]
 fn equality_and_clone_tell_sums_apart() {
-    type C = Complex<crate::units::Ratio, One, i16>;
+    type C = Complex<Ratio, One, i16>;
     let sum = |a: C, b: C| {
         let mut m = Mac::new();
         m.mac(a, b);

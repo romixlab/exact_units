@@ -9,6 +9,8 @@
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
 
+use core::f32;
+use core::f64::consts::PI;
 use exact_units::prefix::{Centi, Deci, Kilo, Micro, Milli, One, Pow2, Rational};
 use exact_units::units::{Radian, Ratio, Second, Volt};
 use exact_units::{
@@ -328,6 +330,10 @@ const KINDS: [StorageKind; 3] = [
 ];
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one table of float conversions: sources, targets, policies"
+)]
 fn requantizer_float_sources_and_targets() {
     let i16_kind = KINDS[0];
     let apply = |factor: &Magnitude, x: Repr, to, r, o| requantize(x, factor, to, r, o);
@@ -364,9 +370,14 @@ fn requantizer_float_sources_and_targets() {
         apply(&one, Repr::Float(-1e10), i16_kind, r, Overflow::Saturate),
         Some(Repr::Int(-32768))
     );
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the expected value is the low 16 bits, as the wrapping policy keeps them"
+    )]
+    let wrapped = 10_000_000_000i64 as i16;
     assert_eq!(
         apply(&one, big, i16_kind, r, Overflow::Wrap),
-        Some(Repr::Int(i128::from(10_000_000_000i64 as i16)))
+        Some(Repr::Int(i128::from(wrapped)))
     );
     // a float that is not whole after the factor and rounding can't be, and NaN and infinities have no value
     for o in [Overflow::Checked, Overflow::Saturate, Overflow::Wrap] {
@@ -445,11 +456,11 @@ fn requantizer_float_sources_and_targets() {
             r,
             Overflow::Checked
         ),
-        Some(Repr::Float(2.0 * core::f64::consts::PI))
+        Some(Repr::Float(2.0 * PI))
     );
     assert_eq!(
         apply(&Magnitude::PI, Repr::Int(2), KINDS[1], r, Overflow::Checked),
-        Some(Repr::Float(f64::from(2.0 * core::f32::consts::PI)))
+        Some(Repr::Float(f64::from(2.0 * f32::consts::PI)))
     );
 }
 
@@ -553,12 +564,22 @@ fn requantizer_ratios_past_128_bits() {
         at(f, -x, Overflow::Saturate),
         Some(Repr::Int(i128::from(i64::MIN)))
     );
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the low 64 bits of the exact product, as the wrapping policy keeps them"
+    )]
     let low = 10u128.pow(20).wrapping_mul(10u128.pow(30)) as u64;
     assert_eq!(
         at(f, x, Overflow::Wrap),
         Some(Repr::Int(i128::from(low.cast_signed())))
     );
-    let low = (-(10i128.pow(20))).wrapping_mul(10i128.pow(30)) as u64;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the low 64 bits of the exact product, as the wrapping policy keeps them"
+    )]
+    let low = (-(10i128.pow(20)))
+        .wrapping_mul(10i128.pow(30))
+        .cast_unsigned() as u64;
     assert_eq!(
         at(f, -x, Overflow::Wrap),
         Some(Repr::Int(i128::from(low.cast_signed())))

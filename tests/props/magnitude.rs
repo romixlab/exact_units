@@ -1,7 +1,7 @@
 //! Property 9: the arithmetic of a [Magnitude] that is a fraction of integers against exact rational arithmetic
 //! (`BigRational`): a product, quotient, power or reciprocal has the exponents of the model, is refused exactly where
 //! an exponent leaves ±63 or more than `MAX_FACTORS` primes are left, and its `to_ratio` and `apply_int` are the
-//! model's reduced fraction. The model keeps one exponent per prime, so a stale slot, a lost prime or a mis-sorted
+//! model's reduced fraction. The model keeps one exponent per prime, so a stale slot, a lost prime or a badly placed
 //! insert is a different fraction.
 #![cfg(not(kani))]
 #![expect(
@@ -124,11 +124,8 @@ impl Model {
 
     /// `(num, den)` as `to_ratio` gives it: `None` where either passes `u128`.
     pub(crate) fn ratio(&self) -> Option<(u128, u128)> {
-        let v = self.value();
-        Some((
-            u128::try_from(v.numer().clone()).ok()?,
-            u128::try_from(v.denom().clone()).ok()?,
-        ))
+        let (num, den) = self.value().into_raw();
+        Some((u128::try_from(num).ok()?, u128::try_from(den).ok()?))
     }
 }
 
@@ -167,21 +164,30 @@ pub(crate) fn number(parts: &[(u64, u32)]) -> Option<u64> {
         .try_fold(1u64, |n, &(p, e)| n.checked_mul(p.checked_pow(e)?))
 }
 
+/// A fraction spelled by the primes of its numerator and of its denominator.
+type Spelled<'a> = (&'a [(u64, u32)], &'a [(u64, u32)]);
+
+/// A magnitude and the model it should be.
+type Atom = (Magnitude, Model);
+
+/// A list of `(prime, exponent)` as the model with every exponent times `sign`.
+#[expect(clippy::expect_used, reason = "the exponents of a test are small")]
+fn spelled(parts: &[(u64, u32)], sign: i32) -> Model {
+    Model::of(
+        &parts
+            .iter()
+            .map(|&(p, e)| (p, sign * i32::try_from(e).expect("small")))
+            .collect::<Vec<_>>(),
+    )
+}
+
 /// `ratio(n, d)` is the model of the primes it was spelled by, `to_ratio` is the reduced fraction, and two spellings of
 /// one fraction are one magnitude.
 pub(crate) fn ratio(num: &[(u64, u32)], den: &[(u64, u32)], k: u32) {
     let (Some(n), Some(d)) = (number(num), number(den)) else {
         return;
     };
-    let model = |parts: &[(u64, u32)], sign: i32| {
-        Model::of(
-            &parts
-                .iter()
-                .map(|&(p, e)| (p, sign * i32::try_from(e).expect("small")))
-                .collect::<Vec<_>>(),
-        )
-    };
-    let want = model(num, 1).mul(&model(den, -1));
+    let want = spelled(num, 1).mul(&spelled(den, -1));
     let got = agrees(Magnitude::checked_ratio(n, d), &want);
     // the reduced value is the plain quotient of the numbers
     assert_eq!(
@@ -204,24 +210,10 @@ pub(crate) fn ratio(num: &[(u64, u32)], den: &[(u64, u32)], k: u32) {
 }
 
 /// Products, quotients, reciprocals and powers of two magnitudes against the model.
-pub(crate) fn operations(
-    a: (&[(u64, u32)], &[(u64, u32)]),
-    b: (&[(u64, u32)], &[(u64, u32)]),
-    pow10: i8,
-    pow2: i8,
-    n: i8,
-) {
-    let make = |(num, den): (&[(u64, u32)], &[(u64, u32)])| -> Option<(Magnitude, Model)> {
+pub(crate) fn operations(a: Spelled<'_>, b: Spelled<'_>, pow10: i8, pow2: i8, n: i8) {
+    let make = |(num, den): Spelled<'_>| -> Option<Atom> {
         let m = Magnitude::checked_ratio(number(num)?, number(den)?).ok()?;
-        let spell = |parts: &[(u64, u32)], sign: i32| {
-            Model::of(
-                &parts
-                    .iter()
-                    .map(|&(p, e)| (p, sign * i32::try_from(e).expect("small")))
-                    .collect::<Vec<_>>(),
-            )
-        };
-        Some((m, spell(num, 1).mul(&spell(den, -1))))
+        Some((m, spelled(num, 1).mul(&spelled(den, -1))))
     };
     let (Some((x, mx)), Some((y, my))) = (make(a), make(b)) else {
         return;
@@ -256,8 +248,6 @@ pub(crate) fn operations(
             let got = m.powi(n);
             assert_eq!(got.to_ratio(), pm.ratio(), "{model:?}^{n}");
         }
-        // equality is the model's
-        assert_eq!(*m == *m, true);
     }
     let (mx, my) = (&atoms[0], &atoms[1]);
     if let (Some((x, mx)), Some((y, my))) = (mx, my) {

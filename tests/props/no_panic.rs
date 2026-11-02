@@ -58,6 +58,15 @@ pub(crate) fn from_f64<T: Int>(x: f64) {
     assert_eq!(got, want, "{x:e} ({:#x})", x.to_bits());
 }
 
+/// `i + d + f`: a whole float near an integer `i` of up to 64 bits (rounded to 53 bits), `f` the fraction.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "the nearest float to a 64-bit integer is the point"
+)]
+pub(crate) fn near(i: i64, d: i32, f: f64) -> f64 {
+    i as f64 + f64::from(d) + f
+}
+
 /// `x` rounded toward zero, without std: the bits below the binary point cleared.
 fn trunc(x: f32) -> f32 {
     let bits = x.to_bits();
@@ -274,7 +283,7 @@ mod tests {
 
         #[test]
         fn from_f64_near_whole(i in strategy::i64(), d in -2i32..=2, f in proptest::sample::select(&[0.0, 0.5, 0.25][..])) {
-            let x = i as f64 + f64::from(d) + f;
+            let x = super::near(i, d, f);
             super::from_f64::<i8>(x);
             super::from_f64::<i16>(x);
             super::from_f64::<i32>(x);

@@ -341,10 +341,10 @@ mod floats {
         let fraction = select(&[0.0, 0.25, 0.5, 0.75, 0.999][..]);
         prop_oneof![
             4 => any::<u64>().prop_map(f64::from_bits),
-            4 => (strategy::i64(), -2i32..=2, fraction).prop_map(|(i, d, f)| i as f64 + f64::from(d) + f),
+            4 => (strategy::i64(), -2i32..=2, fraction).prop_map(|(i, d, f)| crate::no_panic::near(i, d, f)),
             // 2^k and the floats next to it, up to 2^130
-            4 => (0u32..=130, -2i64..=2, any::<bool>()).prop_map(|(k, ulps, neg)| {
-                let x = f64::from_bits(2f64.powi(k as i32).to_bits().wrapping_add_signed(ulps));
+            4 => (0u64..=130, -2i64..=2, any::<bool>()).prop_map(|(k, ulps, neg)| {
+                let x = f64::from_bits(((1023 + k) << 52).wrapping_add_signed(ulps));
                 if neg { -x } else { x }
             }),
             1 => select(&[f64::NAN, f64::INFINITY, f64::NEG_INFINITY, f64::MAX, f64::MIN, -0.0][..]),

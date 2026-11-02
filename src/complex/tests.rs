@@ -246,8 +246,10 @@ fn equality_tells_values_apart() {
 }
 
 #[test]
+#[expect(clippy::clone_on_copy, reason = "the Clone impl is what is under test")]
 fn clone_and_hash_keep_the_value() {
-    use std::hash::{BuildHasher, BuildHasherDefault, DefaultHasher};
+    use core::hash::{BuildHasher, BuildHasherDefault};
+    use std::hash::DefaultHasher;
     let hash =
         |z: &Complex<Ratio, One, i16>| BuildHasherDefault::<DefaultHasher>::default().hash_one(z);
     let z = Complex::<Ratio, One, i16>::new(3, -4);
