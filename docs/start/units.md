@@ -43,7 +43,7 @@ Three markers build the units nobody named:
 use exact_units::{Fixed, prefix::Nano, units::{Hertz, Per, Sqrt, Volt}};
 
 let noise: Fixed<Per<Volt, Sqrt<Hertz>>, Nano, u32> = Fixed::new(12);
-assert_eq!(noise.to_string(), "12 n(V/√Hz)");
+assert_eq!(noise.to_string(), "12 nV/√Hz");
 ```
 
 ## Dimensions

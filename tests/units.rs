@@ -443,8 +443,8 @@ fn symbols_are_unique_but_for_shared_units() {
 }
 
 /// A prefix goes straight before a symbol whose first factor is plain (`mm/s`, `mN·m`), and on the whole of one whose
-/// first factor has an exponent or a prefix (`m³/kg`, `kg/m³`) and none moves inside: `mm³/kg` would be 10⁻⁹ m³/kg, not
-/// 10⁻³; `mm²` is 10⁻⁶ m².
+/// first factor has an exponent or a prefix (`m³/kg`) and none moves inside: `mm³/kg` would be 10⁻⁹ m³/kg, not 10⁻³;
+/// `mm²` is 10⁻⁶ m².
 #[test]
 fn prefixes_on_powered_symbols() {
     use exact_units::Fixed;
@@ -465,8 +465,5 @@ fn prefixes_on_powered_symbols() {
         Fixed::<SpecificVolume, Kilo, u8>::new(5).to_string(),
         "5 k(m³/kg)"
     );
-    assert_eq!(
-        Fixed::<Density, Milli, u8>::new(5).to_string(),
-        "5 m(kg/m³)"
-    );
+    assert_eq!(Fixed::<Density, Milli, u8>::new(5).to_string(), "5 mg/L");
 }

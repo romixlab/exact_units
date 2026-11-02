@@ -75,11 +75,11 @@
 //!
 //! A cable's loss per length is a `Per<Loss<L>, X>`, printed and read as its datasheet writes it.
 //! [Kilometre](crate::units::Kilometre), [Metres100](crate::units::Metres100) and
-//! [Feet100](crate::units::Feet100) are lengths of their own, not `Meter` in a prefixed scale: `with_unit` always
-//! writes a value in a unit's bare symbol ([write_unit](crate::tree::write_unit) with
-//! [Prefix::Unit](crate::Prefix::Unit)),
-//! never moving an SI prefix onto a plain metre inside a quotient, so "dB/km", "dB/100 m" and "dB/100 ft" each need
-//! their own length marker, as [Litre](crate::units::Litre) already does for volume.
+//! [Feet100](crate::units::Feet100) are lengths of their own, not `Meter` in a prefixed scale: `{:#}` and `with_unit`
+//! write a value in a unit's bare symbol ([write_unit](crate::tree::write_unit) with
+//! [Prefix::Unit](crate::Prefix::Unit)), so "dB/km", "dB/100 m" and "dB/100 ft" each need their own length marker
+//! there, as [Litre](crate::units::Litre) already does for volume. `{}` of a plain `Per<Loss<Decibel>, Meter>` moves
+//! its scale into the denominator where a prefix is used on it, `5 dB/km` in `Milli`, and 100 m has none.
 //!
 //! ```
 //! # #[cfg(all(feature = "levels", feature = "mechanical", feature = "customary"))] {

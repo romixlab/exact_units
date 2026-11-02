@@ -71,7 +71,54 @@ assert_eq!(Fixed::<Volume, Kilo, u8>::new(5).to_string(), "5 k(m³)");
 assert_eq!(Fixed::<Area, Pow10<4>, u8>::new(5).to_string(), "5·10⁴ m²");
 ```
 
-This is the text alone. The type, equality, conversion, the wire and serde's numbers don't change, and `serde::with_unit` reads every spelling here, the parenthesised ones included.
+### On a quotient
+
+A scale on a quotient has two sides to go to. The default is the numerator, the SI practice: `mV/m`, `MV/s`, `nV/√Hz`, and `Per<Volt, Meter>` writes the same as the marker `ElectricFieldStrength`. Some units are written another way, and `{}` follows them in this order. The first that fits decides.
+
+1. The markers `Density` and `MolarConcentration` are per litre, from 10⁻¹² to 10³ in steps of 10³. A unit spelled another way keeps its metres, as `Per<Volume, Second>` does: `Per<Gram, Volume>` in `Micro` is the `µg/m³` of air quality.
+2. `dB` and `Np` take no prefix on a quotient. It goes into the denominator: k, c, m, µ and n on the metre, k, M and G on the hertz, m, µ and n on the second. Otherwise the scale stays on the whole unit, as `c(dB/m)`: 100 m has no prefix.
+3. Over `m` and `m²`, the denominator is `cm` or `cm²` where that leaves a prefix in steps of 10³ on the numerator: `µS/cm`, `kV/cm`, `mW/cm²`.
+4. 10⁶ over `m²` is `mm²`: `A/mm²`.
+5. Otherwise the numerator takes the prefix, and `g` stands for `kg` from the gram down: `g/m²`, `mg/s`.
+
+| Unit | Scale | Written | Rule |
+|---|---|---|---|
+| `Density` | 10⁻³ | `mg/L` | 1 |
+| `Density` | 10³ | `kg/L` | 1 |
+| `MolarConcentration` | 10⁻³ | `µmol/L` | 1 |
+| `Per<Decibel, Meter>` | 10⁻³ | `dB/km` | 2 |
+| `Per<Decibel, Meter>` | 10² | `dB/cm` | 2 |
+| `Per<Decibel, Meter>` | 10⁻² | `c(dB/m)` | 2 |
+| `Per<Neper, Meter>` | 10⁻³ | `Np/km` | 2 |
+| `Per<Decibel, Hertz>` | 10⁻⁶ | `dB/MHz` | 2 |
+| `Conductivity` | 10⁻⁴ | `µS/cm` | 3 |
+| `Conductivity` | 10⁻¹ | `mS/cm` | 3 |
+| `ElectricFieldStrength` | 10⁵ | `kV/cm` | 3 |
+| `HeatFluxDensity` | 10¹ | `mW/cm²` | 3 |
+| `CurrentDensity` | 10⁶ | `A/mm²` | 4 |
+| `Conductivity` | 10⁻³ | `mS/m` | 5 |
+| `Per<Volt, Meter>` | 10⁻³ | `mV/m` | 5 |
+| `SurfaceDensity` | 10⁻³ | `g/m²` | 5 |
+| `MassFlow` | 10³ | `k(kg/s)` | none |
+| `Momentum` | 10⁻³ | `m(kg·m/s)` | none |
+
+A unit with a compound numerator, a ratio on top or a numerator that isn't SI (ft, min, °) keeps its form, and so does a unit known by name only. So does a denominator of its own: `Kilometre`, `Metres100` and `Feet100` print as they are, and `{:#}` and `with_unit` write them with their datasheet's spelling, since those write a value in the bare symbol.
+
+```rust
+use exact_units::{Fixed, prefix::{Centi, Micro, Milli, Pow10}, units::{Conductivity, Decibel, Density, ElectricFieldStrength, Gram, Meter, Per, Volt, Volume}};
+
+assert_eq!(Fixed::<Per<Decibel, Meter>, Milli, u8>::new(5).to_string(), "5 dB/km");
+assert_eq!(Fixed::<Per<Decibel, Meter>, Centi, u8>::new(5).to_string(), "5 c(dB/m)");
+assert_eq!(Fixed::<Density, Milli, u8>::new(5).to_string(), "5 mg/L");
+assert_eq!(Fixed::<Per<Gram, Volume>, Micro, u8>::new(5).to_string(), "5 µg/m³");
+assert_eq!(Fixed::<Conductivity, Pow10<-4>, u8>::new(5).to_string(), "5 µS/cm");
+assert_eq!(Fixed::<ElectricFieldStrength, Pow10<5>, u8>::new(5).to_string(), "5 kV/cm");
+assert_eq!(Fixed::<Per<Volt, Meter>, Milli, u8>::new(5).to_string(), "5 mV/m");
+```
+
+### The text alone
+
+This is the text alone. The type, equality, conversion, the wire and serde's numbers don't change. `serde::with_unit` reads every spelling here, and the older ones too: `m(dB/m)`, `·10⁻⁴ S/m`, `dS/m`. A quotient reads in any spelling people use, whichever one the field writes, so a `Density` takes `5 mg/L`, `5 g/m³` and `5 mg/mL`, and a `Conductivity` takes `5 uS/cm`.
 
 ## Precision, width, sign
 

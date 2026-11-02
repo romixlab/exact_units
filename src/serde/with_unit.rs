@@ -9,8 +9,10 @@
 //! Read: a decimal number (`1.5`, `-2e-3`, `1_000`), then the field's unit, with or without an SI prefix (`1.5 ms`,
 //! `1500 µs` or `1500 us`, `0.0015 s`; a binary prefix too, `4 KiB`), the space optional. A ratio takes `%`, `‰`,
 //! `ppm` and `ppb`, or nothing. Square and cubic metres read as `{}` writes them: `5 mm²` (10⁻⁶ m², and `5 m(m²)` is
-//! 10⁻³ m²), `5 cm³/kg`, and litres on a volume and a volume flow, `5 mL/s` as well as `5 cm³/s`. The value goes into
-//! the field's scale and storage exactly, else it is an error that says why:
+//! 10⁻³ m²), `5 cm³/kg`, and litres on a volume and a volume flow, `5 mL/s` as well as `5 cm³/s`. A quotient reads with
+//! a prefix on either side, as people write it, whichever spelling `{}` writes for the field: `5 µS/cm` and `5 uS/cm`,
+//! `5 mg/L` and `5 g/m³`, `5 dB/km`, and the older `5 m(dB/m)`. The value goes into the field's scale and storage
+//! exactly, else it is an error that says why:
 //!
 //! - not the field's unit: `"5 kg" is not in s (with or without an SI prefix)`;
 //! - not a whole number of steps: `"1.2345 ms" is not a whole number of 1 µs steps`, with the nearest values the
@@ -47,7 +49,7 @@
 use super::OutOfRange;
 use super::text::{Buf, Decimal, writes_as};
 use crate::fixed::write_prefix_unit;
-use crate::tree::{inside, is_ratio, takes_bare_prefix, write_unit};
+use crate::tree::{den_prefixes, inside, is_ratio, moved, quotient, takes_bare_prefix, write_unit};
 use crate::{Bounds, Fixed, FixedScale, Prefix, Storage, Unit, UnitExpr};
 use ::serde::de::{self, Deserializer, Visitor};
 use ::serde::ser::Serializer;
@@ -314,7 +316,10 @@ fn prefix_of<U: Unit>(t: &str) -> Option<TextPrefix> {
     if spelled(t) {
         return Some(TextPrefix::UNIT);
     }
-    if let Some(p) = moved_of::<U>(t).or_else(|| nameless_of::<U>(t)) {
+    let found = moved_of::<U>(t)
+        .or_else(|| quotient_of::<U>(t))
+        .or_else(|| nameless_of::<U>(t));
+    if let Some(p) = found {
         return Some(TextPrefix::of(p));
     }
     let named = takes_bare_prefix(&U::EXPR);
@@ -360,26 +365,78 @@ fn moved_of<U: Unit>(t: &str) -> Option<Prefix> {
         Some(rest) if write!(micro, "µ{rest}").is_ok() => micro.as_str(),
         _ => t,
     };
-    // 10³ on m² down to 10⁻⁹ on m³
-    (-27..=6i8)
-        .filter_map(Prefix::from_pow10)
-        .filter_map(|p| Some((p, inside(p, &U::EXPR)?)))
-        .find(|(p, inner)| {
-            writes_as(PrefixText::<U>(*p, PhantomData), t)
-                || t.strip_prefix(inner.symbol())
+    // every power a scale can have: 10⁻⁹ on V/√Hz is written nV/√Hz
+    (-63..=63i8).filter_map(Prefix::from_pow10).find(|p| {
+        moved(*p, &U::EXPR).is_some() && writes_as(PrefixText::<U>(*p, PhantomData), t)
+            || inside(*p, &U::EXPR).is_some_and(|inner| {
+                t.strip_prefix(inner.symbol())
                     .is_some_and(|rest| writes_as(UnitText::<U>(PhantomData), rest))
-        })
-        .map(|(p, _)| p)
+            })
+    })
 }
 
-/// The power of ten without a prefix's name that text ends in, as `{}` writes it after the number: `·10⁴ m²`.
+/// The scale of text that spells a quotient in any way people do, not only the one `{}` writes for `U`: `mS/cm` and
+/// `dS/m`, `mg/L` and `g/m³`, `5 kV/cm` and `500 kV/m`. An SI prefix on the numerator (`g` on a `kg`) and one on the
+/// denominator that is used with it, a litre for a cubic metre.
+fn quotient_of<U: Unit>(t: &str) -> Option<Prefix> {
+    let q = quotient(&U::EXPR)?;
+    let (top, bottom) = t.split_once('/')?;
+    let top = if top == q.num {
+        0
+    } else if !q.takes_prefix {
+        return None;
+    } else if q.num == "kg" {
+        si_exponent(top.strip_suffix('g')?)?.checked_sub(3)?
+    } else {
+        si_exponent(top.strip_suffix(q.num)?)?
+    };
+    let bottom = den_exponent(bottom, q.den?)?;
+    Prefix::from_pow10(top.checked_add(bottom)?)
+}
+
+/// The power of ten that `text` in the place of the denominator `den` puts on the quotient: `km` for `m` is -3.
+fn den_exponent(text: &str, den: &str) -> Option<i8> {
+    if text == den {
+        return Some(0);
+    }
+    let (power, used) = den_prefixes(den)?;
+    let on = |symbol: &str| {
+        let e = si_exponent(text.strip_suffix(symbol)?)?;
+        used.contains(&e).then_some(e)
+    };
+    match on(den) {
+        Some(e) => power.checked_mul(e)?.checked_neg(),
+        // a litre is 10⁻³ m³; a mL and a µL are in the table's powers
+        None if den == "m³" => {
+            let e = si_exponent(text.strip_suffix('L')?)?;
+            matches!(e, 0 | -3 | -6).then(|| 3i8.checked_sub(e))?
+        }
+        None => None,
+    }
+}
+
+/// The power of ten of an SI prefix's symbol, nothing as 0, micro as `u` and as the Greek letter mu too.
+fn si_exponent(symbol: &str) -> Option<i8> {
+    let symbol = if matches!(symbol, "u" | "\u{3bc}") {
+        "µ"
+    } else {
+        symbol
+    };
+    (-30..=30i8)
+        .filter_map(Prefix::si_from_pow10)
+        .find(|p| p.symbol() == symbol)?
+        .pow10()
+}
+
+/// The power of ten without a prefix's name that text starts with, then the unit: `·10⁴ m²`, as `{}` writes it, and as
+/// it wrote `·10⁻⁴ S/m` before that became `µS/cm`.
 fn nameless_of<U: Unit>(t: &str) -> Option<Prefix> {
     t.starts_with('·')
         .then(|| {
             (-63..=63i8)
                 .filter_map(Prefix::from_pow10)
                 .filter(|p| !p.is_named())
-                .find(|p| writes_as(PrefixText::<U>(*p, PhantomData), t))
+                .find(|p| writes_as(format_args!("{p}{}", UnitText::<U>(PhantomData)), t))
         })
         .flatten()
 }

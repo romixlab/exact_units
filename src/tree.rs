@@ -410,6 +410,8 @@ pub(crate) enum Moved<'a> {
     Inside(Prefix),
     /// A litre and what follows the metres in the symbol: `mL`, `/s`.
     Litre(&'static str, &'a str),
+    /// A quotient written out: `µ`, `S`, `c`, `m` is `µS/cm`, and `""`, `dB`, `k`, `m` is `dB/km`.
+    Quotient(&'static str, &'a str, &'static str, &'a str),
 }
 
 /// How `prefix` on `unit` is written when it doesn't go on the whole of it: a power of ten `k` on a unit whose first
@@ -420,12 +422,16 @@ pub(crate) enum Moved<'a> {
 ///
 /// Metres only: `mV²` and `mft³` keep their form, and so does a unit known by name only (no dimension says its `m` is
 /// a metre).
+///
+/// A quotient goes on through [on_quotient] when no power of the metre comes first.
 pub(crate) fn moved<'t, E: Tree<'t>>(prefix: Prefix, unit: &E) -> Option<Moved<'t>> {
-    let inner = inside(prefix, unit)?;
-    prefix
-        .pow10()
-        .and_then(|k| litre(k, unit))
-        .or(Some(Moved::Inside(inner)))
+    match inside(prefix, unit) {
+        Some(inner) => prefix
+            .pow10()
+            .and_then(|k| litre(k, unit))
+            .or(Some(Moved::Inside(inner))),
+        None => on_quotient(prefix, unit),
+    }
 }
 
 /// The prefix on the metre that stands for `prefix` on `unit`, see [moved]: 10⁻⁶ m³ is `Centi`.
@@ -474,6 +480,191 @@ fn litre<'t, E: Tree<'t>>(k: i8, unit: &E) -> Option<Moved<'t>> {
         _ => return None,
     };
     Some(Moved::Litre(litres, symbol.strip_prefix("m³")?))
+}
+
+/// A quotient with a plain numerator: a marker's `S/m` or a tree's `Per<Decibel, Meter>`, taken apart.
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct Quotient<'a> {
+    /// The numerator's symbol: `S`, `dB`, `kg`.
+    pub(crate) num: &'a str,
+    /// The denominator's symbol where it is one plain factor; `√Hz` or `(rad/s)` is `None`.
+    pub(crate) den: Option<&'a str>,
+    /// Whether the numerator is an SI unit, so a prefix before it, or a kilogram's in place of its `k`, means what it says.
+    pub(crate) takes_prefix: bool,
+    /// The marker of the whole quotient, for a tree `""`: `Density`.
+    marker: &'a str,
+}
+
+/// [Quotient] of `unit`. `None` for what isn't one, or has a numerator with a power, a compound or nothing in it
+/// (`m²/s`, `N·m/s`, `/K`), and for a unit known by name only: nothing says what its `m` is.
+pub(crate) fn quotient<'t, E: Tree<'t>>(unit: &E) -> Option<Quotient<'t>> {
+    let (num, den, takes_prefix, marker) = match unit.node()? {
+        Node::Named {
+            name,
+            symbol,
+            dim: Some(_),
+            scale: Some(Scale::Coherent),
+        } => {
+            let (num, den) = symbol.split_once('/')?;
+            (num, plain(den), true, name)
+        }
+        Node::Div(a, b) => {
+            let Node::Named {
+                symbol,
+                dim: Some(_),
+                scale: Some(scale),
+                ..
+            } = a.node()?
+            else {
+                return None;
+            };
+            if matches!(b.node()?, Node::Named { dim: None, .. }) {
+                return None;
+            }
+            let si = matches!(scale, Scale::Coherent | Scale::Pow10(_));
+            (symbol, den_symbol(&b), si, "")
+        }
+        _ => return None,
+    };
+    let plain_num = !num.is_empty() && !num.contains(['/', '·', '(']);
+    plain_num.then_some(Quotient {
+        num,
+        den,
+        takes_prefix: takes_prefix && (num == "kg" || prefix_binds(num)) && !is_level(num),
+        marker,
+    })
+}
+
+/// The symbol of a denominator that is one plain factor: a tree's `m` has to be a metre, `s` a second and `Hz` a hertz.
+fn den_symbol<'t, E: Tree<'t>>(e: &E) -> Option<&'t str> {
+    match e.node()? {
+        Node::Named { symbol, dim, .. } => {
+            let dim = dim?;
+            let known = match symbol {
+                "m" => dim.m == 1,
+                "s" => dim.s == 1,
+                "Hz" => dim.s == -1,
+                _ => true,
+            };
+            plain(symbol).filter(|_| known)
+        }
+        Node::Pow(a, n @ (2 | 3)) => match a.node()? {
+            Node::Named {
+                symbol: "m",
+                dim: Some(dim),
+                ..
+            } if dim.m == 1 => Some(if n == 2 { "m²" } else { "m³" }),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// `s` where it is one factor, no `/`, `·` or parenthesis in it.
+fn plain(s: &str) -> Option<&str> {
+    (!s.contains(['/', '·', '('])).then_some(s)
+}
+
+/// `dB` and `Np`: on a quotient the prefix goes on what is under them, [on_quotient].
+fn is_level(symbol: &str) -> bool {
+    matches!(symbol, "dB" | "Np")
+}
+
+/// The power of the denominator's own unit that a prefix on it is raised to, and the prefixes used on it: the powers of
+/// ten of `km`, `cm`, `mm`, `µm`, `nm`; a `hm` isn't read or written. `None` for a denominator that takes none.
+pub(crate) fn den_prefixes(den: &str) -> Option<(i8, &'static [i8])> {
+    Some(match den {
+        "m" => (1, &[3, -2, -3, -6, -9]),
+        "m²" => (2, &AREA_PREFIXES),
+        "m³" => (3, &VOLUME_PREFIXES),
+        "Hz" => (1, &[3, 6, 9]),
+        "s" | "L" => (1, &[-3, -6, -9]),
+        _ => return None,
+    })
+}
+
+/// A prefix written before the numerator with an engineering power of ten, `10^a`: the case of [on_quotient] where the
+/// denominator takes one too.
+fn engineering(a: i8) -> Option<&'static str> {
+    let whole = a.checked_rem(3)? == 0 && (-12..=12).contains(&a);
+    whole
+        .then(|| Prefix::si_from_pow10(a))
+        .flatten()
+        .map(|p| p.symbol())
+}
+
+/// A power of ten on a quotient, as people write it. The first of these that fits; the book's "Prefixes on quotients"
+/// has the table of cases.
+///
+/// 1. The markers `Density` and `MolarConcentration` are per litre: `mg/L`, `µmol/L`, `kg/L`. As with `L/s`, a unit
+///    spelled another way keeps its metres.
+/// 2. `dB` and `Np` take no prefix on a quotient, it goes into the denominator ([den_prefixes]): `dB/km`, `Np/km`,
+///    `dB/MHz`, `dB/ms`. `dB/100 m` has no prefix, so 10⁻² keeps its form.
+/// 3. Over `m` and `m²`, `cm` or `cm²` where that leaves an engineering prefix on the numerator: `µS/cm`, `kV/cm`,
+///    `mW/cm²`.
+/// 4. 10⁶ over `m²` is `mm²`: `A/mm²`.
+/// 5. The numerator takes the prefix: `mV/m`, `nV/√Hz`, and `g` stands for `kg` from `g/m²` down to `ng/s`.
+///
+/// `None` otherwise, for a binary prefix, and for a marker where rule 5 is what [write_unit] writes anyway.
+fn on_quotient<'t, E: Tree<'t>>(prefix: Prefix, unit: &E) -> Option<Moved<'t>> {
+    let k = prefix.pow10().filter(|k| *k != 0)?;
+    let q = quotient(unit)?;
+    if let Some(m) = per_litre(k, &q) {
+        return Some(m);
+    }
+    if is_level(q.num) {
+        let den = q.den?;
+        let (_, used) = den_prefixes(den).filter(|_| den != "L")?;
+        let p = used
+            .contains(&k.checked_neg()?)
+            .then(|| Prefix::si_from_pow10(k.checked_neg()?))??;
+        return Some(Moved::Quotient("", q.num, p.symbol(), den));
+    }
+    if !q.takes_prefix {
+        return None;
+    }
+    // the gram is what a prefix goes on: 10⁻³ kg is g
+    let (num, base) = if q.num == "kg" {
+        ("g", k.checked_add(3)?)
+    } else {
+        (q.num, k)
+    };
+    if let Some(den) = q.den {
+        // what cm or cm² takes off the scale
+        let cm = match den {
+            "m" => 2,
+            "m²" => 4,
+            _ => 0,
+        };
+        let per_cm = (cm != 0)
+            .then(|| engineering(base.checked_sub(cm)?))
+            .flatten();
+        if let Some(head) = per_cm {
+            return Some(Moved::Quotient(head, num, "c", den));
+        }
+        if den == "m²" && k == 6 {
+            return Some(Moved::Quotient("", q.num, "m", den));
+        }
+        if q.num == "kg" {
+            return (base <= 0)
+                .then(|| engineering(base))?
+                .map(|head| Moved::Quotient(head, num, "", den));
+        }
+    }
+    (q.marker.is_empty() && q.num != "kg" && prefix.is_named()).then_some(Moved::Inside(prefix))
+}
+
+/// `Density` and `MolarConcentration` per litre, 10⁻¹² up to 10³ on the marker in steps of 10³.
+fn per_litre<'t>(k: i8, q: &Quotient<'_>) -> Option<Moved<'t>> {
+    let (num, shift) = match (q.marker, q.num, q.den) {
+        ("Density", "kg", Some("m³")) => ("g", 0),
+        ("MolarConcentration", "mol", Some("m³")) => ("mol", -3),
+        _ => return None,
+    };
+    let head = (-12..=3)
+        .contains(&k)
+        .then(|| engineering(k.checked_add(shift)?))??;
+    Some(Moved::Quotient(head, num, "", "L"))
 }
 
 /// `n` when the symbol of `e` starts with mⁿ, a metre, for `n` of 2 or 3, with nothing before it that a prefix would
@@ -554,7 +745,7 @@ fn same_at<'s, 't, A: Tree<'s>, B: Tree<'t>>(a: &A, b: &B, depth: usize) -> bool
 /// The prefix and the unit's symbol, as written after a number: ` mV`, ` kg`, ` %` for a ratio in `Centi`,
 /// ` k(N·m/(rad/s))` for a compound unit. A power of ten on square or cubic metres goes inside where people write it
 /// so: ` mm²` for `Micro` on m², ` cm³/kg` for `Micro` on m³/kg, and the markers `Volume` and `VolumetricFlow` are in
-/// litres from 10⁻³ down to 10⁻⁹ (` mL/s`).
+/// litres from 10⁻³ down to 10⁻⁹ (` mL/s`). A scale on a quotient goes where people write it: ` dB/km`, ` mg/L`, ` µS/cm`.
 pub fn write_unit<'t, E: Tree<'t>>(
     prefix: Prefix,
     unit: &E,
@@ -566,6 +757,9 @@ pub fn write_unit<'t, E: Tree<'t>>(
             return write_symbol(unit, f, 0);
         }
         Some(Moved::Litre(litres, rest)) => return write!(f, " {litres}{rest}"),
+        Some(Moved::Quotient(head, num, under, den)) => {
+            return write!(f, " {head}{num}/{under}{den}");
+        }
         None => {}
     }
     if !prefix.is_named() {

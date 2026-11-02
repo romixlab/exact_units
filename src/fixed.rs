@@ -1211,7 +1211,8 @@ fn rescale<T: Storage>(x: Repr, scale: Magnitude) -> Option<T> {
 
 /// The number as stored and the prefix with the unit: `1500 µs`, `4 KiB`, `50 %`, a scale without a prefix after
 /// the number (`15·10⁻⁴ s`, `32767·1/65535`). On square and cubic metres a prefix people use with the power goes
-/// inside, as [write_unit] says: `5 mm²` is a [Fixed] of `Area` in `Micro`, `5 L/s` of `VolumetricFlow` in `Milli`.
+/// inside, as [write_unit] says: `5 mm²` is a [Fixed] of `Area` in `Micro`, `5 L/s` of `VolumetricFlow` in `Milli`. A
+/// scale on a quotient goes where people write it: `5 dB/km`, `5 mg/L`, `5 µS/cm`.
 ///
 /// `{:#}` writes the value in the unit itself, `0.0015 s`: exactly where the steps are a fraction of integers whose
 /// decimal ends (powers of ten, Q formats and binary angles, `1/65535` not), as a float otherwise. A dimensionless
@@ -1287,14 +1288,25 @@ impl<U: Unit, P: FixedScale, T: Storage + defmt::Format, B: Bounds<T>> defmt::Fo
 {
     fn format(&self, f: defmt::Formatter<'_>) {
         let prefix = P::SCALE.as_pow10().and_then(Prefix::from_pow10);
-        if let (UnitExpr::Named { symbol, .. }, Some(m)) =
-            (U::EXPR, prefix.and_then(|p| moved(p, &U::EXPR)))
-        {
-            let (head, rest) = match m {
-                crate::tree::Moved::Inside(p) => (p.symbol(), *symbol),
-                crate::tree::Moved::Litre(litres, rest) => (litres, rest),
-            };
-            return defmt::write!(f, "{} {=str}{=str}", self.value, head, rest);
+        match (U::EXPR, prefix.and_then(|p| moved(p, &U::EXPR))) {
+            (_, Some(crate::tree::Moved::Quotient(head, num, under, den))) => {
+                return defmt::write!(
+                    f,
+                    "{} {=str}{=str}/{=str}{=str}",
+                    self.value,
+                    head,
+                    num,
+                    under,
+                    den
+                );
+            }
+            (UnitExpr::Named { symbol, .. }, Some(crate::tree::Moved::Inside(p))) => {
+                return defmt::write!(f, "{} {=str}{=str}", self.value, p.symbol(), *symbol);
+            }
+            (_, Some(crate::tree::Moved::Litre(litres, rest))) => {
+                return defmt::write!(f, "{} {=str}{=str}", self.value, litres, rest);
+            }
+            _ => {}
         }
         match U::EXPR {
             UnitExpr::Named { symbol: "", .. } if P::RUNTIME.is_some() => {

@@ -443,6 +443,46 @@ fn prefixed_units_agree() {
     }
 }
 
+/// A scale on a quotient reads the same from a type's tree, the wire's and the owned one, a `Per` as well as a marker.
+#[test]
+fn quotients_agree() {
+    static PER_M: UnitExpr =
+        UnitExpr::Div(<units::Volt as Unit>::EXPR, <units::Meter as Unit>::EXPR);
+    static LOSS: UnitExpr =
+        UnitExpr::Div(<units::Decibel as Unit>::EXPR, <units::Meter as Unit>::EXPR);
+    static PER_M2: UnitExpr = UnitExpr::Div(
+        <units::Watt as Unit>::EXPR,
+        &UnitExpr::Pow(<units::Meter as Unit>::EXPR, 2),
+    );
+
+    for expr in [&PER_M, &LOSS, &PER_M2] {
+        let owned = SIExprOwned::from(expr);
+        let bytes = owned.to_ww_bytes_owned().unwrap();
+        let wire = SIExpr::from_ww_bytes(&bytes).unwrap();
+        for prefix in (-63..=63).filter_map(Prefix::from_pow10) {
+            let typed = prefixed(prefix, &expr);
+            assert_eq!(prefixed(prefix, &&owned), typed);
+            assert_eq!(prefixed(prefix, &wire), typed);
+        }
+    }
+    assert_eq!(prefixed(Prefix::Milli, &&PER_M), " mV/m");
+    assert_eq!(prefixed(Prefix::Hecto, &&PER_M), " V/cm");
+    assert_eq!(prefixed(Prefix::Milli, &&LOSS), " dB/km");
+    assert_eq!(prefixed(Prefix::Deca, &&PER_M2), " mW/cm²");
+
+    // nothing says this `m` is a metre
+    let not_a_metre = SIExprOwned::Div(
+        Box::new(SIExprOwned::from(<units::Decibel as Unit>::EXPR)),
+        Box::new(SIExprOwned::Named {
+            name: "m".into(),
+            symbol: "m".into(),
+            dim: Dim::ONE.into(),
+            scale: Scale::Coherent,
+        }),
+    );
+    assert_eq!(prefixed(Prefix::Milli, &&not_a_metre), " m(dB/m)");
+}
+
 /// Metres to a power in a tree: `UnitExpr::Pow` takes the prefix inside as a named symbol does, a parenthesis in front
 /// or another unit keeps it outside, and a part known by name only is not known to be a metre.
 #[test]

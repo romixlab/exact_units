@@ -171,10 +171,10 @@ crate::unit! {
     pub struct Meter = "m", [m 1];
 
     /// Length in kilometers, km: a fibre's own unit, so `Per<Loss<Decibel>, Kilometre>` reads as it prints,
-    /// "dB/km" (0.2 dB/km at 1550 nm is typical). A unit of its own, not `Meter` in a prefixed scale: the `with_unit`
-    /// text always writes a value in a unit's bare symbol ([write_unit](crate::tree::write_unit) with
-    /// [Prefix::Unit](crate::Prefix::Unit)), never moving an SI prefix onto a plain metre inside a quotient, so
-    /// "dB/km" needs its own marker, as [Litre] already does for volume.
+    /// "dB/km" (0.2 dB/km at 1550 nm is typical). A unit of its own, not `Meter` in a prefixed scale: `{}` of a
+    /// `Per<Loss<Decibel>, Meter>` in `Milli` writes `dB/km` too, but `{:#}` and the `with_unit` text write a value in
+    /// a unit's bare symbol ([write_unit](crate::tree::write_unit) with [Prefix::Unit](crate::Prefix::Unit)), so
+    /// "dB/km" there needs its own marker, as [Litre] already does for volume.
     #[cfg(feature = "mechanical")]
     pub struct Kilometre = "km", [m 1], Exact(1000 / 1);
 
@@ -265,7 +265,8 @@ crate::unit! {
     pub struct Wavenumber = "m⁻¹", [m -1];
 
     /// Density, mass density or mass concentration in kilograms per cubic meter, kg/m³ (SI Brochure, 9th ed.,
-    /// table 5); g/L is the same unit.
+    /// table 5); g/L is the same unit. A scale is written per litre from 10⁻¹² to 10³, `5 mg/L` for `Milli`; for
+    /// `µg/m³` spell the unit `Per<Gram, Volume>`.
     #[cfg(feature = "mechanical")]
     pub struct Density = "kg/m³", [kg 1, m -3];
 
