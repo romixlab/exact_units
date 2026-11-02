@@ -273,7 +273,7 @@ mod tests {
         }
 
         #[test]
-        fn from_f64_near_whole(i in crate::strategy::i64(), d in -2i32..=2, f in proptest::sample::select(&[0.0, 0.5, 0.25][..])) {
+        fn from_f64_near_whole(i in strategy::i64(), d in -2i32..=2, f in proptest::sample::select(&[0.0, 0.5, 0.25][..])) {
             let x = i as f64 + f64::from(d) + f;
             super::from_f64::<i8>(x);
             super::from_f64::<i16>(x);

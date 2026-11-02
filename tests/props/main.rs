@@ -18,6 +18,7 @@ mod no_panic;
 mod numeric;
 #[cfg(not(kani))]
 mod panics;
+mod point;
 mod reference;
 mod rounding;
 #[cfg(all(not(kani), feature = "serde", feature = "std", feature = "shrink_wrap"))]

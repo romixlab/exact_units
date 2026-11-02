@@ -60,7 +60,7 @@ mod time {
         );
         assert_eq!(
             t.to::<UnixEpoch, Nano, u64>(),
-            Some(UnixNanos::from_raw(1_700_000_000_123_000_000))
+            Some(UnixNanos::<u64>::from_raw(1_700_000_000_123_000_000))
         );
         // not a whole second
         assert_eq!(t.to::<UnixEpoch, One, u64>(), None);
@@ -429,6 +429,59 @@ mod angle {
         assert_eq!((Deg::from_raw(350.0) + Fixed::new(20.0)).raw(), 10.0);
     }
 
+    crate::scale! {
+        /// Steps of π/180 over the radian: a degree, as a scale of radians.
+        pub(super) struct DegStep = "", Exact(1 / 180, pi 1);
+    }
+
+    crate::origin! {
+        /// An angle from a zero of its own that doesn't wrap.
+        struct Bearing { unit: Radian, symbol: "rad", offset: Offset::ZERO }
+    }
+
+    #[test]
+    fn float_angles_across_an_irrational_factor() {
+        use core::f64::consts::{FRAC_PI_2, PI};
+        type Rad = Point<Bearing, Fixed<Radian, One, f64>>;
+        type Deg = Point<Bearing, Fixed<Radian, DegStep, f64>>;
+        let rad = |d: f64| Deg::from_raw(d).to::<Bearing, One, f64>().map(Point::raw);
+        assert_eq!(rad(0.0), Some(0.0));
+        assert!((rad(180.0).unwrap() - PI).abs() < 1e-12);
+        assert!((rad(90.0).unwrap() - FRAC_PI_2).abs() < 1e-12);
+        assert!((rad(-90.0).unwrap() + FRAC_PI_2).abs() < 1e-12);
+        // back: radians to steps of a degree
+        let deg = |r: f64| {
+            Rad::from_raw(r)
+                .to::<Bearing, DegStep, f64>()
+                .map(Point::raw)
+        };
+        assert!((deg(PI).unwrap() - 180.0).abs() < 1e-9);
+        assert!((deg(-FRAC_PI_2).unwrap() + 90.0).abs() < 1e-9);
+        assert_eq!(deg(0.0), Some(0.0));
+        // an integer storage can't cross the factor with π: a float one can, from integers too
+        type IntDeg = Point<Bearing, Fixed<Radian, DegStep, i32>>;
+        let r = IntDeg::from_raw(180)
+            .to::<Bearing, One, f64>()
+            .map(Point::raw)
+            .unwrap();
+        assert!((r - PI).abs() < 1e-12);
+    }
+
+    #[test]
+    fn float_angles_wrap_negative_numbers() {
+        type Deg = Point<Angle<Degree>, Fixed<Degree, One, f64>>;
+        let same = |d: f64| {
+            Deg::from_raw(d)
+                .to::<Angle<Degree>, One, f64>()
+                .map(Point::raw)
+        };
+        assert_eq!(same(-90.0), Some(270.0));
+        assert_eq!(same(0.0), Some(0.0));
+        assert_eq!(same(359.5), Some(359.5));
+        assert_eq!(same(-360.0).map(|x| x == 0.0), Some(true));
+        assert_eq!(same(450.0), Some(90.0));
+    }
+
     crate::origin! {
         /// An encoder's index pulse: an angle reference of its own.
         struct EncoderIndex {
@@ -471,4 +524,71 @@ fn equality_tells_points_apart() {
         p.partial_cmp(&P::from_raw(6)),
         Some(core::cmp::Ordering::Less)
     );
+}
+
+#[cfg(feature = "thermal")]
+#[test]
+fn checked_steps_and_differences_have_results() {
+    use crate::origins::Celsius;
+    use crate::units::Kelvin;
+    type DegC = Point<Celsius, Fixed<Kelvin, Centi, i16>>;
+    type UDegC = Point<Celsius, Fixed<Kelvin, Centi, u16>>;
+    let t = DegC::from_raw(2500);
+    assert_eq!(t.checked_sub(Fixed::new(500)), Some(DegC::from_raw(2000)));
+    assert_eq!(t.checked_add(Fixed::new(500)), Some(DegC::from_raw(3000)));
+    assert_eq!(
+        t.checked_sub(Fixed::new(i16::MAX)),
+        Some(DegC::from_raw(2500 - i16::MAX))
+    );
+    assert_eq!(
+        DegC::from_raw(-2500).checked_sub(Fixed::new(i16::MAX)),
+        None
+    );
+    assert_eq!(
+        t.checked_diff(DegC::from_raw(500)).map(Fixed::get),
+        Some(2000)
+    );
+    assert_eq!(
+        DegC::from_raw(500).checked_diff(t).map(Fixed::get),
+        Some(-2000)
+    );
+    assert_eq!(t.checked_diff(t).map(Fixed::get), Some(0));
+    // an unsigned storage below the subtrahend, and the other way
+    let u = UDegC::from_raw(10);
+    assert_eq!(u.checked_sub(Fixed::new(10)), Some(UDegC::from_raw(0)));
+    assert_eq!(u.checked_sub(Fixed::new(11)), None);
+    assert_eq!(u.checked_diff(UDegC::from_raw(10)).map(Fixed::get), Some(0));
+    assert_eq!(u.checked_diff(UDegC::from_raw(4)).map(Fixed::get), Some(6));
+    assert_eq!(UDegC::from_raw(4).checked_diff(u), None);
+    // floats: finite results only
+    type FDegC = Point<Celsius, Fixed<Kelvin, One, f32>>;
+    let f = FDegC::from_raw(1.5);
+    assert_eq!(f.checked_sub(Fixed::new(0.5)), Some(FDegC::from_raw(1.0)));
+    assert_eq!(
+        f.checked_diff(FDegC::from_raw(0.5)).map(Fixed::get),
+        Some(1.0)
+    );
+    assert_eq!(f.checked_sub(Fixed::new(f32::INFINITY)), None);
+    assert_eq!(f.checked_diff(FDegC::from_raw(f32::NAN)), None);
+}
+
+#[cfg(all(feature = "time", feature = "angle"))]
+#[test]
+fn display_where_the_ratio_does_not_fit() {
+    use crate::origins::{Angle, UnixNanos};
+    use crate::units::Radian;
+    // a u64 count of nanoseconds that an f64 can't hold, shown exactly
+    assert_eq!(
+        UnixNanos::<u64>::from_raw(1_700_000_000_123_456_789).to_string(),
+        "1700000000.123456789 s UTC"
+    );
+    assert_eq!(
+        UnixNanos::<u64>::from_raw(u64::MAX).to_string(),
+        "18446744073.709551615 s UTC"
+    );
+    // an integer storage over an irrational step: the nearest float
+    type P = Point<Angle<Radian>, Fixed<Radian, angle::DegStep, i16>>;
+    assert_eq!(P::from_raw(90).to_string(), "1.5707963267948966 rad");
+    assert_eq!(P::from_raw(-90).to_string(), "-1.5707963267948966 rad");
+    assert_eq!(P::from_raw(0).to_string(), "0 rad");
 }
