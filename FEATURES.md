@@ -173,6 +173,17 @@ counted units, and the kinds that keep look-alike quantities apart.
   unit's other spellings (`nit`, `nt`), read by `serde::with_unit` too (42d53d7).
 - 📋 **UNIT-6 More counted units** (was STD-69) · `v0.5` — Symbol (baud = Symbol/s), Packet, Pulse, Event, Tick, Chunk, Particle,
   each a dimension of its own; `AVOGADRO` bridges `Particle` and mol exactly.
+- 📋 **UNIT-7 The unit's identity and data form** · `foundations` — `UnitDef` per named unit with `UnitId { crate_name,
+  name }`; `Scale` becomes `Magnitude` alone (no `Affine`, no `DegreeCelsius`); every type-level concept has a const
+  data form with a (crate, name) identity and the same checks at run time (napier, `ww`); `SIExpr` carries the crate and
+  gets a catch-all. P2401#3nov-0046, design: P2401 `design/foundations-review.md` §1.
+- 📋 **UNIT-8 Quantity specs: the ISQ hierarchy** · `foundations` — `QuantitySpec` / `QuantityDef` (parent, kind root,
+  character), `quantity!`, `Of<Q, U>` in the unit slot, `QuantityExpr` replacing `Kind`: up the tree implicit, down by a
+  named step, siblings and other kinds refused, `+` to the nearest common ancestor, products `Derived`. The foundation
+  of UNIT-2. P2401#3nov-0046b, design: P2401 `design/foundations-review.md` §2.
+- 📋 **UNIT-9 Dimension systems** · `foundations` — `Dim` as positional exponents with a system tag and a `SystemDef`;
+  `np` and `np_loss` as fixed SI bases; `Natural` (ħ = c = 1) with exact bridges from the 2019 constants, Gaussian / ESU
+  / EMU later as a `SystemDef`. P2401#3nov-0047, design: P2401 `design/foundations-review.md` §3.
 
 ## Points and origins (`PT`)
 
@@ -195,6 +206,10 @@ and clocks with a named epoch.
   through its existing `origins` re-export (feature `time`). Docs: [points](std_library/points.md#origins).
 - 📋 **PT-3 Instants and clocks with named epochs** (was STD-65) · `v0.5` — `Instant<Clock, ..>`: device-monotonic, Unix, TAI, GPS
   (TAI − 19 s), UTC through a versioned leap-second table on hosts; GPS week rollover as a `Seq` modulo 1024.
+- 📋 **PT-4 Time scales as references** · `foundations` — `ReferenceDef` (exact, run time, time scale); `TaiScale`,
+  `PosixScale`, `DeviceMonotonic`; `UnixEpoch` moves off `UnitZero`; within a scale exact at compile time, across
+  through a `LeapTable` at run time. The foundation of PT-3. P2401#3nov-0047c, design: P2401
+  `design/foundations-review.md` §5.
 
 ## Levels (`LVL`)
 
@@ -249,6 +264,10 @@ non-linear named scales.
 - 📋 **LVL-5 Complex level rates** (was STD-98) — `Level` / `LossLevel` and the rate forms of LVL-3 on `Complex` and
   `Polar` quantities (a complex gain or loss, S-parameters and transfer functions as levels with a rate), once
   LVL-3's remaining pieces land.
+- 📋 **LVL-6 Codecs: non-linear encodings beside `Fixed`** · `foundations` — `Coded<C, V>` with the bytes of the raw
+  number, `Codec`, `CodecDef` as data (μ-law, A-law, gamma, exp, table), composing with `Niched`; a `Curve` trait for
+  named conversions. The foundation of LVL-4 and of IO-3's SFLOAT. P2401#3nov-0047d, design: P2401
+  `design/foundations-review.md` §6.
 
 ## Complex quantities (`CPX`)
 
@@ -336,6 +355,10 @@ the command line, databases, Arrow.
   refusing what IO-5 refuses. Later, optional feature.
 - 📋 **IO-8 Unit metadata in Arrow and Polars** (was STD-82) — a column's unit and scale as Arrow field metadata, read back
   exactly, Polars through it. Later, optional feature.
+- 📋 **IO-9 Unit names, a registry and notations** · `foundations` — `UnitNames` (Unicode and ASCII symbol, long name,
+  aliases, UCUM code, `PrefixPolicy`), a `Registry` over static tables without a global, parsing with an expected
+  dimension that refuses an ambiguous reading, `Notation` (Unicode, ASCII, UCUM, Typst). The foundation of IO-4, IO-2,
+  IO-5, IO-7. P2401#3nov-0047b, design: P2401 `design/foundations-review.md` §4.
 
 ## Dropped and superseded
 
