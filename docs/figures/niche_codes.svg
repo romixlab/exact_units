@@ -1,0 +1,26 @@
+<svg class="eu-svg" viewBox="0 0 640 170" width="640" height="170" role="img" aria-label="The u8 of J1939 coolant temperature: 0 to 250 are values, 0 and 250 rails, 251 to 253 reserved, 0xFE error, 0xFF not available" xmlns="http://www.w3.org/2000/svg">
+  <text x="220" y="34" text-anchor="middle" class="green">0 ..= 250: Reading::Value, −40 ..= 210 °C</text>
+  <rect x="40" y="50" width="360" height="22" rx="2" class="green" style="opacity:0.35"/>
+  <line x1="40" y1="72" x2="400" y2="72" class="line"/>
+  <line x1="40" y1="44" x2="40" y2="80" class="thin"/>
+  <line x1="400" y1="44" x2="400" y2="80" class="thin"/>
+  <text x="40" y="96" text-anchor="middle" class="mono">0</text>
+  <text x="400" y="96" text-anchor="middle" class="mono">250</text>
+  <circle cx="40" cy="61" r="5" class="accent"/>
+  <circle cx="400" cy="61" r="5" class="accent"/>
+  <text x="40" y="118" class="soft">rail: AtMost(−40 °C)</text>
+  <text x="400" y="118" text-anchor="end" class="soft">rail: AtLeast(210 °C)</text>
+  <line x1="412" y1="54" x2="420" y2="68" class="thin"/>
+  <line x1="418" y1="54" x2="426" y2="68" class="thin"/>
+  <rect x="436" y="50" width="66" height="22" rx="2" class="faint"/>
+  <text x="469" y="65" text-anchor="middle" class="mono">251..=253</text>
+  <rect x="510" y="50" width="44" height="22" rx="2" class="accent" style="opacity:0.35"/>
+  <text x="532" y="65" text-anchor="middle" class="mono">0xFE</text>
+  <rect x="562" y="50" width="44" height="22" rx="2" class="blue" style="opacity:0.35"/>
+  <text x="584" y="65" text-anchor="middle" class="mono">0xFF</text>
+  <text x="469" y="96" text-anchor="middle" class="soft">Reserved(c)</text>
+  <text x="532" y="96" text-anchor="middle" class="accent">Error</text>
+  <text x="584" y="96" text-anchor="middle" class="blue">NotAvail.</text>
+  <text x="521" y="34" text-anchor="middle" class="soft">Reading::Niche: no value</text>
+  <text x="40" y="152" class="soft">One byte in memory and on the wire: get() decodes it, the code goes back unchanged.</text>
+</svg>

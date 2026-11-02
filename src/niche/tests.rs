@@ -5,6 +5,7 @@ use crate::prefix::{One, Pow2, Rational};
 use crate::units::{Kelvin, Ratio, Volt};
 use crate::{Fixed, Offset, OutOfBounds, Point, Range, Saturating, origin, origins::Celsius};
 use core::mem::size_of;
+use std::format;
 
 type Pct = Fixed<Ratio, One, u8, Range<0, 250>>;
 type Load = Niched<Pct, J1939U8>;

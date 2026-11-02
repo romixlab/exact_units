@@ -1,7 +1,7 @@
-//! Niche codes next to [Bounds](crate::Bounds): raw values a protocol reserves for a meaning other than a number
+//! Niche codes next to [Bounds]: raw values a protocol reserves for a meaning other than a number
 //! (not available, error, not implemented, null), and rail marks for a value clipped at an end of its range.
 //!
-//! - [Niched]`<V, N>`: a value `V` ([Fixed](crate::Fixed) or [Point](crate::Point)) or one of the codes of `N`, in
+//! - [Niched]`<V, N>`: a value `V` ([Fixed] or [Point]) or one of the codes of `N`, in
 //!   memory and on the wire the raw storage alone (`size_of` is the storage's). [get](Niched::get) answers a
 //!   [Reading]: the value, or the meaning of the code, never the code as a value.
 //! - [Niches]: the codes and their meanings, declared with [niches!](crate::niches): a single code or a code range

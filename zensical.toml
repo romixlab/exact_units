@@ -33,6 +33,7 @@ nav = [
                     "maths/rounding.md",
                     "maths/overflow.md",
                     "maths/kinds.md",
+                    "maths/niches.md",
                 ]
             },
         ]
