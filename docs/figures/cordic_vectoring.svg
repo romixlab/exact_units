@@ -1,28 +1,27 @@
 <svg class="eu-svg" viewBox="0 0 620 300" width="620" height="300" role="img" aria-label="CORDIC turns a vector onto the x axis in steps of arctan 2 to the -i; the angles add up to the vector's angle" xmlns="http://www.w3.org/2000/svg">
-  <defs><marker id="eu-arrow-cordic" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" class="accent"/></marker></defs>
+  <defs><marker id="eu-arrow-cordic" viewBox="0 0 5 5" markerUnits="userSpaceOnUse" refX="4.2" refY="2.5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L5 2.5 L0 5 z" class="accent"/></marker></defs>
   <line x1="40" y1="250" x2="360.0" y2="250" class="thin"/>
   <line x1="60" y1="270" x2="60" y2="32.5" class="thin"/>
   <text x="364.0" y="254" class="soft">x</text>
   <text x="56" y="26.5" text-anchor="end" class="soft">y</text>
-  <line x1="60" y1="250" x2="112.5" y2="130.0" class="accent-line" style="stroke-width:2"/>
-  <line x1="60" y1="250" x2="232.5" y2="182.5" class="thin" style=""/>
-  <line x1="60" y1="250" x2="266.2" y2="268.8" class="thin" style=""/>
-  <line x1="60" y1="250" x2="270.9" y2="217.2" class="thin" style=""/>
-  <line x1="60" y1="250" x2="275.0" y2="243.6" class="thin" style=""/>
-  <line x1="60" y1="250" x2="275.4" y2="257.0" class="thin" style=""/>
-  <line x1="60" y1="250" x2="275.7" y2="250.3" class="thin" style=""/>
-  <line x1="60" y1="250" x2="275.7" y2="246.9" class="thin" style=""/>
-  <path d="M112.5 130.0 L232.5 182.5" class="accent-line" style="stroke-width:1.6" marker-end="url(#eu-arrow-cordic)"/>
-  <path d="M232.5 182.5 L266.2 268.8" class="accent-line" style="stroke-width:1.6" marker-end="url(#eu-arrow-cordic)"/>
-  <path d="M266.2 268.8 L270.9 217.2" class="accent-line" style="stroke-width:1.6" marker-end="url(#eu-arrow-cordic)"/>
-  <path d="M270.9 217.2 L275.0 243.6" class="accent-line" style="stroke-width:1.6" marker-end="url(#eu-arrow-cordic)"/>
-  <path d="M275.0 243.6 L275.4 257.0" class="accent-line" style="stroke-width:1.6" marker-end="url(#eu-arrow-cordic)"/>
-  <path d="M275.4 257.0 L275.7 250.3" class="accent-line" style="stroke-width:1.6" marker-end="url(#eu-arrow-cordic)"/>
-  <path d="M275.7 250.3 L275.7 246.9" class="accent-line" style="stroke-width:1.6" marker-end="url(#eu-arrow-cordic)"/>
-  <text x="120.5" y="126.0" class="mono soft" style="font-size:11px">0</text>
-  <text x="240.5" y="178.5" class="mono soft" style="font-size:11px">1</text>
-  <text x="274.2" y="264.8" class="mono soft" style="font-size:11px">2</text>
-  <text x="278.9" y="213.2" class="mono soft" style="font-size:11px">3</text>
+  <line x1="60" y1="250" x2="112.4" y2="130.0" class="accent-line" style="stroke-width:2"/>
+  <line x1="60" y1="250" x2="232.5" y2="182.4" class="thin"/>
+  <line x1="60" y1="250" x2="266.3" y2="268.6" class="thin"/>
+  <line x1="60" y1="250" x2="270.9" y2="217.1" class="thin"/>
+  <line x1="60" y1="250" x2="286.2" y2="243.1" class="thin" style="opacity:0.7"/>
+  <line x1="60" y1="250" x2="299.8" y2="257.7" class="thin" style="opacity:0.55"/>
+  <line x1="60" y1="250" x2="314.3" y2="250.2" class="thin" style="opacity:0.45"/>
+  <path d="M114.7 131.0 L230.2 181.4" class="accent-line" style="stroke-width:1.6" marker-end="url(#eu-arrow-cordic)"/>
+  <path d="M233.4 184.7 L265.4 266.3" class="accent-line" style="stroke-width:1.6" marker-end="url(#eu-arrow-cordic)"/>
+  <path d="M266.5 266.2 L270.7 219.6" class="accent-line" style="stroke-width:1.6" marker-end="url(#eu-arrow-cordic)"/>
+  <path d="M272.2 219.2 L284.9 240.9" class="accent-line" style="stroke-width:1.6" marker-end="url(#eu-arrow-cordic)"/>
+  <path d="M287.9 244.9 L298.1 255.8" class="accent-line" style="stroke-width:1.4;opacity:0.7" marker-end="url(#eu-arrow-cordic)"/>
+  <path d="M302.0 256.5 L312.1 251.3" class="accent-line" style="stroke-width:1.4;opacity:0.55" marker-end="url(#eu-arrow-cordic)"/>
+  <path d="M316.7 249.5 L327.1 246.6" class="accent-line" style="stroke-width:1.4;opacity:0.45" marker-end="url(#eu-arrow-cordic)"/>
+  <text x="120.4" y="126.0" class="mono soft" style="font-size:11px">0</text>
+  <text x="240.5" y="178.4" class="mono soft" style="font-size:11px">1</text>
+  <text x="274.3" y="264.6" class="mono soft" style="font-size:11px">2</text>
+  <text x="278.9" y="213.1" class="mono soft" style="font-size:11px">3</text>
   <text x="380" y="70" class="">Each step i turns by ±arctan 2⁻ⁱ:</text>
   <text x="380" y="90" class="soft">45°, 26.6°, 14.0°, 7.1°, …</text>
   <text x="380" y="130" class="">a shift and an add, no multiply</text>
