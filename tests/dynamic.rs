@@ -1,6 +1,11 @@
 //! Units known only at run time (STD-37): `Dim` and `Scale` on the wire, `SIExpr`; golden bytes and round trips,
 //! and that each is shown like the typed unit it maps onto.
 #![cfg(all(feature = "std", feature = "quantities"))]
+#![expect(clippy::panic, reason = "a test fails by panicking")]
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "a test counts tree levels far below usize::MAX"
+)]
 
 use core::fmt;
 use exact_units::units::{self, AngularVelocity, Per, Times, Torque};
@@ -471,4 +476,256 @@ fn prefixes_on_trees() {
         scale: Scale::Coherent,
     };
     assert_eq!(prefixed(Prefix::Micro, &&name_only), " µ(m³)");
+}
+
+/// Volt as an owned tree, its name, symbol, dimension and scale changed by `f`.
+fn volt_with(
+    f: impl FnOnce(&mut String, &mut String, &mut Dim<'static>, &mut Scale),
+) -> SIExprOwned {
+    let UnitExpr::Named {
+        name,
+        symbol,
+        mut dim,
+        mut scale,
+        ..
+    } = *<units::Volt as Unit>::EXPR
+    else {
+        panic!("Volt is a named unit")
+    };
+    let (mut name, mut symbol) = (name.to_string(), symbol.to_string());
+    f(&mut name, &mut symbol, &mut dim, &mut scale);
+    SIExprOwned::Named {
+        name,
+        symbol,
+        dim: dim.into(),
+        scale,
+    }
+}
+
+/// A named unit read from the wire is a known unit only when all of it matches: one that differs from Volt in one
+/// part (a forged or mistaken description) is neither `==` Volt nor `known()`, owned or decoded.
+#[test]
+fn forged_named_units() {
+    let volt = <units::Volt as Unit>::EXPR;
+    let ampere = <units::Ampere as Unit>::EXPR;
+    let real = volt_with(|_, _, _, _| {});
+    assert_eq!(real, *volt);
+    assert_eq!(real.known(), Some(volt));
+    let forged = [
+        volt_with(|n, _, _, _| *n = "Volts".into()),
+        volt_with(|_, s, _, _| *s = "A".into()),
+        volt_with(|_, _, d, _| *d = <units::Ampere as Unit>::DIM),
+        volt_with(|_, _, _, c| *c = Scale::Pow10(-3)),
+        SIExprOwned::from(ampere),
+    ];
+    for f in &forged {
+        assert_ne!(*f, *volt, "{f:?}");
+        assert_eq!(f.known().filter(|k| *k == volt), None, "{f:?}");
+        let bytes = f.to_ww_bytes_owned().unwrap();
+        let decoded = SIExpr::from_ww_bytes(&bytes).unwrap();
+        assert_ne!(decoded, *volt, "{f:?}");
+        assert_eq!(decoded.known().filter(|k| *k == volt), None, "{f:?}");
+        let owned = SIExprOwned::from_ww_bytes_owned(&bytes).unwrap();
+        assert_ne!(owned, *volt, "{f:?}");
+        assert_eq!(owned.known().filter(|k| *k == volt), None, "{f:?}");
+    }
+    // Volt's name on Ampere's description is not a known unit at all
+    let renamed = SIExprOwned::from(ampere);
+    let SIExprOwned::Named {
+        symbol, dim, scale, ..
+    } = renamed
+    else {
+        panic!("Ampere is a named unit")
+    };
+    let renamed = SIExprOwned::Named {
+        name: "Volt".into(),
+        symbol,
+        dim,
+        scale,
+    };
+    assert_eq!(renamed.known(), None);
+    let bytes = renamed.to_ww_bytes_owned().unwrap();
+    assert_eq!(SIExpr::from_ww_bytes(&bytes).unwrap().known(), None);
+    // a compound unit is never a known named unit
+    let per = SIExprOwned::Div(Box::new(real.clone()), Box::new(real.clone()));
+    assert_eq!(per.known(), None);
+}
+
+/// Compound trees are the same only in the same shape: the same exponent, the same operator, the same order.
+#[test]
+fn compound_shapes() {
+    let m = || SIExprOwned::from(<units::Meter as Unit>::EXPR);
+    let s = || SIExprOwned::from(<units::Second as Unit>::EXPR);
+    let square: &'static UnitExpr =
+        Box::leak(Box::new(UnitExpr::Pow(<units::Meter as Unit>::EXPR, 2)));
+    let speed: &'static UnitExpr = Box::leak(Box::new(UnitExpr::Div(
+        <units::Meter as Unit>::EXPR,
+        <units::Second as Unit>::EXPR,
+    )));
+    let root: &'static UnitExpr = Box::leak(Box::new(UnitExpr::Sqrt(<units::Meter as Unit>::EXPR)));
+    let cube = SIExprOwned::Pow(Box::new(m()), 3);
+    let cases = [
+        (SIExprOwned::Pow(Box::new(m()), 2), square, true),
+        (cube, square, false),
+        (SIExprOwned::Pow(Box::new(s()), 2), square, false),
+        (SIExprOwned::Div(Box::new(m()), Box::new(s())), speed, true),
+        (SIExprOwned::Mul(Box::new(m()), Box::new(s())), speed, false),
+        (SIExprOwned::Div(Box::new(s()), Box::new(m())), speed, false),
+        (SIExprOwned::Div(Box::new(m()), Box::new(m())), speed, false),
+        (SIExprOwned::Sqrt(Box::new(m())), root, true),
+        (SIExprOwned::Sqrt(Box::new(s())), root, false),
+        (m(), root, false),
+    ];
+    for (e, typed, same) in cases {
+        assert_eq!(e == *typed, same, "{e:?}");
+        let bytes = e.to_ww_bytes_owned().unwrap();
+        assert_eq!(
+            SIExpr::from_ww_bytes(&bytes).unwrap() == *typed,
+            same,
+            "{e:?}"
+        );
+    }
+}
+
+/// A ratio as a typed unit: no symbol, dimensionless, coherent.
+static RATIO: UnitExpr = UnitExpr::Named {
+    name: "Ratio",
+    symbol: "",
+    dim: Dim::ONE,
+    scale: Scale::Coherent,
+    provenance: exact_units::Provenance::Defined,
+};
+
+/// `RATIO` in `levels` levels of the tree `wrap` makes, as a typed tree.
+fn deep_typed(levels: usize, wrap: fn(&'static UnitExpr) -> UnitExpr) -> &'static UnitExpr {
+    let mut e = &RATIO;
+    for _ in 1..levels {
+        e = Box::leak(Box::new(wrap(e)));
+    }
+    e
+}
+
+/// Past [MAX_UNIT_DEPTH] every walk stops, whatever the nodes: two equal trees that deep are not the same unit, have
+/// no magnitude, are not ratios and are written with `…`; a tree of [MAX_UNIT_DEPTH] levels is all of these.
+#[test]
+fn depth_limit_every_node() {
+    let wraps: [fn(&'static UnitExpr) -> UnitExpr; 6] = [
+        |e| UnitExpr::Pow(e, 1),
+        |e| UnitExpr::Mul(e, &RATIO),
+        |e| UnitExpr::Div(e, &RATIO),
+        // the deep side on the right: each child counts its own level
+        |e| UnitExpr::Mul(&RATIO, e),
+        |e| UnitExpr::Div(&RATIO, e),
+        UnitExpr::Sqrt,
+    ];
+    for wrap in wraps {
+        for levels in [MAX_UNIT_DEPTH, MAX_UNIT_DEPTH + 1] {
+            let typed = deep_typed(levels, wrap);
+            let within = levels <= MAX_UNIT_DEPTH;
+            let owned = SIExprOwned::from(typed);
+            let bytes = owned.to_ww_bytes_owned().unwrap();
+            let decoded = SIExpr::from_ww_bytes(&bytes).unwrap();
+            assert_eq!(owned == *typed, within, "{levels}: {owned}");
+            assert_eq!(decoded == *typed, within, "{levels}: {decoded}");
+            assert_eq!(tree::same(&decoded, &&owned), within, "{levels}: {decoded}");
+            assert_eq!(decoded.magnitude().is_some(), within, "{levels}: {decoded}");
+            assert_eq!(owned.magnitude().is_some(), within, "{levels}: {owned}");
+            assert_eq!(tree::is_ratio(&decoded), within, "{levels}: {decoded}");
+            assert_eq!(decoded.factor().is_some(), within, "{levels}: {decoded}");
+            assert_eq!(decoded.dim().is_some(), within, "{levels}: {decoded}");
+            let shown = (decoded.to_string(), decoded.name().to_string());
+            assert_eq!(!shown.0.contains('…'), within, "{levels}: {shown:?}");
+            assert_eq!(!shown.1.contains('…'), within, "{levels}: {shown:?}");
+        }
+    }
+}
+
+/// The `Pow` levels above the first named unit of an owned tree, and that unit's name.
+fn pow_levels(mut e: &SIExprOwned) -> (usize, &str) {
+    let mut levels = 0;
+    while let SIExprOwned::Pow(a, _) = e {
+        levels += 1;
+        e = a;
+    }
+    let SIExprOwned::Named { name, .. } = e else {
+        panic!("a chain of Pow over a named unit")
+    };
+    (levels, name)
+}
+
+/// A tree read from the wire becomes owned only up to [MAX_UNIT_DEPTH] levels, the rest is the unknown unit `?`:
+/// however deep the bytes, the owned tree a client keeps is bounded.
+#[test]
+fn owned_from_wire_stops_at_the_limit() {
+    let volt = SIExprOwned::from(<units::Volt as Unit>::EXPR);
+    for levels in [MAX_UNIT_DEPTH - 1, MAX_UNIT_DEPTH, MAX_UNIT_DEPTH + 1, 100] {
+        let mut e = volt.clone();
+        for _ in 1..levels {
+            e = SIExprOwned::Pow(Box::new(e), 1);
+        }
+        let bytes = e.to_ww_bytes_owned().unwrap();
+        let owned = SIExprOwned::from(&SIExpr::from_ww_bytes(&bytes).unwrap());
+        let (pows, name) = pow_levels(&owned);
+        if levels <= MAX_UNIT_DEPTH {
+            assert_eq!((pows, name), (levels - 1, "Volt"));
+            assert_eq!(owned, e);
+        } else {
+            assert_eq!((pows, name), (MAX_UNIT_DEPTH, "?"));
+        }
+    }
+}
+
+/// Bytes outside what a type holds are refused on reading, borrowed and owned: an [exact_units::Index] past its
+/// bounds, a negative zero [exact_units::Offset], a dimension with its counted bases out of order or a root it
+/// doesn't need, and a unit tree with such a dimension.
+#[test]
+fn validate_refuses() {
+    use exact_units::{DimOwned, Index, Offset, Range};
+    type Slot = Index<units::Sample, u8, Range<0, 7>>;
+    let err = shrink_wrap::Error::SubtypeOutOfRange;
+    assert_eq!(Slot::from_ww_bytes(&[7]).unwrap().get(), 7);
+    assert_eq!(Slot::from_ww_bytes(&[8]).err(), Some(err));
+    assert_eq!(Slot::from_ww_bytes_owned(&[8]).err(), Some(err));
+
+    let mut buf = [0u8; 16];
+    let zero = Offset::ZERO.to_ww_bytes(&mut buf).unwrap().to_vec();
+    assert_eq!(zero, [0x00]);
+    assert_eq!(Offset::from_ww_bytes(&zero), Ok(Offset::ZERO));
+    // the sign bit set on zero
+    assert_eq!(Offset::from_ww_bytes(&[0x80]).err(), Some(err));
+    assert_eq!(Offset::from_ww_bytes_owned(&[0x80]).err(), Some(err));
+    let minus = Offset::new(true, Magnitude::ratio(1, 2));
+    let bytes = minus.to_ww_bytes(&mut buf).unwrap().to_vec();
+    assert_eq!(Offset::from_ww_bytes(&bytes), Ok(minus));
+
+    let counted = Dim::counted("exact_units", "Sample")
+        .mul(Dim::counted("exact_units", "Block"))
+        .div(Dim::counted("exact_units", "Frame"));
+    let mut unsorted = counted;
+    unsorted.counted.swap(0, 2);
+    let mut long = Dim::new(0, 2, 0, 0, 0, 0, 0);
+    long.root = true;
+    for bad in [unsorted, long] {
+        assert!(!bad.is_canonical());
+        let mut buf = [0u8; 128];
+        let bytes = bad.to_ww_bytes(&mut buf).unwrap().to_vec();
+        assert_eq!(Dim::from_ww_bytes(&bytes).err(), Some(err), "{bad:?}");
+        assert_eq!(
+            DimOwned::from_ww_bytes_owned(&bytes).err(),
+            Some(err),
+            "{bad:?}"
+        );
+        let unit = SIExprOwned::Named {
+            name: "Forged".into(),
+            symbol: "f".into(),
+            dim: bad.into(),
+            scale: Scale::Coherent,
+        };
+        let bytes = unit.to_ww_bytes_owned().unwrap();
+        assert!(SIExprOwned::from_ww_bytes_owned(&bytes).is_err(), "{bad:?}");
+        assert!(SIExpr::from_ww_bytes(&bytes).is_err(), "{bad:?}");
+    }
+    let mut buf = [0u8; 128];
+    let bytes = counted.to_ww_bytes(&mut buf).unwrap().to_vec();
+    assert_eq!(DimOwned::from_ww_bytes_owned(&bytes), Ok(counted.into()));
 }

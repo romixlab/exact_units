@@ -84,6 +84,21 @@ pub(crate) fn numbers(x: i16, y: u32) {
             "{x} decodes past its bounds"
         ),
     }
+    // a bounded index is the number on the wire too, read only within its bounds
+    type Slot = Index<Sample, u32, Range<0, 1000>>;
+    let mut buf = [0u8; 8];
+    #[expect(clippy::expect_used, reason = "a property fails by panicking")]
+    let bytes = y.to_ww_bytes(&mut buf).expect("encodes").to_vec();
+    match Slot::try_new(y) {
+        Ok(i) => {
+            round_trip(&i);
+            assert_eq!(Slot::from_ww_bytes(&bytes).ok(), Some(i));
+        }
+        Err(_) => assert!(
+            Slot::from_ww_bytes(&bytes).is_err(),
+            "index {y} decodes past its bounds"
+        ),
+    }
     let one = IndexFrom1::<Sample, u32>::try_new(y);
     if let Ok(i) = one {
         round_trip(&i);
@@ -321,13 +336,27 @@ pub(crate) fn si_expr(e: &Expr) {
     walk_owned(&owned);
 }
 
-/// Every walk of a decoded unit.
+/// Every walk of a decoded unit; its owned form is cut at `MAX_UNIT_DEPTH` levels however deep the bytes.
 fn walk(e: &SIExpr<'_>) {
     let _ = (e.to_string(), e.name().to_string(), e.symbol().to_string());
     let _ = (e.dim(), e.factor(), e.magnitude(), e.offset(), e.known());
     let _ = (tree::is_ratio(e), tree::same(e, e));
     let owned = SIExprOwned::from(e);
     let _ = owned.to_string();
+    let depth = owned_depth(&owned);
+    assert!(
+        depth <= exact_units::MAX_UNIT_DEPTH + 1,
+        "{depth} levels owned"
+    );
+}
+
+/// The nodes on the longest path from the root of an owned tree to a named unit.
+fn owned_depth(e: &SIExprOwned) -> usize {
+    match e {
+        SIExprOwned::Named { .. } => 1,
+        SIExprOwned::Mul(a, b) | SIExprOwned::Div(a, b) => 1 + owned_depth(a).max(owned_depth(b)),
+        SIExprOwned::Pow(a, _) | SIExprOwned::Sqrt(a) => 1 + owned_depth(a),
+    }
 }
 
 /// Every walk of an owned unit.
