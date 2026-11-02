@@ -98,6 +98,31 @@
 //! # }
 //! ```
 //!
+//! Medical ultrasound's own rate is frequency-scaled, α(f) = α₀·f, in dB per [CentimetreMegahertz] (soft tissue ≈
+//! 0.5): `α₀ · f` is [times_into](Fixed::times_into) then [convert](Fixed::convert) into a loss per length (cm·MHz
+//! divided by Hz is a length, by the product table's dimension rule), then [over](Fixed::over) a path length is the
+//! total loss. A power law α₀·f^y with y ≠ 1 is worked out in floats by the caller, not typed here.
+//!
+//! ```
+//! # #[cfg(all(feature = "levels", feature = "mechanical", feature = "time"))] {
+//! use exact_units::{Fixed, Rounding::NearestEven, prefix::{Centi, Deci, Mega, One}};
+//! use exact_units::units::{CentimetreMegahertz, Decibel, Hertz, Loss, Meter, Per};
+//!
+//! // soft tissue's 0.5 dB/(cm·MHz) at 5 MHz is 2.5 dB/cm
+//! let alpha0 = Fixed::<Per<Loss<Decibel>, CentimetreMegahertz>, Deci, i32>::new(5);
+//! let f = Fixed::<Hertz, Mega, i32>::new(5);
+//! let product = alpha0.times_into::<Hertz, Mega, _, Deci, i32>(f, NearestEven).unwrap();
+//! let alpha: Fixed<Per<Loss<Decibel>, Meter>, One, i32> = product.convert().unwrap();
+//! assert_eq!(alpha.get(), 250); // 2.5 dB/cm = 250 dB/m
+//!
+//! // through 4 cm one way, and back: a round trip of 20 dB
+//! let path = Fixed::<Meter, Centi, i32>::new(4);
+//! let one_way: Fixed<Loss<Decibel>, Deci, i32> = alpha.over(path).unwrap();
+//! assert_eq!(one_way.get(), 100); // 10.0 dB
+//! assert_eq!((one_way + one_way).get(), 200); // 20.0 dB
+//! # }
+//! ```
+//!
 //! A loss is not a gain, and a rate of a level is not a wavenumber:
 //!
 //! ```compile_fail
@@ -136,6 +161,18 @@
 //! let _ = Fixed::<Per<Neper, Second>, One, f32>::new(3.0).convert::<AngularVelocity, One, f32>();
 //! ```
 //!
+//! α(f) = α₀·f takes a frequency in hertz, not an angular velocity (a factor 2π lost, and cm·MHz / (rad/s) isn't a
+//! length):
+//!
+//! ```compile_fail
+//! # #[cfg(not(all(feature = "levels", feature = "mechanical", feature = "angle")))] compile_error!("needs levels, mechanical, angle");
+//! use exact_units::{Fixed, Rounding, prefix::One, units::{AngularVelocity, CentimetreMegahertz, Decibel, Loss, Meter, Per}};
+//! let alpha0 = Fixed::<Per<Loss<Decibel>, CentimetreMegahertz>, One, i32>::new(5);
+//! let omega = Fixed::<AngularVelocity, One, i32>::new(5);
+//! let product = alpha0.times_into::<AngularVelocity, One, _, One, i32>(omega, Rounding::NearestEven).unwrap();
+//! let _: Option<Fixed<Per<Loss<Decibel>, Meter>, One, i32>> = product.convert();
+//! ```
+//!
 //! An absorbance is a loss, and ln 10 isn't a fraction of integers, so an integer conversion to a depth names its
 //! rounding. A μ isn't a wavenumber either, however m⁻¹ it looks in SI:
 //!
@@ -165,11 +202,11 @@ pub use damping::DampingCoefficient;
 pub use damping::LogarithmicDecrement;
 
 use crate::complex::{ComplexStorage, Policy};
-#[cfg(feature = "mechanical")]
-use crate::units::Meter;
 #[cfg(feature = "chemical")]
 use crate::units::MolarCentimeter;
 use crate::units::{Absorbance, Decibel, DecibelLoss, Neper, NeperLoss, OpticalDepth, Per};
+#[cfg(feature = "mechanical")]
+use crate::units::{CentimetreMegahertz, Meter};
 use crate::{Dim, Fixed, Unit, Unlimited};
 
 /// The dimension of a level signed as a gain, [Neper]'s: the counted base `Neper` of this crate.
@@ -266,6 +303,12 @@ pub type LinearAttenuation = Per<OpticalDepth, Meter>;
 /// `T = 10^(−μ₁₀·x)`. A spectrometer's AU/cm is `Fixed<DecadicAttenuation, Hecto, _>`.
 #[cfg(feature = "mechanical")]
 pub type DecadicAttenuation = Per<Absorbance, Meter>;
+
+/// Medical ultrasound's frequency-scaled attenuation, α(f) = α₀·f, a loss per [CentimetreMegahertz] (soft tissue ≈
+/// 0.5 dB/(cm·MHz)). `α₀ · f` ([times_into](Fixed::times_into), then [convert](Fixed::convert)) is the loss per
+/// length at `f`: cm·MHz divided by hertz is a length, by the product table's dimension rule.
+#[cfg(feature = "mechanical")]
+pub type FrequencyScaledAttenuation = Per<DecibelLoss, CentimetreMegahertz>;
 
 /// Molar absorptivity ε, the L/(mol·cm) of tables as AU/(M·cm): `A = ε·l·c`, whose product converts to an [Absorbance].
 #[cfg(feature = "chemical")]

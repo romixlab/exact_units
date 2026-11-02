@@ -190,6 +190,14 @@ crate::unit! {
     #[cfg(all(feature = "mechanical", feature = "customary"))]
     pub struct Feet100 = "100 ft", [m 1], Exact(381 / 1, pow10 -2, pow2 3);
 
+    /// Length times frequency in centimetre-megahertz, cm·MHz (10⁴ m·Hz, the dimension of a speed): medical
+    /// ultrasound's own unit for frequency-scaled attenuation, α(f) = α₀·f, so `Per<Loss<Decibel>,
+    /// CentimetreMegahertz>` prints as a datasheet writes it, "dB/(cm·MHz)" (soft tissue ≈ 0.5), the middle dot
+    /// parenthesizing the denominator as a `rad/s` one already does. A marker of its own, not `Times<Meter, Hertz>`
+    /// in a prefixed scale, for the same reason as [Metres100] and [Kilometre].
+    #[cfg(feature = "mechanical")]
+    pub struct CentimetreMegahertz = "cm·MHz", [m 1, s -1], Exact(10000 / 1);
+
     /// Mass in grams, g (10⁻³ kg): 5 kg is `Gram::kilo(5u8)`.
     #[cfg(feature = "mechanical")]
     pub struct Gram = "g", [kg 1], Pow10(-3);

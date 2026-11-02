@@ -63,10 +63,10 @@ electrical = []
 # ElectricFieldStrength (V/m), MagneticFieldStrength (A/m), CurrentDensity (A/m²), ChargeDensity (C/m³),
 # ElectricDisplacement (C/m²), Permittivity (F/m), Permeability (H/m), Resistivity (Ω·m), Conductivity (S/m)
 fields = []
-# Meter, Kilometre, Metres100, Gram, Newton, Pascal, Joule, Torque, Litre, VolumetricFlow, Speed, Acceleration,
-# Jerk, Snap, Yank; Area, Volume, Wavenumber, Density, GramPerCubicCentimeter, SurfaceDensity, SpecificVolume,
-# MassFlow, Momentum, AngularMomentum, MomentOfInertia, SurfaceTension, DynamicViscosity, KinematicViscosity,
-# EnergyDensity, PowerDensity; Feet100 with `customary` too
+# Meter, Kilometre, Metres100, CentimetreMegahertz, Gram, Newton, Pascal, Joule, Torque, Litre, VolumetricFlow,
+# Speed, Acceleration, Jerk, Snap, Yank; Area, Volume, Wavenumber, Density, GramPerCubicCentimeter, SurfaceDensity,
+# SpecificVolume, MassFlow, Momentum, AngularMomentum, MomentOfInertia, SurfaceTension, DynamicViscosity,
+# KinematicViscosity, EnergyDensity, PowerDensity; Feet100 with `customary` too
 mechanical = []
 # Radian, Degree, Turn, Steradian, AngularVelocity, AngularAcceleration: angle is a base dimension of its own
 angle = []

@@ -661,3 +661,38 @@ fn with_unit_round_trips_attenuation_per_length() {
         Ok(5)
     );
 }
+
+/// Medical ultrasound's own `Per<Loss<Decibel>, CentimetreMegahertz>` reads and writes as "dB/(cm·MHz)" (the middle
+/// dot in the unit's own symbol parenthesizes it, as a `rad/s` denominator already does), and a bare
+/// `CentimetreMegahertz` as "cm·MHz".
+#[cfg(all(feature = "levels", feature = "mechanical"))]
+#[test]
+fn with_unit_round_trips_frequency_scaled_attenuation() {
+    use exact_units::units::{CentimetreMegahertz, Decibel, Loss, Per};
+
+    // soft tissue: 0.5 dB/(cm.MHz)
+    let alpha0 = Fixed::<Per<Loss<Decibel>, CentimetreMegahertz>, Centi, i32>::new(50);
+    assert_eq!(write(alpha0), "0.5 dB/(cm·MHz)");
+    assert_eq!(
+        read::<Per<Loss<Decibel>, CentimetreMegahertz>, Centi, i32, exact_units::Unbounded>(
+            "0.5 dB/(cm·MHz)"
+        ),
+        Ok(50)
+    );
+    // the space after the number is optional, as for any unit
+    assert_eq!(
+        read::<Per<Loss<Decibel>, CentimetreMegahertz>, Centi, i32, exact_units::Unbounded>(
+            "0.5dB/(cm·MHz)"
+        ),
+        Ok(50)
+    );
+
+    assert_eq!(
+        write(Fixed::<CentimetreMegahertz, One, i32>::new(5)),
+        "5 cm·MHz"
+    );
+    assert_eq!(
+        read::<CentimetreMegahertz, One, i32, exact_units::Unbounded>("5 cm·MHz"),
+        Ok(5)
+    );
+}
