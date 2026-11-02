@@ -10,6 +10,8 @@
 //!   that is the two numbers one after the other, as a tuple would be; in a text format the parts are named, so a
 //!   config can't swap them, and `[re, im]` reads too.
 //! - [Polar]: `{ abs, arg }`, each part as above.
+//! - [Niched]: the raw number, a value or a niche code alike; reading refuses a number that is neither.
+//!   [Clipped]: its value.
 //! - [Decibels]: in a human-readable format (JSON, TOML, RON) the decimal as text,
 //!   `"-3.01"`, which reads back exactly (a JSON number reads too: `-3.01`, `6`); in a binary one its two stored
 //!   numbers, `(num, decimals)`.
@@ -48,6 +50,7 @@ pub mod with_unit;
 use crate::complex::{Complex, ComplexStorage, Polar};
 use crate::decibel::{Decibels, MAX_DECIMALS};
 use crate::fixed::write_prefix_unit;
+use crate::niche::{Clipped, Niched, Niches, Rails, RawValue};
 use crate::{Bounds, Fixed, FixedScale, Origin, Point, Storage, Unit, Unlimited};
 use ::serde::de::{self, Deserialize, Deserializer};
 use ::serde::ser::{Serialize, Serializer};
@@ -120,6 +123,49 @@ impl<'de, O: Origin<Unit = U>, U: Unit, P: FixedScale, T: Storage + Deserialize<
 {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         Fixed::deserialize(deserializer).map(Point::new)
+    }
+}
+
+impl<T: Storage + Serialize, V: RawValue<Raw = T>, N: Niches<T>> Serialize for Niched<V, N, T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.raw().serialize(serializer)
+    }
+}
+
+impl<'de, T: Storage + Deserialize<'de>, V: RawValue<Raw = T>, N: Niches<T>> Deserialize<'de>
+    for Niched<V, N, T>
+{
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = T::deserialize(deserializer)?;
+        Self::try_from_raw(raw).map_err(|_| de::Error::custom(NotACode::<V> { raw }))
+    }
+}
+
+/// `150 is neither a value of 0..=100 nor a niche code (u8)`: a number read for a [Niched] that is neither.
+struct NotACode<V: RawValue> {
+    raw: V::Raw,
+}
+
+impl<V: RawValue> fmt::Display for NotACode<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.raw.fmt_number(f)?;
+        f.write_str(" is neither a value")?;
+        if let Some((min, max)) = V::RANGE {
+            write!(f, " of {min}..={max}")?;
+        }
+        write!(f, " nor a niche code ({})", <V::Raw as Storage>::NAME)
+    }
+}
+
+impl<V: RawValue + Serialize, R: Rails> Serialize for Clipped<V, R> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.value().serialize(serializer)
+    }
+}
+
+impl<'de, V: RawValue + Deserialize<'de>, R: Rails> Deserialize<'de> for Clipped<V, R> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        V::deserialize(deserializer).map(Clipped::new)
     }
 }
 

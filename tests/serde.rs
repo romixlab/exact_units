@@ -17,6 +17,7 @@
 use core::fmt::Debug;
 use exact_units::complex::Polar;
 use exact_units::decibel::Decibels;
+use exact_units::niche::{Clipped, J1939U8, Niched, Null};
 use exact_units::origins::Celsius;
 use exact_units::prefix::{Centi, Kibi, Micro, Milli, One, Pow2};
 use exact_units::units::{Byte, Item, Kelvin, Meter, Ratio, Sample, Second, Volt};
@@ -88,6 +89,30 @@ fn bounds_are_checked_on_reading() {
     );
     type Low = Fixed<Volt, Milli, i32, Range<-2147483648, 0>>;
     assert!(json_err::<Low>("1").starts_with("1 mV is out of -2147483648..=0 mV (Volt, i32)"));
+}
+
+#[test]
+fn niched_is_its_raw_number() {
+    type Level = Niched<Fixed<Ratio, One, u8, Range<0, 100>>, Null<0xFF>>;
+    round_trip(&Level::null(), "255", 0xFFu8);
+    round_trip(&Level::try_from_raw(42).unwrap(), "42", 42u8);
+    assert_eq!(
+        json_err::<Level>("150"),
+        "150 is neither a value of 0..=100 nor a niche code (u8)"
+    );
+    assert_eq!(
+        postcard_err::<Level, _>(150u8),
+        postcard::Error::SerdeDeCustom
+    );
+
+    type Load = Niched<Fixed<Ratio, One, u8, Range<0, 250>>, J1939U8>;
+    for raw in 0..=u8::MAX {
+        round_trip(&Load::try_from_raw(raw).unwrap(), &raw.to_string(), raw);
+    }
+
+    type Adc = Clipped<Fixed<Volt, One, u16, Range<0, 4095>>>;
+    round_trip(&Adc::try_from_raw(4095).unwrap(), "4095", 4095u16);
+    assert!(json_err::<Adc>("4096").starts_with("4096 V is out of 0..=4095 V"));
 }
 
 #[test]
