@@ -170,6 +170,26 @@ crate::unit! {
     #[cfg(feature = "mechanical")]
     pub struct Meter = "m", [m 1];
 
+    /// Length in kilometers, km: a fibre's own unit, so `Per<Loss<Decibel>, Kilometre>` reads as it prints,
+    /// "dB/km" (0.2 dB/km at 1550 nm is typical). A unit of its own, not `Meter` in a prefixed scale: the `with_unit`
+    /// text always writes a value in a unit's bare symbol ([write_unit](crate::tree::write_unit) with
+    /// [Prefix::Unit](crate::Prefix::Unit)), never moving an SI prefix onto a plain metre inside a quotient, so
+    /// "dB/km" needs its own marker, as [Litre] already does for volume.
+    #[cfg(feature = "mechanical")]
+    pub struct Kilometre = "km", [m 1], Exact(1000 / 1);
+
+    /// Length in hundreds of meters, 100 m: a cable datasheet's own unit, so `Per<Loss<Decibel>, Metres100>` reads
+    /// as it prints, "dB/100 m".
+    #[cfg(feature = "mechanical")]
+    pub struct Metres100 = "100 m", [m 1], Exact(100 / 1);
+
+    /// Length in hundreds of feet (international foot), 100 ft = 30.48 m: a cable datasheet's own unit, so
+    /// `Per<Loss<Decibel>, Feet100>` reads as it prints, "dB/100 ft". A crate convenience scaled on
+    /// [FootInternational], not a unit of its own in NIST SP 811, so it stays out of the sourced customary
+    /// catalogue (`customary::sourced`).
+    #[cfg(all(feature = "mechanical", feature = "customary"))]
+    pub struct Feet100 = "100 ft", [m 1], Exact(381 / 1, pow10 -2, pow2 3);
+
     /// Mass in grams, g (10⁻³ kg): 5 kg is `Gram::kilo(5u8)`.
     #[cfg(feature = "mechanical")]
     pub struct Gram = "g", [kg 1], Pow10(-3);

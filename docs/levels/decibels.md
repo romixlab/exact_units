@@ -105,7 +105,7 @@ $$
 
 <figure class="eu-figure" markdown="0">
 --8<-- "plots/neper_cable.svg"
-<figcaption>Line theory works in nepers because they fall out of the wave equation: V(x) = V<sub>0</sub>·e<sup>−γx</sup> with γ = α + jβ, so the amplitude is V<sub>0</sub>·e<sup>−αx</sup>. With α in Np/m, αx is the level in Np, no conversion factor needed. A datasheet's dB per 100 m becomes Np/m by dividing by 100 and multiplying by ln 10/20, so α ≈ 0.001151 × dB/100 m. The cable is a Belden 8259 RG-58: nominally 5.4 dB/100 ft at 100 MHz, velocity 66 %. Computed by <code>tools/book_plots</code> with the crate's <code>Magnitude</code>, <code>to_db</code> and <code>from_db_const</code>.</figcaption>
+<figcaption>Line theory works in nepers because they fall out of the wave equation: V(x) = V<sub>0</sub>·e<sup>−γx</sup> with γ = α + jβ, so the amplitude is V<sub>0</sub>·e<sup>−αx</sup>. With α in Np/m, αx is the level in Np, no conversion factor needed. A datasheet's dB per 100 ft is typed as written, <code>Per&lt;Loss&lt;Decibel&gt;, Feet100&gt;</code>, and <code>convert</code>s to α in Np/m exactly. The cable is a Belden 8259 RG-58: nominally 5.4 dB/100 ft at 100 MHz, velocity 66 %. Computed by <code>tools/book_plots</code> with the crate's <code>convert</code>, <code>over</code>, <code>to_db</code> and <code>from_db_const</code>.</figcaption>
 </figure>
 
 `exact_units` takes a neper level the way it takes a dB level, and the kind picks the form: `ln(x)` Np for a ratio of root-power quantities (V/V), `½·ln(x)` Np for a ratio of powers (W/W). At compile time `np!` gives the stored value nearest to $e^{L}$ (or $e^{2L}$ for powers), worked out in integers like `db!`, with no float at run time:

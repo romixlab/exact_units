@@ -73,6 +73,29 @@
 //! # }
 //! ```
 //!
+//! A cable's loss per length is a `Per<Loss<L>, X>`, printed and read as its datasheet writes it. [Kilometre],
+//! [Metres100] and [Feet100] are lengths of their own, not `Meter` in a prefixed scale: `with_unit` always writes a
+//! value in a unit's bare symbol ([write_unit](crate::tree::write_unit) with [Prefix::Unit](crate::Prefix::Unit)),
+//! never moving an SI prefix onto a plain metre inside a quotient, so "dB/km", "dB/100 m" and "dB/100 ft" each need
+//! their own length marker, as [Litre](crate::units::Litre) already does for volume.
+//!
+//! ```
+//! # #[cfg(all(feature = "levels", feature = "mechanical", feature = "customary"))] {
+//! use exact_units::{Fixed, prefix::{Deci, One}, units::{Decibel, Feet100, Kilometre, Loss, Metres100, Per}};
+//!
+//! // a fibre's 0.2 dB/km at 1550 nm
+//! let per_km = Fixed::<Per<Loss<Decibel>, Kilometre>, One, f64>::new(0.2);
+//! assert_eq!(format!("{per_km:#}"), "0.2 dB/km");
+//!
+//! // Belden 8259 (RG-58): 5.4 dB/100 ft at 100 MHz, as the datasheet writes it
+//! let per_100ft = Fixed::<Per<Loss<Decibel>, Feet100>, Deci, i32>::new(54);
+//! assert_eq!(format!("{per_100ft:#}"), "5.4 dB/100 ft");
+//!
+//! let per_100m = Fixed::<Per<Loss<Decibel>, Metres100>, One, f64>::new(17.7);
+//! assert_eq!(format!("{per_100m:#}"), "17.7 dB/100 m");
+//! # }
+//! ```
+//!
 //! A loss is not a gain, and a rate of a level is not a wavenumber:
 //!
 //! ```compile_fail
@@ -399,4 +422,90 @@ impl<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>> Fixe
             Via::Np(k) => Fixed::from_np(v / k),
         }
     }
+}
+
+/// `v`'s value in the coherent unit of its dimension, as `to_db` works one out: its stored number, by `P`'s scale,
+/// by the unit's own factor.
+#[cfg(any(feature = "std", feature = "libm"))]
+fn coherent_f64<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>>(
+    v: Fixed<U, P, T, B>,
+) -> f64 {
+    let x = match v.get().to_repr() {
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_precision_loss,
+            reason = "a rate times a length is worked out in f64, rounded"
+        )]
+        crate::Repr::Int(i) => i as f64,
+        crate::Repr::Float(x) => x,
+    };
+    x * P::SCALE.to_f64() * U::EXPR.factor()
+}
+
+#[cfg(any(feature = "std", feature = "libm"))]
+impl<L: Unit, X: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>>
+    Fixed<Per<L, X>, P, T, B>
+{
+    /// This rate over `length`: what it adds up to across it (a cable's dB/100 m times its length in meters is its
+    /// total loss in dB), in scale `P2` and storage `T2`. The two values' coherent numbers multiply, then the
+    /// product settles into `P2 · L`, rounded to the nearest stored value for an integer `T2` (ties to even). `None`
+    /// where it doesn't fit `T2`. Feature `std` or `libm`.
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "levels", feature = "mechanical"))] {
+    /// use exact_units::{Fixed, prefix::{Deci, One}, units::{Decibel, Feet100, Loss, Metres100, Per}};
+    ///
+    /// // Belden 8259: 5.4 dB/100 ft, over 820 ft (8.2 "100 ft" units) of cable
+    /// let alpha = Fixed::<Per<Loss<Decibel>, Feet100>, Deci, i32>::new(54);
+    /// let length = Fixed::<Feet100, Deci, i32>::new(82);
+    /// let loss: Fixed<Loss<Decibel>, One, f64> = alpha.over(length).unwrap();
+    /// assert!((loss.get() - 44.28).abs() < 1e-9);
+    ///
+    /// let alpha_si = Fixed::<Per<Loss<Decibel>, Metres100>, Deci, i32>::new(177); // 17.7 dB/100 m
+    /// let length_si = Fixed::<Metres100, One, i32>::new(1);
+    /// let loss_si: Fixed<Loss<Decibel>, One, f64> = alpha_si.over(length_si).unwrap();
+    /// assert!((loss_si.get() - 17.7).abs() < 1e-9);
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn over<P2: crate::FixedScale, T2: crate::Storage, PX: crate::FixedScale, TX: crate::Storage, BX: crate::Bounds<TX>>(
+        self,
+        length: Fixed<X, PX, TX, BX>,
+    ) -> Option<Fixed<L, P2, T2>> {
+        over(self, length)
+    }
+}
+
+/// The product of a rate `Per<L, X>` and a `length` in `X`, settled into `L`'s own `P2 · T2`: both sides' coherent
+/// numbers multiply, and the result is read back out through `L`'s own factor.
+#[cfg(any(feature = "std", feature = "libm"))]
+fn over<
+    L: Unit,
+    X: Unit,
+    P: crate::FixedScale,
+    T: crate::Storage,
+    B: crate::Bounds<T>,
+    P2: crate::FixedScale,
+    T2: crate::Storage,
+    PX: crate::FixedScale,
+    TX: crate::Storage,
+    BX: crate::Bounds<TX>,
+>(
+    rate: Fixed<Per<L, X>, P, T, B>,
+    length: Fixed<X, PX, TX, BX>,
+) -> Option<Fixed<L, P2, T2>> {
+    let level = coherent_f64(rate) * coherent_f64(length);
+    let x = level / const { P2::SCALE.to_f64() * L::EXPR.factor() };
+    if !x.is_finite() {
+        return None;
+    }
+    let x = if T2::IS_FLOAT {
+        x
+    } else {
+        crate::fixed::round_f64(x, crate::Rounding::NearestEven)
+    };
+    Some(Fixed::new(crate::fixed::settle_f64(
+        x,
+        crate::Overflow::Checked,
+    )?))
 }

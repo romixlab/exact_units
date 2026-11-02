@@ -1,15 +1,16 @@
 //! `neper_cable.svg`: a wave dying along a coax cable, marked where its amplitude has fallen by 1, 2 and 3 Np, and
-//! under it the one level 1 Np is for an amplitude and for a power. Every number comes from the datasheet's dB through
-//! the crate's exact `ln10 / 20`, `to_db` and `from_db_const`; the `assert!`s fail `just docs-build` if a number on the
-//! figure stops matching the formula or the page.
+//! under it the one level 1 Np is for an amplitude and for a power. Every number comes from the datasheet's own
+//! 5.4 dB/100 ft, typed as `Per<Loss<Decibel>, Feet100>` and `convert`ed, through the crate's `to_db` and
+//! `from_db_const`; the `assert!`s fail `just docs-build` if a number on the figure stops matching the formula or
+//! the page.
 
 use core::f64::consts::{E, TAU};
 
 use exact_units::{
-    Fixed, Magnitude,
+    Fixed,
     decibel::Decibels,
-    prefix::{Micro, One},
-    units::{Per, Volt, Watt},
+    prefix::{Deci, Micro, One},
+    units::{Decibel, Feet100, Loss, Meter, Metres100, Neper, Per, Volt, Watt},
 };
 
 use crate::svg::{Panel, Svg};
@@ -20,13 +21,14 @@ type PowerGain = Fixed<Per<Watt, Watt>, One, f64>;
 type VoltMicro = Fixed<Per<Volt, Volt>, Micro, u32>;
 type PowerMicro = Fixed<Per<Watt, Watt>, Micro, u32>;
 
-/// Belden 8259 (RG-58), its product page: 5.4 dB/100 ft at 100 MHz, nominal, velocity of propagation 66 %.
-const LOSS_DB_PER_100_FT: (u64, u64) = (54, 10);
+/// Belden 8259 (RG-58), its product page: 5.4 dB/100 ft at 100 MHz, nominal, velocity of propagation 66 %, as the
+/// datasheet writes it.
+fn datasheet_loss() -> Fixed<Per<Loss<Decibel>, Feet100>, Deci, i32> {
+    Fixed::new(54)
+}
 const VELOCITY_FACTOR: f64 = 0.66;
 const FREQUENCY_HZ: f64 = 100e6;
 const LIGHT_M_PER_S: f64 = 299_792_458.0;
-/// 100 ft in metres, exactly.
-const METRES_PER_100_FT: (u64, u64) = (3048, 100);
 /// Whole wave periods the drawing shows per neper, so that a crest falls on each mark.
 const CYCLES_PER_NP: f64 = 4.0;
 
@@ -44,18 +46,15 @@ const ROW_PITCH: f64 = 24.0;
 /// Where the amplitude and the power of the second panel start.
 const LEVELS_TOP: f64 = 438.0;
 
-/// The attenuation constant in Np/m, the datasheet's dB through the crate's exact factor.
-fn alpha(db_in_np: Magnitude) -> f64 {
-    let (num, den) = LOSS_DB_PER_100_FT;
-    let (metres, per) = METRES_PER_100_FT;
-    let alpha = Magnitude::ratio(num, den)
-        .div(Magnitude::ratio(metres, per))
-        .mul(db_in_np)
-        .to_f64();
-    // back through the crate: the wave over 100 ft is the datasheet's loss
-    let span = f64::from(u32::try_from(metres).unwrap_or(0)) / 100.0;
-    let loss = VoltGain::new((-alpha * span).exp()).to_db();
-    assert!((loss + 5.4).abs() < 1e-9, "{loss} dB over 100 ft");
+/// The attenuation constant in Np/m, the datasheet's dB/100 ft converted through the crate's own types.
+fn alpha() -> f64 {
+    let per_100ft = datasheet_loss();
+    let np_per_m: Fixed<Per<Loss<Neper>, Meter>, One, f64> = per_100ft.convert().unwrap();
+    let alpha = np_per_m.get();
+    // back through the crate: the loss over one "100 ft" span is the datasheet's own number
+    let span = Fixed::<Feet100, One, f64>::new(1.0);
+    let loss: Fixed<Loss<Decibel>, One, f64> = per_100ft.over(span).unwrap();
+    assert!((loss.get() - 5.4).abs() < 1e-9, "{} dB over 100 ft", loss.get());
     alpha
 }
 
@@ -148,13 +147,10 @@ fn wave(s: &mut Svg, p: &Panel, np_per_m: f64) {
 
 /// The heading: the datasheet's number, the same in dB per 100 m, and in Np/m.
 fn heading(s: &mut Svg, np_per_m: f64) {
-    let (metres, per) = METRES_PER_100_FT;
-    let (num, den) = LOSS_DB_PER_100_FT;
-    let db_per_m = Magnitude::ratio(num, den)
-        .div(Magnitude::ratio(metres, per))
-        .to_f64();
+    let per_100m: Fixed<Per<Loss<Decibel>, Metres100>, One, f64> =
+        datasheet_loss().convert().unwrap();
     s.text(LEFT, 22.0, "start", "lg strong", "RG-58 at 100 MHz");
-    let loss = format!("5.4 dB/100 ft = {:.1} dB/100 m", db_per_m * 100.0);
+    let loss = format!("5.4 dB/100 ft = {:.1} dB/100 m", per_100m.get());
     s.text(LEFT, 44.0, "start", "mono lg", &loss);
     let alpha = format!("α = {np_per_m:.4} Np/m: 1 Np every {:.1} m", 1.0 / np_per_m);
     s.text(LEFT, 66.0, "start", "mono lg", &alpha);
@@ -258,10 +254,13 @@ fn levels(s: &mut Svg, db_in_np: f64) {
 }
 
 pub fn neper_cable() -> String {
-    let db_in_np = Magnitude::LN10.div(Magnitude::ratio(20, 1));
-    // the page's own numbers: the figure can't drift from them
-    assert!((db_in_np.to_f64() - core::f64::consts::LN_10 / 20.0).abs() < 1e-15);
-    let np_per_m = alpha(db_in_np);
+    // 1 dB in Np, through the crate's own conversion: the page's own numbers can't drift from it
+    let db_in_np = Fixed::<Decibel, One, f64>::new(1.0)
+        .convert::<Neper, One, f64>()
+        .unwrap()
+        .get();
+    assert!((db_in_np - core::f64::consts::LN_10 / 20.0).abs() < 1e-15);
+    let np_per_m = alpha();
     assert!((np_per_m - 0.0204).abs() < 5e-5 && (1.0 / np_per_m - 49.0).abs() < 0.05);
 
     let mut s = Svg::new(
@@ -274,8 +273,8 @@ pub fn neper_cable() -> String {
     let p = panel(np_per_m);
     heading(&mut s, np_per_m);
     cable(&mut s, &p);
-    marks(&mut s, &p, np_per_m, db_in_np.to_f64());
+    marks(&mut s, &p, np_per_m, db_in_np);
     wave(&mut s, &p, np_per_m);
-    levels(&mut s, db_in_np.to_f64());
+    levels(&mut s, db_in_np);
     s.finish()
 }

@@ -9,7 +9,7 @@ publish = false
 [workspace]
 
 [dependencies]
-exact_units = { path = "../..", default-features = false, features = ["std"] }
+exact_units = { path = "../..", default-features = false, features = ["std", "customary"] }
 
 [lints.rust]
 unsafe_code = "forbid"
