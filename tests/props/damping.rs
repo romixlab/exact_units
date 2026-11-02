@@ -1,4 +1,4 @@
-//! Damping per time (STD-97): ζ ↔ Q, the time constant 1 Np / δ and ζ = δ/ω₀ in integers, each rounded once against
+//! Damping per time (LVL-3): ζ ↔ Q, the time constant 1 Np / δ and ζ = δ/ω₀ in integers, each rounded once against
 //! an exact quotient in `i128`; Λ ↔ ζ in floats against a second form of the formula.
 #![expect(
     clippy::arithmetic_side_effects,

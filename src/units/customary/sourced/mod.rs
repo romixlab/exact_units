@@ -1,10 +1,10 @@
-//! Imperial and US customary units (STD-72), the sourced catalogue: every unit as the exact rational of SI its legal
+//! Imperial and US customary units (UNIT-1), the sourced catalogue: every unit as the exact rational of SI its legal
 //! definition gives, with the source of that definition, the value NIST SP 811 prints for it, and the groups of
 //! names that are ambiguous on their own (a bare "gallon", "ton" or "BTU" never names a unit here).
 //!
 //! Test-only: the data the markers of [customary](super) are checked against (`markers`), with the citations, the
 //! values SP 811 prints and the ambiguity groups the docs table is made of. The source extracts are kept with the
-//! STD-72 design notes.
+//! UNIT-1 design notes.
 
 #![expect(
     clippy::unwrap_used,
@@ -66,7 +66,7 @@ pub(super) struct Unit {
     /// Unique, never a bare ambiguous name.
     pub id: &'static str,
     pub name: &'static str,
-    /// A proposal, unique across the table; STD-73 decides the display and parse symbols.
+    /// A proposal, unique across the table; IO-4 decides the display and parse symbols.
     pub symbol: &'static str,
     pub dim: Dim,
     pub mag: Mag,

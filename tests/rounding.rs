@@ -1,4 +1,4 @@
-//! Rounding conversions and overflow policies (STD-63): every mode against a reference written independently of the
+//! Rounding conversions and overflow policies (NUM-4): every mode against a reference written independently of the
 //! crate's own (Euclidean division), the typed conversion against the run-time one, factors with π.
 #![expect(
     clippy::as_conversions,

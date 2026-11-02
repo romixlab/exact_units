@@ -34,7 +34,7 @@
 /// - The scale, coherent when left out: `Pow10(-3)`, `Exact(1 / 180, pi 1)` (`num / den`, then optionally `pow10 e`,
 ///   `pow2 e`, `pi e`, `ln2 e`, `ln10 e` in that order, see [Magnitude::new](crate::Magnitude::new); the decibel is
 ///   `Exact(1 / 20, ln10 1)` of the neper), so every reader computes the same
-///   value; or `Affine { factor: 1.0, offset: 273.15 }` for a unit with an offset (moves to origins, STD-64). A float
+///   value; or `Affine { factor: 1.0, offset: 273.15 }` for a unit with an offset (moves to origins, PT-1). A float
 ///   factor isn't a unit's scale: an exact one is a `Magnitude`, and a factor known only at run time is a value.
 /// - After the dimension, `kind "resistance"` names a kind of quantity of its own ([Kind::Named](crate::Kind)):
 ///   such a unit doesn't convert to or from another of its dimension, `Ohm` is no `Per<Volt, Ampere>`.

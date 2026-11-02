@@ -1,4 +1,4 @@
-//! Levels in Np (STD-95): the gains `from_np_const` works out at compile time against an 80-digit reference and
+//! Levels in Np (LVL-2): the gains `from_np_const` works out at compile time against an 80-digit reference and
 //! libm's `exp`, `np!`, and the run-time `to_np` / `from_np` in `f64` and `f32`, with 1 Np = 20/ln 10 dB.
 #![cfg(feature = "electrical")]
 #![expect(

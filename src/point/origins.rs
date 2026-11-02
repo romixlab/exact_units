@@ -16,7 +16,7 @@ mod time {
         /// to 2017).
         ///
         /// Clocks that count every SI second (TAI, GPS = TAI − 19 s) and UTC with its leap-second table come with
-        /// WireWeaver's STD-65 as clocks of their own; this origin stays POSIX time, and a conversion to them goes
+        /// WireWeaver's PT-3 as clocks of their own; this origin stays POSIX time, and a conversion to them goes
         /// through the table, never at compile time.
         pub struct UnixEpoch { unit: Second, symbol: "s UTC", offset: Offset::ZERO }
     }

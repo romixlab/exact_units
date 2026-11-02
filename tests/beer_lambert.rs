@@ -1,4 +1,4 @@
-//! Beer-Lambert (STD-97): absorbance and optical depth as exact scales of the loss base, μ against α, ε·l·c.
+//! Beer-Lambert (LVL-3): absorbance and optical depth as exact scales of the loss base, μ against α, ε·l·c.
 #![cfg(all(
     feature = "levels",
     feature = "mechanical",

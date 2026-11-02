@@ -1,4 +1,4 @@
-//! Named rounding and overflow policies for conversions that aren't exact (STD-63): [Rounding], [Overflow], and
+//! Named rounding and overflow policies for conversions that aren't exact (NUM-4): [Rounding], [Overflow], and
 //! [requantize], the same conversion with the storage known only at run time (what a dynamic client does).
 
 use super::storage::{Repr, Storage};

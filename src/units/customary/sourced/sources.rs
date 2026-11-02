@@ -1,4 +1,4 @@
-//! The documents the catalogue cites, each read in full on 27 Oct 2026 (copies kept with the STD-72 design notes).
+//! The documents the catalogue cites, each read in full on 27 Oct 2026 (copies kept with the UNIT-1 design notes).
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Src {

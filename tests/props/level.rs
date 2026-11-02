@@ -1,4 +1,4 @@
-//! Levels (STD-97): dB ↔ Np in integers rounded against an exact reference (ln 10 to 30 digits), a literal in dB
+//! Levels (LVL-3): dB ↔ Np in integers rounded against an exact reference (ln 10 to 30 digits), a literal in dB
 //! into an Np storage, a loss negated into a gain and back by each overflow policy, the gain edge in floats, and
 //! Beer-Lambert: absorbance, optical depth, μ against α, ε·l·c.
 #![expect(

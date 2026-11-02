@@ -131,7 +131,7 @@ fn no_marker_is_named_by_an_ambiguous_word() {
     for a in AMBIGUOUS {
         let bare: String = a.bare.split([' ', '-']).map(camel).collect();
         // SI Brochure Table 6 names the angle unit "degree", and a temperature unit is always "degree Celsius" or
-        // "degree Fahrenheit": the marker `Degree` is the angle. The group stays for text ("deg", STD-73).
+        // "degree Fahrenheit": the marker `Degree` is the angle. The group stays for text ("deg", IO-4).
         if bare != "Degree" {
             assert!(!names.contains(bare.as_str()), "a marker named {bare}");
         }

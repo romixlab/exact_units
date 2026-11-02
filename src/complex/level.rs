@@ -1,4 +1,4 @@
-//! Levels in dB of a complex value, from |z|² and without a square root (STD-90): the form is the unit's, as for
+//! Levels in dB of a complex value, from |z|² and without a square root (CPX-6): the form is the unit's, as for
 //! [Fixed::to_db], and 20·lg|z| = 10·lg|z|² (10·lg|z| = 5·lg|z|² for a power kind).
 //!
 //! - [to_db](Complex::to_db) / [to_db_f32](Complex::to_db_f32) take the exact [norm_sqr](Complex::norm_sqr) and one

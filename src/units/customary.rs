@@ -1,4 +1,4 @@
-//! Imperial, US customary and other units outside the SI (STD-72): every one the exact rational of SI its legal
+//! Imperial, US customary and other units outside the SI (UNIT-1): every one the exact rational of SI its legal
 //! definition gives, with the source of that definition in its docs (NIST SP 811 Appendix B, NIST Handbook 44
 //! Appendix C, the 1959 international yard and pound, the UK Weights and Measures Act 1985, the 3rd CGPM for g_n).
 //!

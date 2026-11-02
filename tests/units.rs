@@ -70,7 +70,7 @@ fn prefix_names() {
     assert_eq!(Prefix::from_name("milli"), None);
 }
 
-/// Kinds that share a dimension (STD-68): a quotient keeps what cancelled, a product cancels it, and Ω and S are kinds
+/// Kinds that share a dimension (UNIT-2): a quotient keeps what cancelled, a product cancels it, and Ω and S are kinds
 /// of their own.
 #[test]
 fn kinds_of_markers() {

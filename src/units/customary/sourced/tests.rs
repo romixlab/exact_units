@@ -1,7 +1,7 @@
 #![cfg(test)]
 //! Every magnitude checked exactly: against what NIST SP 811 prints (equal where bold, within half a unit of the last
 //! printed digit otherwise), against the literal values the sources state, and for the rules of the table (no bare
-//! ambiguous name, units of a group all listed, dimensions). Ends with the bit sizes STD-62's magnitude choice needs.
+//! ambiguous name, units of a group all listed, dimensions). Ends with the bit sizes NUM-3's magnitude choice needs.
 #![expect(
     clippy::as_conversions,
     reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"
@@ -528,7 +528,7 @@ fn show_factors(n: u128) -> String {
         .join("·")
 }
 
-/// The input to STD-62's choice of magnitude: bits of num and den once 2 and 5 are out, the factors, and the
+/// The input to NUM-3's choice of magnitude: bits of num and den once 2 and 5 are out, the factors, and the
 /// products and conversion factors a customary API meets. `cargo nextest run -p ww_si bit_sizes --no-capture`.
 #[test]
 fn bit_sizes() {
@@ -588,7 +588,7 @@ fn bit_sizes() {
         primes.keys().collect::<Vec<_>>()
     );
     let bits = |m: Mag| (m.num_bits(), m.den_bits());
-    // the numbers sent to STD-62 (27 Oct 2026); a change here is a change of that input
+    // the numbers sent to NUM-3 (27 Oct 2026); a change here is a change of that input
     assert_eq!(bits(LBF.div(IN2)), (44, 14), "psi");
     assert_eq!(bits(FT.mul(LBF)), (52, 1), "ft·lbf");
     assert_eq!(bits(HP_MECH).0, 56, "hp");

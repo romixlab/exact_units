@@ -1,4 +1,4 @@
-//! Angles and roots in integer arithmetic only (STD-89): CORDIC for [atan2](atan2_16) into a binary angle and
+//! Angles and roots in integer arithmetic only (CPX-2): CORDIC for [atan2](atan2_16) into a binary angle and
 //! [sin and cos](sin_cos_16) of one into Q15 / Q31, and [isqrt](isqrt_u32) with a [Rounding]. No float at run time
 //! and no tables but the `const` ones of the iterations, so they run as they are on a Cortex-M0.
 //!
@@ -17,7 +17,7 @@
 //! Q31 value, so `cos 0` is `1 - 2⁻¹⁵`, the largest; -1 is exact.
 //!
 //! The results are plain [Fixed](crate::Fixed) types: an angle of a turn, a [Ratio](crate::units::Ratio) in Q15.
-//! The phase angle of a complex number (STD-88, STD-90) is built on these.
+//! The phase angle of a complex number (CPX-1, CPX-6) is built on these.
 //!
 //! ```
 //! # #[cfg(all(feature = "angle", feature = "dimensionless"))] {

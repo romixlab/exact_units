@@ -5,9 +5,13 @@ planned, for humans and AI agents alike.
 
 Until 2 Nov 2026 these items lived in wire_weaver's `FEATURES.md` under its `STD` area, because `exact_units`
 had no tracker of its own; a session claiming an id with `tpm work claim STD` in an `exact_units` worktree
-couldn't see wire_weaver's file and handed out the same id twice (STD-92). They moved here with their ids
-unchanged. wire_weaver's `FEATURES.md` keeps a short note under its own `STD` section saying so; an item that
-concerns both crates stays there, with a pointer to the `exact_units` id it depends on.
+couldn't see wire_weaver's file and handed out the same id twice (STD-92). They moved here on 2 Nov 2026, split
+the same day into six areas of their own (below), each numbered from 1 in build order (by first commit); every
+entry keeps a "(was STD-xx)" note, and the full old-id to new-id table is at the end of this file. `STD-84` was
+claimed twice before the move: once for `Complex<U, P, T, B>` (never written down) and later for
+`Minute`/`Hour`/`Day`/`Week`/the Unix epoch; the double is resolved below, each piece under its own id.
+wire_weaver's `FEATURES.md` keeps a short note under its own `STD` section saying so; an item there that
+concerns both crates carries a pointer to the `exact_units` id it depends on.
 
 ## How to use this file
 
@@ -20,20 +24,23 @@ concerns both crates stays there, with a pointer to the `exact_units` id it depe
   - 🔍 probably done or obsolete, needs a check before closing
   - 🧪 done and tested on the host, the check on hardware is still open (the note says what to check)
 - **Target** is the release an item is planned for; no tag means not scheduled.
-- **IDs** (`STD-55`, `STD-83`) are stable: never renumber or reuse one. New items take the next free number,
-  even when inserted in the middle of the list (`tpm work claim STD` in this crate's worktree prints the next
-  free one). Use the ID in commit messages, CHANGELOG entries and code `TODO`s. When talking to people, name an
-  ID with a short slug from its title (`STD-83 typed-products-and-quotients`), never bare.
-- Items are grouped by status: done first, then open items ordered by target. When finishing work, update the
-  item in the same change: mark it ✅, move it up to the done items and add a pointer (docs page, test or
-  example). Don't delete done items. Move items that turn out to be obsolete to
-  [Dropped and superseded](#dropped-and-superseded) with a one-line reason.
-- New ideas go in as 💡. Small code-level gaps stay as `TODO` comments in the source; only those that limit
-  users or block a feature get an item here.
+- **IDs** (`NUM-2`, `CPX-6`) are stable: never renumber or reuse one. New items take the next free number of
+  their area, even when inserted in the middle of it (`tpm work claim AREA` in this crate's worktree prints the
+  next free one, e.g. `tpm work claim LVL`). Use the ID in commit messages, CHANGELOG entries and code `TODO`s.
+  When talking to people, name an ID with a short slug from its title (`CPX-6 polar-form-and-levels`), never bare.
+- Items are grouped by area, and within an area by status: done first, then open items ordered by target. When
+  finishing work, update the item in the same change: mark it ✅, move it up to the done items of its area
+  and add a pointer (docs page, test or example). Don't delete done items. Move items that turn out to be
+  obsolete to [Dropped and superseded](#dropped-and-superseded) with a one-line reason.
+- New ideas go in as 💡. Small code-level gaps stay as `TODO` comments in the source; only those that
+  limit users or block a feature get an item here.
 
-## Standard library core (`STD`)
+## Number core (`NUM`)
 
-- ✅ **STD-61 `exact_units`: the compile-time unit core as a crate of its own** · `v0.5` — a standalone `no_std`
+`Fixed`, `Magnitude` and the arithmetic every other area builds on: exact scales, rounding and
+overflow policy, products and quotients, decimal literals, counted positions, niche codes.
+
+- ✅ **NUM-1 `exact_units`: the compile-time unit core as a crate of its own** (was STD-61) · `v0.5` — a standalone `no_std`
   crate, no dependencies without features (Roman, 27 Oct 2026): `Dim` (SI, rad, bit, counted bases, root flag), unit
   markers and `Unit` (with `Sqrt<U>`), `ExactScale` (with a power of π), `Fixed`, bounds, const `sqrt_f64`;
   `shrink_wrap` (wire format, `SIExpr`, through `#[wire(..)]` fields the same bytes as before), `std` and `defmt`
@@ -43,7 +50,7 @@ concerns both crates stays there, with a pointer to the `exact_units` id it depe
   thumbv6m. Moved to a repository of its own, [romixlab/exact_units](https://github.com/romixlab/exact_units), with its
   history (28 Oct 2026): wire_weaver takes it by git, its snapshot is saved from that source into
   `wire_weaver_snapshots/other_repos` (`ww api save --dep exact_units --snapshots-dir`).
-- ✅ **STD-55 `exact_units::Fixed<U, P, T, B = Unbounded>`: unit, scale and bounds fixed at compile time** · `v0.5` —
+- ✅ **NUM-2 `exact_units::Fixed<U, P, T, B = Unbounded>`: unit, scale and bounds fixed at compile time** (was STD-55) · `v0.5` —
   a value of unit `U` at scale `P` stored as `T`, on the wire exactly `T` (DER-18 `transparent`; no prefix, no
   `NumericValue` tag, so a `u64` doesn't turn on `ww_numeric`'s `u64` for everyone); scale markers (every prefix
   name, `Kibi`.., `Pow10<E>`, `Rational<N, D>`), bounds (`Unbounded`, `Range`, `RangeU64`, `RangeDec`) checked on
@@ -52,39 +59,7 @@ concerns both crates stays there, with a pointer to the `exact_units` id it depe
   of one generic definition with `B` explicit, so introspection shows the unit. Same code as a plain field on
   Cortex-M (DER-20). [exact_units](docs/std_library/exact_units.md), conformance `stdlib.si.fixed.*`,
   `tests/quantities`.
-- ✅ **STD-72 Imperial and US customary units, complete** · `v0.5` — feature `customary`, opt-in (not in `quantities` or `std`, free for an API without it; host clients turn it on):
-  166 markers in `exact_units::units`, each the exact rational of SI from its legal definition (1959 yard and pound,
-  NIST SP 811 and Handbook 44, UK WMA 1985, g_n), the source cited per unit and checked against a sourced catalogue
-  with SP 811's printed values. No bare ambiguous name (47 groups: US / imperial gallon, fl oz, pint, quart, bushel;
-  international / US survey foot and mile; short / long / metric ton; avoirdupois / troy; Btu and calorie variants;
-  horsepower variants; thou vs angular mil; inHg / mmHg conventional or at a temperature); `PoundAvdp` and `Slug`
-  mass, `PoundForce`, `Kip`, `Poundal` force; °F and °R are origins (STD-64). Measured units carry
-  `Provenance::Conventional`, in the API model a `MarkerDef::ConventionalUnit` (defined units keep their bytes). `Fixed::convert` between units of one dimension, exact or `None`, factor at compile
-  time; `DynQuantity::convert` and Python `Quantity.convert` the same at run time. The Mars Climate Orbiter case
-  (lbf·s read as N·s) in `tests/customary` (typed, dynamic) and Python: converts exactly or is refused; the `Fixed`
-  field too, with its unit in the dynamic client (CLT-54). [Imperial and US customary](docs/std_library/customary.md),
-  conformance `stdlib.si.fixed.customary`, `stdlib.si.si_expr.pound_force` (derive, dynamic, Python; C waits on
-  API-26).
-- ✅ **STD-58 `Index`, `IndexFrom1` and `Seq`** · `v0.5` — `exact_units` (feature `counting`, re-exported by
-  `ww_si`): `Index<Of, T, B>`, a 0-based position in a table of `Of` (index ± amount = index, index − index = a
-  `Fixed<Of, One, T>` distance, index + index and index · x don't compile, checked forms for bounded ones);
-  `IndexFrom1<Of, T, B>`, 1-based as people count, refuses 0 on construction and decode, `to_index` / `from_index`;
-  `Seq<Of, T>`, a wrapping sequence number (`next`, `wrapping_add`, `distance` as a `Wrapping` amount, RFC 1982
-  `is_before` / `serial_cmp` within half the range, no `Ord`, no `Seq + Seq`). All `transparent`, the bytes of `T`; in
-  the model instances of `Index` / `IndexFrom1` `[Of, T, B]` and `Seq` `[Of, T]`, shown and checked by clients
-  (CLT-54). [Indices and sequence numbers](docs/std_library/indices.md), conformance `stdlib.si.index.*`,
-  `stdlib.si.index_from_1.*`, `stdlib.si.seq.*` (derive, dynamic, Python; C waits on API-26).
-- ✅ **STD-64 Points and origins** · `v0.5` — `exact_units::Point<O, Fixed<..>>`: a position against an origin, a
-  zero-size marker declared with `origin!` carrying its unit, an exact `Offset` (sign and `Magnitude`), its reference
-  and an optional modulus. Point ± vector = point, point − point = vector, point + point and point · x don't compile.
-  `origins`: `AbsoluteZero`, `Celsius` (273.15), `Rankine`, `Fahrenheit` (45967/180 K, steps of 5/9 K), `Vacuum`,
-  `Gauge` (reference: ambient pressure, converts only with `against` at run time), `AboveStandardAtmosphere`,
-  `Angle<Turn | Degree | Radian>` (wrap every turn, the difference signed and shortest). Register formulas are origins
-  `above` another (LSM6DS `raw/256 + 25 °C`, J1939 −40 °C). `to::<O2, P2, T2>()` between origins of the same unit and
-  reference, its factor and offset at compile time, exact or `None`. On the wire a point is its number; `OriginDef`
-  holds an origin as data for INT-13. [Points and origins](docs/std_library/points.md), conformance
-  `stdlib.si.point.*`, `stdlib.si.offset.*` (derive, dynamic, Python; C waits on API-26).
-- ✅ **STD-62 One exact magnitude for every scale** · `v0.5` — `exact_units::Magnitude`, a canonical product of prime
+- ✅ **NUM-3 One exact magnitude for every scale** (was STD-62) · `v0.5` — `exact_units::Magnitude`, a canonical product of prime
   powers (2 and 5 as powers of 10 and 2) with powers of π, ln 2 and ln 10, whole or half exponents: every scale
   (prefixes, `Pow10<E>`, `Pow2<E>`, `Rational<N, D>` with `u64` parameters factored at compile time, `Kibi`..,
   `FullScale<V, BITS>`, `FullScaleMax<V, BITS>`) is one, equal however it is written (`Milli` = `Pow10<-3>` =
@@ -94,7 +69,7 @@ concerns both crates stays there, with a pointer to the `exact_units` id it depe
   `Q31`, `UQ16_16`, binary angles `Bam16`, `Bam32`. Replaces `ExactScale` in `Scale::Exact` (104 bytes in memory, a
   decimal prefix 2 bytes on the wire). [Exact magnitudes](docs/std_library/magnitude.md), conformance
   `stdlib.si.magnitude.*` (derive, dynamic, Python; C waits on API-26).
-- ✅ **STD-63 Named rounding and overflow policies** · `v0.5` — `to()` stays exact or `None`; lossy conversions name
+- ✅ **NUM-4 Named rounding and overflow policies** (was STD-63) · `v0.5` — `to()` stays exact or `None`; lossy conversions name
   their rounding (`Rounding`: truncate, floor, ceil, nearest ties-to-even, nearest ties-away) and overflow policy
   (`Overflow`: checked, saturate, wrap): `Fixed::to_rounded`, `to_saturating`, `to_wrapping`, `requantize`, exact (the
   true quotient rounded once), π/ln factors through a 64-bit fixed point (`Magnitude::fixed_point`). Arithmetic's
@@ -103,8 +78,17 @@ concerns both crates stays there, with a pointer to the `exact_units` id it depe
   `Range`-bounded value for a whole factor, a compile error where the proof fails. Run-time `requantize` /
   `Requantizer` for dynamic clients. [Rounding and overflow](docs/std_library/rounding.md),
   `exact_units/tests/rounding.rs`, conformance `requantize.*` (derive, dynamic, Python `ww.requantize`, C `sw_requantize()`).
-  `Seq` wrapping comes with STD-58.
-- ✅ **STD-83 Typed products and quotients of quantities** · `v0.5` — in `exact_units` (locked at 93a1607): `a * b`
+  `Seq` wrapping comes with NUM-5.
+- ✅ **NUM-5 `Index`, `IndexFrom1` and `Seq`** (was STD-58) · `v0.5` — `exact_units` (feature `counting`, re-exported by
+  `ww_si`): `Index<Of, T, B>`, a 0-based position in a table of `Of` (index ± amount = index, index − index = a
+  `Fixed<Of, One, T>` distance, index + index and index · x don't compile, checked forms for bounded ones);
+  `IndexFrom1<Of, T, B>`, 1-based as people count, refuses 0 on construction and decode, `to_index` / `from_index`;
+  `Seq<Of, T>`, a wrapping sequence number (`next`, `wrapping_add`, `distance` as a `Wrapping` amount, RFC 1982
+  `is_before` / `serial_cmp` within half the range, no `Ord`, no `Seq + Seq`). All `transparent`, the bytes of `T`; in
+  the model instances of `Index` / `IndexFrom1` `[Of, T, B]` and `Seq` `[Of, T]`, shown and checked by clients
+  (CLT-54). [Indices and sequence numbers](docs/std_library/indices.md), conformance `stdlib.si.index.*`,
+  `stdlib.si.index_from_1.*`, `stdlib.si.seq.*` (derive, dynamic, Python; C waits on API-26).
+- ✅ **NUM-6 Typed products and quotients of quantities** (was STD-83) · `v0.5` — in `exact_units` (locked at 93a1607): `a * b`
   is a `Fixed<Times<U1, U2>, Product<P1, P2>, T>`, `a / b` a `Fixed<Per<U1, U2>, Quotient<P1, P2>, T>`, one multiply
   or division of `T`; `prefix::Product` / `prefix::Quotient` carry the exact result scale as a type (`Product<Milli,
   Milli>` is `Micro`), overflow by the operands' policy, `checked_` / `saturating_` / `wrapping_times` and `_per`,
@@ -112,14 +96,58 @@ concerns both crates stays there, with a pointer to the `exact_units` id it depe
   compare across bounds. In the model as `MarkerDef::Product` / `Quotient` (appended, older readers get `Unknown`),
   a client computes the scale as rustc does; the evolution check compares them by meaning (test in
   `tests/quantities`).
-- ✅ **STD-84 `Minute`, `Hour`, `Day`, `Week` and the Unix epoch** — `exact_units` 8584aad: `Secs<T>`, `Minutes<T>`,
-  `Hours<T>`, `Days<T>` (`Fixed<Second|Minute|Hour|Day, One, T>`) and `origins::UnixEpoch` with `UnixSecs<T>` /
-  `UnixMillis<T>` / `UnixMicros<T>` / `UnixNanos<T>` (`T` defaults to `u64`), a `Point<UnixEpoch, Secs<T>|..>` for
-  POSIX time (`time_t`, journald's `__REALTIME_TIMESTAMP`). `ww_si` re-exports `Secs`, `Minutes`, `Hours`, `Days`
-  next to `Micros`, `Millis`, `Nanos`; `units::{Minute, Hour, Day, Week}` and `origins::{UnixEpoch, UnixSecs, ..}`
-  reach `ww_si::..` through its existing `units` / `origins` re-exports (feature `time`). Docs:
-  [`exact_units`](std_library/exact_units.md#aliases), [points](std_library/points.md#origins).
-- ✅ **STD-85 `Count`, `Percent`/`Permille`, binary byte sizes, `Hz`, and counted `Line`/`Row`/`Record`/`Entry`** —
+- ✅ **NUM-7 Decimal literals as exact constants** (was STD-93) — `exact_units` d4b5b1a, fce4739, 790d6f0: `fixed!(0.1)` is the
+  `Fixed` (or, of two literals, the `Complex`) its context names, holding the stored value nearest to the literal,
+  worked out at compile time (`fixed!(0.1)` in Q30 is `107_374_182`); a scale with π, a value past the storage or
+  its bounds doesn't compile; `Fixed::from_decimal` as a `const fn`. `Mac::mean_at_least(threshold, n)`: a mean
+  power against a typed threshold (`db!(norm_sqr -10)`) in one exact integer compare.
+- ✅ **NUM-8 Niche codes next to `Bounds`** (was STD-66) — `exact_units` d7266c7, module `niche`: `Niched<V, N>` is a value
+  `V` (`Fixed` or `Point`) or one of the codes of `N`, stored as the raw number alone, so `size_of` and the wire
+  bytes are the storage's. `get()` answers `Reading::Value(v)` or `Reading::Niche(meaning)`, never a code as a
+  value; `try_from_raw`, `niche`, `from_reading` and `raw` read and write the number, and a code read is the code
+  written back. `niches!` declares the meanings for one storage, each a single code (`Error = 0xFE`) or a code
+  range that keeps its code (`Reserved = 251..=253`). `Null<CODE>` is the one-code set, a `Niched` of it converts
+  to and from `Option` (Matter's nullable integers, a BLE RSSI of 127). `J1939U8`, `J1939U16` and `J1939U32` are
+  J1939's 1-, 2- and 4-byte sets. Checked at compile time where the type is used: every code fits the storage,
+  none is inside the bounds, no two overlap. The wire and serde refuse a number that is neither a value within
+  the bounds nor a code. Book page "Niche codes and rails", `docs/maths/niches.md`.
+
+## Units and markers (`UNIT`)
+
+The unit markers themselves: SI derived units, Imperial and US customary, calendar units, more
+counted units, and the kinds that keep look-alike quantities apart.
+
+- ✅ **UNIT-1 Imperial and US customary units, complete** (was STD-72) · `v0.5` — feature `customary`, opt-in (not in `quantities` or `std`, free for an API without it; host clients turn it on):
+  166 markers in `exact_units::units`, each the exact rational of SI from its legal definition (1959 yard and pound,
+  NIST SP 811 and Handbook 44, UK WMA 1985, g_n), the source cited per unit and checked against a sourced catalogue
+  with SP 811's printed values. No bare ambiguous name (47 groups: US / imperial gallon, fl oz, pint, quart, bushel;
+  international / US survey foot and mile; short / long / metric ton; avoirdupois / troy; Btu and calorie variants;
+  horsepower variants; thou vs angular mil; inHg / mmHg conventional or at a temperature); `PoundAvdp` and `Slug`
+  mass, `PoundForce`, `Kip`, `Poundal` force; °F and °R are origins (PT-1). Measured units carry
+  `Provenance::Conventional`, in the API model a `MarkerDef::ConventionalUnit` (defined units keep their bytes). `Fixed::convert` between units of one dimension, exact or `None`, factor at compile
+  time; `DynQuantity::convert` and Python `Quantity.convert` the same at run time. The Mars Climate Orbiter case
+  (lbf·s read as N·s) in `tests/customary` (typed, dynamic) and Python: converts exactly or is refused; the `Fixed`
+  field too, with its unit in the dynamic client (CLT-54). [Imperial and US customary](docs/std_library/customary.md),
+  conformance `stdlib.si.fixed.customary`, `stdlib.si.si_expr.pound_force` (derive, dynamic, Python; C waits on
+  API-26).
+- 🚧 **UNIT-2 Kinds that share a dimension** (was STD-68) · `v0.5` — first piece done (gain kinds): `exact_units::Kind` as
+  `Unit::KIND` next to `DIM`, checked by `Fixed::convert` at compile time (rules after ISO 80000-1 / mp-units: a
+  quotient of one dimension keeps what cancelled, V/V ≠ A/A ≠ W/W ≠ `Ratio`; a dimension-one factor keeps the other's
+  kind; any other product plain, V/V · V = V); `Ohm` `resistance` and `Siemens` `conductance` (`kind ".."` on a
+  `unit!` line), apart from V/A and A/V; named steps `as_ratio` / `as_gain`, `as_resistance` / `as_transimpedance`,
+  `as_conductance` / `as_transconductance`; in the model as `MarkerDef::KindUnit` and
+  `ww_self::units::CanonicalUnit::kind`, compared by the evolution check (EVO-17), conformance case
+  `model.marker_def.unit_kind`. Missing: the rest below. relative humidity, duty cycle, state of charge, strain,
+  volume fraction; Hz vs Bq vs rad/s; electrical vs mechanical angle through pole pairs; colour vs thermodynamic
+  temperature; explicit casts between siblings. W / VA / var and their energies, Gy / Sv; a kind survives a product
+  with plain units (var·h stays reactive energy, never kW·h). Kinds with arguments: gas volume and density at stated
+  reference conditions (`StandardVolume<Ref>`: DIN 1343, ISO 13443, US SCF), with an opt-in exact ideal-gas bridge to
+  mol.
+- ✅ **UNIT-3 `Minute`, `Hour`, `Day` and `Week` units** (was STD-84) — `exact_units` 8584aad: `Secs<T>`, `Minutes<T>`,
+  `Hours<T>`, `Days<T>` (`Fixed<Second|Minute|Hour|Day, One, T>`). `ww_si` re-exports `Secs`, `Minutes`, `Hours`,
+  `Days` next to `Micros`, `Millis`, `Nanos`; `units::{Minute, Hour, Day, Week}` reach `ww_si::..` through its
+  existing `units` re-export (feature `time`). Docs: [`exact_units`](std_library/exact_units.md#aliases).
+- ✅ **UNIT-4 `Count`, `Percent`/`Permille`, binary byte sizes, `Hz`, and counted `Line`/`Row`/`Record`/`Entry`** (was STD-85) —
   `exact_units` d28ec86: `Count<Of, T>` (`Fixed<Of, One, T>`, a count of `Of`s, unconditional), `Percent<T>` and
   `Permille<T>` (`Fixed<Ratio, Centi|Milli, T>`, feature `dimensionless`), `Kibibytes<T>` / `Mebibytes<T>` /
   `Gibibytes<T>` beside `Bytes<T>` (feature `information`) and `Hz<T>` (`Fixed<Hertz, One, T>`, feature `time`):
@@ -128,57 +156,7 @@ concerns both crates stays there, with a pointer to the `exact_units` id it depe
   them; they reach `ww_si::..` through its existing `units` re-export. Docs:
   [`exact_units`](std_library/exact_units.md#aliases), [`ww_si`](std_library/ww_si.md#dimensions),
   [indices](std_library/indices.md).
-- ✅ **STD-88 `units::Phase<A>`** — a phase angle in the angle unit `A` (`Radian`, `Degree`, `Turn`, or an API's
-  own unit that implements `units::PlaneAngle`), with `A`'s dimension, scale and symbol but the kind `phase angle`;
-  `Phase<Turn>` converts to `Phase<Degree>`, to or from a plane angle is a compile error, crossed by the named steps
-  `as_phase` / `as_plane_angle`. `electrical(pole_pairs)` takes a motor's mechanical angle to its electrical angle by
-  the overflow policy (a `Bam16` wraps at a turn), so field-oriented control that takes a phase refuses the encoder's
-  angle. Aliases `PhaseBam16` / `PhaseBam32` (feature `angle`), binary phase angles that wrap. √W (power waves) is a
-  root-power dimension: `Per<Sqrt<Watt>, Sqrt<Watt>>` has a level of 20·lg, as V/V has.
-- ✅ **STD-89 `cordic`** — angles and square roots in integers only, `const fn`s with `const` iteration tables,
-  for a Cortex-M0 as much as a host: `atan2_16(y, x)` of `i16` into a `Bam16` and `atan2_32` of `i32` into a `Bam32`
-  (24 and 40 CORDIC steps in `i32` / `i64`, short vectors normalised first so they are as exact as long ones),
-  `sin_cos_16` of a `Bam16` into two `Q15` and `sin_cos_32` of a `Bam32` into two `Q31` (gain undone in fixed point;
-  `cos 0` saturates to the largest Q value). Each within 0.51 of a step of the exact value (tested against libm over
-  dense grids, every `Bam16`, the axes, the corners and ±full scale), the axes and eighths of a turn exact.
-  `isqrt_u32` / `isqrt_u64` / `isqrt_u128` round √x by a `Rounding`, exactly. `PhaseBam16` / `PhaseBam32` and the arg
-  of a complex number (STD-90) come on top of these. `docs/complex/cordic.md`.
-- ✅ **STD-90 Polar form and levels of a `Complex`** — `exact_units` efc885e, c5349ab: `Polar<U, P, T, A>`, a magnitude
-  `Fixed` and a phase angle, with `Complex::to_polar` / `from_polar` and `Polar::to_complex`. Floats through `hypot`,
-  `atan2` and `sin`/`cos` (feature `std` or `libm`); integers without a float: `abs` the correctly rounded root of
-  the exact `norm_sqr` in the unsigned twin, `arg` by CORDIC into a `PhaseBam16` / `PhaseBam32` within 0.51 of a
-  step, `from_polar` by Q31 sin/cos. `to_db` from |z|², `norm_sqr_at(Decibels)` and `db!(norm_sqr -15)` as a typed
-  threshold; RF helpers on an impedance (Γ, VSWR, return loss), example `13_impedance_match`.
-- ✅ **STD-91 IQ fixed-point DSP** — `exact_units` 87f2e18, 041b72e: `CQ15<U = Ratio>` and `CQ31<U = Ratio>`, saturating
-  Q15 and Q31 IQ samples; complex multiplies rounded once into their own scale (`mul_round`, `mul_conj_round`, `mix`),
-  `Mac` summing products exactly in `i64` / `i128`, interleaved `[re, im, ..]` buffers without `unsafe`, `Nco` (a
-  `Bam32` phase accumulator with a CORDIC phasor), `cordic::sin_cos_32_q15`; example `14_iq_downconvert`.
-- ✅ **STD-92 Complex power with its kinds** — `exact_units` 4df3d43: `units::VoltAmpere` (`VA`, kind apparent power)
-  and `units::Var` (`var`, kind reactive power), the watt's dimension under a kind of their own, `Watt` staying
-  plain; S = V·I* as a `Complex<VoltAmpere>`.
-- ✅ **STD-93 Decimal literals as exact constants** — `exact_units` d4b5b1a, fce4739, 790d6f0: `fixed!(0.1)` is the
-  `Fixed` (or, of two literals, the `Complex`) its context names, holding the stored value nearest to the literal,
-  worked out at compile time (`fixed!(0.1)` in Q30 is `107_374_182`); a scale with π, a value past the storage or
-  its bounds doesn't compile; `Fixed::from_decimal` as a `const fn`. `Mac::mean_at_least(threshold, n)`: a mean
-  power against a typed threshold (`db!(norm_sqr -10)`) in one exact integer compare.
-- ✅ **STD-94 serde for the numbers, for firmware and configs** — `exact_units` feature `serde`, `no_std` without alloc
-  (the first two forms of STD-78): `Fixed`, `Point`, `Index`, `IndexFrom1`, `Seq` as their stored number, `Complex` as
-  `{ re, im }`, `Polar` as `{ abs, arg }`, `Decibels` as `"-3.01"` in text formats and `(num, decimals)` in binary
-  ones; reading refuses a value outside its bounds (`6000 ms is out of 1..=5000 ms (Second, u16)`) or an
-  `IndexFrom1` of 0. `exact_units::serde::with_unit` writes a field as `{:#}` text and reads a number with its unit
-  and an SI or binary prefix exactly into the field's scale and storage, or says why not (wrong unit, between two
-  steps with the nearest two, past the storage, out of bounds). Breaking: `serde` no longer turns on `std` and
-  `shrink_wrap`; `Magnitude` / `Offset` need `std` too, the owned mirrors `std` and `shrink_wrap` as before. Tests
-  `exact_units/tests/serde.rs`, properties `tests/props/serde_values.rs` (two Kani proofs); docs
-  [`exact_units`](std_library/exact_units.md#serde).
-- ✅ **STD-95 Levels in nepers** — the twin of the dB API in `decibel`: `Fixed::to_np` / `from_np` (`f64`) and
-  `to_np_f32` / `from_np_f32`, with the form from the unit's `Kind` like `to_db` (a root-power ratio such as V/V is
-  `ln(x)` Np, a power ratio such as W/W is `½·ln(x)` Np; feature `std` or `libm`). At compile time the
-  `decibel::Nepers` decimal, `Fixed::from_np_const` and the `np!` macro (`np!(-1)`, `np!(-0.5)`) give the stored
-  value nearest to `e^Np` (`e^(2·Np)` for powers), worked out in integers with an error bound by the same machinery
-  as `from_db_const`, no float at run time. `LevelForm::np_per_ln()` is the form's factor; 1 Np is 20/ln 10 dB for
-  both forms (aaf886f). Book: the Neper section of the Decibels page.
-- ✅ **STD-96 48 SI derived-unit markers, `Nit`, fields and radiometric groups** — named markers for the
+- ✅ **UNIT-5 48 SI derived-unit markers, `Nit`, fields and radiometric groups** (was STD-96) — named markers for the
   everyday coherent derived units of the SI Brochure (9th ed., tables 5 and 6, cited in each marker's docs), 48 in
   all: `mechanical` gains `Area`, `Volume`, `Wavenumber`, `Density`, `GramPerCubicCentimeter`, `SurfaceDensity`,
   `SpecificVolume`, `MassFlow`, `Momentum`, `AngularMomentum`, `MomentOfInertia`, `SurfaceTension`,
@@ -193,17 +171,38 @@ concerns both crates stays there, with a pointer to the `exact_units` id it depe
   both in `quantities`. The named markers are plain, so their compounds convert to them, except where a named
   marker of the same dimension is another kind (`EnergyDensity`, `Entropy`); `units::spellings(name)` gives a
   unit's other spellings (`nit`, `nt`), read by `serde::with_unit` too (42d53d7).
-- 📋 **STD-65 Instants and clocks with named epochs** · `v0.5` — `Instant<Clock, ..>`: device-monotonic, Unix, TAI, GPS
+- 📋 **UNIT-6 More counted units** (was STD-69) · `v0.5` — Symbol (baud = Symbol/s), Packet, Pulse, Event, Tick, Chunk, Particle,
+  each a dimension of its own; `AVOGADRO` bridges `Particle` and mol exactly.
+
+## Points and origins (`PT`)
+
+A number against an origin: temperatures, angles that wrap, register formulas, the Unix epoch,
+and clocks with a named epoch.
+
+- ✅ **PT-1 Points and origins** (was STD-64) · `v0.5` — `exact_units::Point<O, Fixed<..>>`: a position against an origin, a
+  zero-size marker declared with `origin!` carrying its unit, an exact `Offset` (sign and `Magnitude`), its reference
+  and an optional modulus. Point ± vector = point, point − point = vector, point + point and point · x don't compile.
+  `origins`: `AbsoluteZero`, `Celsius` (273.15), `Rankine`, `Fahrenheit` (45967/180 K, steps of 5/9 K), `Vacuum`,
+  `Gauge` (reference: ambient pressure, converts only with `against` at run time), `AboveStandardAtmosphere`,
+  `Angle<Turn | Degree | Radian>` (wrap every turn, the difference signed and shortest). Register formulas are origins
+  `above` another (LSM6DS `raw/256 + 25 °C`, J1939 −40 °C). `to::<O2, P2, T2>()` between origins of the same unit and
+  reference, its factor and offset at compile time, exact or `None`. On the wire a point is its number; `OriginDef`
+  holds an origin as data for INT-13. [Points and origins](docs/std_library/points.md), conformance
+  `stdlib.si.point.*`, `stdlib.si.offset.*` (derive, dynamic, Python; C waits on API-26).
+- ✅ **PT-2 The Unix epoch** (was STD-84) — `exact_units` 8584aad: `origins::UnixEpoch` with `UnixSecs<T>` /
+  `UnixMillis<T>` / `UnixMicros<T>` / `UnixNanos<T>` (`T` defaults to `u64`), a `Point<UnixEpoch, Secs<T>|..>` for
+  POSIX time (`time_t`, journald's `__REALTIME_TIMESTAMP`). `origins::{UnixEpoch, UnixSecs, ..}` reach `ww_si::..`
+  through its existing `origins` re-export (feature `time`). Docs: [points](std_library/points.md#origins).
+- 📋 **PT-3 Instants and clocks with named epochs** (was STD-65) · `v0.5` — `Instant<Clock, ..>`: device-monotonic, Unix, TAI, GPS
   (TAI − 19 s), UTC through a versioned leap-second table on hosts; GPS week rollover as a `Seq` modulo 1024.
-- 📋 **STD-66 Sentinels next to bounds** · `v0.5` — named codes in a `Fixed`'s raw value: single codes or code ranges
-  (J1939 not-available / error ranges per 1, 2 and 4 bytes, SunSpec not-implemented 0x8000, Matter null, HCI RSSI
-  127, reserved ranges) decode to an enum (`Value`, `NotAvailable`, `Error`, `NotImplemented`, a user meaning), `Option`
-  only as the one-code shorthand. Stored as the raw `T` (size of `T`, no extra byte), `get()` gives the enum, and
-  encoding it gives back the same code, so the bytes don't change. Niche codes and `Bounds` are checked disjoint and
-  every code to fit `T` at compile time. Clipped / rail codes are a value with a saturation mark (at least / at most),
-  not an absent value. Published in the model and honoured by the dynamic client, Python and C, with conformance cases.
-- 🚧 **STD-67 Levels: dB, dBm, dBV, dBFS, dBc, Np, LUFS, RSSI** · `v0.5` — first piece done: a gain's dB by its kind
-  (STD-68), `Fixed::to_db` / `from_db` with 20·lg for ratios of root-power quantities (V/V, A/A, Pa/Pa) and 10·lg for
+
+## Levels (`LVL`)
+
+dB and Np, the gain/loss edge, level rates (Beer-Lambert, damping) and their complex form,
+non-linear named scales.
+
+- 🚧 **LVL-1 Levels: dB, dBm, dBV, dBFS, dBc, Np, LUFS, RSSI** (was STD-67) · `v0.5` — first piece done: a gain's dB by its kind
+  (UNIT-2), `Fixed::to_db` / `from_db` with 20·lg for ratios of root-power quantities (V/V, A/A, Pa/Pa) and 10·lg for
   powers (W/W, J/J), a plain `Ratio` refused at compile time; `to_db` / `from_db` in `f64` and `f32`, without `std`
   through the `libm` feature; `db!()` works the stored value out exactly at compile time. Missing: the rest below.
   `Level<Kind, Ref>` on the point
@@ -211,67 +210,174 @@ concerns both crates stays there, with a pointer to the `exact_units` id it depe
   or square convention). The log base comes from the level's unit (Np coherent on a log-ratio base, B, dB, octave,
   decade, shannon, hartley, nat), the form is power, root-power or plain with a sign (pH and absorbance are −lg), and
   the reference may be absent (a pure gain), a quantity or dimension one; gains compose (dB/km, Np/s ≠ Hz).
-- 🚧 **STD-68 Kinds that share a dimension** · `v0.5` — first piece done (gain kinds): `exact_units::Kind` as
-  `Unit::KIND` next to `DIM`, checked by `Fixed::convert` at compile time (rules after ISO 80000-1 / mp-units: a
-  quotient of one dimension keeps what cancelled, V/V ≠ A/A ≠ W/W ≠ `Ratio`; a dimension-one factor keeps the other's
-  kind; any other product plain, V/V · V = V); `Ohm` `resistance` and `Siemens` `conductance` (`kind ".."` on a
-  `unit!` line), apart from V/A and A/V; named steps `as_ratio` / `as_gain`, `as_resistance` / `as_transimpedance`,
-  `as_conductance` / `as_transconductance`; in the model as `MarkerDef::KindUnit` and
-  `ww_self::units::CanonicalUnit::kind`, compared by the evolution check (EVO-17), conformance case
-  `model.marker_def.unit_kind`. Missing: the rest below. relative humidity, duty cycle, state of charge, strain,
-  volume fraction; Hz vs Bq vs rad/s; electrical vs mechanical angle through pole pairs; colour vs thermodynamic
-  temperature; explicit casts between siblings. W / VA / var and their energies, Gy / Sv; a kind survives a product
-  with plain units (var·h stays reactive energy, never kW·h). Kinds with arguments: gas volume and density at stated
-  reference conditions (`StandardVolume<Ref>`: DIN 1343, ISO 13443, US SCF), with an opt-in exact ideal-gas bridge to
-  mol.
-- 📋 **STD-69 More counted units** · `v0.5` — Symbol (baud = Symbol/s), Packet, Pulse, Event, Tick, Chunk, Particle,
-  each a dimension of its own; `AVOGADRO` bridges `Particle` and mol exactly.
-- 📋 **STD-70 Text unit codes in and out** — UCUM, UNECE Rec 20, QUDT, SenML / RFC 8798, OpenMetrics: exact
+- ✅ **LVL-2 Levels in nepers** (was STD-95) — the twin of the dB API in `decibel`: `Fixed::to_np` / `from_np` (`f64`) and
+  `to_np_f32` / `from_np_f32`, with the form from the unit's `Kind` like `to_db` (a root-power ratio such as V/V is
+  `ln(x)` Np, a power ratio such as W/W is `½·ln(x)` Np; feature `std` or `libm`). At compile time the
+  `decibel::Nepers` decimal, `Fixed::from_np_const` and the `np!` macro (`np!(-1)`, `np!(-0.5)`) give the stored
+  value nearest to `e^Np` (`e^(2·Np)` for powers), worked out in integers with an error bound by the same machinery
+  as `from_db_const`, no float at run time. `LevelForm::np_per_ln()` is the form's factor; 1 Np is 20/ln 10 dB for
+  both forms (aaf886f). Book: the Neper section of the Decibels page.
+- 🚧 **LVL-3 Level rates** (was STD-97) — levels and their rates as quantities: the neper is a counted base of this crate
+  (like the radian), the decibel is `(ln 10)/20` of it exactly, and a loss sits on a second base (`NeperLoss`), so
+  a datasheet's positive dB/100 m is typed as written and never mixes with a gain. Done (piece 1, e8af146): units
+  `Neper`, `Decibel`, `NeperLoss`, `DecibelLoss`; `Loss<L>` over the `Level` / `LossLevel` traits, carried through
+  `Per`; `as_loss` / `as_gain` negating by the bound's policy; the gain edge `to_level` / `to_gain` (`std` or
+  `libm`); `Dim::strip_neper` for exports; `Fixed::convert_rounded` (dB to Np in integers); `fixed!(v in S)` /
+  `from_decimal_in`; `unit!` lines taking `counted(Other)` and `ln2` / `ln10` exponents. Done (piece 3, damping,
+  cd88312): `DampingCoefficient` δ (`Per<Loss<Neper>, Second>`) and `LogarithmicDecrement` Λ
+  (`Per<Loss<Neper>, Cycle>`), signed as a loss; markers `DampingRatio` ζ and `QualityFactor` Q, numbers of kinds
+  of their own (neither converts to the other or to a `Ratio`); `time_constant` (1 Np / δ, any time unit),
+  `damping_ratio(ω₀)` (δ/ω₀, rad/s only, Hz doesn't compile), `quality_factor` / `damping_ratio` (Q = 1/(2ζ)), each
+  one division rounded once; `from_log_decrement` / `log_decrement` (Λ ↔ ζ, `f64`, no `std` or `libm`). Book page
+  "Damping". Done (piece 5, Beer-Lambert, 72a6c3f): `Absorbance` (AU, `(ln 10)/2` of a neper of loss, A = −lg T),
+  `OpticalDepth` (τ, ½ of one, τ = −ln T), `MolarCentimeter` (feature `chemical`); aliases `LinearAttenuation`
+  (μ, natural), `DecadicAttenuation` and `MolarAbsorptivity` (ε, printed AU/(M·cm)); μ converts to the α of
+  `Per<Loss<Neper>, Meter>` by halving, closing the factor-2 bug; τ = ln 10 · A through `convert` /
+  `convert_rounded` / `fixed!`; `to_gain` into a ratio of powers is the transmittance T. Missing: pieces 2 and 4
+  (length and ultrasound rates) still landing. Book: "A level as a quantity" and "Absorbance and optical depth"
+  on the Decibels page. WireWeaver's crate walker learns the new `unit!` syntax with the wire_weaver side of
+  this item.
+- 📋 **LVL-4 Non-linear scales by name** (was STD-75) · `v0.5` — AWG, mpg ↔ L/100 km, Beaufort, Richter, shoe sizes: a named exact
+  conversion function each, or out of scope with the reason written down.
+- 📋 **LVL-5 Complex level rates** (was STD-98) — `Level` / `LossLevel` and the rate forms of LVL-3 on `Complex` and
+  `Polar` quantities (a complex gain or loss, S-parameters and transfer functions as levels with a rate), once
+  LVL-3's remaining pieces land.
+
+## Complex quantities (`CPX`)
+
+`Complex<U, P, T, B>` and everything built on it: polar form, IQ fixed-point DSP, CORDIC, phase
+angles, complex power.
+
+- ✅ **CPX-1 `units::Phase<A>`** (was STD-88) — a phase angle in the angle unit `A` (`Radian`, `Degree`, `Turn`, or an API's
+  own unit that implements `units::PlaneAngle`), with `A`'s dimension, scale and symbol but the kind `phase angle`;
+  `Phase<Turn>` converts to `Phase<Degree>`, to or from a plane angle is a compile error, crossed by the named steps
+  `as_phase` / `as_plane_angle`. `electrical(pole_pairs)` takes a motor's mechanical angle to its electrical angle by
+  the overflow policy (a `Bam16` wraps at a turn), so field-oriented control that takes a phase refuses the encoder's
+  angle. Aliases `PhaseBam16` / `PhaseBam32` (feature `angle`), binary phase angles that wrap. √W (power waves) is a
+  root-power dimension: `Per<Sqrt<Watt>, Sqrt<Watt>>` has a level of 20·lg, as V/V has.
+- ✅ **CPX-2 `cordic`** (was STD-89) — angles and square roots in integers only, `const fn`s with `const` iteration tables,
+  for a Cortex-M0 as much as a host: `atan2_16(y, x)` of `i16` into a `Bam16` and `atan2_32` of `i32` into a `Bam32`
+  (24 and 40 CORDIC steps in `i32` / `i64`, short vectors normalised first so they are as exact as long ones),
+  `sin_cos_16` of a `Bam16` into two `Q15` and `sin_cos_32` of a `Bam32` into two `Q31` (gain undone in fixed point;
+  `cos 0` saturates to the largest Q value). Each within 0.51 of a step of the exact value (tested against libm over
+  dense grids, every `Bam16`, the axes, the corners and ±full scale), the axes and eighths of a turn exact.
+  `isqrt_u32` / `isqrt_u64` / `isqrt_u128` round √x by a `Rounding`, exactly. `PhaseBam16` / `PhaseBam32` and the arg
+  of a complex number (CPX-6) come on top of these. `docs/complex/cordic.md`.
+- ✅ **CPX-3 `Complex<U, P, T, B = Unbounded>`** (was STD-84, its first claim) — `exact_units` c35076c: a complex quantity, `re` then
+  `im` in unit `U` and scale `P`, both stored as a signed `T` (`ComplexStorage`: `i8`..`i64`, `f32`, `f64`), with
+  an overflow policy `B` (`Unbounded`, `Wrapping`, `Saturating`). `#[repr(C)]`, the common interleaved layout of
+  complex samples; on the wire a `sized` struct of the two numbers. `re()` / `im()` as `Fixed`, `conj`, `mul_j`,
+  `+ - neg` and `*` `/` by a number or a real `Fixed` by the policy, `Complex * Complex` in `Times<U1, U2>` and
+  `Product<P1, P2>` with the kind rules (an `Impedance` times an `Admittance` converts to a `Ratio`), float
+  `Complex / Complex`, `to` / `requantize` / `convert` part by part, `norm_sqr` exact in a storage that always
+  holds it (`NormStorage`: `u32` for `i16`), `times_into` / `times_requantize` rounding each part once from the
+  widened product (the Q15 complex multiply, settled by an `Overflow` where a part doesn't fit), `checked_*`;
+  `Display` `50-25j mΩ` (`{:#}` `0.05-0.025j Ω`), `Debug`, `defmt`. Aliases `Impedance<P, T>` and
+  `Admittance<P, T>` (feature `electrical`). This was the original claim of STD-84, before `Minute`/`Hour`/`Day`/
+  `Week` (8584aad) took the id a second time; it ends the double under its own number.
+- ✅ **CPX-4 Complex power with its kinds** (was STD-92) — `exact_units` 4df3d43: `units::VoltAmpere` (`VA`, kind apparent power)
+  and `units::Var` (`var`, kind reactive power), the watt's dimension under a kind of their own, `Watt` staying
+  plain; S = V·I* as a `Complex<VoltAmpere>`.
+- ✅ **CPX-5 IQ fixed-point DSP** (was STD-91) — `exact_units` 87f2e18, 041b72e: `CQ15<U = Ratio>` and `CQ31<U = Ratio>`, saturating
+  Q15 and Q31 IQ samples; complex multiplies rounded once into their own scale (`mul_round`, `mul_conj_round`, `mix`),
+  `Mac` summing products exactly in `i64` / `i128`, interleaved `[re, im, ..]` buffers without `unsafe`, `Nco` (a
+  `Bam32` phase accumulator with a CORDIC phasor), `cordic::sin_cos_32_q15`; example `14_iq_downconvert`.
+- ✅ **CPX-6 Polar form and levels of a `Complex`** (was STD-90) — `exact_units` efc885e, c5349ab: `Polar<U, P, T, A>`, a magnitude
+  `Fixed` and a phase angle, with `Complex::to_polar` / `from_polar` and `Polar::to_complex`. Floats through `hypot`,
+  `atan2` and `sin`/`cos` (feature `std` or `libm`); integers without a float: `abs` the correctly rounded root of
+  the exact `norm_sqr` in the unsigned twin, `arg` by CORDIC into a `PhaseBam16` / `PhaseBam32` within 0.51 of a
+  step, `from_polar` by Q31 sin/cos. `to_db` from |z|², `norm_sqr_at(Decibels)` and `db!(norm_sqr -15)` as a typed
+  threshold; RF helpers on an impedance (Γ, VSWR, return loss), example `13_impedance_match`.
+
+## Numbers and units at the edges (`IO`)
+
+Getting a typed number or unit in and out of text, serde, other crates' ecosystems: JSON Schema,
+the command line, databases, Arrow.
+
+- ✅ **IO-1 serde for the numbers, for firmware and configs** (was STD-94) — `exact_units` feature `serde`, `no_std` without alloc
+  (the first two forms of IO-5): `Fixed`, `Point`, `Index`, `IndexFrom1`, `Seq` as their stored number, `Complex` as
+  `{ re, im }`, `Polar` as `{ abs, arg }`, `Decibels` as `"-3.01"` in text formats and `(num, decimals)` in binary
+  ones; reading refuses a value outside its bounds (`6000 ms is out of 1..=5000 ms (Second, u16)`) or an
+  `IndexFrom1` of 0. `exact_units::serde::with_unit` writes a field as `{:#}` text and reads a number with its unit
+  and an SI or binary prefix exactly into the field's scale and storage, or says why not (wrong unit, between two
+  steps with the nearest two, past the storage, out of bounds). Breaking: `serde` no longer turns on `std` and
+  `shrink_wrap`; `Magnitude` / `Offset` need `std` too, the owned mirrors `std` and `shrink_wrap` as before. Tests
+  `exact_units/tests/serde.rs`, properties `tests/props/serde_values.rs` (two Kani proofs); docs
+  [`exact_units`](std_library/exact_units.md#serde).
+- 📋 **IO-2 Text unit codes in and out** (was STD-70) — UCUM, UNECE Rec 20, QUDT, SenML / RFC 8798, OpenMetrics: exact
   imports, exports that say where they lose something. Later, in a separate optional crate `exact_units_interop`
   (Roman, 27 Oct): this release builds the capability to represent them (STD-77, TEST-28), not the tables.
-- 📋 **STD-71 Device-standard units in and out** — BLE GATT 0x2904 / GSS, USB HID, BACnet, OPC UA EUInformation, CAN
+- 📋 **IO-3 Device-standard units in and out** (was STD-71) — BLE GATT 0x2904 / GSS, USB HID, BACnet, OPC UA EUInformation, CAN
   DBC / J1939, IEEE 1451 TEDS, SunSpec, IODD, with exact decimal factors and sentinel tables, from public sources
-  only. Later, in `exact_units_interop` like STD-70.
-- 📋 **STD-73 One table of unit symbols and spellings** · `v0.5` — display and parsing of every unit from one table,
+  only. Later, in `exact_units_interop` like IO-2.
+- 📋 **IO-4 One table of unit symbols and spellings** (was STD-73) · `v0.5` — display and parsing of every unit from one table,
   shared by Rust, si_dynamic, `ww` and Python, UCUM spelling where there is one; symbols are case-sensitive and a
   bare ambiguous one is refused (`pH`: picohenry or pH, `B`: bel or byte).
-- 📋 **STD-75 Non-linear scales by name** · `v0.5` — AWG, mpg ↔ L/100 km, Beaufort, Richter, shoe sizes: a named exact
-  conversion function each, or out of scope with the reason written down.
-- 🚧 **STD-78 `serde` for units, three forms per field** · `v0.5` — STD-94 delivers the first two forms for
+- 🚧 **IO-5 `serde` for units, three forms per field** (was STD-78) · `v0.5` — IO-1 delivers the first two forms for
   `exact_units`' typed numbers, the plain number and the `"5 ms"` text (`with_unit`); missing: the rest below. An
   `exact_units` feature `serde` (Roman, 28 Oct 2026), the form chosen per field with `#[serde(with = ..)]` adapters: a plain number (the unit stated in the schema),
-  a human string `"5 ms"` (STD-73's table, exact) or a self-describing `{ value, unit }`. Deserializing accepts any
+  a human string `"5 ms"` (IO-4's table, exact) or a self-describing `{ value, unit }`. Deserializing accepts any
   compatible unit and converts exactly; it refuses a wrong dimension, an inexact conversion, a value out of bounds and
   an ambiguous name; sentinels map to their meaning. Tests per form, and a docs page "Storing units": a fixed unit per
   column is a `Fixed` with the unit in the schema and integers at the fixed scale (SQL aggregates stay right); a unit
   that varies per row is an `AnyQuantity` or a unit column; `Quantity` is a wire tool, normalized before storing; text
   headers like `vbus [mV]`. For configs, web APIs and queues, telemetry, logs and metrics, data files, CAD / EDA (nm
   in better_erc) and Python bindings, not firmware only.
-- 📋 **STD-79 JSON Schema with unit and range** — a `schemars` feature: each unit field's schema names its unit and
-  bounds. Later, an optional feature like STD-78.
-- 📋 **STD-80 Unit values on the command line** — a `clap` value parser (`--timeout 5ms`) on STD-73's table, exact,
-  refusing what STD-78 refuses. Later, optional feature.
-- 📋 **STD-82 Unit metadata in Arrow and Polars** — a column's unit and scale as Arrow field metadata, read back
+- 📋 **IO-6 JSON Schema with unit and range** (was STD-79) — a `schemars` feature: each unit field's schema names its unit and
+  bounds. Later, an optional feature like IO-5.
+- 📋 **IO-7 Unit values on the command line** (was STD-80) — a `clap` value parser (`--timeout 5ms`) on IO-4's table, exact,
+  refusing what IO-5 refuses. Later, optional feature.
+- 📋 **IO-8 Unit metadata in Arrow and Polars** (was STD-82) — a column's unit and scale as Arrow field metadata, read back
   exactly, Polars through it. Later, optional feature.
-- 🚧 **STD-97 Level rates** — levels and their rates as quantities: the neper is a counted base of this crate
-  (like the radian), the decibel is `(ln 10)/20` of it exactly, and a loss sits on a second base (`NeperLoss`), so
-  a datasheet's positive dB/100 m is typed as written and never mixes with a gain. Done (piece 1, e8af146): units
-  `Neper`, `Decibel`, `NeperLoss`, `DecibelLoss`; `Loss<L>` over the `Level` / `LossLevel` traits, carried through
-  `Per`; `as_loss` / `as_gain` negating by the bound's policy; the gain edge `to_level` / `to_gain` (`std` or
-  `libm`); `Dim::strip_neper` for exports; `Fixed::convert_rounded` (dB to Np in integers); `fixed!(v in S)` /
-  `from_decimal_in`; `unit!` lines taking `counted(Other)` and `ln2` / `ln10` exponents. Done (piece 5, Beer-Lambert,
-  72a6c3f): `Absorbance` (AU, `(ln 10)/2` of a neper of loss, A = −lg T), `OpticalDepth` (τ, ½ of one, τ = −ln T),
-  `MolarCentimeter` (feature `chemical`); aliases `LinearAttenuation` (μ, natural), `DecadicAttenuation` and
-  `MolarAbsorptivity` (ε, printed AU/(M·cm)); μ converts to the α of `Per<Loss<Neper>, Meter>` by halving, closing
-  the factor-2 bug; τ = ln 10 · A through `convert` / `convert_rounded` / `fixed!`; `to_gain` into a ratio of powers
-  is the transmittance T. Missing: pieces 2-4 (length, time and ultrasound rates) still landing. Book: "A level as a
-  quantity" and "Absorbance and optical depth" on the Decibels page. WireWeaver's crate walker learns the new
-  `unit!` syntax with the wire_weaver side of this item.
-- 📋 **STD-98 Complex level rates** — `Level` / `LossLevel` and the rate forms of STD-97 on `Complex` and
-  `Polar` quantities (a complex gain or loss, S-parameters and transfer functions as levels with a rate), once
-  STD-97's remaining pieces land.
 
 ## Dropped and superseded
 
-- **STD-57 `Quantity` used at one fixed scale becomes `Fixed`** — dropped (Roman, 27 Oct 2026): the per-use list of
+- **NUM-9 `Quantity` used at one fixed scale becomes `Fixed`** (was STD-57) — dropped (Roman, 27 Oct 2026): the per-use list of
   `Quantity` fields found none whose scale is fixed by contract, so nothing to change.
+
+## STD → area id mapping
+
+Every id that moved out of wire_weaver's `STD` area on 2 Nov 2026, and the area id it carries now.
+`STD-84` appears three times: it was claimed first for `Complex<U, P, T, B>` (never written down), then
+a second time for `Minute`/`Hour`/`Day`/`Week`/the Unix epoch, which itself splits across two areas; each
+claim gets its own row and its own new id below.
+
+| new id | was | title |
+|---|---|---|
+| `NUM-1` | `STD-61` | `exact_units`: the compile-time unit core as a crate of its own |
+| `NUM-2` | `STD-55` | `exact_units::Fixed<U, P, T, B = Unbounded>`: unit, scale and bounds fixed at compile time |
+| `NUM-3` | `STD-62` | One exact magnitude for every scale |
+| `NUM-4` | `STD-63` | Named rounding and overflow policies |
+| `NUM-5` | `STD-58` | `Index`, `IndexFrom1` and `Seq` |
+| `NUM-6` | `STD-83` | Typed products and quotients of quantities |
+| `NUM-7` | `STD-93` | Decimal literals as exact constants |
+| `NUM-8` | `STD-66` | Niche codes next to `Bounds` |
+| `UNIT-1` | `STD-72` | Imperial and US customary units, complete |
+| `UNIT-2` | `STD-68` | Kinds that share a dimension |
+| `UNIT-3` | `STD-84 (units piece)` | `Minute`, `Hour`, `Day` and `Week` units |
+| `UNIT-4` | `STD-85` | `Count`, `Percent`/`Permille`, binary byte sizes, `Hz`, and counted `Line`/`Row`/`Record`/`Entry` |
+| `UNIT-5` | `STD-96` | 48 SI derived-unit markers, `Nit`, fields and radiometric groups |
+| `UNIT-6` | `STD-69` | More counted units |
+| `PT-1` | `STD-64` | Points and origins |
+| `PT-2` | `STD-84 (origin piece)` | The Unix epoch |
+| `PT-3` | `STD-65` | Instants and clocks with named epochs |
+| `LVL-1` | `STD-67` | Levels: dB, dBm, dBV, dBFS, dBc, Np, LUFS, RSSI |
+| `LVL-2` | `STD-95` | Levels in nepers |
+| `LVL-3` | `STD-97` | Level rates |
+| `LVL-4` | `STD-75` | Non-linear scales by name |
+| `LVL-5` | `STD-98` | Complex level rates |
+| `CPX-1` | `STD-88` | `units::Phase<A>` |
+| `CPX-2` | `STD-89` | `cordic` |
+| `CPX-3` | `STD-84 (first claim)` | `Complex<U, P, T, B = Unbounded>` |
+| `CPX-4` | `STD-92` | Complex power with its kinds |
+| `CPX-5` | `STD-91` | IQ fixed-point DSP |
+| `CPX-6` | `STD-90` | Polar form and levels of a `Complex` |
+| `IO-1` | `STD-94` | serde for the numbers, for firmware and configs |
+| `IO-2` | `STD-70` | Text unit codes in and out |
+| `IO-3` | `STD-71` | Device-standard units in and out |
+| `IO-4` | `STD-73` | One table of unit symbols and spellings |
+| `IO-5` | `STD-78` | `serde` for units, three forms per field |
+| `IO-6` | `STD-79` | JSON Schema with unit and range |
+| `IO-7` | `STD-80` | Unit values on the command line |
+| `IO-8` | `STD-82` | Unit metadata in Arrow and Polars |
+| `NUM-9` | `STD-57` | `Quantity` used at one fixed scale becomes `Fixed` |

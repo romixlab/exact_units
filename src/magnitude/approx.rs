@@ -1,5 +1,5 @@
 //! The value of a [Magnitude] that isn't a fraction of integers (π, ln 2, ln 10, a half exponent) as a fixed-point
-//! factor, worked out in `const` code: what a rounding conversion multiplies by (STD-63).
+//! factor, worked out in `const` code: what a rounding conversion multiplies by (NUM-4).
 //!
 //! The magnitude is evaluated in a 128-bit mantissa (every step rounded to nearest, a relative error of a few
 //! 2⁻¹²⁸ in all), then rounded to a 64-bit mantissa `m` with a power of two: the factor is `m · 2^shift` with

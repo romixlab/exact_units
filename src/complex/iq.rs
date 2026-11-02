@@ -1,4 +1,4 @@
-//! IQ fixed-point DSP (STD-91): Q15 and Q31 IQ samples ([CQ15], [CQ31]), a complex multiply into Q15 or Q31 that
+//! IQ fixed-point DSP (CPX-5): Q15 and Q31 IQ samples ([CQ15], [CQ31]), a complex multiply into Q15 or Q31 that
 //! rounds once and saturates per part, the conjugate multiply, a multiply-accumulate in the wide type ([Mac]) and
 //! the dot products built on it, safe adaptors for interleaved sample buffers ([Interleaved]), and an NCO ([Nco])
 //! whose phase accumulator drives a unit phasor by CORDIC.

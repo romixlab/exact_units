@@ -1,4 +1,4 @@
-//! Polar form, levels from |z|² and the RF helpers against libm (STD-90).
+//! Polar form, levels from |z|² and the RF helpers against libm (CPX-6).
 #![expect(
     clippy::as_conversions,
     reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"

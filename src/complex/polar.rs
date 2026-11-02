@@ -1,4 +1,4 @@
-//! The polar form of a [Complex]: |z| and arg z, and back (STD-90).
+//! The polar form of a [Complex]: |z| and arg z, and back (CPX-6).
 //!
 //! - **Floats** take `hypot`, `atan2` and `sin`/`cos` (feature `std` or `libm`; with `libm` from it even when `std`
 //!   is on, so a host and a firmware compute the same bits). The angle is a [Phase] in radians, `Fixed<Phase<Radian>,

@@ -1,4 +1,4 @@
-//! RF helpers on an [Impedance](crate::Impedance) (STD-90): the reflection coefficient Γ = (Z − Z₀) / (Z + Z₀) as a voltage ratio,
+//! RF helpers on an [Impedance](crate::Impedance) (CPX-6): the reflection coefficient Γ = (Z − Z₀) / (Z + Z₀) as a voltage ratio,
 //! VSWR, return loss and mismatch loss from it, and Z ↔ Y. Floats only: Γ is a complex quotient, rounded twice in
 //! integers (see the [module](crate::complex)); a firmware works Γ out once in floats, or tests a Q15 |Γ|² against
 //! `db!(norm_sqr ..)` ([level](crate::complex::level)).

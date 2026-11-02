@@ -1,4 +1,4 @@
-//! Levels in dB (STD-67): the gains `from_db_const` works out at compile time against an 80-digit reference and
+//! Levels in dB (LVL-1): the gains `from_db_const` works out at compile time against an 80-digit reference and
 //! libm's `exp10`, and the run-time `to_db` / `from_db` in `f64` and `f32`.
 #![cfg(feature = "electrical")]
 #![expect(
