@@ -55,6 +55,16 @@ impl LevelForm {
             LevelForm::RootPower => 20.0,
         }
     }
+
+    /// Nepers per natural logarithm of the ratio: 1 for root-power quantities (`ln(V/V₀)` Np), ½ for powers
+    /// (`½·ln(P/P₀)` Np).
+    #[must_use]
+    pub const fn np_per_ln(self) -> f64 {
+        match self {
+            LevelForm::Power => 0.5,
+            LevelForm::RootPower => 1.0,
+        }
+    }
 }
 
 /// Dimensions of power quantities: W, J, W/m².

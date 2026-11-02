@@ -1,4 +1,4 @@
-//! `10^(n/d) · den / num` at compile time, as an interval of binary fractions with 128-bit mantissas: every step
+//! `10^(n/d) · den / num` (and `e^(n/d) · den / num`, for nepers) at compile time, as an interval of binary fractions with 128-bit mantissas: every step
 //! rounds its lower end down and its upper end up, so the true value is always inside. A result is taken only when
 //! both ends round to the same stored value; otherwise the level is too close to halfway between two of them to
 //! decide, and that is a compile error rather than a guess. Integers only: `powf` and `log10` aren't `const`.
@@ -47,6 +47,35 @@ impl Num {
         match m.checked_add(1) {
             Some(m) => Num { m, e },
             None => Num { m: TOP, e: e + 1 },
+        }
+    }
+
+    /// `self + rhs`, rounded down or up.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a.e >= b.e by the swap, so the shift is non-negative and below 128 where it is used; the exponents stay below 2^62 in size (Interval::exp clamps its integer part)"
+    )]
+    const fn add(self, rhs: Num, up: bool) -> Num {
+        let (a, b) = if self.e >= rhs.e {
+            (self, rhs)
+        } else {
+            (rhs, self)
+        };
+        let shift = a.e - b.e;
+        // b shifted right by `shift`, and whether that dropped a set bit
+        let (bm, sticky) = if shift >= 128 {
+            (0, true)
+        } else if shift == 0 {
+            (b.m, false)
+        } else {
+            (b.m >> shift, b.m & ((1 << shift) - 1) != 0)
+        };
+        if let Some(m) = a.m.checked_add(bm) {
+            Num::bump(m, a.e, up && sticky)
+        } else {
+            // 2^128 + w: the top bit carries into the exponent, w's lowest bit is lost
+            let w = a.m.wrapping_add(bm);
+            Num::bump(TOP | (w >> 1), a.e + 1, up && (sticky || w & 1 != 0))
         }
     }
 
@@ -225,6 +254,13 @@ impl Interval {
         }
     }
 
+    const fn add(self, rhs: Interval) -> Interval {
+        Interval {
+            lo: self.lo.add(rhs.lo, false),
+            hi: self.hi.add(rhs.hi, true),
+        }
+    }
+
     const fn pow(self, n: u64) -> Interval {
         Interval {
             lo: self.lo.pow(n, false),
@@ -315,6 +351,66 @@ impl Interval {
         x.mul(Interval::exact(den)).div(Interval::exact(num))
     }
 
+    /// `e^(r/d)` for `0 <= r <= d`, `d > 0`: the Taylor series to `TERMS` terms, each term rounded both ways. The
+    /// terms fall by at least a factor `TERMS` from the last on (`r / d <= 1`), so the rest of the series is below
+    /// the last term, which the upper end takes once more.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "d < 2^64 and i <= TERMS, so d · i fits u128"
+    )]
+    const fn exp_frac(r: u64, d: u64) -> Interval {
+        const TERMS: u128 = 40;
+        let one = Interval::exact(1);
+        if r == 0 {
+            return one;
+        }
+        let r = Interval::exact(r as u128);
+        let mut term = one;
+        let mut sum = one;
+        let mut i = 1;
+        while i <= TERMS {
+            term = term.mul(r).div(Interval::exact(d as u128 * i));
+            sum = sum.add(term);
+            i += 1;
+        }
+        Interval {
+            lo: sum.lo,
+            hi: sum.hi.add(term.hi, true),
+        }
+    }
+
+    /// `e^(k + r/d) · den / num`, `0 <= r < d`: the value of a level in nepers. An integer part past ±2^32 is far
+    /// outside any storage, and stands in as a number too large or too small for all of them.
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable; |k| <= 2^32 is checked before the cast"
+    )]
+    pub(crate) const fn neper(k: i128, r: u64, d: u64, num: u128, den: u128) -> Interval {
+        const FAR: i128 = 1 << 32;
+        let x = if k > FAR || k < -FAR {
+            let far = Num {
+                m: TOP,
+                e: if k > 0 { 1 << 40 } else { -(1 << 40) },
+            };
+            Interval { lo: far, hi: far }
+        } else {
+            let frac = Interval::exp_frac(r, d);
+            let e = Interval::exp_frac(1, 1);
+            if k >= 0 {
+                frac.mul(e.pow(k as u64))
+            } else {
+                frac.div(e.pow(k.unsigned_abs() as u64))
+            }
+        };
+        x.mul(Interval::exact(den)).div(Interval::exact(num))
+    }
+
     /// The nearest integer, the same for both ends, or a compile error.
     #[expect(
         clippy::panic,
@@ -401,6 +497,7 @@ impl Interval {
 )]
 mod tests {
     use super::*;
+    use core::f64::consts;
 
     #[expect(
         clippy::cast_precision_loss,
@@ -440,6 +537,42 @@ mod tests {
     }
 
     #[test]
+    fn add_brackets() {
+        let third = Interval::ratio(1, 3);
+        let sum = third.add(third).add(third);
+        assert!(sum.lo.le(Num::of(1)) && Num::of(1).le(sum.hi));
+        // a carry out of the top bit, and a far smaller addend
+        assert_eq!(
+            Interval::exact(u128::MAX)
+                .add(Interval::exact(1))
+                .hi
+                .round_int(),
+            None
+        );
+        let big = Interval::exact(1 << 120).add(Interval::ratio(1, 1 << 100));
+        assert!(big.lo.le(big.hi) && !big.hi.le(Num::of(1 << 120)));
+        assert_eq!(big.lo.round_int(), Some(1 << 120));
+    }
+
+    #[test]
+    fn exp_matches_f64() {
+        // e^1, e^(1/2), e^-2.5, e^10 against f64 (within a few ulps of the f64 reference)
+        let close = |got: f64, want: f64| {
+            assert!(
+                (got / want - 1.0).abs() < 4.0 * f64::EPSILON,
+                "{got} {want}"
+            );
+        };
+        close(Interval::neper(1, 0, 1, 1, 1).to_f64(), consts::E);
+        close(Interval::neper(0, 1, 2, 1, 1).to_f64(), 0.5f64.exp());
+        close(Interval::neper(-3, 1, 2, 1, 1).to_f64(), (-2.5f64).exp());
+        close(Interval::neper(10, 0, 1, 1, 1).to_f64(), 10f64.exp());
+        // the interval is tight
+        let x = Interval::neper(0, 1, 3, 1, 1);
+        assert!(f64_of(x.hi) - f64_of(x.lo) < 1e-35);
+    }
+
+    #[test]
     fn rounding() {
         // 2.5 ties to 2, 3.5 to 4
         assert_eq!(Num::of(5).div(Num::of(2), false).round_int(), Some(2));
@@ -448,6 +581,7 @@ mod tests {
         assert_eq!(Interval::exact(1).to_f64(), 1.0);
         assert_eq!(Interval::level(1, 1, 1, 1).to_f32(), 10.0);
         assert_eq!(Interval::level(-1, 1, 1, 1).to_f64(), 0.1);
+        assert_eq!(Interval::neper(0, 0, 1, 1, 1).to_f64(), 1.0);
     }
 
     /// `m · 2^e` with the top 53 bits of `m` all ones: the bits below are `rem`.

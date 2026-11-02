@@ -127,6 +127,59 @@ pub(crate) fn level(num: i64, decimals: u8) {
     }
 }
 
+/// The gain at `num · 10^-decimals` Np, as `np!` works it out: a power gain in a `u64` and an amplitude gain in an
+/// `f32` are the nearest stored values to `e^(2·Np)` and `e^Np` (against `f64`, within its rounding), or a
+/// documented refusal for a gain past the storage or one too close to a tie.
+pub(crate) fn neper_level(num: i64, decimals: u8) {
+    use exact_units::decibel::Nepers;
+    let np = Nepers::new(num, decimals);
+    let x = np.to_f64();
+    match outcome(|| Fixed::<Per<Watt, Watt>, One, u64>::from_np_const(np).get()) {
+        Ok(g) => {
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_precision_loss,
+                reason = "compared within f64's rounding"
+            )]
+            let g = g as f64;
+            let want = (2.0 * x).exp();
+            assert!(
+                (g - want).abs() <= 0.5 + want * 1e-12,
+                "{x} Np: {g}, e^(2Np) = {want}"
+            );
+        }
+        Err(m) => {
+            assert!(LEVEL_REFUSALS.contains(&m.as_str()), "{x} Np: {m}");
+            // past u64::MAX (22.18 Np), or a tie: within a step of n + 1/2
+            let want = (2.0 * x).exp();
+            assert!(
+                want > 1.8e19 || (want.fract() - 0.5).abs() < 1e-6 * want.max(1.0),
+                "{x} Np refused: {m}"
+            );
+        }
+    }
+    match outcome(|| Fixed::<Per<Volt, Volt>, One, f32>::from_np_const(np).get()) {
+        Ok(g) => {
+            let want = x.exp();
+            let g = f64::from(g);
+            assert!(
+                (g - want).abs() <= want * 1e-7,
+                "{x} Np: {g}, e^Np = {want}"
+            );
+        }
+        Err(m) => {
+            assert!(LEVEL_REFUSALS.contains(&m.as_str()), "{x} Np: {m}");
+            // outside f32's normal range: below 2^-126 or past f32::MAX, or a tie
+            let want = x.exp();
+            let f = f64::from(f32::MAX);
+            assert!(
+                !(1.2e-38..=f).contains(&want) || is_f32_tie(want),
+                "{x} Np refused: {m}"
+            );
+        }
+    }
+}
+
 /// `x` within f64's rounding of halfway between two f32s.
 #[expect(
     clippy::as_conversions,
@@ -307,6 +360,12 @@ mod tests {
         #[test]
         fn gains(num in prop_oneof![any::<i64>(), -400_000i64..=400_000], decimals in 0..=9u8) {
             super::level(num, decimals);
+        }
+
+        /// Gains in nepers over the whole range of levels, far past every storage and between.
+        #[test]
+        fn neper_gains(num in prop_oneof![any::<i64>(), -100_000i64..=100_000], decimals in 0..=9u8) {
+            super::neper_level(num, decimals);
         }
 
         #[test]

@@ -193,6 +193,18 @@ pub(crate) fn level_at_most_0_db(num: i64, decimals: u8) {
     assert_eq!(g, u64::from(nano > -3_010_299_957), "{num}e-{decimals} dB");
 }
 
+/// A level of `num · 10^-decimals` Np, at or below 0, as a power gain in an u64: 1 above −ln(2)/2 Np = −0.34657359 Np
+/// (half the power), 0 below, however far.
+pub(crate) fn neper_at_most_0(num: i64, decimals: u8) {
+    use exact_units::decibel::Nepers;
+    use exact_units::prefix::One;
+    use exact_units::units::{Per, Watt};
+    let g = Fixed::<Per<Watt, Watt>, One, u64>::from_np_const(Nepers::new(num, decimals)).get();
+    // −ln(2)/2 Np = −0.346573590279972…, in units of 10⁻⁹ Np
+    let nano = i128::from(num) * 10i128.pow(9 - u32::from(decimals));
+    assert_eq!(g, u64::from(nano >= -346_573_590), "{num}e-{decimals} Np");
+}
+
 #[cfg(not(kani))]
 mod tests {
     use super::{Tinier, Tiny};
@@ -392,6 +404,11 @@ mod tests {
         #[test]
         fn levels_at_most_0_db(num in i64::MIN..=0, decimals in 0..=9u8) {
             super::level_at_most_0_db(num, decimals);
+        }
+
+        #[test]
+        fn nepers_at_most_0(num in i64::MIN..=0, decimals in 0..=9u8) {
+            super::neper_at_most_0(num, decimals);
         }
 
         /// Levels where the power gain's exponent of 2 is a few hundred past a multiple of −2³²: an exponent cast

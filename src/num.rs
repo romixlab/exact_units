@@ -160,6 +160,9 @@ pub fn scale_f32(x: f32, exp: i8) -> f32 {
 pub(crate) mod math {
     #[cfg(feature = "libm")]
     pub(crate) use libm::{exp10, exp10f, hypot, hypotf, log10, log10f};
+    // levels in nepers
+    #[cfg(feature = "libm")]
+    pub(crate) use libm::{exp as exp_e, expf as exp_ef, log as ln, logf as lnf};
     // the polar form's arg and from_polar, angles only
     #[cfg(all(feature = "libm", feature = "angle"))]
     pub(crate) use libm::{atan2, atan2f, sincos, sincosf};
@@ -174,6 +177,26 @@ pub(crate) mod math {
         #[inline(always)]
         pub(crate) fn log10f(x: f32) -> f32 {
             x.log10()
+        }
+
+        #[inline(always)]
+        pub(crate) fn ln(x: f64) -> f64 {
+            x.ln()
+        }
+
+        #[inline(always)]
+        pub(crate) fn lnf(x: f32) -> f32 {
+            x.ln()
+        }
+
+        #[inline(always)]
+        pub(crate) fn exp_e(x: f64) -> f64 {
+            x.exp()
+        }
+
+        #[inline(always)]
+        pub(crate) fn exp_ef(x: f32) -> f32 {
+            x.exp()
         }
 
         #[inline(always)]

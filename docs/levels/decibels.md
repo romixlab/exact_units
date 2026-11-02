@@ -108,20 +108,32 @@ $$
 <figcaption>Line theory works in nepers because they fall out of the wave equation: V(x) = V<sub>0</sub>·e<sup>−γx</sup> with γ = α + jβ, so the amplitude is V<sub>0</sub>·e<sup>−αx</sup>. With α in Np/m, αx is the level in Np, no conversion factor needed. A datasheet's dB per 100 m becomes Np/m by dividing by 100 and multiplying by ln 10/20, so α ≈ 0.001151 × dB/100 m. The cable is a Belden 8259 RG-58: nominally 5.4 dB/100 ft at 100 MHz, velocity 66 %. Computed by <code>tools/book_plots</code> with the crate's <code>Magnitude</code>, <code>to_db</code> and <code>from_db_const</code>.</figcaption>
 </figure>
 
-`exact_units` has no neper unit. A level is computed in dB, the kind picks 20·lg or 10·lg, and the factor to Np is one [`Magnitude`](../nomicon/magnitude.md). It keeps $\ln 10$ as an exact symbol, so the factor is exact too:
+`exact_units` takes a neper level the way it takes a dB level, and the kind picks the form: `ln(x)` Np for a ratio of root-power quantities (V/V), `½·ln(x)` Np for a ratio of powers (W/W). At compile time `np!` gives the stored value nearest to $e^{L}$ (or $e^{2L}$ for powers), worked out in integers like `db!`, with no float at run time:
 
 ```rust
-use exact_units::{Fixed, Magnitude, prefix::One, units::{Per, Volt, Watt}};
-
-let db_in_np = Magnitude::LN10.div(Magnitude::ratio(20, 1));
-assert!((db_in_np.to_f64() - core::f64::consts::LN_10 / 20.0).abs() < 1e-15);
+use exact_units::{Fixed, np, prefix::Micro, units::{Per, Volt, Watt}};
 
 // 1 Np down: a voltage at 1/e and a power at 1/e² are one level
+let volts: Fixed<Per<Volt, Volt>, Micro, u32> = np!(-1);
+let watts: Fixed<Per<Watt, Watt>, Micro, u32> = np!(-1);
+assert_eq!(volts.get(), 367_879); // 1/e = 0.367879..
+assert_eq!(watts.get(), 135_335); // 1/e² = 0.135335..
+```
+
+At run time `to_np` and `from_np` (`f64`; `to_np_f32` and `from_np_f32` for the `f32` of a Cortex-M4F) take the same forms, with feature `std` or `libm`, and `1 Np = 20/ln 10 dB` holds for both:
+
+```rust
+use exact_units::{Fixed, prefix::One, units::{Per, Volt, Watt}};
+
 let e = core::f64::consts::E;
-let volts = Fixed::<Per<Volt, Volt>, One, f64>::new(1.0 / e).to_db();
-let watts = Fixed::<Per<Watt, Watt>, One, f64>::new(1.0 / (e * e)).to_db();
-assert!((volts * db_in_np.to_f64() + 1.0).abs() < 1e-12);
-assert!((watts * db_in_np.to_f64() + 1.0).abs() < 1e-12);
+let volts = Fixed::<Per<Volt, Volt>, One, f64>::new(1.0 / e);
+let watts = Fixed::<Per<Watt, Watt>, One, f64>::new(1.0 / (e * e));
+assert!((volts.to_np() + 1.0).abs() < 1e-12);
+assert!((watts.to_np() + 1.0).abs() < 1e-12);
+
+let np_in_db = 20.0 / core::f64::consts::LN_10;
+assert!((volts.to_np() * np_in_db - volts.to_db()).abs() < 1e-12);
+assert!((watts.to_np() * np_in_db - watts.to_db()).abs() < 1e-12);
 ```
 
 More on thresholds, dBFS and complex levels: [Thresholds](thresholds.md).
