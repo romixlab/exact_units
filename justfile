@@ -24,9 +24,9 @@ props-hunt cases="10000" seconds="":
     PROPTEST_CASES={{cases}} {{ if seconds == "" { "" } else { "timeout " + seconds + "s" } }} cargo nextest run --features shrink_wrap,customary,serde --no-fail-fast
 
 # The Kani proofs in tests/props: the properties the proptests draw inputs for, proved for every input. Needs Kani
-# (`cargo install --locked kani-verifier && cargo kani setup`); takes minutes, so it isn't part of `just test`. `serde`: the tests/serde.rs target requires it, and Kani refuses a target whose features are off
+# (`cargo install --locked kani-verifier && cargo kani setup`); takes minutes, so it isn't part of `just test`. The features: test targets require `shrink_wrap` and `serde`, and Kani refuses a target whose features are off
 verify:
-    cargo kani --tests --features serde
+    cargo kani --tests --features shrink_wrap,customary,serde
 
 # Mutation testing: change the library one mutation at a time (.cargo/mutants.toml) and list the mutants no test
 # catches, in mutants.out/. Needs cargo-mutants (`cargo install --locked cargo-mutants`); hours, so not in CI. Extra
