@@ -624,15 +624,20 @@ impl Magnitude {
 
     /// `2^e`: a binary prefix, a Q format. Panics (at compile time in a `const`) for `e` outside `-64..=63`.
     #[must_use]
+    pub const fn pow2(e: i8) -> Self {
+        unwrap(Self::checked_pow2(e))
+    }
+
+    /// `2^e`, `None` for `e` outside `-64..=63`.
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
     #[expect(clippy::arithmetic_side_effects, reason = "2 · an i8 fits i32")]
-    pub const fn pow2(e: i8) -> Self {
+    pub const fn checked_pow2(e: i8) -> Result<Self, MagnitudeError> {
         let mut w = Work::ONE;
         w.pow2 = 2 * e as i32;
-        unwrap(w.pack())
+        w.pack()
     }
 
     /// `num / den`, factored into primes. Panics (at compile time in a `const`) where [checked_ratio](Self::checked_ratio)
@@ -717,19 +722,33 @@ impl Magnitude {
     }
 
     /// `1 / self`.
+    ///
+    /// # Panics
+    ///
+    /// Where negating the exponents of `self` leaves ±63½: `pow10(-64)` has no `pow10(64)` to be its reciprocal.
     #[must_use]
     pub const fn recip(self) -> Self {
-        Self::ONE.div(self)
+        unwrap(self.checked_recip())
+    }
+
+    /// `1 / self`, `None` where negating an exponent leaves ±63½.
+    pub const fn checked_recip(self) -> Result<Self, MagnitudeError> {
+        Self::ONE.checked_div(self)
     }
 
     /// `self^n`. Panics (at compile time in a `const`) when an exponent leaves ±63½.
     #[must_use]
+    pub const fn powi(self, n: i8) -> Self {
+        unwrap(self.checked_powi(n))
+    }
+
+    /// `self^n`, `None` when an exponent leaves ±63½.
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
     )]
-    pub const fn powi(self, n: i8) -> Self {
-        unwrap(Work::of(&self).scale(n as i32).pack())
+    pub const fn checked_powi(self, n: i8) -> Result<Self, MagnitudeError> {
+        Work::of(&self).scale(n as i32).pack()
     }
 
     /// `√self`: exact, the exponents halved (√2, `10^(3/2)`). Panics (at compile time in a `const`) where

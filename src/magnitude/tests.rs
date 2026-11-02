@@ -159,6 +159,32 @@ fn large_and_refused() {
         Magnitude::pow10(40).checked_mul(Magnitude::pow10(30)),
         Err(MagnitudeError::ExponentRange)
     );
+    // pow10(-64) has no pow10(64) to be its reciprocal: negating the doubled exponent leaves an i8
+    assert_eq!(
+        Magnitude::pow10(-64).checked_recip(),
+        Err(MagnitudeError::ExponentRange)
+    );
+    assert_eq!(
+        Magnitude::pow10(-63).checked_recip(),
+        Ok(Magnitude::pow10(63))
+    );
+    assert_eq!(
+        Magnitude::pow2(10).checked_recip(),
+        Ok(Magnitude::pow2(-10))
+    );
+    assert_eq!(
+        Magnitude::checked_pow2(64),
+        Err(MagnitudeError::ExponentRange)
+    );
+    assert!(Magnitude::checked_pow2(63).is_ok());
+    assert_eq!(
+        Magnitude::pow10(-64).checked_powi(2),
+        Err(MagnitudeError::ExponentRange)
+    );
+    assert_eq!(
+        Magnitude::pow10(-64).checked_powi(1),
+        Ok(Magnitude::pow10(-64))
+    );
     assert_eq!(u64::MAX, 3 * 5 * 17 * 257 * 641 * 65537 * 6700417);
     let m = Magnitude::ratio(u64::MAX, 1);
     assert_eq!(m.to_ratio(), Some((u128::from(u64::MAX), 1)));

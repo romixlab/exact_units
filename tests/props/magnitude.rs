@@ -232,9 +232,13 @@ pub(crate) fn operations(a: Spelled<'_>, b: Spelled<'_>, pow10: i8, pow2: i8, n:
     for (i, p) in atoms.iter().flatten().enumerate() {
         let (m, model) = p;
         assert_eq!(m.to_ratio(), model.ratio());
-        // `recip` panics where the inverse leaves the range (10^-64 has no 10^64)
+        // `recip` panics where the inverse leaves the range (10^-64 has no 10^64); `checked_recip` says so instead
         if model.recip().representable() {
-            assert_eq!(m.recip().to_ratio(), model.recip().ratio());
+            let r = m.recip();
+            assert_eq!(r.to_ratio(), model.recip().ratio());
+            assert_eq!(m.checked_recip(), Ok(r));
+        } else {
+            assert_eq!(m.checked_recip(), Err(MagnitudeError::ExponentRange));
         }
         for q in atoms.iter().flatten().skip(i) {
             let (m2, model2) = q;

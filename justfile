@@ -5,14 +5,23 @@ default:
 # The tests, the feature sets of CI's test job. `--changed` (what a session runs before it is ready) is the same run:
 # the repository is one crate. Warnings are errors, as in CI (its toolchain action sets `-D warnings`): a test config
 # that warns fails here too. Not `--all-features`: with `defmt` host test binaries need a global logger (ci.yml).
+# PROPTEST_RNG_SEED fixes tests/props' draws: the same code gives the same result here and under `just mutants`;
+# `just props-hunt` draws from proptest's own random seed instead.
 test *flags:
-    CARGO_BUILD_WARNINGS=deny cargo nextest run --features shrink_wrap,customary,serde --no-fail-fast
-    CARGO_BUILD_WARNINGS=deny cargo nextest run --no-default-features --features std --no-fail-fast
-    CARGO_BUILD_WARNINGS=deny cargo nextest run --no-default-features --features shrink_wrap,quantities,serde --no-fail-fast
+    CARGO_BUILD_WARNINGS=deny PROPTEST_RNG_SEED=0 cargo nextest run --features shrink_wrap,customary,serde --no-fail-fast
+    CARGO_BUILD_WARNINGS=deny PROPTEST_RNG_SEED=0 cargo nextest run --no-default-features --features std --no-fail-fast
+    CARGO_BUILD_WARNINGS=deny PROPTEST_RNG_SEED=0 cargo nextest run --no-default-features --features shrink_wrap,quantities,serde --no-fail-fast
     # nextest does not run doctests; they include the book's pages (src/book.rs)
     CARGO_BUILD_WARNINGS=deny cargo test --doc --features shrink_wrap,customary,serde
     # the book site's Markdown extensions (docs_ext: the `bits` fence, `rust,compile_fail` blocks)
     uv run --group dev pytest -q docs_ext
+
+# Hunt tests/props for failures a fixed seed can't reach: proptest's own random seed, many more cases than the gate
+# (CASES, default 10000) - a spare PC overnight, not `just test`. A case it finds persists to
+# tests/proptest-regressions/<module>.txt, the file `just test` and `just mutants` replay too; commit it with the
+# fix. SECONDS time-boxes the run with `timeout` (none: runs to completion)
+props-hunt cases="10000" seconds="":
+    PROPTEST_CASES={{cases}} {{ if seconds == "" { "" } else { "timeout " + seconds + "s" } }} cargo nextest run --features shrink_wrap,customary,serde --no-fail-fast
 
 # The Kani proofs in tests/props: the properties the proptests draw inputs for, proved for every input. Needs Kani
 # (`cargo install --locked kani-verifier && cargo kani setup`); takes minutes, so it isn't part of `just test`. `serde`: the tests/serde.rs target requires it, and Kani refuses a target whose features are off
@@ -21,9 +30,9 @@ verify:
 
 # Mutation testing: change the library one mutation at a time (.cargo/mutants.toml) and list the mutants no test
 # catches, in mutants.out/. Needs cargo-mutants (`cargo install --locked cargo-mutants`); hours, so not in CI. Extra
-# flags pass through: `-f src/index.rs` for one file, `-j 8` for parallel jobs
+# flags pass through: `-f src/index.rs` for one file, `-j 8` for parallel jobs. PROPTEST_RNG_SEED: see `just test`
 mutants *flags:
-    cargo mutants --features shrink_wrap,customary,serde {{flags}}
+    PROPTEST_RNG_SEED=0 cargo mutants --features shrink_wrap,customary,serde {{flags}}
 
 # Fuzz one target of fuzz/ for SECONDS: the property functions of tests/props, coverage-guided. Needs a nightly
 # toolchain and cargo-fuzz (`rustup toolchain install nightly`, `cargo install cargo-fuzz`). Starts from the
