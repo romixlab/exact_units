@@ -642,7 +642,13 @@ impl Requant {
         reason = "max · num and max · den fit i128 (i64 where narrow), asserted in of_terms, so n, d and their \
                   negations fit"
     )]
-    fn per<T: Storage, T3: Storage>(self, a: T, b: T, r: Rounding, o: Overflow) -> Option<T3> {
+    pub(crate) fn per<T: Storage, T3: Storage>(
+        self,
+        a: T,
+        b: T,
+        r: Rounding,
+        o: Overflow,
+    ) -> Option<T3> {
         if self.float {
             let d = to_f64(b);
             if d == 0.0 {

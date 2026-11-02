@@ -11,6 +11,8 @@
 )]
 
 mod arith;
+#[cfg(feature = "levels")]
+mod damping;
 mod format;
 #[cfg(feature = "levels")]
 mod level;

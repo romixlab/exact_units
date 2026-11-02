@@ -62,6 +62,7 @@ nav = [
             "levels/decibels.md",
             { "Advanced" = [
                     "levels/thresholds.md",
+                    "levels/damping.md",
                 ]
             },
         ]

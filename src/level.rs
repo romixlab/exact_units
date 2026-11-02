@@ -132,6 +132,13 @@
 //! let _ = Fixed::<LinearAttenuation, One, f32>::new(0.02).convert::<Wavenumber, One, f32>();
 //! ```
 
+mod damping;
+
+#[cfg(feature = "time")]
+pub use damping::DampingCoefficient;
+#[cfg(feature = "counting")]
+pub use damping::LogarithmicDecrement;
+
 use crate::complex::{ComplexStorage, Policy};
 #[cfg(feature = "mechanical")]
 use crate::units::Meter;

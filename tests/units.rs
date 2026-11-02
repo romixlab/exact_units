@@ -404,7 +404,7 @@ fn derived_names() {
 /// No two named units share a symbol but the pairs that are one unit of two quantities (SI Brochure table 6 lists each
 /// pair on one line): W/m² of heat flux and irradiance, J/K of heat capacity and entropy, m²·s⁻² of absorbed and
 /// equivalent dose differ in their symbols. A loss shares its gain's symbol (dB, Np): their dimensions tell them
-/// apart.
+/// apart. A damping ratio and a quality factor are numbers like a ratio, told apart by their kinds.
 #[test]
 fn symbols_are_unique_but_for_shared_units() {
     use exact_units::UnitExpr;
@@ -430,6 +430,12 @@ fn symbols_are_unique_but_for_shared_units() {
             ("Neper", "NeperLoss"),
             #[cfg(feature = "levels")]
             ("Decibel", "DecibelLoss"),
+            #[cfg(feature = "levels")]
+            ("DampingRatio", "QualityFactor"),
+            #[cfg(all(feature = "levels", feature = "dimensionless"))]
+            ("DampingRatio", "Ratio"),
+            #[cfg(all(feature = "levels", feature = "dimensionless"))]
+            ("QualityFactor", "Ratio"),
             ("HeatFluxDensity", "Irradiance"),
             ("HeatCapacity", "Entropy"),
         ]

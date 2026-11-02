@@ -34,6 +34,8 @@ pages! {
     Indices = "points/indices.md";
     Decibels = "levels/decibels.md";
     Thresholds = "levels/thresholds.md";
+    #[cfg(all(feature = "levels", feature = "time", feature = "angle", feature = "counting"))]
+    Damping = "levels/damping.md";
     Complex = "complex/complex.md";
     Iq = "complex/iq.md";
     Cordic = "complex/cordic.md";

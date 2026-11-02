@@ -1,0 +1,140 @@
+//! Damping per time (STD-97): ζ ↔ Q, the time constant 1 Np / δ and ζ = δ/ω₀ in integers, each rounded once against
+//! an exact quotient in `i128`; Λ ↔ ζ in floats against a second form of the formula.
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "a test computes with the values it chose, which fit; an overflow fails the test"
+)]
+
+use super::reference::round_div;
+use core::f64::consts::{LN_10, TAU};
+use exact_units::prefix::{Micro, Milli, One};
+use exact_units::units::{
+    AngularVelocity, DampingCoefficient, DampingRatio, QualityFactor, Second,
+};
+use exact_units::{Fixed, Rounding};
+
+/// `n / d` rounded by `r`, `None` for `d = 0`, as the reference of a quotient of any sign.
+fn quotient(n: i128, d: i128, r: Rounding) -> Option<i128> {
+    match d {
+        0 => None,
+        d if d < 0 => Some(round_div(-n, -d, r)),
+        d => Some(round_div(n, d, r)),
+    }
+}
+
+/// `z` thousandths of a damping ratio as a quality factor in thousandths: 1/(2ζ) is `500 000 / z`, and the same
+/// formula back from Q. `None` for 0 or past `i16`.
+pub(crate) fn zeta_to_q(z: i16, r: Rounding) {
+    let want = quotient(500_000, i128::from(z), r).and_then(|q| i16::try_from(q).ok());
+    let q = Fixed::<DampingRatio, Milli, i16>::new(z).quality_factor::<Milli, i16>(r);
+    assert_eq!(q.map(Fixed::get), want, "ζ {z} m {r:?}");
+    let back = Fixed::<QualityFactor, Milli, i16>::new(z).damping_ratio::<Milli, i16>(r);
+    assert_eq!(back.map(Fixed::get), want, "Q {z} m {r:?}");
+}
+
+/// `d` mNp/s of damping as a time constant in µs: 1/(d · 10⁻³) s is `10⁹ / d` µs; `None` for 0.
+pub(crate) fn time_constant(d: i16, r: Rounding) {
+    let want = quotient(1_000_000_000, i128::from(d), r).and_then(|t| i32::try_from(t).ok());
+    let delta = Fixed::<DampingCoefficient, Milli, i32>::new(i32::from(d));
+    let tau = delta.time_constant::<Second, Micro, i32>(r);
+    assert_eq!(tau.map(Fixed::get), want, "δ {d} mNp/s {r:?}");
+}
+
+/// `d` mNp/s of damping at ω₀ of `w` rad/s as a damping ratio in µ: `d · 1000 / w`; `None` for ω₀ = 0.
+pub(crate) fn damping_ratio(d: i16, w: i16, r: Rounding) {
+    let want = quotient(i128::from(d) * 1000, i128::from(w), r).and_then(|z| i32::try_from(z).ok());
+    let delta = Fixed::<DampingCoefficient, Milli, i32>::new(i32::from(d));
+    let omega0 = Fixed::<AngularVelocity, One, i32>::new(i32::from(w));
+    let zeta = delta.damping_ratio::<_, _, _, Micro, i32>(omega0, r);
+    assert_eq!(
+        zeta.map(Fixed::get),
+        want,
+        "δ {d} mNp/s, ω₀ {w} rad/s {r:?}"
+    );
+}
+
+/// ζ in (−1, 1) to Λ and back is ζ within a few ulps, and Λ agrees with `ζ = 1/√(1 + (2π/Λ)²)` read backwards.
+#[cfg(feature = "counting")]
+pub(crate) fn decrement_round_trip(zeta: f64) {
+    use exact_units::units::LogarithmicDecrement;
+    let z = Fixed::<DampingRatio, One, f64>::new(zeta);
+    let lambda = z.log_decrement::<LogarithmicDecrement, One, f64>();
+    assert!(lambda.is_some(), "ζ {zeta} in (−1, 1) has a decrement");
+    let l = lambda.map_or(f64::NAN, Fixed::get);
+    if zeta != 0.0 {
+        let other = (1.0 / (1.0 + (TAU / l).powi(2)).sqrt()).copysign(l);
+        assert!(
+            (other - zeta).abs() <= 1e-12,
+            "ζ {zeta}: Λ {l} gives {other}"
+        );
+    }
+    let back = lambda.and_then(Fixed::<DampingRatio, One, f64>::from_log_decrement);
+    let back = back.map_or(f64::NAN, Fixed::get);
+    assert!((back - zeta).abs() <= 1e-12, "ζ {zeta}: back {back}");
+}
+
+/// Every i16 through every mode: ζ ↔ Q and the time constant in full.
+#[cfg(not(kani))]
+#[test]
+fn every_i16() {
+    for x in i16::MIN..=i16::MAX {
+        for r in super::reference::MODES {
+            zeta_to_q(x, r);
+            time_constant(x, r);
+        }
+    }
+}
+
+/// ζ of 1 and beyond has no decrement; a Λ in dB per cycle is the one in Np scaled by (ln 10)/20.
+#[cfg(all(not(kani), feature = "counting"))]
+#[test]
+fn decrement_edges() {
+    use exact_units::units::{Cycle, Decibel, LogarithmicDecrement, Loss, Per};
+    for zeta in [1.0, -1.0, 1.5, f64::NAN, f64::INFINITY] {
+        let z = Fixed::<DampingRatio, One, f64>::new(zeta);
+        assert_eq!(
+            z.log_decrement::<LogarithmicDecrement, One, f64>(),
+            None,
+            "{zeta}"
+        );
+    }
+    let np = Fixed::<LogarithmicDecrement, One, f64>::new(0.5);
+    let db = Fixed::<Per<Loss<Decibel>, Cycle>, One, f64>::new(0.5 * 20.0 / LN_10);
+    let a: Fixed<DampingRatio, One, f64> = Fixed::from_log_decrement(np).unwrap();
+    let b: Fixed<DampingRatio, One, f64> = Fixed::from_log_decrement(db).unwrap();
+    assert!((a.get() - b.get()).abs() < 1e-15);
+}
+
+#[cfg(not(any(kani, fuzzing)))]
+mod tests {
+    use super::*;
+    use crate::strategy;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn damping_ratio_i16(d in strategy::i16(), w in strategy::i16(), r in strategy::mode()) {
+            damping_ratio(d, w, r);
+        }
+
+        #[cfg(feature = "counting")]
+        #[test]
+        fn decrement(zeta in prop_oneof![-0.999_999f64..0.999_999, -1e-6f64..1e-6]) {
+            decrement_round_trip(zeta);
+        }
+    }
+}
+
+#[cfg(kani)]
+mod proofs {
+    use super::*;
+    use crate::reference::MODES;
+
+    /// Every pair of i16 and every mode, what the proptest samples (ζ ↔ Q and the time constant are walked whole by
+    /// `every_i16`).
+    #[kani::proof]
+    fn damping_ratio_i16() {
+        let r = MODES[usize::from(kani::any_where(|i: &u8| *i < 5))];
+        damping_ratio(kani::any(), kani::any(), r);
+    }
+}

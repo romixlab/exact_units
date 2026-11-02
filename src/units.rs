@@ -363,6 +363,17 @@ crate::unit! {
     #[cfg(feature = "levels")]
     pub struct OpticalDepth = "τ", counted(NeperLoss), Exact(1 / 2);
 
+    /// A damping ratio, ζ: δ/ω₀ of a second-order system (x″ + 2ζω₀·x′ + ω₀²·x = 0), 1 at critical damping. A number of
+    /// the kind `damping ratio`, so it isn't a plain `Ratio` or a [QualityFactor] (Q = 1/(2ζ)): `damping_ratio` and
+    /// `quality_factor` are the steps.
+    #[cfg(feature = "levels")]
+    pub struct DampingRatio = "", [] kind "damping ratio";
+
+    /// A quality factor, Q: 1/(2ζ) of a second-order system, ω₀ over the half-power bandwidth. A number of the kind
+    /// `quality factor`, so it isn't a plain `Ratio` or a [DampingRatio].
+    #[cfg(feature = "levels")]
+    pub struct QualityFactor = "", [] kind "quality factor";
+
     // Thermal
 
     /// Thermodynamic temperature in kelvins, K.
@@ -799,6 +810,10 @@ impl<P, T: crate::Storage, B: crate::Bounds<T>> crate::Fixed<Per<Cycle, Second>,
     }
 }
 
+#[cfg(all(feature = "levels", feature = "time"))]
+pub use crate::level::DampingCoefficient;
+#[cfg(all(feature = "levels", feature = "counting"))]
+pub use crate::level::LogarithmicDecrement;
 #[cfg(all(feature = "levels", feature = "chemical"))]
 pub use crate::level::MolarAbsorptivity;
 #[cfg(all(feature = "levels", feature = "mechanical"))]
