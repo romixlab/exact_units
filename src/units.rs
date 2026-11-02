@@ -195,7 +195,8 @@ crate::unit! {
     #[cfg(feature = "mechanical")]
     pub struct Litre = "L", [m 3], Pow10(-3);
 
-    /// Volumetric flow in cubic meters per second, m³/s.
+    /// Volumetric flow in cubic meters per second, m³/s. Written in litres from 10⁻³ m³/s down, like a [Volume]:
+    /// `5 L/s`, `5 mL/s`, `5 µL/s`.
     #[cfg(feature = "mechanical")]
     pub struct VolumetricFlow = "m³/s", [m 3, s -1];
 
@@ -219,12 +220,14 @@ crate::unit! {
     #[cfg(feature = "mechanical")]
     pub struct Yank = "N/s", [kg 1, m 1, s -3];
 
-    /// Area in square meters, m² (SI Brochure, 9th ed., table 5). With a prefix it is written on the whole unit,
-    /// `m(m²)`: `mm²` would read as (mm)², 10⁻⁶ m²; a square millimetre is `Fixed<Area, Micro, T>`.
+    /// Area in square meters, m² (SI Brochure, 9th ed., table 5). A prefix binds to the metre and the power applies
+    /// to both: a `Fixed<Area, Micro, T>` is written `5 mm²`, and a `Fixed<Area, Milli, T>`, which no prefix on the
+    /// metre makes, `5 m(m²)`.
     #[cfg(feature = "mechanical")]
     pub struct Area = "m²", [m 2];
 
-    /// Volume in cubic meters, m³ (SI Brochure, 9th ed., table 5); a litre is [Litre], 10⁻³ m³.
+    /// Volume in cubic meters, m³ (SI Brochure, 9th ed., table 5); a litre is [Litre], 10⁻³ m³. Written in litres from
+    /// 10⁻³ m³ down to 10⁻⁹ m³: a `Fixed<Volume, Milli, T>` is `5 L`, in `Micro` `5 mL`, in `Nano` `5 µL`.
     #[cfg(feature = "mechanical")]
     pub struct Volume = "m³", [m 3];
 

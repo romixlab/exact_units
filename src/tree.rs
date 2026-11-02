@@ -385,12 +385,134 @@ pub(crate) fn takes_bare_prefix<'t, E: Tree<'t>>(e: &E) -> bool {
 }
 
 /// Whether a prefix written straight before `symbol` means the prefix times the unit: `mV`, `mm/s`, `mN·m`. Not where
-/// the first factor has an exponent (`mm²` reads as (mm)², 10⁻⁶ m², and `mm³/s` as 10⁻⁹ m³/s) or already has a
-/// prefix (`kg/m³`, `kgf`): such a unit takes it on the whole of it in parentheses, `m(m²)`, as a compound unit does.
+/// the first factor has an exponent (`mm²` is (mm)², 10⁻⁶ m², and `mm³/s` is 10⁻⁹ m³/s) or already has a prefix
+/// (`kg/m³`, `kgf`): such a unit takes it on the whole of it in parentheses, `m(m²)`, as a compound unit does, unless
+/// [moved] finds the form people write.
 pub(crate) fn prefix_binds(symbol: &str) -> bool {
     let lead = symbol.split(['/', '·']).next().unwrap_or(symbol);
     !lead.starts_with("kg")
         && !lead.contains(['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹', '⁻'])
+}
+
+/// The powers of ten that move inside a square metre: dm², cm², mm², µm², nm², km². Other prefixes aren't used on a
+/// power (hm² is 10⁴ m², but nobody reads it), so such a scale stays on the whole unit.
+const AREA_PREFIXES: [i8; 6] = [-1, -2, -3, -6, -9, 3];
+
+/// The powers of ten that move inside a cubic metre: dm³, cm³, mm³, µm³, nm³. A km³ is rare, a dam³ rarer.
+const VOLUME_PREFIXES: [i8; 5] = [-1, -2, -3, -6, -9];
+
+/// A scale on a unit with a power of the metre, as people write it. The unit and its [Magnitude](crate::Magnitude)
+/// don't change, only the text.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum Moved<'a> {
+    /// The prefix binds to the metre and the power applies to the prefixed unit (SI Brochure, 9th ed., §3): 10⁻⁶ m³
+    /// with `Centi` here is `cm³`.
+    Inside(Prefix),
+    /// A litre and what follows the metres in the symbol: `mL`, `/s`.
+    Litre(&'static str, &'a str),
+}
+
+/// How `prefix` on `unit` is written when it doesn't go on the whole of it: a power of ten `k` on a unit whose first
+/// factor is m² or m³ moves inside as `10^(k/n)` where `n` divides `k` and that prefix is one people use with the power
+/// ([AREA_PREFIXES], [VOLUME_PREFIXES]). `None` otherwise: [write_unit] then keeps the prefix on the whole unit,
+/// `k(m³)`, `da(m²)`, or the scale after the number where it has no symbol, `·10⁴ m²`. Works for a scale without a
+/// prefix's name too: 10⁻⁴ m² is `cm²`.
+///
+/// Metres only: `mV²` and `mft³` keep their form, and so does a unit known by name only (no dimension says its `m` is
+/// a metre).
+pub(crate) fn moved<'t, E: Tree<'t>>(prefix: Prefix, unit: &E) -> Option<Moved<'t>> {
+    let inner = inside(prefix, unit)?;
+    prefix
+        .pow10()
+        .and_then(|k| litre(k, unit))
+        .or(Some(Moved::Inside(inner)))
+}
+
+/// The prefix on the metre that stands for `prefix` on `unit`, see [moved]: 10⁻⁶ m³ is `Centi`.
+pub(crate) fn inside<'t, E: Tree<'t>>(prefix: Prefix, unit: &E) -> Option<Prefix> {
+    let k = prefix.pow10()?;
+    let n = metre_power(unit, 0)?;
+    if k.checked_rem(n)? != 0 {
+        return None;
+    }
+    let inner = k.checked_div(n)?;
+    let allowed: &[i8] = if n == 2 {
+        &AREA_PREFIXES
+    } else {
+        &VOLUME_PREFIXES
+    };
+    if allowed.contains(&inner) {
+        Prefix::si_from_pow10(inner)
+    } else {
+        None
+    }
+}
+
+/// `L`, `mL` and `µL` for the markers `Volume` and `VolumetricFlow` themselves. Any other unit of the dimension was
+/// spelled by its author (`Per<Volume, Second>`, a kind of its own, `Litre`, which has its own prefixes) and keeps its
+/// spelling.
+fn litre<'t, E: Tree<'t>>(k: i8, unit: &E) -> Option<Moved<'t>> {
+    let Node::Named {
+        name,
+        symbol,
+        scale: Some(Scale::Coherent),
+        ..
+    } = unit.node()?
+    else {
+        return None;
+    };
+    if !matches!(
+        (name, symbol),
+        ("Volume", "m³") | ("VolumetricFlow", "m³/s")
+    ) {
+        return None;
+    }
+    let litres = match k {
+        -3 => "L",
+        -6 => "mL",
+        -9 => "µL",
+        _ => return None,
+    };
+    Some(Moved::Litre(litres, symbol.strip_prefix("m³")?))
+}
+
+/// `n` when the symbol of `e` starts with mⁿ, a metre, for `n` of 2 or 3, with nothing before it that a prefix would
+/// have to go past (a parenthesis, as in `(m³/s)/s`).
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "depth < MAX_UNIT_DEPTH, checked first"
+)]
+fn metre_power<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<i8> {
+    if depth >= MAX_UNIT_DEPTH {
+        return None;
+    }
+    match e.node()? {
+        Node::Named { symbol, dim, .. } => {
+            let n = match symbol.split(['/', '·']).next()? {
+                "m²" => 2,
+                "m³" => 3,
+                _ => return None,
+            };
+            (dim?.m == n).then_some(n)
+        }
+        Node::Pow(a, n @ (2 | 3)) => match a.node()? {
+            Node::Named {
+                symbol: "m",
+                dim: Some(dim),
+                ..
+            } if dim.m == 1 => Some(n),
+            _ => None,
+        },
+        // as write_symbol parenthesises them
+        Node::Div(a, _) if !matches!(a.node()?, Node::Div(..)) => metre_power(&a, depth + 1),
+        Node::Mul(a, _)
+            if a.node()
+                .is_some_and(|n| !is_compound(&n) || matches!(n, Node::Mul(..))) =>
+        {
+            metre_power(&a, depth + 1)
+        }
+        _ => None,
+    }
 }
 
 #[expect(
@@ -430,12 +552,22 @@ fn same_at<'s, 't, A: Tree<'s>, B: Tree<'t>>(a: &A, b: &B, depth: usize) -> bool
 }
 
 /// The prefix and the unit's symbol, as written after a number: ` mV`, ` kg`, ` %` for a ratio in `Centi`,
-/// ` k(N·m/(rad/s))` for a compound unit.
+/// ` k(N·m/(rad/s))` for a compound unit. A power of ten on square or cubic metres goes inside where people write it
+/// so: ` mm²` for `Micro` on m², ` cm³/kg` for `Micro` on m³/kg, and the markers `Volume` and `VolumetricFlow` are in
+/// litres from 10⁻³ down to 10⁻⁹ (` mL/s`).
 pub fn write_unit<'t, E: Tree<'t>>(
     prefix: Prefix,
     unit: &E,
     f: &mut fmt::Formatter<'_>,
 ) -> fmt::Result {
+    match moved(prefix, unit) {
+        Some(Moved::Inside(p)) => {
+            write!(f, " {}", p.symbol())?;
+            return write_symbol(unit, f, 0);
+        }
+        Some(Moved::Litre(litres, rest)) => return write!(f, " {litres}{rest}"),
+        None => {}
+    }
     if !prefix.is_named() {
         // a factor without a symbol: after the number, then the unit
         write!(f, "{prefix}")?;

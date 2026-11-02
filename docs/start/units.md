@@ -29,7 +29,7 @@ The markers come in groups, one cargo feature each. A firmware turns on only the
 
 `quantities` turns on every group but `customary`. `std` turns on `quantities`.
 
-The derived units are the coherent ones of the SI Brochure's tables 5 and 6, plus a few exact everyday scales (`MolePerLitre`, `GramPerCubicCentimeter`, `GramPerMole`, `SievertPerHour`). A unit with a power in its first factor takes a prefix on the whole of it: a `Fixed<Area, Micro, T>` is written `5 µ(m²)`, since `5 mm²` would mean 10⁻⁶ m², not 10⁻³.
+The derived units are the coherent ones of the SI Brochure's tables 5 and 6, plus a few exact everyday scales (`MolePerLitre`, `GramPerCubicCentimeter`, `GramPerMole`, `SievertPerHour`). [Printing values](display.md#prefixes-on-powers) shows how a prefix is written on a unit with a power.
 
 ## Building units
 

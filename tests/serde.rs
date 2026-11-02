@@ -19,7 +19,7 @@ use exact_units::complex::Polar;
 use exact_units::decibel::Decibels;
 use exact_units::niche::{Clipped, J1939U8, Niched, Null};
 use exact_units::origins::Celsius;
-use exact_units::prefix::{Centi, Kibi, Micro, Milli, One, Pow2};
+use exact_units::prefix::{Centi, Kibi, Micro, Milli, Nano, One, Pow2, Pow10};
 use exact_units::units::{Byte, Item, Kelvin, Meter, Ratio, Sample, Second, Volt};
 use exact_units::{
     Bam16, CQ15, Complex, Duty16, Fixed, Impedance, Index, IndexFrom1, Millis, PhaseBam16, Point,
@@ -434,9 +434,9 @@ fn with_unit_round_trips_the_ends_of_wide_storages() {
         );
     }
     for v in [0, 1, u64::MAX] {
-        let s = write(Fixed::<Second, exact_units::prefix::Nano, u64>::new(v));
+        let s = write(Fixed::<Second, Nano, u64>::new(v));
         assert_eq!(
-            read::<Second, exact_units::prefix::Nano, u64, exact_units::Unbounded>(&s),
+            read::<Second, Nano, u64, exact_units::Unbounded>(&s),
             Ok(v),
             "{s}"
         );
@@ -492,7 +492,7 @@ fn dim_reads_only_canonical() {
 }
 
 /// Every derived unit's symbol reads back as written, bare and with a prefix (in parentheses where its first factor
-/// has an exponent or a prefix, `m(m²)`); a luminance also reads as `nit` and `nt`.
+/// has an exponent or a prefix and none moves inside, `m(m²)`); a luminance also reads as `nit` and `nt`.
 #[cfg(all(
     feature = "mechanical",
     feature = "fields",
@@ -579,11 +579,30 @@ fn with_unit_round_trips_derived_symbols() {
         assert_eq!(nits(s), Ok(500), "{s}");
     }
     assert_eq!(write(Fixed::<Nit, One, u16>::new(500)), "500 cd/m²");
-    // a powered symbol takes no bare prefix: `mm²` is not 10⁻³ m²
+    // the prefix of `mm²` is on the metre, 10⁻⁶ m², not 10⁻³ m²
     assert!(read::<units::Area, Milli, i32, exact_units::Unbounded>("5 mm²").is_err());
+    assert_eq!(
+        read::<units::Area, Micro, i32, exact_units::Unbounded>("5 mm²"),
+        Ok(5)
+    );
     assert_eq!(
         read::<units::Area, Milli, i32, exact_units::Unbounded>("5 m(m²)"),
         Ok(5)
     );
+    // ASCII micro, and the Greek letter
+    for s in ["5 um²", "5 µm²", "5 \u{3bc}m²"] {
+        assert_eq!(
+            read::<units::Area, Pow10<-12>, i32, exact_units::Unbounded>(s),
+            Ok(5),
+            "{s}"
+        );
+    }
+    assert_eq!(
+        read::<units::Volume, Nano, i32, exact_units::Unbounded>("5 uL"),
+        Ok(5)
+    );
+    // what isn't written isn't read: not a prefix people use with the power, not a unit of the kind
+    assert!(read::<units::Area, Pow10<4>, i32, exact_units::Unbounded>("5 hm²").is_err());
+    assert!(read::<units::SpecificVolume, Milli, i32, exact_units::Unbounded>("5 L/kg").is_err());
     assert!(read::<units::Density, One, i32, exact_units::Unbounded>("5 g/m³").is_err());
 }

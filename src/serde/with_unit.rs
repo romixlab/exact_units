@@ -8,8 +8,9 @@
 //!
 //! Read: a decimal number (`1.5`, `-2e-3`, `1_000`), then the field's unit, with or without an SI prefix (`1.5 ms`,
 //! `1500 µs` or `1500 us`, `0.0015 s`; a binary prefix too, `4 KiB`), the space optional. A ratio takes `%`, `‰`,
-//! `ppm` and `ppb`, or nothing. The value goes into the field's scale and storage exactly, else it is an error that
-//! says why:
+//! `ppm` and `ppb`, or nothing. Square and cubic metres read as `{}` writes them: `5 mm²` (10⁻⁶ m², and `5 m(m²)` is
+//! 10⁻³ m²), `5 cm³/kg`, and litres on a volume and a volume flow, `5 mL/s` as well as `5 cm³/s`. The value goes into
+//! the field's scale and storage exactly, else it is an error that says why:
 //!
 //! - not the field's unit: `"5 kg" is not in s (with or without an SI prefix)`;
 //! - not a whole number of steps: `"1.2345 ms" is not a whole number of 1 µs steps`, with the nearest values the
@@ -46,7 +47,7 @@
 use super::OutOfRange;
 use super::text::{Buf, Decimal, writes_as};
 use crate::fixed::write_prefix_unit;
-use crate::tree::{is_ratio, takes_bare_prefix, write_unit};
+use crate::tree::{inside, is_ratio, takes_bare_prefix, write_unit};
 use crate::{Bounds, Fixed, FixedScale, Prefix, Storage, Unit, UnitExpr};
 use ::serde::de::{self, Deserializer, Visitor};
 use ::serde::ser::Serializer;
@@ -172,6 +173,15 @@ struct UnitText<U>(PhantomData<U>);
 impl<U: Unit> fmt::Display for UnitText<U> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write_unit(Prefix::Unit, &U::EXPR, f)
+    }
+}
+
+/// `" mm²"`: `U` with a prefix, as `{}` writes it after the number.
+struct PrefixText<U>(Prefix, PhantomData<U>);
+
+impl<U: Unit> fmt::Display for PrefixText<U> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_unit(self.0, &U::EXPR, f)
     }
 }
 
@@ -304,6 +314,9 @@ fn prefix_of<U: Unit>(t: &str) -> Option<TextPrefix> {
     if spelled(t) {
         return Some(TextPrefix::UNIT);
     }
+    if let Some(p) = moved_of::<U>(t).or_else(|| nameless_of::<U>(t)) {
+        return Some(TextPrefix::of(p));
+    }
     let named = takes_bare_prefix(&U::EXPR);
     let prefixes = (-30..=30i8).filter_map(Prefix::si_from_pow10).chain([
         Prefix::Kibi,
@@ -335,6 +348,40 @@ fn prefix_of<U: Unit>(t: &str) -> Option<TextPrefix> {
         return Some(TextPrefix::of(Prefix::Micro));
     }
     None
+}
+
+/// The scale of text that names it the way people write it on metres (`cm²`, `mL/s`): whatever `{}` writes for `U`
+/// reads back, a volume in metres too (`5 cm³` where `5 mL` is written), and nothing else (a `hm²` isn't written, so it
+/// is refused).
+fn moved_of<U: Unit>(t: &str) -> Option<Prefix> {
+    // micro as u, and as the Greek letter mu next to the micro sign
+    let mut micro = Buf::new();
+    let t = match t.strip_prefix('u').or_else(|| t.strip_prefix('\u{3bc}')) {
+        Some(rest) if write!(micro, "µ{rest}").is_ok() => micro.as_str(),
+        _ => t,
+    };
+    // 10³ on m² down to 10⁻⁹ on m³
+    (-27..=6i8)
+        .filter_map(Prefix::from_pow10)
+        .filter_map(|p| Some((p, inside(p, &U::EXPR)?)))
+        .find(|(p, inner)| {
+            writes_as(PrefixText::<U>(*p, PhantomData), t)
+                || t.strip_prefix(inner.symbol())
+                    .is_some_and(|rest| writes_as(UnitText::<U>(PhantomData), rest))
+        })
+        .map(|(p, _)| p)
+}
+
+/// The power of ten without a prefix's name that text ends in, as `{}` writes it after the number: `·10⁴ m²`.
+fn nameless_of<U: Unit>(t: &str) -> Option<Prefix> {
+    t.starts_with('·')
+        .then(|| {
+            (-63..=63i8)
+                .filter_map(Prefix::from_pow10)
+                .filter(|p| !p.is_named())
+                .find(|p| writes_as(PrefixText::<U>(*p, PhantomData), t))
+        })
+        .flatten()
 }
 
 /// `s` as a value of the field.

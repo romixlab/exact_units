@@ -432,20 +432,27 @@ fn symbols_are_unique_but_for_shared_units() {
 }
 
 /// A prefix goes straight before a symbol whose first factor is plain (`mm/s`, `mN·m`), and on the whole of one whose
-/// first factor has an exponent or a prefix (`m²`, `m³/s`, `kg/m³`): `mm²` would be 10⁻⁶ m², not 10⁻³.
+/// first factor has an exponent or a prefix (`m³/kg`, `kg/m³`) and none moves inside: `mm³/kg` would be 10⁻⁹ m³/kg, not
+/// 10⁻³; `mm²` is 10⁻⁶ m².
 #[test]
 fn prefixes_on_powered_symbols() {
     use exact_units::Fixed;
-    use exact_units::prefix::{Micro, Milli};
-    use units::{Area, Density, Nit, Speed, Torque, VolumetricFlow};
+    use exact_units::prefix::{Kilo, Micro, Milli};
+    use units::{Area, Density, Nit, SpecificVolume, Speed, Torque};
 
     assert_eq!(Fixed::<Speed, Milli, u8>::new(5).to_string(), "5 mm/s");
     assert_eq!(Fixed::<Torque, Milli, u8>::new(5).to_string(), "5 mN·m");
     assert_eq!(Fixed::<Nit, Milli, u8>::new(5).to_string(), "5 mcd/m²");
-    assert_eq!(Fixed::<Area, Micro, u8>::new(5).to_string(), "5 µ(m²)");
+    assert_eq!(Fixed::<Area, Milli, u8>::new(5).to_string(), "5 m(m²)");
+    assert_eq!(Fixed::<Area, Kilo, u8>::new(5).to_string(), "5 k(m²)");
+    assert_eq!(Fixed::<Area, Micro, u8>::new(5).to_string(), "5 mm²");
     assert_eq!(
-        Fixed::<VolumetricFlow, Milli, u8>::new(5).to_string(),
-        "5 m(m³/s)"
+        Fixed::<SpecificVolume, Micro, u8>::new(5).to_string(),
+        "5 cm³/kg"
+    );
+    assert_eq!(
+        Fixed::<SpecificVolume, Kilo, u8>::new(5).to_string(),
+        "5 k(m³/kg)"
     );
     assert_eq!(
         Fixed::<Density, Milli, u8>::new(5).to_string(),

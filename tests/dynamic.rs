@@ -2,8 +2,11 @@
 //! and that each is shown like the typed unit it maps onto.
 #![cfg(all(feature = "std", feature = "quantities"))]
 
+use core::fmt;
 use exact_units::units::{self, AngularVelocity, Per, Times, Torque};
-use exact_units::{Dim, MAX_UNIT_DEPTH, Magnitude, SIExpr, SIExprOwned, Scale, Unit, UnitExpr};
+use exact_units::{
+    Dim, MAX_UNIT_DEPTH, Magnitude, Prefix, SIExpr, SIExprOwned, Scale, Unit, UnitExpr, tree,
+};
 use shrink_wrap::prelude::*;
 
 type Viscous = Per<Torque, AngularVelocity>;
@@ -404,4 +407,68 @@ fn sqrt_marker() {
         .unwrap()
         .to_vec();
     assert_eq!(sqrt[0] >> 4, 4, "{sqrt:02x?}");
+}
+
+/// `prefix` and `unit` as written after a number.
+fn prefixed<'t, E: tree::Tree<'t>>(prefix: Prefix, unit: &E) -> String {
+    struct Written<'a, E>(Prefix, &'a E);
+
+    impl<'t, E: tree::Tree<'t>> fmt::Display for Written<'_, E> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            tree::write_unit(self.0, self.1, f)
+        }
+    }
+
+    Written(prefix, unit).to_string()
+}
+
+/// A prefix on a powered unit reads the same from the type's tree, the wire's and the owned one, for every marker and
+/// every power of ten; the wire model carries no text of it.
+#[test]
+fn prefixed_units_agree() {
+    for &expr in units::ALL {
+        let owned = SIExprOwned::from(expr);
+        let bytes = owned.to_ww_bytes_owned().unwrap();
+        let wire = SIExpr::from_ww_bytes(&bytes).unwrap();
+        for prefix in (-63..=63).filter_map(Prefix::from_pow10) {
+            let typed = prefixed(prefix, &expr);
+            assert_eq!(prefixed(prefix, &&owned), typed);
+            assert_eq!(prefixed(prefix, &wire), typed);
+        }
+    }
+}
+
+/// Metres to a power in a tree: `UnitExpr::Pow` takes the prefix inside as a named symbol does, a parenthesis in front
+/// or another unit keeps it outside, and a part known by name only is not known to be a metre.
+#[test]
+fn prefixes_on_trees() {
+    const METER: &UnitExpr = <units::Meter as Unit>::EXPR;
+    const SECOND: &UnitExpr = <units::Second as Unit>::EXPR;
+    static M2: UnitExpr = UnitExpr::Pow(METER, 2);
+    static M3: UnitExpr = UnitExpr::Pow(METER, 3);
+    static M4: UnitExpr = UnitExpr::Pow(METER, 4);
+    static FLOW: UnitExpr = UnitExpr::Div(&M3, SECOND);
+    static PER_S: UnitExpr = UnitExpr::Div(&FLOW, SECOND);
+    static TIMES: UnitExpr = UnitExpr::Mul(&M2, SECOND);
+    static IN_FRONT: UnitExpr = UnitExpr::Mul(&FLOW, SECOND);
+    static V2: UnitExpr = UnitExpr::Pow(<units::Volt as Unit>::EXPR, 2);
+
+    assert_eq!(prefixed(Prefix::Micro, &&M2), " mm²");
+    assert_eq!(prefixed(Prefix::Milli, &&M2), " m(m²)");
+    // not litres: a volume spelled as a power of the metre
+    assert_eq!(prefixed(Prefix::Milli, &&M3), " dm³");
+    assert_eq!(prefixed(Prefix::Milli, &&FLOW), " dm³/s");
+    assert_eq!(prefixed(Prefix::Nano, &&PER_S), " n((m³/s)/s)");
+    assert_eq!(prefixed(Prefix::Micro, &&TIMES), " mm²·s");
+    assert_eq!(prefixed(Prefix::Nano, &&IN_FRONT), " n((m³/s)·s)");
+    assert_eq!(prefixed(Prefix::Pico, &&M4), " p(m⁴)");
+    assert_eq!(prefixed(Prefix::Micro, &&V2), " µ(V²)");
+
+    let name_only = SIExprOwned::Named {
+        name: "m³".into(),
+        symbol: "m³".into(),
+        dim: Dim::ONE.into(),
+        scale: Scale::Coherent,
+    };
+    assert_eq!(prefixed(Prefix::Micro, &&name_only), " µ(m³)");
 }

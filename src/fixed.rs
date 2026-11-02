@@ -1,6 +1,6 @@
 //! [Fixed]: a number with its unit, prefix and storage fixed at compile time, on the wire exactly the number.
 
-use crate::tree::write_unit;
+use crate::tree::{moved, write_unit};
 use crate::unit::{Unit, UnitExpr};
 use crate::{Magnitude, Prefix};
 use core::cmp::Ordering;
@@ -1182,7 +1182,8 @@ fn rescale<T: Storage>(x: Repr, scale: Magnitude) -> Option<T> {
 }
 
 /// The number as stored and the prefix with the unit: `1500 µs`, `4 KiB`, `50 %`, a scale without a prefix after
-/// the number (`15·10⁻⁴ s`, `32767·1/65535`).
+/// the number (`15·10⁻⁴ s`, `32767·1/65535`). On square and cubic metres a prefix people use with the power goes
+/// inside, as [write_unit] says: `5 mm²` is a [Fixed] of `Area` in `Micro`, `5 L/s` of `VolumetricFlow` in `Milli`.
 ///
 /// `{:#}` writes the value in the unit itself, `0.0015 s`: exactly where the steps are a fraction of integers whose
 /// decimal ends (powers of ten, Q formats and binary angles, `1/65535` not), as a float otherwise. A dimensionless
@@ -1210,7 +1211,9 @@ pub(crate) fn write_prefix_unit<P: FixedScale>(
     unit: &UnitExpr,
     f: &mut fmt::Formatter<'_>,
 ) -> fmt::Result {
-    if let Some(prefix) = P::SCALE.as_pow10().and_then(Prefix::si_from_pow10) {
+    // a power of ten without a prefix's name has one on metres: 10⁻⁴ m² is cm²
+    let prefix = P::SCALE.as_pow10().and_then(Prefix::from_pow10);
+    if let Some(prefix) = prefix.filter(|p| p.is_named() || moved(*p, &unit).is_some()) {
         return write_unit(prefix, &unit, f);
     }
     if P::SYMBOL.is_empty() {
@@ -1255,6 +1258,16 @@ impl<U: Unit, P: FixedScale, T: Storage + defmt::Format, B: Bounds<T>> defmt::Fo
     for Fixed<U, P, T, B>
 {
     fn format(&self, f: defmt::Formatter<'_>) {
+        let prefix = P::SCALE.as_pow10().and_then(Prefix::from_pow10);
+        if let (UnitExpr::Named { symbol, .. }, Some(m)) =
+            (U::EXPR, prefix.and_then(|p| moved(p, &U::EXPR)))
+        {
+            let (head, rest) = match m {
+                crate::tree::Moved::Inside(p) => (p.symbol(), *symbol),
+                crate::tree::Moved::Litre(litres, rest) => (litres, rest),
+            };
+            return defmt::write!(f, "{} {=str}{=str}", self.value, head, rest);
+        }
         match U::EXPR {
             UnitExpr::Named { symbol: "", .. } if P::RUNTIME.is_some() => {
                 defmt::write!(f, "{}", self.value);
