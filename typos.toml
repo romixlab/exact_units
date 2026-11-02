@@ -3,3 +3,7 @@
 [default.extend-words]
 # therm, the unit symbol (customary units catalogue)
 thm = "thm"
+
+[default.extend-identifiers]
+# an opaque Google Fonts kit id (docs_ext/eu_docs_ext/vendor.py), not a word
+lMdyB37aqBaTkKmg9EcSE = "lMdyB37aqBaTkKmg9EcSE"
