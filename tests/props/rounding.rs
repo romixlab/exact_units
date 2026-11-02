@@ -8,7 +8,8 @@
 use super::reference::{MODES, POLICIES, assert_rounded, range, round_div, settle};
 use exact_units::units::Ratio;
 use exact_units::{
-    Fixed, FixedScale, Magnitude, Overflow, Repr, Rounding, Storage, StorageKind, requantize,
+    Fixed, FixedScale, Magnitude, Overflow, Repr, Requantizer, Rounding, Storage, StorageKind,
+    requantize,
 };
 
 /// A storage the properties read back as an exact integer.
@@ -159,6 +160,101 @@ pub(crate) fn float_requantizes<T2: Int>(x: f64, r: Rounding, o: Overflow) {
     assert_eq!(got, want, "{x:e} {r:?} {o:?} into {}", T2::NAME);
 }
 
+/// The 64-bit mantissas of π and ln 2 as `Magnitude::fixed_point` rounds them: π = `PI_M` · 2⁻⁶², ln 2 = `LN2_M` · 2⁻⁶⁴
+/// (the digits of the constants, the 65th bit rounded up).
+const PI_M: u64 = 0xC90F_DAA2_2168_C235;
+const LN2_M: u64 = 0xB172_17F7_D1CF_79AC;
+
+/// `x · m · 2^shift` rounded by `r`, worked out from the exact product: `(negative, the value if it fits i128, the
+/// value modulo 2¹²⁸ in two's complement)`.
+#[cfg(not(kani))]
+fn scaled(x: i64, m: u64, shift: i32, r: Rounding) -> (bool, Option<i128>, i128) {
+    let neg = x < 0;
+    // |x| ≤ 2⁶³ and m < 2⁶⁴: the product is below 2¹²⁷
+    let p = u128::from(x.unsigned_abs()) * u128::from(m);
+    let signed = |mag: u128| -> i128 {
+        if neg {
+            mag.wrapping_neg().cast_signed()
+        } else {
+            mag.cast_signed()
+        }
+    };
+    if shift >= 0 {
+        let s = shift.unsigned_abs();
+        let fits = p == 0 || (s < 128 && p.leading_zeros() > s);
+        let mag = if s < 128 { p << s } else { 0 };
+        return (neg, fits.then(|| signed(mag)), signed(mag));
+    }
+    let k = shift.unsigned_abs();
+    let v = if k <= 126 {
+        round_div(signed(p), 1 << k, r)
+    } else {
+        // below 1 in magnitude: 0, or 1 away from zero by the mode; the half is 2^(k - 1), above every p from k = 129
+        let half = if k <= 128 {
+            1u128 << (k - 1)
+        } else {
+            u128::MAX
+        };
+        let (above, tie) = (p > half, p == half);
+        let up = match r {
+            Rounding::Truncate => false,
+            Rounding::Floor => neg && p != 0,
+            Rounding::Ceil => !neg && p != 0,
+            Rounding::NearestAway => above || tie,
+            Rounding::NearestEven => above,
+        };
+        i128::from(up) * if neg { -1 } else { 1 }
+    };
+    (neg, Some(v), v)
+}
+
+/// [Requantizer::apply] of an integer by `π · 2^k` or `ln 2 · 2^k` (a fixed-point factor) into an integer of `bits`, for
+/// every rounding mode and policy, against the product of the constant's 64-bit mantissa.
+#[cfg(not(kani))]
+pub(crate) fn fixed_point_requantizes(
+    x: i64,
+    ln2: bool,
+    k: i8,
+    bits: u32,
+    signed: bool,
+    r: Rounding,
+    o: Overflow,
+) {
+    let (m, base, base_shift) = if ln2 {
+        (LN2_M, Magnitude::LN2, -64)
+    } else {
+        (PI_M, Magnitude::PI, -62)
+    };
+    let factor = base.mul(Magnitude::pow2(k));
+    assert_eq!(factor.fixed_point(), (m, base_shift + i32::from(k)));
+    let to = StorageKind::Int { bits, signed };
+    let got = Requantizer::new(&factor, to, r, o).apply(Repr::Int(i128::from(x)));
+    assert_eq!(requantize(Repr::Int(i128::from(x)), &factor, to, r, o), got);
+    let (neg, exact, low) = scaled(x, m, base_shift + i32::from(k), r);
+    let (min, max) = range(bits, signed);
+    let want = match (o, exact) {
+        (Overflow::Wrap, _) => {
+            let v = low.cast_unsigned() & ((1u128 << bits) - 1);
+            let v = v.cast_signed();
+            Some(if signed && v >> (bits - 1) == 1 {
+                v - (1 << bits)
+            } else {
+                v
+            })
+        }
+        (Overflow::Checked, Some(v)) => (min..=max).contains(&v).then_some(v),
+        (Overflow::Saturate, Some(v)) => Some(v.clamp(min, max)),
+        (Overflow::Checked, None) => None,
+        (Overflow::Saturate, None) => Some(if neg { min } else { max }),
+    };
+    assert_eq!(
+        got,
+        want.map(Repr::Int),
+        "{x} * {} * 2^{k} into {bits} bits (signed {signed}) {r:?} {o:?}",
+        if ln2 { "ln2" } else { "pi" }
+    );
+}
+
 /// One proptest per pair of scales and pair of storages: inputs at the ends of `T`, near 0 and anywhere.
 macro_rules! scale_pairs {
     ($($name:ident: $p:ty => $p2:ty, $num:literal / $den:literal, [$($m:ident: $t:ident => $t2:ident),*];)*) => {$(
@@ -215,6 +311,20 @@ mod run_time {
         fn requantizes(x in strategy::i64(), num in 1..=u32::MAX, den in 1..=u32::MAX, bits in 1..=64u32,
                        signed: bool, r in strategy::mode(), o in strategy::policy()) {
             super::requantizes_at_run_time(x, num, den, bits, signed, r, o);
+        }
+
+        #[test]
+        fn fixed_point_requantizes(x in strategy::i64(), ln2: bool, k in -64i8..=63, bits in 1..=64u32,
+                                   signed: bool, r in strategy::mode(), o in strategy::policy()) {
+            super::fixed_point_requantizes(x, ln2, k, bits, signed, r, o);
+        }
+
+        /// Ties and near misses: a value that is the exact half of a step of the target.
+        #[test]
+        fn fixed_point_requantizes_near_ties(e in 0u32..=62, d in -3i64..=3, ln2: bool, k in -64i8..=-1, bits in 1..=64u32,
+                                              signed: bool, r in strategy::mode(), o in strategy::policy()) {
+            super::fixed_point_requantizes((1i64 << e) + d, ln2, k, bits, signed, r, o);
+            super::fixed_point_requantizes(-(1i64 << e) + d, ln2, k, bits, signed, r, o);
         }
     }
 }

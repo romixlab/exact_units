@@ -318,6 +318,267 @@ fn float_sources_settle_by_policy() {
     assert_eq!(wrap(-(2f64.powi(40)) - 7.0), -7);
 }
 
+const KINDS: [StorageKind; 3] = [
+    StorageKind::Int {
+        bits: 16,
+        signed: true,
+    },
+    StorageKind::F32,
+    StorageKind::F64,
+];
+
+#[test]
+fn requantizer_float_sources_and_targets() {
+    let i16_kind = KINDS[0];
+    let apply = |factor: &Magnitude, x: Repr, to, r, o| requantize(x, factor, to, r, o);
+    let one = Magnitude::ONE;
+    // a float into an integer: rounded once by the mode, then settled
+    for (x, r, want) in [
+        (2.5, Rounding::NearestEven, 2),
+        (2.5, Rounding::NearestAway, 3),
+        (2.5, Rounding::Floor, 2),
+        (2.5, Rounding::Ceil, 3),
+        (-2.5, Rounding::NearestEven, -2),
+        (-2.5, Rounding::NearestAway, -3),
+        (-2.5, Rounding::Truncate, -2),
+        (-2.5, Rounding::Floor, -3),
+        (3.5, Rounding::NearestEven, 4),
+        (2.4999, Rounding::NearestAway, 2),
+        (2.5001, Rounding::NearestEven, 3),
+    ] {
+        assert_eq!(
+            apply(&one, Repr::Float(x), i16_kind, r, Overflow::Checked),
+            Some(Repr::Int(want)),
+            "{x} {r:?}"
+        );
+    }
+    // out of range: checked refuses, saturating takes the end, wrapping the low bits
+    let big = Repr::Float(1e10);
+    let r = Rounding::NearestEven;
+    assert_eq!(apply(&one, big, i16_kind, r, Overflow::Checked), None);
+    assert_eq!(
+        apply(&one, big, i16_kind, r, Overflow::Saturate),
+        Some(Repr::Int(32767))
+    );
+    assert_eq!(
+        apply(&one, Repr::Float(-1e10), i16_kind, r, Overflow::Saturate),
+        Some(Repr::Int(-32768))
+    );
+    assert_eq!(
+        apply(&one, big, i16_kind, r, Overflow::Wrap),
+        Some(Repr::Int(i128::from(10_000_000_000i64 as i16)))
+    );
+    // a float that is not whole after the factor and rounding can't be, and NaN and infinities have no value
+    for o in [Overflow::Checked, Overflow::Saturate, Overflow::Wrap] {
+        let nan = apply(&one, Repr::Float(f64::NAN), i16_kind, r, o);
+        assert_eq!(
+            nan,
+            (o != Overflow::Checked).then_some(Repr::Int(0)),
+            "{o:?}"
+        );
+        let inf = apply(&one, Repr::Float(f64::INFINITY), i16_kind, r, o);
+        let want = match o {
+            Overflow::Checked => None,
+            Overflow::Saturate => Some(Repr::Int(32767)),
+            Overflow::Wrap => Some(Repr::Int(0)),
+        };
+        assert_eq!(inf, want, "{o:?}");
+    }
+    // a factor on a float: 25 · 0.1 is 2.5 (tie to even: 2)
+    let tenth = Magnitude::pow10(-1);
+    assert_eq!(
+        apply(&tenth, Repr::Float(25.0), i16_kind, r, Overflow::Checked),
+        Some(Repr::Int(2))
+    );
+    assert_eq!(
+        apply(&tenth, Repr::Float(35.0), i16_kind, r, Overflow::Checked),
+        Some(Repr::Int(4))
+    );
+    // unsigned: below 0 is refused, 0, or wrapped
+    let u8_kind = StorageKind::Int {
+        bits: 8,
+        signed: false,
+    };
+    assert_eq!(
+        apply(&one, Repr::Float(-1.0), u8_kind, r, Overflow::Checked),
+        None
+    );
+    assert_eq!(
+        apply(&one, Repr::Float(-1.0), u8_kind, r, Overflow::Saturate),
+        Some(Repr::Int(0))
+    );
+    assert_eq!(
+        apply(&one, Repr::Float(-1.0), u8_kind, r, Overflow::Wrap),
+        Some(Repr::Int(255))
+    );
+    assert_eq!(
+        apply(&one, Repr::Float(255.0), u8_kind, r, Overflow::Checked),
+        Some(Repr::Int(255))
+    );
+    assert_eq!(
+        apply(&one, Repr::Float(256.0), u8_kind, r, Overflow::Checked),
+        None
+    );
+    // into floats: the factor applied to an integer or a float, f32 rounded once more
+    let third = Magnitude::ratio(1, 3);
+    assert_eq!(
+        apply(&third, Repr::Int(3), KINDS[2], r, Overflow::Checked),
+        Some(Repr::Float(1.0))
+    );
+    assert_eq!(
+        apply(&third, Repr::Int(1), KINDS[2], r, Overflow::Checked),
+        Some(Repr::Float(1.0 / 3.0))
+    );
+    assert_eq!(
+        apply(&third, Repr::Int(1), KINDS[1], r, Overflow::Checked),
+        Some(Repr::Float(f64::from(1.0f32 / 3.0)))
+    );
+    assert_eq!(
+        apply(&third, Repr::Float(1.0), KINDS[1], r, Overflow::Checked),
+        Some(Repr::Float(f64::from(1.0f32 / 3.0)))
+    );
+    assert_eq!(
+        apply(
+            &Magnitude::PI,
+            Repr::Float(2.0),
+            KINDS[2],
+            r,
+            Overflow::Checked
+        ),
+        Some(Repr::Float(2.0 * core::f64::consts::PI))
+    );
+    assert_eq!(
+        apply(&Magnitude::PI, Repr::Int(2), KINDS[1], r, Overflow::Checked),
+        Some(Repr::Float(f64::from(2.0 * core::f32::consts::PI)))
+    );
+}
+
+#[test]
+fn requantizer_fixed_point_factors() {
+    let u64_kind = StorageKind::Int {
+        bits: 64,
+        signed: false,
+    };
+    let at = |factor: Magnitude, x: i128, r, o| {
+        Requantizer::new(&factor, u64_kind, r, o).apply(Repr::Int(x))
+    };
+    let pi = |k: i8| Magnitude::PI.mul(Magnitude::pow2(k));
+    // π · 2^-63 · 2^61: the mantissa of π is odd, so x = 2^61 at shift -62 is half a step above 0x6487ED5110B4611A
+    let low = 0x6487_ED51_10B4_611Au128;
+    let tie = |r| at(Magnitude::PI, 1 << 61, r, Overflow::Checked);
+    assert_eq!(
+        tie(Rounding::NearestEven),
+        Some(Repr::Int(low.cast_signed()))
+    );
+    assert_eq!(
+        tie(Rounding::NearestAway),
+        Some(Repr::Int((low + 1).cast_signed()))
+    );
+    assert_eq!(tie(Rounding::Floor), Some(Repr::Int(low.cast_signed())));
+    assert_eq!(tie(Rounding::Truncate), Some(Repr::Int(low.cast_signed())));
+    assert_eq!(
+        tie(Rounding::Ceil),
+        Some(Repr::Int((low + 1).cast_signed()))
+    );
+    // 2^63 times π: past u64 for any x ≥ 1, saturated or wrapped or refused; below 1 it rounds to 0 or 1
+    let big = pi(63);
+    assert_eq!(at(big, 1, Rounding::Floor, Overflow::Checked), None);
+    assert_eq!(
+        at(big, 1, Rounding::Floor, Overflow::Saturate),
+        Some(Repr::Int(i128::from(u64::MAX)))
+    );
+    assert_eq!(
+        at(big, -1, Rounding::Floor, Overflow::Saturate),
+        Some(Repr::Int(0))
+    );
+    // the low 64 bits of 0xC90FDAA22168C235 · 2 (shift 1)
+    assert_eq!(
+        at(big, 1, Rounding::Floor, Overflow::Wrap),
+        Some(Repr::Int(i128::from(
+            0xC90F_DAA2_2168_C235u64.wrapping_mul(2)
+        )))
+    );
+    let tiny = pi(-64);
+    assert_eq!(
+        at(tiny, 1, Rounding::Ceil, Overflow::Checked),
+        Some(Repr::Int(1))
+    );
+    assert_eq!(
+        at(tiny, 1, Rounding::Floor, Overflow::Checked),
+        Some(Repr::Int(0))
+    );
+    assert_eq!(
+        at(tiny, 1, Rounding::NearestEven, Overflow::Checked),
+        Some(Repr::Int(0))
+    );
+    assert_eq!(
+        at(tiny, -1, Rounding::Floor, Overflow::Saturate),
+        Some(Repr::Int(0))
+    );
+    assert_eq!(at(tiny, -1, Rounding::Floor, Overflow::Checked), None);
+    // x of more than 64 bits has no fixed-point product
+    assert_eq!(at(pi(0), 1 << 64, Rounding::Floor, Overflow::Checked), None);
+    assert_eq!(
+        at(pi(0), -(1 << 64), Rounding::Floor, Overflow::Saturate),
+        None
+    );
+    assert_eq!(
+        at(pi(0), (1 << 64) - 1, Rounding::Floor, Overflow::Saturate),
+        Some(Repr::Int(i128::from(u64::MAX)))
+    );
+    assert_eq!(
+        at(pi(0), 0, Rounding::Floor, Overflow::Checked),
+        Some(Repr::Int(0))
+    );
+}
+
+#[test]
+fn requantizer_ratios_past_128_bits() {
+    let i64_kind = StorageKind::Int {
+        bits: 64,
+        signed: true,
+    };
+    let at = |factor: Magnitude, x: i128, o| {
+        requantize(Repr::Int(x), &factor, i64_kind, Rounding::Floor, o)
+    };
+    // 10^20 · 10^30 is past i128: a whole factor, so saturating and wrapping still know the answer
+    let f = Magnitude::pow10(30);
+    let x = 10i128.pow(20);
+    assert_eq!(at(f, x, Overflow::Checked), None);
+    assert_eq!(
+        at(f, x, Overflow::Saturate),
+        Some(Repr::Int(i128::from(i64::MAX)))
+    );
+    assert_eq!(
+        at(f, -x, Overflow::Saturate),
+        Some(Repr::Int(i128::from(i64::MIN)))
+    );
+    let low = 10u128.pow(20).wrapping_mul(10u128.pow(30)) as u64;
+    assert_eq!(
+        at(f, x, Overflow::Wrap),
+        Some(Repr::Int(i128::from(low.cast_signed())))
+    );
+    let low = (-(10i128.pow(20))).wrapping_mul(10i128.pow(30)) as u64;
+    assert_eq!(
+        at(f, -x, Overflow::Wrap),
+        Some(Repr::Int(i128::from(low.cast_signed())))
+    );
+    // a fraction whose product doesn't fit has no answer at all
+    let frac = Magnitude::pow10(30).mul(Magnitude::ratio(1, 3));
+    assert_eq!(at(frac, x, Overflow::Saturate), None);
+    assert_eq!(at(frac, x, Overflow::Wrap), None);
+    // x · num fits, den does: ordinary rounding
+    assert_eq!(
+        at(Magnitude::ratio(1, 3), i128::MAX, Overflow::Checked),
+        None,
+        "i128::MAX / 3 is past i64"
+    );
+    assert_eq!(
+        at(Magnitude::ratio(1, 3), 10, Overflow::Checked),
+        Some(Repr::Int(3))
+    );
+}
+
 exact_units::scale! {
     /// Steps of 1/1000 °, over the unit radian: the scale is π/180000, not a fraction of integers.
     struct MilliDegree = "m°", Exact(1 / 180000, pi 1);
