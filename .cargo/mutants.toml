@@ -1,0 +1,21 @@
+# cargo-mutants (`just mutants`): change the library's code one mutation at a time and check the tests notice.
+# A dev tool, not a dependency: `cargo install --locked cargo-mutants`. Results land in mutants.out/ (ignored).
+
+# nextest, as `just test`; it skips doctests, so a mutant only the book's examples would catch counts as missed
+test_tool = "nextest"
+
+exclude_globs = [
+    # test-only data (`#[cfg(all(test, feature = "std"))]`): the catalogue the customary markers are checked against;
+    # mutating it mutates the tests, not the library
+    "src/units/customary/sourced/**",
+]
+
+exclude_re = [
+    # Debug output: for people reading a panic or a log, no behaviour depends on it and no test pins its text
+    "impl (fmt::|core::fmt::)?Debug for",
+    # defmt Format impls: only built with `defmt`, which host tests can't link (no global logger, see ci.yml)
+    "defmt",
+]
+
+# a test run under a mutant is many test binaries on a loaded machine: give slow ones room before a TIMEOUT
+minimum_test_timeout = 60

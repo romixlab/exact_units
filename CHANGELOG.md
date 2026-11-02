@@ -543,6 +543,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
   Each says what is built, the bug a plain `u32` or `f32` lets through there, how the type stops it and what it
   costs at run time; each runs (`required-features`-gated, so `cargo test` builds every one it can) and shows what
   doesn't compile with the compiler's real message. Listed in the README's Examples section.
+* Mutation testing: `just mutants` runs cargo-mutants (with nextest) over the library and lists the mutants no test catches in `mutants.out/`. `.cargo/mutants.toml` leaves out Debug and defmt output and the test-only customary catalogue, each with its reason. A dev tool, not a dependency, and not in CI (it takes hours).
 
 ### 🐛 Fixes
 

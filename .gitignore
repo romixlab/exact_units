@@ -10,3 +10,5 @@ target/
 /docs/assets/logo/
 __pycache__/
 /.pytest_cache/
+# cargo-mutants output (`just mutants`)
+/mutants.out*/

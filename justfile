@@ -19,6 +19,12 @@ test *flags:
 verify:
     cargo kani --tests --features serde
 
+# Mutation testing: change the library one mutation at a time (.cargo/mutants.toml) and list the mutants no test
+# catches, in mutants.out/. Needs cargo-mutants (`cargo install --locked cargo-mutants`); hours, so not in CI. Extra
+# flags pass through: `-f src/index.rs` for one file, `-j 8` for parallel jobs
+mutants *flags:
+    cargo mutants --features customary,serde {{flags}}
+
 # Fuzz one target of fuzz/ for SECONDS: the property functions of tests/props, coverage-guided. Needs a nightly
 # toolchain and cargo-fuzz (`rustup toolchain install nightly`, `cargo install cargo-fuzz`). Starts from the
 # hand-written seeds in fuzz/seeds/TARGET; the corpus it grows (fuzz/corpus/TARGET) and a crash (fuzz/artifacts/TARGET)

@@ -35,6 +35,7 @@ just customary-docs  # regenerate docs/customary.md's tables from the catalogue
 just logo            # export the logo from assets/logo/logo.typ (typst and the Audiowide font installed)
 just verify          # the Kani proofs of tests/props (minutes; needs cargo-kani, not in CI)
 just fuzz T SECS     # one cargo-fuzz target of fuzz/ for SECS seconds (nightly and cargo-fuzz; not in CI)
+just mutants         # cargo-mutants over the library (.cargo/mutants.toml; hours; needs cargo-mutants, not in CI)
 ```
 
 CI (`.github/workflows/ci.yml`) fails on any warning and also builds for `thumbv6m-none-eabi`. Run `just lint` and
