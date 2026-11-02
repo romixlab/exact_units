@@ -5,7 +5,9 @@
   </picture>
 </p>
 
-![Crates.io Version](https://img.shields.io/crates/v/exact_units)
+[![Crates.io Version](https://img.shields.io/crates/v/exact_units)](https://crates.io/crates/exact_units)
+[![Book](https://img.shields.io/badge/book-exact.vhrd.tech-ff7100)](https://exact.vhrd.tech)
+[![docs.rs](https://img.shields.io/docsrs/exact_units)](https://docs.rs/exact_units)
 [![CI](https://github.com/romixlab/exact_units/actions/workflows/ci.yml/badge.svg)](https://github.com/romixlab/exact_units/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/romixlab/exact_units/graph/badge.svg)](https://codecov.io/gh/romixlab/exact_units)
 
