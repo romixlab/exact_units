@@ -91,6 +91,8 @@ pub(crate) fn any_bytes_all(bytes: &[u8]) {
     check::<Fixed<Volt, Milli, f32, exact_units::RangeDec<-5, 25, -1>>>(bytes);
     check::<Complex<Volt, Pow2<-15>, i16, Saturating>>(bytes);
     check::<Decibels>(bytes);
+    check::<super::niche::Word>(bytes);
+    check::<super::niche::Rssi>(bytes);
     check::<exact_units::IndexFrom1<exact_units::units::Item, u16, Range<1, 300>>>(bytes);
     check::<exact_units::Index<exact_units::units::Item, u8, Range<0, 9>>>(bytes);
     check::<exact_units::Seq<exact_units::units::Item, u16>>(bytes);

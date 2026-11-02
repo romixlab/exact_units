@@ -1,7 +1,7 @@
 //! Property 9: the wire format (feature `shrink_wrap`). A value encodes, its bytes fit the type's `MAX_SIZE` where it
 //! has one, and decode to the same value; bytes from outside decode to an error or to a value that encodes and
 //! decodes the same again, never a panic. A dimension that isn't canonical doesn't decode, a bounded `Fixed` outside
-//! its bounds neither. Decoded units are walked (shown, their dimension and factor worked out) without a panic.
+//! its bounds neither, a `Niched` number that is neither a value nor a niche code neither. Decoded units are walked (shown, their dimension and factor worked out) without a panic.
 //! Byte buffers, so no Kani proof; `fuzz/` runs the same functions.
 #![expect(
     clippy::arithmetic_side_effects,
@@ -10,6 +10,7 @@
 #![expect(clippy::panic, reason = "a property fails by panicking")]
 
 use core::fmt::Debug;
+use exact_units::niche::{J1939U16, Niched, Null, Reading};
 use exact_units::origins::Celsius;
 use exact_units::prefix::{Centi, Milli, One};
 use exact_units::units::{Kelvin, Ratio, Sample, Volt};
@@ -342,7 +343,7 @@ fn walk_owned(e: &SIExprOwned) {
 
 /// Bytes from outside, as the type `which` picks: an error or a value that round-trips, and a decoded unit walks.
 pub(crate) fn any_bytes(which: u8, bytes: &[u8]) {
-    match which % 12 {
+    match which % 14 {
         0 => decode::<Fixed<Volt, Milli, i16>>(bytes),
         1 => decode::<Fixed<Volt, Milli, i16, Range<-1000, 1000>>>(bytes),
         2 => decode::<Complex<Volt, Milli, i16>>(bytes),
@@ -394,9 +395,29 @@ pub(crate) fn any_bytes(which: u8, bytes: &[u8]) {
                 assert!(SIExprOwned::from_ww_bytes_owned(&again).is_ok());
             }
         }
-        _ => {
+        11 => {
             if let Ok(s) = SeriesOwned::<Row>::from_ww_bytes_owned(bytes) {
                 let _ = s.iter().count();
+            }
+        }
+        12 => {
+            // a value within 0..=0xFAFF or a J1939 code, never a code as a value
+            if let Ok(n) =
+                Niched::<Fixed<Ratio, One, u16, Range<0, 0xFAFF>>, J1939U16>::from_ww_bytes(bytes)
+            {
+                round_trip(&n);
+                if let Reading::Value(v) = n.get() {
+                    assert!(v.get() <= 0xFAFF, "{n:?}");
+                }
+            }
+        }
+        _ => {
+            // -127..=20 or the code 127, nothing else
+            if let Ok(n) =
+                Niched::<Fixed<Ratio, One, i8, Range<-127, 20>>, Null<127>>::from_ww_bytes(bytes)
+            {
+                round_trip(&n);
+                assert!(n.raw() == 127 || (-127..=20).contains(&n.raw()), "{n:?}");
             }
         }
     }

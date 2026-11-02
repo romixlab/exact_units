@@ -13,6 +13,7 @@
 mod arith;
 mod format;
 mod literal;
+mod niche;
 mod no_panic;
 mod numeric;
 #[cfg(not(kani))]
