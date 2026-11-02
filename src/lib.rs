@@ -61,6 +61,7 @@ mod index;
 pub mod kind;
 pub mod literal;
 mod magnitude;
+pub mod niche;
 pub mod num;
 mod point;
 mod products;
