@@ -136,4 +136,43 @@ assert!((volts.to_np() * np_in_db - volts.to_db()).abs() < 1e-12);
 assert!((watts.to_np() * np_in_db - watts.to_db()).abs() < 1e-12);
 ```
 
+## A level as a quantity
+
+With feature `levels` (in `quantities`), a level is a number of its own unit, not an `f64` beside a gain:
+
+- `Neper` and `Decibel` are levels signed as a gain: a decay is negative. 1 dB is exactly (ln 10)/20 Np.
+- `Loss<Neper>` and `Loss<Decibel>` are the same levels signed as a loss: a decay is positive, as a datasheet writes it.
+- The neper has a base dimension of its own, like the radian. So a level doesn't mix with a `Ratio`, and dB/m doesn't convert to m⁻¹.
+- A loss sits on a second base. A loss and a gain don't convert into each other; `as_gain` and `as_loss` negate.
+- A level has no 10·lg or 20·lg in it. The kind of the gain picks the form at the edge: `to_level` and `to_gain`.
+
+```rust
+use exact_units::{Fixed, Rounding, fixed, prefix::{Centi, Micro, One}};
+use exact_units::units::{Decibel, Loss, Meter, Neper, Per, Volt};
+
+// a cable's loss as the datasheet writes it, positive, in an integer of µNp/m
+type Alpha = Fixed<Per<Loss<Neper>, Meter>, Micro, u32>;
+const ALPHA: Alpha = fixed!(0.177 in Per<Loss<Decibel>, Meter>); // 17.7 dB/100 m
+assert_eq!(ALPHA.get(), 20_378);
+
+// dB to Np in integers, rounded by name: ln 10 is not a fraction of integers
+let db = Fixed::<Decibel, Centi, i16>::new(1770);
+let np = db.convert_rounded::<Neper, Micro, i32>(Rounding::NearestEven).unwrap();
+assert_eq!(np.get(), 2_037_788);
+
+// the edge to a gain: V/V takes 20·lg, and a loss is the gain negated
+let gain = Fixed::<Per<Volt, Volt>, One, f64>::new(0.1);
+let loss: Fixed<Loss<Decibel>, One, f64> = gain.to_level().unwrap();
+assert!((loss.get() - 20.0).abs() < 1e-12);
+assert!((loss.as_gain().get() + 20.0).abs() < 1e-12);
+```
+
+A loss is not a gain, so the compiler refuses to mix them:
+
+```rust,compile_fail
+use exact_units::{Fixed, prefix::One, units::{Decibel, Loss}};
+
+let _ = Fixed::<Loss<Decibel>, One, f32>::new(3.0).convert::<Decibel, One, f32>();
+```
+
 More on thresholds, dBFS and complex levels: [Thresholds](thresholds.md).

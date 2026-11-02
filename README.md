@@ -74,7 +74,7 @@ The API reference is on [docs.rs](https://docs.rs/exact_units).
 | Feature       | What it adds                                                                                         |
 |---------------|------------------------------------------------------------------------------------------------------|
 | none          | `Dim`, `Magnitude`, `Fixed`, `Point` and their ops as plain Rust types, no dependencies              |
-| unit groups   | `time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`, `radiometric`, `radiation`, `fields`, `dimensionless`, `information`, `counting`; `quantities` for all |
+| unit groups   | `time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`, `radiometric`, `radiation`, `fields`, `dimensionless`, `information`, `counting`, `levels`; `quantities` for all |
 | `customary`   | imperial, US customary and other units outside the SI (opt-in only)                                  |
 | `std`         | every unit group but `customary`; with `shrink_wrap` the owned wire mirrors                          |
 | `shrink_wrap` | the wire format of [WireWeaver](https://github.com/vhrdtech/wire_weaver); exact-width bit fields `U1`..`U64` / `I2`..`I64` (opt-in, not a default) |

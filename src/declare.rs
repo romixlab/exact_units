@@ -29,9 +29,11 @@
 ///   Eq, Hash`. A `#[cfg(..)]` applies to its impl too.
 /// - The dimension is a list of exponents of `s`, `m`, `kg`, `a`, `k`, `mol`, `cd`, `rad`, `bit` (`[kg 1, m 2, s -3,
 ///   a -1]` for a volt, `[]` for a ratio), or `counted`: a counted base of its own named by the crate and the marker
-///   ([counted!](crate::counted)).
+///   ([counted!](crate::counted)), or `counted(Other)`: the counted base of the marker `Other` of the same crate, a
+///   scaled unit of it (the decibel of the neper).
 /// - The scale, coherent when left out: `Pow10(-3)`, `Exact(1 / 180, pi 1)` (`num / den`, then optionally `pow10 e`,
-///   `pow2 e`, `pi e` in that order, see [Magnitude::new](crate::Magnitude::new)), so every reader computes the same
+///   `pow2 e`, `pi e`, `ln2 e`, `ln10 e` in that order, see [Magnitude::new](crate::Magnitude::new); the decibel is
+///   `Exact(1 / 20, ln10 1)` of the neper), so every reader computes the same
 ///   value; or `Affine { factor: 1.0, offset: 273.15 }` for a unit with an offset (moves to origins, STD-64). A float
 ///   factor isn't a unit's scale: an exact one is a `Magnitude`, and a factor known only at run time is a value.
 /// - After the dimension, `kind "resistance"` names a kind of quantity of its own ([Kind::Named](crate::Kind)):
@@ -48,14 +50,14 @@ macro_rules! unit {
         @table $(#[$all_attr:meta])* $all_vis:vis static $all:ident;
         $(
             $(#[$($attr:tt)*])*
-            $vis:vis struct $name:ident = $symbol:literal, $dim:tt $(kind $qkind:literal)?
+            $vis:vis struct $name:ident = $symbol:literal, $dim:tt $(($base:ident))? $(kind $qkind:literal)?
                 $(, $kind:ident $args:tt $(, conventional($source:literal, $year:literal))?)?;
         )*
     ) => {
         $crate::unit! {
             $(
                 $(#[$($attr)*])*
-                $vis struct $name = $symbol, $dim $(kind $qkind)? $(, $kind $args $(, conventional($source, $year))?)?;
+                $vis struct $name = $symbol, $dim $(($base))? $(kind $qkind)? $(, $kind $args $(, conventional($source, $year))?)?;
             )*
         }
 
@@ -72,7 +74,7 @@ macro_rules! unit {
     (
         $(
             $(#[$($attr:tt)*])*
-            $vis:vis struct $name:ident = $symbol:literal, $dim:tt $(kind $qkind:literal)?
+            $vis:vis struct $name:ident = $symbol:literal, $dim:tt $(($base:ident))? $(kind $qkind:literal)?
                 $(, $kind:ident $args:tt $(, conventional($source:literal, $year:literal))?)?;
         )*
     ) => {
@@ -84,7 +86,7 @@ macro_rules! unit {
             $crate::__with_cfgs! {
                 [] $(#[$($attr)*])* =>
                 impl $crate::Unit for $name {
-                    const DIM: $crate::Dim<'static> = $crate::__unit_dim!($name $dim);
+                    const DIM: $crate::Dim<'static> = $crate::__unit_dim!($name $dim $(($base))?);
                     const KIND: $crate::Kind<'static> = $crate::__unit_kind!($($qkind)?);
                     const EXPR: &'static $crate::UnitExpr = &$crate::UnitExpr::Named {
                         name: stringify!($name),
@@ -169,6 +171,9 @@ macro_rules! __with_cfgs {
 macro_rules! __unit_dim {
     ($name:ident counted) => {
         $crate::counted!($name)
+    };
+    ($name:ident counted($base:ident)) => {
+        $crate::counted!($base)
     };
     ($name:ident [$($d:ident $e:literal),* $(,)?]) => {{
         #[expect(clippy::allow_attributes, reason = "mutated only when the dimension has exponents")]
@@ -269,11 +274,14 @@ macro_rules! __scale_runtime {
     };
 }
 
-/// `num / den, pow10 a, pow2 b, pi c` as a [Magnitude](crate::Magnitude).
+/// `num / den, pow10 a, pow2 b, pi c, ln2 d, ln10 e` as a [Magnitude](crate::Magnitude).
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __magnitude {
-    ($num:literal / $den:literal $(, pow10 $p10:literal)? $(, pow2 $p2:literal)? $(, pi $pi:literal)? $(,)?) => {
+    (
+        $num:literal / $den:literal $(, pow10 $p10:literal)? $(, pow2 $p2:literal)? $(, pi $pi:literal)?
+            $(, ln2 $ln2:literal)? $(, ln10 $ln10:literal)? $(,)?
+    ) => {
         $crate::Magnitude::new(
             $num,
             $den,
@@ -281,6 +289,8 @@ macro_rules! __magnitude {
             $crate::__or_zero!($($p2)?),
             $crate::__or_zero!($($pi)?),
         )
+        .mul($crate::Magnitude::LN2.powi($crate::__or_zero!($($ln2)?)))
+        .mul($crate::Magnitude::LN10.powi($crate::__or_zero!($($ln10)?)))
     };
 }
 

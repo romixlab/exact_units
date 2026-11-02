@@ -11,6 +11,10 @@
 //! - The literal is in units of `U`: `fixed!(0.25)` of a `Fixed<Volt, Milli, u16>` is 0.25 V, stored as 250.
 //!   A decimal exponent works too: `fixed!(2.5e-3)`.
 //! - `fixed!(0.5, -0.25)` is a [Complex] of two such parts.
+//! - `fixed!(17.7 in Decibel)` is a literal in another unit `S` of the same dimension and kind
+//!   ([Fixed::from_decimal_in]): a level in dB into a storage of µNp, degrees into radians. A factor with π, ln 10 or
+//!   a root in it is rounded from an interval around the exact value, and a literal too close to halfway between two
+//!   stored values to decide is a compile error.
 //!
 //! It is an associated const ([AtLiteral]), so nothing of it runs at run time; [Fixed::from_decimal] is the same as
 //! a `const fn`, for a value that isn't a literal.
@@ -29,7 +33,7 @@
 
 use crate::complex::Complex;
 use crate::decibel::exact::Interval;
-use crate::{Bounds, Fixed, FixedScale, Unlimited};
+use crate::{Bounds, Fixed, FixedScale, Magnitude, Unit, Unlimited};
 
 /// A decimal number, `num · 10^exp`: what [fixed!](crate::fixed) parses its literal into.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -170,8 +174,8 @@ impl Decimal {
         clippy::arithmetic_side_effects,
         reason = "every g is a gcd with one side at least 1 (q starts at 1 or 10^k, p at |num| >= 1: both callers return early for 0), so g >= 1"
     )]
-    const fn over<P: FixedScale>(self) -> (u128, u128) {
-        let Some((snum, sden)) = P::SCALE.to_ratio() else {
+    const fn over(self, scale: Magnitude) -> (u128, u128) {
+        let Some((snum, sden)) = scale.to_ratio() else {
             panic!(
                 "a literal needs a scale that is a fraction of integers: the stored values of a scale with π or a \
                  root in it aren't decimals"
@@ -205,11 +209,11 @@ impl Decimal {
         clippy::arithmetic_side_effects,
         reason = "q >= 1: a product of factors at least 1 (to_ratio's num is a product of prime powers); rem < q, so q - rem fits; up only when rem > 0, so q >= 2 and int + 1 fits; 0 <= x <= i128::MAX, so -x fits"
     )]
-    const fn to_int<P: FixedScale>(self) -> i128 {
+    const fn to_int(self, scale: Magnitude) -> i128 {
         if self.num == 0 {
             return 0;
         }
-        let (p, q) = self.over::<P>();
+        let (p, q) = self.over(scale);
         let (int, rem) = (p / q, p % q);
         // rem > q/2, or rem == q/2 and int is odd; q - rem can't overflow where 2 · rem could
         let up = rem > q - rem || (rem == q - rem && int & 1 == 1);
@@ -227,13 +231,81 @@ impl Decimal {
     }
 
     /// The exact `|self|` in units of `P` as an interval, for the nearest float; `None` for zero.
-    const fn to_interval<P: FixedScale>(self) -> Option<Interval> {
+    const fn to_interval(self, scale: Magnitude) -> Option<Interval> {
         if self.num == 0 {
             return None;
         }
-        let (p, q) = self.over::<P>();
+        let (p, q) = self.over(scale);
         Some(Interval::ratio(p, q))
     }
+
+    /// As [to_interval](Self::to_interval), also for a scale that isn't a fraction of integers (π, ln 10, a root):
+    /// `|self| / scale` with the scale's interval ([Interval::magnitude]).
+    const fn to_interval_any(self, scale: Magnitude) -> Option<Interval> {
+        if scale.is_rational() {
+            return self.to_interval(scale);
+        }
+        match self.to_interval(Magnitude::ONE) {
+            Some(x) => Some(x.mul(Interval::magnitude(scale.recip()))),
+            None => None,
+        }
+    }
+
+    /// As [to_int](Self::to_int), also for a scale that isn't a fraction of integers: then the interval of the exact
+    /// value must round to one integer at both ends, else a compile error (a literal too close to halfway between
+    /// two stored values to decide).
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "0 <= x <= i128::MAX, checked, so -x fits"
+    )]
+    const fn to_int_any(self, scale: Magnitude) -> i128 {
+        if scale.is_rational() {
+            return self.to_int(scale);
+        }
+        let Some(x) = self.to_interval_any(scale) else {
+            return 0;
+        };
+        let x = x.to_int();
+        assert!(
+            x <= i128::MAX as u128,
+            "this literal is too large for its storage"
+        );
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "x is checked to be at most i128::MAX just above"
+        )]
+        let x = x as i128;
+        if self.num < 0 { -x } else { x }
+    }
+}
+
+/// The scale of a literal in unit `S` against stored values of `P · U`, `U · P / S`, or a compile error for units
+/// that don't convert ([Fixed::convert]'s rules).
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented: units that don't convert"
+)]
+const fn scale_in<S: Unit, U: Unit, P: FixedScale>() -> Magnitude {
+    assert!(
+        S::DIM.same(U::DIM),
+        "a literal in another unit takes one of the same dimension"
+    );
+    assert!(
+        S::KIND.same(U::KIND),
+        "a literal in another unit takes one of the same kind: a loss is not a gain, V/V is not a Ratio"
+    );
+    assert!(
+        !S::EXPR.has_offset() && !U::EXPR.has_offset(),
+        "a unit with an offset converts as a Point, not a Fixed"
+    );
+    let (Some(from), Some(to)) = (S::EXPR.magnitude(), U::EXPR.magnitude()) else {
+        panic!("a literal in another unit needs both units' exact factors to SI")
+    };
+    to.mul(P::SCALE).div(from)
 }
 
 /// `a · b`, or a compile error: the scale and the literal together need more than 128 bits.
@@ -265,6 +337,10 @@ const fn gcd(mut a: u128, mut b: u128) -> u128 {
 #[derive(Debug)]
 pub struct Literal<const NUM: i64, const EXP: i16>;
 
+/// A decimal literal in the unit `S` as a type, `NUM · 10^EXP` of `S`: what `fixed!(17.7 in Decibel)` names.
+#[derive(Debug)]
+pub struct LiteralIn<const NUM: i64, const EXP: i16, S>(core::marker::PhantomData<S>);
+
 /// The stored value of literal `L` as an associated const, worked out at compile time ([Fixed::from_decimal]): what
 /// [fixed!](crate::fixed) reads, for every [Fixed] with an integer or float storage and every [Complex].
 pub trait AtLiteral<L>: Sized {
@@ -281,6 +357,16 @@ pub trait AtLiteral<L>: Sized {
 /// assert_eq!(GAIN.get(), 23170);
 /// const Z: CQ15 = fixed!(0.5, -0.25);
 /// assert_eq!(Z.get(), (16384, -8192));
+/// ```
+///
+/// A literal in another unit of the same dimension and kind is written `in` it:
+///
+/// ```
+/// # #[cfg(feature = "angle")] {
+/// use exact_units::{Fixed, fixed, prefix::Micro, units::{Degree, Radian}};
+/// const RIGHT: Fixed<Radian, Micro, i32> = fixed!(90 in Degree);
+/// assert_eq!(RIGHT.get(), 1_570_796); // π/2 = 1.5707963..
+/// # }
 /// ```
 ///
 /// A value that doesn't fit its storage doesn't compile, nor does a negative one of an unsigned storage, one outside
@@ -325,6 +411,15 @@ macro_rules! fixed {
             >,
         )>>::AT
     };
+    ($value:literal in $unit:ty) => {
+        <_ as $crate::literal::AtLiteral<
+            $crate::literal::LiteralIn<
+                { $crate::literal::Decimal::parse(stringify!($value)).num() },
+                { $crate::literal::Decimal::parse(stringify!($value)).exp() },
+                $unit,
+            >,
+        >>::AT
+    };
     ($value:literal) => {
         <_ as $crate::literal::AtLiteral<
             $crate::literal::Literal<
@@ -342,10 +437,14 @@ macro_rules! from_decimal {
             /// The stored value nearest to `x` in units of `U`, ties to even, at compile time: see the
             /// [module](crate::literal). A compile error in `const` code (a panic at run time) for a value that
             /// doesn't fit `T` or `B`, or a scale that isn't a fraction of integers.
+            pub const fn from_decimal(x: Decimal) -> Self {
+                Self::of_literal(x.to_int(P::SCALE))
+            }
+
+            /// `v` in `T` and `B`, or a compile error.
             #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
             #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
-            pub const fn from_decimal(x: Decimal) -> Self {
-                let v = x.to_int::<P>();
+            const fn of_literal(v: i128) -> Self {
                 if v < $ty::MIN as i128 {
                     panic!("this literal is below the range of its storage");
                 }
@@ -362,10 +461,27 @@ macro_rules! from_decimal {
             }
         }
 
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
+            /// The stored value nearest to `x` in units of `S`, ties to even, at compile time: what
+            /// `fixed!(17.7 in Decibel)` reads, a literal in another unit of the same dimension and kind. A factor
+            /// that isn't a fraction of integers (dB in Np, ° in rad) is rounded from an interval around the exact
+            /// value. A compile error in `const` code (a panic at run time) for units that don't convert, a value
+            /// that doesn't fit `T` or `B`, or one too close to halfway between two stored values to decide.
+            pub const fn from_decimal_in<S: Unit>(x: Decimal) -> Self {
+                Self::of_literal(x.to_int_any(scale_in::<S, U, P>()))
+            }
+        }
+
         impl<U, P: FixedScale, B: Bounds<$ty>, const N: i64, const E: i16> AtLiteral<Literal<N, E>>
             for Fixed<U, P, $ty, B>
         {
             const AT: Self = Self::from_decimal(Decimal::new(N, E));
+        }
+
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+            AtLiteral<LiteralIn<N, E, S>> for Fixed<U, P, $ty, B>
+        {
+            const AT: Self = Self::from_decimal_in::<S>(Decimal::new(N, E));
         }
     )*};
     (float $($ty:ident $to:ident)*) => {$(
@@ -374,7 +490,12 @@ macro_rules! from_decimal {
             /// [module](crate::literal). A compile error in `const` code (a panic at run time) for a value outside
             /// `B` or the float's normal range, or a scale that isn't a fraction of integers.
             pub const fn from_decimal(x: Decimal) -> Self {
-                let v = match x.to_interval::<P>() {
+                Self::of_literal(x, x.to_interval(P::SCALE))
+            }
+
+            /// `±|x|` from its interval, checked against `B`.
+            const fn of_literal(x: Decimal, abs: Option<Interval>) -> Self {
+                let v = match abs {
                     Some(i) => i.$to(),
                     None => 0.0,
                 };
@@ -393,10 +514,26 @@ macro_rules! from_decimal {
             }
         }
 
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
+            /// The float nearest to `x` in units of `S`, ties to even, at compile time: what
+            /// `fixed!(17.7 in Decibel)` reads. A compile error in `const` code (a panic at run time) for units that
+            /// don't convert, a value outside `B` or the float's normal range, or one too close to halfway between
+            /// two floats to decide.
+            pub const fn from_decimal_in<S: Unit>(x: Decimal) -> Self {
+                Self::of_literal(x, x.to_interval_any(scale_in::<S, U, P>()))
+            }
+        }
+
         impl<U, P: FixedScale, B: Bounds<$ty>, const N: i64, const E: i16> AtLiteral<Literal<N, E>>
             for Fixed<U, P, $ty, B>
         {
             const AT: Self = Self::from_decimal(Decimal::new(N, E));
+        }
+
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+            AtLiteral<LiteralIn<N, E, S>> for Fixed<U, P, $ty, B>
+        {
+            const AT: Self = Self::from_decimal_in::<S>(Decimal::new(N, E));
         }
     )*};
 }

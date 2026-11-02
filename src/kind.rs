@@ -109,7 +109,7 @@ const fn any_same(dims: &[Dim<'static>], d: Dim<'_>) -> bool {
     clippy::arithmetic_side_effects,
     reason = "i < a.len(), the loop bound"
 )]
-const fn same_str(a: &str, b: &str) -> bool {
+pub(crate) const fn same_str(a: &str, b: &str) -> bool {
     let (a, b) = (a.as_bytes(), b.as_bytes());
     if a.len() != b.len() {
         return false;

@@ -266,6 +266,39 @@ impl<'i> Dim<'i> {
         self.with_rad(0)
     }
 
+    /// The same without the level bases, as SI writes it (Np = 1): `Per<Neper, Second>` (a damping coefficient)
+    /// becomes the hertz's s⁻¹, `Per<Decibel, Meter>` m⁻¹. Drops the gain base `Neper` and the loss base `NeperLoss`
+    /// of this crate alike, so the sign of a loss is the caller's to keep. The explicit bridge for exports to systems
+    /// without a level dimension (UCUM, Pint, uom), like [strip_radian](Self::strip_radian); never applied
+    /// implicitly.
+    #[must_use]
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "i and kept are below MAX_COUNTED, the loop bound (kept <= i)"
+    )]
+    #[expect(clippy::arithmetic_side_effects, reason = "i, kept < MAX_COUNTED")]
+    pub const fn strip_neper(self) -> Dim<'i> {
+        let mut out = self;
+        out.counted = [None; MAX_COUNTED];
+        let (mut i, mut kept) = (0, 0);
+        while i < MAX_COUNTED {
+            if let Some(c) = self.counted[i]
+                && !(crate::kind::same_str(c.crate_name, "exact_units")
+                    && (crate::kind::same_str(c.name, "Neper")
+                        || crate::kind::same_str(c.name, "NeperLoss")))
+            {
+                out.counted[kept] = Some(c);
+                kept += 1;
+            }
+            i += 1;
+        }
+        // canonical again: a root whose odd exponent was a level's halves
+        match out.combine(Dim::ONE, 0, 1) {
+            Some(d) => d,
+            None => out,
+        }
+    }
+
     /// The exponents of s, m, kg, A, K, mol, cd, rad, bit.
     #[must_use]
     pub const fn exps(&self) -> [i8; FIXED] {

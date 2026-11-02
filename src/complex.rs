@@ -306,7 +306,7 @@ impl<U, P, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T, B> {
 }
 
 /// The operations whose overflow follows `B`, one impl per policy.
-trait Policy<T: ComplexStorage> {
+pub(crate) trait Policy<T: ComplexStorage> {
     fn add(a: T, b: T) -> T;
 
     fn sub(a: T, b: T) -> T;

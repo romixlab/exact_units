@@ -12,6 +12,8 @@
 
 mod arith;
 mod format;
+#[cfg(feature = "levels")]
+mod level;
 mod literal;
 mod magnitude;
 mod niche;

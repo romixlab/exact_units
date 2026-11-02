@@ -22,7 +22,9 @@ pub mod prefix;
 mod product;
 pub(crate) use product::{Requant, check as check_product};
 mod rounding;
-pub(crate) use rounding::{div_i128 as round_div_i128, settle as settle_i128};
+pub(crate) use rounding::{
+    div_i128 as round_div_i128, round_f64, settle as settle_i128, settle_f64,
+};
 pub(crate) mod format;
 mod storage;
 pub(crate) use format::Number;
@@ -435,8 +437,33 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// ```
     #[inline(always)]
     pub fn convert<U2: Unit, P2: FixedScale, T2: Storage>(self) -> Option<Fixed<U2, P2, T2>> {
-        let c = const { Conversion::between::<U, P, U2, P2, T, T2>() };
+        let c = const { Conversion::between::<U, P, U2, P2, T, T2>(false) };
         c.apply::<T, T2>(self.value).map(Fixed::new)
+    }
+
+    /// The same value in another unit `U2` of the same dimension and kind, scale `P2` and storage `T2`, rounded by
+    /// `r` where it isn't a whole number of `P2`: [convert](Self::convert) as [to_rounded](Self::to_rounded) is
+    /// [to](Self::to). Between integer storages the factor may have π, ln 2, ln 10 or a half exponent in it (degrees
+    /// to radians, decibels to nepers), multiplied as its 64-bit fixed point, with the accuracy `to_rounded` states.
+    /// `None` only when it doesn't fit `T2`.
+    ///
+    /// ```
+    /// # #[cfg(feature = "levels")] {
+    /// use exact_units::{Fixed, Rounding, prefix::{Centi, Micro}, units::{Decibel, Neper}};
+    /// // 17.7 dB is 2.0378.. Np
+    /// let db = Fixed::<Decibel, Centi, i16>::new(1770);
+    /// let np = db.convert_rounded::<Neper, Micro, i32>(Rounding::NearestEven);
+    /// assert_eq!(np, Some(Fixed::new(2_037_788)));
+    /// # }
+    /// ```
+    #[inline(always)]
+    pub fn convert_rounded<U2: Unit, P2: FixedScale, T2: Storage>(
+        self,
+        r: Rounding,
+    ) -> Option<Fixed<U2, P2, T2>> {
+        let c = const { Conversion::between::<U, P, U2, P2, T, T2>(true) };
+        c.apply_rounded(self.value, r, Overflow::Checked)
+            .map(Fixed::new)
     }
 
     /// The value `x · scale` (in the unit `U` itself) in this prefix and storage, if it is exact (as [to](Self::to))
@@ -867,13 +894,14 @@ impl Conversion {
     }
 
     /// From unit `U` in scale `P` to `U2` in `P2`: both units' exact factors to SI and the same dimension, else a
-    /// compile error.
+    /// compile error; `rounding` as for [of](Self::of).
     #[expect(
         clippy::panic,
         reason = "a compile error in const code (a panic at run time), as documented: units without an exact factor to SI"
     )]
-    const fn between<U: Unit, P: FixedScale, U2: Unit, P2: FixedScale, T: Storage, T2: Storage>()
-    -> Self {
+    const fn between<U: Unit, P: FixedScale, U2: Unit, P2: FixedScale, T: Storage, T2: Storage>(
+        rounding: bool,
+    ) -> Self {
         assert!(
             U::DIM.same(U2::DIM),
             "a Fixed converts only between units of the same dimension (a pound-force is not a pound)"
@@ -890,7 +918,7 @@ impl Conversion {
         let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
             panic!("a Fixed converts only between units with an exact factor to SI")
         };
-        Self::by::<T, T2>(from.mul(P::SCALE).div(to.mul(P2::SCALE)), false)
+        Self::by::<T, T2>(from.mul(P::SCALE).div(to.mul(P2::SCALE)), rounding)
     }
 
     #[expect(
@@ -1063,7 +1091,7 @@ impl Conversion {
             return if T2::IS_FLOAT {
                 T2::from_float(y)
             } else {
-                rounding::settle_f64(rounding::round_f64(y, r), o)
+                settle_f64(round_f64(y, r), o)
             };
         }
         if let Some((m, shift)) = self.fixed_point {

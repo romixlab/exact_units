@@ -324,6 +324,33 @@ crate::unit! {
     #[cfg(feature = "angle")]
     pub struct AngularAcceleration = "rad/s²", [rad 1, s -2];
 
+    // Levels: the neper is a base of its own (a counted base of this crate), like the radian, so a level doesn't mix
+    // with a Ratio and a rate of one (Np/m, dB/s) not with a wavenumber or a hertz. A loss is a second base: a loss and
+    // a gain of the same number are each other's negation, crossed by the named steps `as_loss` and `as_gain`.
+
+    /// A level in nepers, Np: ln(F/F₀) of a root-power quantity, ½·ln(P/P₀) of a power, so a field level and its
+    /// power level are the same number (ISO 80000-3, IEC 60027-3). Signed as a gain: a decay is negative. A base of
+    /// its own here: [Fixed::to_level](crate::Fixed::to_level) and [to_gain](crate::Fixed::to_gain) cross from and to
+    /// a gain (V/V, W/W).
+    #[cfg(feature = "levels")]
+    pub struct Neper = "Np", counted;
+
+    /// A level in decibels, dB ((ln 10)/20 [Neper], exactly): 20·lg of a root-power ratio, 10·lg of a power ratio,
+    /// the same number for both. Signed as a gain.
+    #[cfg(feature = "levels")]
+    pub struct Decibel = "dB", counted(Neper), Exact(1 / 20, ln10 1);
+
+    /// A loss in nepers, Np: a [Neper] level signed as a loss, positive for a decay, as attenuation coefficients and
+    /// datasheets write it. A base of its own, so a loss doesn't convert to a gain: `as_gain` negates. Written
+    /// `Loss<Neper>` ([Loss]).
+    #[cfg(feature = "levels")]
+    pub struct NeperLoss = "Np", counted;
+
+    /// A loss in decibels, dB ((ln 10)/20 [NeperLoss], exactly): a cable's 17.7 dB/100 m is
+    /// `Per<Loss<Decibel>, _>` of +17.7. Written `Loss<Decibel>` ([Loss]).
+    #[cfg(feature = "levels")]
+    pub struct DecibelLoss = "dB", counted(NeperLoss), Exact(1 / 20, ln10 1);
+
     // Thermal
 
     /// Thermodynamic temperature in kelvins, K.
@@ -754,3 +781,6 @@ impl<P, T: crate::Storage, B: crate::Bounds<T>> crate::Fixed<Per<Cycle, Second>,
         crate::Fixed::new_unchecked(self.get())
     }
 }
+
+#[cfg(feature = "levels")]
+pub use crate::level::{Level, Loss, LossLevel};

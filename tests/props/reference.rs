@@ -160,3 +160,10 @@ fn digits(s: &str) -> Option<i128> {
     }
     any.then_some(n)
 }
+
+/// ln 10 to 30 significant digits, `LN10 / 10^29`: 2.30258509299404568401799145468.. Far closer than any stored
+/// value tells apart (a relative 10⁻³⁰), and small enough that a level times it stays in `i128`.
+pub(crate) const LN10: i128 = 230_258_509_299_404_568_401_799_145_468;
+
+/// The denominator of [LN10].
+pub(crate) const LN10_DEN: i128 = 10_i128.pow(29);

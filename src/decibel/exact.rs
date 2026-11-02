@@ -240,7 +240,7 @@ impl Interval {
         }
     }
 
-    const fn mul(self, rhs: Interval) -> Interval {
+    pub(crate) const fn mul(self, rhs: Interval) -> Interval {
         Interval {
             lo: self.lo.mul(rhs.lo, false),
             hi: self.hi.mul(rhs.hi, true),
@@ -319,6 +319,35 @@ impl Interval {
     /// `p / q`, both above 0.
     pub(crate) const fn ratio(p: u128, q: u128) -> Interval {
         Interval::exact(p).div(Interval::exact(q))
+    }
+
+    /// A magnitude, `[m - 1, m + 1] · 2^shift` around its 64-bit fixed point ([Magnitude::fixed_point](crate::Magnitude::fixed_point)), which is
+    /// within 2⁻⁶⁴ of it relative: less than one unit of `m`, as `2⁶³ <= m`. Exact for a fraction of integers.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "2^63 <= m < 2^64, so m - 1 and m + 1 fit u128; |shift| < 2^16, so the exponents fit i64"
+    )]
+    pub(crate) const fn magnitude(x: crate::Magnitude) -> Interval {
+        if let Some((p, q)) = x.to_ratio() {
+            return Interval::ratio(p, q);
+        }
+        let (m, shift) = x.fixed_point();
+        let lo = Num::of(m as u128 - 1);
+        let hi = Num::of(m as u128 + 1);
+        Interval {
+            lo: Num {
+                m: lo.m,
+                e: lo.e + shift as i64,
+            },
+            hi: Num {
+                m: hi.m,
+                e: hi.e + shift as i64,
+            },
+        }
     }
 
     /// `10^(n/d) · den / num`, `d > 0`.
