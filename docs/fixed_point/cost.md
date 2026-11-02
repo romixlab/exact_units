@@ -24,6 +24,8 @@ In the tables, `=` means LLVM emits the same instructions for both twins. Otherw
 
 Measured on 28 Oct 2026, Rust 1.98.1.
 
+Instructions in the ELF, plain / typed; `=` means identical code.
+
 | Conversion | M0 `z` | M0 `3` | M4F `z` | M4F `3` |
 |---|---|---|---|---|
 | ms → µs, `u32` (× 1000, checked) | 16 / 15 | 17 / 17 | 10 / 13 | 11 / 15 |
@@ -36,6 +38,8 @@ Measured on 28 Oct 2026, Rust 1.98.1.
 The ms → µs difference is a range check on the input in place of a 64-bit multiply and a check of its high word.
 
 ## Rounding and overflow
+
+Instructions in the ELF, plain / typed; `=` means identical code.
 
 | Conversion | M0 `z` | M0 `3` | M4F `z` | M4F `3` |
 |---|---|---|---|---|
@@ -51,6 +55,8 @@ The ms → µs difference is a range check on the input in place of a 64-bit mul
 Where the typed side is longer the arithmetic is the same: LLVM hoists the divide above the range check and picks selects where the hand version branches. The π row's hand version is the same correctly rounded 64-bit fixed point; the usual hand-written 32.32 approximation is shorter (13 instructions on M0) and not correctly rounded.
 
 ## Points
+
+Instructions in the ELF, plain / typed; `=` means identical code.
 
 | Operation | M0 `3` | M4F `3` | M4F `z` |
 |---|---|---|---|
