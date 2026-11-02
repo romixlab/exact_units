@@ -33,7 +33,7 @@
 //! `no_std`, no alloc, and no dependencies without features. `shrink_wrap` adds the wire format (`shrink_wrap`'s),
 //! `std` every unit group and with `shrink_wrap` the owned forms of the wire types, `defmt` their `defmt::Format`,
 //! `serde` their serde, `libm` the run-time dB without `std`. Unit groups are cargo features (`time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`,
-//! `radiation`, `dimensionless`, `information`, `counting`, `quantities` for all).
+//! `radiometric`, `radiation`, `fields`, `dimensionless`, `information`, `counting`, `quantities` for all).
 //!
 //! Run-time quantities (a prefix and a number type chosen per value) are `ww_si`'s `Quantity` and `AnyQuantity`,
 //! built on this crate.

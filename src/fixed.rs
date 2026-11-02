@@ -1220,7 +1220,9 @@ pub(crate) fn write_prefix_unit<P: FixedScale>(
     }
     match unit {
         UnitExpr::Named { symbol: "", .. } => write!(f, " {}", P::SYMBOL),
-        UnitExpr::Named { symbol, .. } => write!(f, " {}{symbol}", P::SYMBOL),
+        UnitExpr::Named { symbol, .. } if crate::tree::prefix_binds(symbol) => {
+            write!(f, " {}{symbol}", P::SYMBOL)
+        }
         unit => write!(f, " {}({unit})", P::SYMBOL),
     }
 }
@@ -1261,8 +1263,11 @@ impl<U: Unit, P: FixedScale, T: Storage + defmt::Format, B: Bounds<T>> defmt::Fo
             UnitExpr::Named { symbol, .. } if P::SYMBOL.is_empty() && P::RUNTIME.is_none() => {
                 defmt::write!(f, "{} ·{} {=str}", self.value, P::SCALE, symbol);
             }
-            UnitExpr::Named { symbol, .. } => {
+            UnitExpr::Named { symbol, .. } if crate::tree::prefix_binds(symbol) => {
                 defmt::write!(f, "{} {=str}{=str}", self.value, P::SYMBOL, symbol);
+            }
+            UnitExpr::Named { symbol, .. } => {
+                defmt::write!(f, "{} {=str}({=str})", self.value, P::SYMBOL, symbol);
             }
             // compound units are rare on a device: the type name instead of a rendered tree
             _ => defmt::write!(f, "{} {=str}?", self.value, P::SYMBOL),

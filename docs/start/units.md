@@ -14,18 +14,22 @@ The markers come in groups, one cargo feature each. A firmware turns on only the
 |---|---|
 | `time` | `Second`, `Minute`, `Hour`, `Day`, `Week`, `Hertz`, `HertzPerSecond`, `Baud` |
 | `electrical` | `Ampere`, `Volt`, `Ohm`, `Farad`, `Siemens`, `Henry`, `Coulomb`, `Watt`, `VoltAmpere`, `Var`, `Weber`, `Tesla` |
-| `mechanical` | `Meter`, `KiloGram`, `Newton`, `Pascal`, `Joule`, `Torque`, `Litre`, `Speed`, `Acceleration`, ... |
+| `fields` | `ElectricFieldStrength` (V/m), `MagneticFieldStrength` (A/m), `CurrentDensity` (A/m²), `ChargeDensity` (C/m³), `ElectricDisplacement` (C/m²), `Permittivity` (F/m), `Permeability` (H/m), `Resistivity` (Ω·m), `Conductivity` (S/m) |
+| `mechanical` | `Meter`, `Gram`, `Newton`, `Pascal`, `Joule`, `Torque`, `Litre`, `Speed`, `Acceleration`, ...; `Area`, `Volume`, `Density`, `Momentum`, `MomentOfInertia`, `DynamicViscosity` (Pa·s), `KinematicViscosity` (m²/s), `EnergyDensity` (J/m³), ... |
 | `angle` | `Radian`, `Degree`, `Turn`, `Steradian`, `AngularVelocity`, `AngularAcceleration` |
-| `thermal` | `Kelvin`, `DegreeCelsius` |
-| `chemical` | `Mole`, `Katal` |
-| `photometric` | `Candela`, `Lumen`, `Lux` |
-| `radiation` | `Becquerel`, `Gray`, `Sievert`, `ElectronVolt` |
+| `thermal` | `Kelvin`, `DegreeCelsius`, `HeatFluxDensity` (W/m²), `HeatCapacity` and `Entropy` (J/K), `SpecificHeatCapacity`, `ThermalConductivity`, `ThermalConductance` (W/K), `ThermalResistance` (K/W), `HeatTransferCoefficient` |
+| `chemical` | `Mole`, `Katal`, `MolarConcentration` (mol/m³), `MolePerLitre`, `Molality`, `MolarMass`, `GramPerMole`, `MolarEnergy`, `MolarHeatCapacity` |
+| `photometric` | `Candela`, `Lumen`, `Lux`, `Nit` (cd/m²), `LuminousEfficacy` (lm/W) |
+| `radiometric` | `Irradiance` (W/m²), `RadiantIntensity` (W/sr), `Radiance` (W/(m²·sr)) |
+| `radiation` | `Becquerel`, `Gray`, `Sievert`, `ElectronVolt`, `Exposure` (C/kg), `AbsorbedDoseRate` (Gy/s), `SievertPerHour` |
 | `dimensionless` | `Ratio`: duty, probability, scale |
 | `information` | `Bit`, `Nibble`, `Byte`, `Halfword`, `Word`, `Doubleword` |
 | `counting` | `Item`, `Sample`, `Frame`, `Packet`, `Line`, `Row`, `Record`, `Entry`, `Cycle`, `Block`, `Sector`, `Chunk`, `Char`, `Code` |
 | `customary` | inch, pound, psi, gallon and the rest: [Customary units](../customary.md) |
 
 `quantities` turns on every group but `customary`. `std` turns on `quantities`.
+
+The derived units are the coherent ones of the SI Brochure's tables 5 and 6, plus a few exact everyday scales (`MolePerLitre`, `GramPerCubicCentimeter`, `GramPerMole`, `SievertPerHour`). A unit with a power in its first factor takes a prefix on the whole of it: a `Fixed<Area, Micro, T>` is written `5 µ(m²)`, since `5 mm²` would mean 10⁻⁶ m², not 10⁻³.
 
 ## Building units
 

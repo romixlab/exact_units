@@ -56,6 +56,9 @@ Where crossing is right, it is a named step that keeps the number:
 | `Ohm` | `as_transimpedance()` | `Per<Volt, Ampere>` |
 | `Per<Volt, Ampere>` | `as_resistance()` | `Ohm` |
 | `Siemens` | `as_transconductance()` | `Per<Ampere, Volt>` |
+| `Per<Joule, Volume>` | `as_energy_density()` | `EnergyDensity`, not a `Pascal` |
+| `HeatCapacity`, `Per<Joule, Kelvin>` | `as_entropy()` | `Entropy` |
+| `Entropy` | `as_heat_capacity()` | `HeatCapacity` |
 | a cycle count per second | `to_hertz()` | `Hertz` |
 
 ```rust

@@ -490,3 +490,100 @@ fn dim_reads_only_canonical() {
         assert!(e.to_string().contains("isn't canonical"), "{bad}: {e}");
     }
 }
+
+/// Every derived unit's symbol reads back as written, bare and with a prefix (in parentheses where its first factor
+/// has an exponent or a prefix, `m(m²)`); a luminance also reads as `nit` and `nt`.
+#[cfg(all(
+    feature = "mechanical",
+    feature = "fields",
+    feature = "chemical",
+    feature = "photometric",
+    feature = "radiometric",
+    feature = "radiation"
+))]
+#[test]
+fn with_unit_round_trips_derived_symbols() {
+    use exact_units::prefix::Kilo;
+    use exact_units::units::{self, Nit};
+
+    macro_rules! each {
+        ($($u:ident = $sym:literal, $kilo:literal;)*) => {$(
+            let x = Fixed::<units::$u, One, i32>::new(-5);
+            assert_eq!(write(x), concat!("-5 ", $sym), stringify!($u));
+            assert_eq!(read::<units::$u, One, i32, exact_units::Unbounded>(concat!("-5 ", $sym)), Ok(-5));
+            assert_eq!(read::<units::$u, One, i32, exact_units::Unbounded>(concat!("-5", $sym)), Ok(-5));
+            assert_eq!(read::<units::$u, Kilo, i32, exact_units::Unbounded>($kilo), Ok(2), $kilo);
+            assert_eq!(write(Fixed::<units::$u, Milli, i32>::new(1500)), concat!("1.5 ", $sym));
+        )*};
+    }
+    each! {
+        Area = "m²", "2 k(m²)";
+        Volume = "m³", "2 k(m³)";
+        Wavenumber = "m⁻¹", "2 k(m⁻¹)";
+        Density = "kg/m³", "2 k(kg/m³)";
+        GramPerCubicCentimeter = "g/cm³", "2 kg/cm³";
+        SurfaceDensity = "kg/m²", "2 k(kg/m²)";
+        SpecificVolume = "m³/kg", "2 k(m³/kg)";
+        MassFlow = "kg/s", "2 k(kg/s)";
+        Momentum = "kg·m/s", "2 k(kg·m/s)";
+        AngularMomentum = "kg·m²/s", "2 k(kg·m²/s)";
+        MomentOfInertia = "kg·m²", "2 k(kg·m²)";
+        SurfaceTension = "N/m", "2 kN/m";
+        DynamicViscosity = "Pa·s", "2 kPa·s";
+        KinematicViscosity = "m²/s", "2 k(m²/s)";
+        EnergyDensity = "J/m³", "2 kJ/m³";
+        PowerDensity = "W/m³", "2 kW/m³";
+        ElectricFieldStrength = "V/m", "2 kV/m";
+        MagneticFieldStrength = "A/m", "2 kA/m";
+        CurrentDensity = "A/m²", "2 kA/m²";
+        ChargeDensity = "C/m³", "2 kC/m³";
+        ElectricDisplacement = "C/m²", "2 kC/m²";
+        Permittivity = "F/m", "2 kF/m";
+        Permeability = "H/m", "2 kH/m";
+        Resistivity = "Ω·m", "2 kΩ·m";
+        Conductivity = "S/m", "2 kS/m";
+        HeatFluxDensity = "W/m²", "2 kW/m²";
+        HeatCapacity = "J/K", "2 kJ/K";
+        Entropy = "J/K", "2 kJ/K";
+        SpecificHeatCapacity = "J/(kg·K)", "2 kJ/(kg·K)";
+        ThermalConductivity = "W/(m·K)", "2 kW/(m·K)";
+        ThermalConductance = "W/K", "2 kW/K";
+        ThermalResistance = "K/W", "2 kK/W";
+        HeatTransferCoefficient = "W/(m²·K)", "2 kW/(m²·K)";
+        MolarConcentration = "mol/m³", "2 kmol/m³";
+        MolePerLitre = "mol/L", "2 kmol/L";
+        Molality = "mol/kg", "2 kmol/kg";
+        MolarMass = "kg/mol", "2 k(kg/mol)";
+        GramPerMole = "g/mol", "2 kg/mol";
+        MolarEnergy = "J/mol", "2 kJ/mol";
+        MolarHeatCapacity = "J/(mol·K)", "2 kJ/(mol·K)";
+        Nit = "cd/m²", "2 kcd/m²";
+        LuminousEfficacy = "lm/W", "2 klm/W";
+        Irradiance = "W/m²", "2 kW/m²";
+        RadiantIntensity = "W/sr", "2 kW/sr";
+        Radiance = "W/(m²·sr)", "2 kW/(m²·sr)";
+        Exposure = "C/kg", "2 kC/kg";
+        AbsorbedDoseRate = "Gy/s", "2 kGy/s";
+        SievertPerHour = "Sv/h", "2 kSv/h";
+    }
+
+    let nits = |s| read::<Nit, One, u16, exact_units::Unbounded>(s);
+    for s in [
+        "500 nit",
+        "500nt",
+        "500 cd/m²",
+        "0.5 knit",
+        "0.5 knt",
+        "500000 mnit",
+    ] {
+        assert_eq!(nits(s), Ok(500), "{s}");
+    }
+    assert_eq!(write(Fixed::<Nit, One, u16>::new(500)), "500 cd/m²");
+    // a powered symbol takes no bare prefix: `mm²` is not 10⁻³ m²
+    assert!(read::<units::Area, Milli, i32, exact_units::Unbounded>("5 mm²").is_err());
+    assert_eq!(
+        read::<units::Area, Milli, i32, exact_units::Unbounded>("5 m(m²)"),
+        Ok(5)
+    );
+    assert!(read::<units::Density, One, i32, exact_units::Unbounded>("5 g/m³").is_err());
+}

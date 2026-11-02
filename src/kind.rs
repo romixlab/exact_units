@@ -390,6 +390,94 @@ mod electrical {
     }
 }
 
+/// An energy density is not a pressure, nor entropy a heat capacity, though each pair has one dimension: the
+/// compound reaches the named kind only by a named step.
+///
+/// ```
+/// # #[cfg(all(feature = "mechanical", feature = "thermal"))] {
+/// use exact_units::{Fixed, prefix::{Kilo, One}, units::{Entropy, HeatCapacity, Joule, Kelvin, Pascal, Per, Volume}};
+///
+/// let w = Fixed::<Per<Joule, Volume>, Kilo, u32>::new(12);
+/// // J/m³ is a plain compound: it is a pressure by conversion, an energy density by a named step
+/// assert_eq!(w.convert::<Pascal, One, u32>(), Some(Fixed::new(12000)));
+/// assert_eq!(w.as_energy_density().get(), 12);
+/// let c = Fixed::<Per<Joule, Kelvin>, One, f32>::new(4.2);
+/// let _: Option<Fixed<HeatCapacity, One, f32>> = c.convert();
+/// let s: Fixed<Entropy, One, f32> = c.as_entropy();
+/// assert_eq!(s.as_heat_capacity(), Fixed::new(4.2));
+/// # }
+/// ```
+///
+/// A pressure is not an energy density:
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, prefix::One, units::{EnergyDensity, Pascal}};
+/// let _ = Fixed::<Pascal, One, f32>::new(1.0).convert::<EnergyDensity, One, f32>();
+/// ```
+///
+/// nor a heat capacity entropy:
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, prefix::One, units::{Entropy, HeatCapacity}};
+/// let _ = Fixed::<HeatCapacity, One, f32>::new(1.0).convert::<Entropy, One, f32>();
+/// ```
+#[cfg(all(feature = "mechanical", feature = "thermal"))]
+#[expect(dead_code, reason = "a holder of doctests")]
+struct DerivedKinds;
+
+#[cfg(feature = "mechanical")]
+mod mechanical {
+    use crate::units::{EnergyDensity, Joule, Per, Volume};
+    use crate::{Bounds, Fixed, Storage};
+
+    /// Joules per cubic meter are a pressure as they stand; an energy density only by this named step.
+    impl<P, T: Storage, B: Bounds<T>> Fixed<Per<Joule, Volume>, P, T, B> {
+        /// The same number as an energy density in J/m³.
+        pub fn as_energy_density(self) -> Fixed<EnergyDensity, P, T, B> {
+            Fixed::new_unchecked(self.get())
+        }
+    }
+
+    impl<P, T: Storage, B: Bounds<T>> Fixed<EnergyDensity, P, T, B> {
+        /// The same number as a plain J/m³, which converts to [Pascal](crate::units::Pascal).
+        pub fn as_joule_per_volume(self) -> Fixed<Per<Joule, Volume>, P, T, B> {
+            Fixed::new_unchecked(self.get())
+        }
+    }
+}
+
+#[cfg(feature = "thermal")]
+mod thermal {
+    use crate::units::{Entropy, HeatCapacity};
+    #[cfg(feature = "mechanical")]
+    use crate::units::{Joule, Kelvin, Per};
+    use crate::{Bounds, Fixed, Storage};
+
+    /// A heat capacity (J/K) becomes an entropy only by this named step, and back.
+    impl<P, T: Storage, B: Bounds<T>> Fixed<HeatCapacity, P, T, B> {
+        /// The same number as an entropy in J/K.
+        pub fn as_entropy(self) -> Fixed<Entropy, P, T, B> {
+            Fixed::new_unchecked(self.get())
+        }
+    }
+
+    impl<P, T: Storage, B: Bounds<T>> Fixed<Entropy, P, T, B> {
+        /// The same number as a heat capacity in J/K.
+        pub fn as_heat_capacity(self) -> Fixed<HeatCapacity, P, T, B> {
+            Fixed::new_unchecked(self.get())
+        }
+    }
+
+    /// `Per<Joule, Kelvin>` converts to a [HeatCapacity]; this is its step to an entropy.
+    #[cfg(feature = "mechanical")]
+    impl<P, T: Storage, B: Bounds<T>> Fixed<Per<Joule, Kelvin>, P, T, B> {
+        /// The same number as an entropy in J/K.
+        pub fn as_entropy(self) -> Fixed<Entropy, P, T, B> {
+            Fixed::new_unchecked(self.get())
+        }
+    }
+}
+
 #[cfg(feature = "dimensionless")]
 mod ratio {
     use crate::units::{Per, Ratio};

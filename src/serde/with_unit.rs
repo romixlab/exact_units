@@ -46,7 +46,7 @@
 use super::OutOfRange;
 use super::text::{Buf, Decimal, writes_as};
 use crate::fixed::write_prefix_unit;
-use crate::tree::{is_ratio, write_unit};
+use crate::tree::{is_ratio, takes_bare_prefix, write_unit};
 use crate::{Bounds, Fixed, FixedScale, Prefix, Storage, Unit, UnitExpr};
 use ::serde::de::{self, Deserializer, Visitor};
 use ::serde::ser::Serializer;
@@ -297,10 +297,14 @@ fn prefix_of<U: Unit>(t: &str) -> Option<TextPrefix> {
         };
         return Some(TextPrefix::of(prefix));
     }
-    if writes_as(&unit, t) {
+    let spelled = |t: &str| {
+        writes_as(&unit, t)
+            || matches!(U::EXPR, UnitExpr::Named { name, .. } if crate::units::spellings(name).contains(&t))
+    };
+    if spelled(t) {
         return Some(TextPrefix::UNIT);
     }
-    let named = matches!(U::EXPR, UnitExpr::Named { .. });
+    let named = takes_bare_prefix(&U::EXPR);
     let prefixes = (-30..=30i8).filter_map(Prefix::si_from_pow10).chain([
         Prefix::Kibi,
         Prefix::Mebi,
@@ -314,19 +318,20 @@ fn prefix_of<U: Unit>(t: &str) -> Option<TextPrefix> {
         else {
             continue;
         };
-        // a compound unit takes its prefix on the whole of it in parentheses, as Display writes it: `m(V/A)`
+        // a compound unit, and a named one whose first factor has an exponent or a prefix (`m²`, `kg/m³`), takes its
+        // prefix on the whole of it in parentheses, as Display writes it: `m(V/A)`, `m(m²)`
         let rest = if named {
             Some(rest)
         } else {
             rest.strip_prefix('(').and_then(|r| r.strip_suffix(')'))
         };
-        if rest.is_some_and(|r| writes_as(&unit, r)) {
+        if rest.is_some_and(spelled) {
             return Some(TextPrefix::of(p));
         }
     }
     // micro as u, and as the Greek letter mu next to the micro sign
     let micro = t.strip_prefix('u').or_else(|| t.strip_prefix('\u{3bc}'));
-    if named && micro.is_some_and(|r| writes_as(&unit, r)) {
+    if named && micro.is_some_and(spelled) {
         return Some(TextPrefix::of(Prefix::Micro));
     }
     None

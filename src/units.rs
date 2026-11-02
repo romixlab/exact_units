@@ -122,6 +122,48 @@ crate::unit! {
     #[cfg(feature = "electrical")]
     pub struct Tesla = "T", [kg 1, s -2, a -1];
 
+    // Fields: electric and magnetic fields and the material constants between them
+
+    /// Electric field strength in volts per meter, V/m (kg·m·s⁻³·A⁻¹, SI Brochure, 9th ed., table 6).
+    #[cfg(feature = "fields")]
+    pub struct ElectricFieldStrength = "V/m", [kg 1, m 1, s -3, a -1];
+
+    /// Magnetic field strength in amperes per meter, A/m (SI Brochure, 9th ed., table 5).
+    #[cfg(feature = "fields")]
+    pub struct MagneticFieldStrength = "A/m", [m -1, a 1];
+
+    /// Current density in amperes per square meter, A/m² (SI Brochure, 9th ed., table 5): a trace's or a wire's A/mm²
+    /// is `Fixed<CurrentDensity, Mega, T>`.
+    #[cfg(feature = "fields")]
+    pub struct CurrentDensity = "A/m²", [m -2, a 1];
+
+    /// Electric charge density in coulombs per cubic meter, C/m³ (m⁻³·s·A, SI Brochure, 9th ed., table 6).
+    #[cfg(feature = "fields")]
+    pub struct ChargeDensity = "C/m³", [m -3, s 1, a 1];
+
+    /// Electric displacement (electric flux density) or surface charge density in coulombs per square meter, C/m²
+    /// (m⁻²·s·A, SI Brochure, 9th ed., table 6).
+    #[cfg(feature = "fields")]
+    pub struct ElectricDisplacement = "C/m²", [m -2, s 1, a 1];
+
+    /// Permittivity in farads per meter, F/m (kg⁻¹·m⁻³·s⁴·A², SI Brochure, 9th ed., table 6); also a cable's
+    /// capacitance per length.
+    #[cfg(feature = "fields")]
+    pub struct Permittivity = "F/m", [kg -1, m -3, s 4, a 2];
+
+    /// Permeability in henries per meter, H/m (kg·m·s⁻²·A⁻², SI Brochure, 9th ed., table 6); also a cable's
+    /// inductance per length.
+    #[cfg(feature = "fields")]
+    pub struct Permeability = "H/m", [kg 1, m 1, s -2, a -2];
+
+    /// Electrical resistivity in ohm meters, Ω·m (kg·m³·s⁻³·A⁻²): copper is about 17 nΩ·m.
+    #[cfg(feature = "fields")]
+    pub struct Resistivity = "Ω·m", [kg 1, m 3, s -3, a -2];
+
+    /// Electrical conductivity in siemens per meter, S/m (kg⁻¹·m⁻³·s³·A²): seawater is about 5 S/m.
+    #[cfg(feature = "fields")]
+    pub struct Conductivity = "S/m", [kg -1, m -3, s 3, a 2];
+
     // Mechanical
 
     /// Length in meters, m.
@@ -177,6 +219,81 @@ crate::unit! {
     #[cfg(feature = "mechanical")]
     pub struct Yank = "N/s", [kg 1, m 1, s -3];
 
+    /// Area in square meters, m² (SI Brochure, 9th ed., table 5). With a prefix it is written on the whole unit,
+    /// `m(m²)`: `mm²` would read as (mm)², 10⁻⁶ m²; a square millimetre is `Fixed<Area, Micro, T>`.
+    #[cfg(feature = "mechanical")]
+    pub struct Area = "m²", [m 2];
+
+    /// Volume in cubic meters, m³ (SI Brochure, 9th ed., table 5); a litre is [Litre], 10⁻³ m³.
+    #[cfg(feature = "mechanical")]
+    pub struct Volume = "m³", [m 3];
+
+    /// Wavenumber in reciprocal meters, m⁻¹ (SI Brochure, 9th ed., table 5): the cm⁻¹ of spectroscopy is
+    /// `Fixed<Wavenumber, Hecto, T>`, 100 m⁻¹.
+    #[cfg(feature = "mechanical")]
+    pub struct Wavenumber = "m⁻¹", [m -1];
+
+    /// Density, mass density or mass concentration in kilograms per cubic meter, kg/m³ (SI Brochure, 9th ed.,
+    /// table 5); g/L is the same unit.
+    #[cfg(feature = "mechanical")]
+    pub struct Density = "kg/m³", [kg 1, m -3];
+
+    /// Density in grams per cubic centimetre, g/cm³ (10³ kg/m³, also kg/L): water is about 1 g/cm³.
+    #[cfg(feature = "mechanical")]
+    pub struct GramPerCubicCentimeter = "g/cm³", [kg 1, m -3], Pow10(3);
+
+    /// Surface density, mass per area, in kilograms per square meter, kg/m² (SI Brochure, 9th ed., table 5): a paper's
+    /// grammage in g/m² is `Fixed<SurfaceDensity, Milli, T>`.
+    #[cfg(feature = "mechanical")]
+    pub struct SurfaceDensity = "kg/m²", [kg 1, m -2];
+
+    /// Specific volume in cubic meters per kilogram, m³/kg (SI Brochure, 9th ed., table 5).
+    #[cfg(feature = "mechanical")]
+    pub struct SpecificVolume = "m³/kg", [m 3, kg -1];
+
+    /// Mass flow rate in kilograms per second, kg/s.
+    #[cfg(feature = "mechanical")]
+    pub struct MassFlow = "kg/s", [kg 1, s -1];
+
+    /// Momentum or impulse in kilogram meters per second, kg·m/s (N·s).
+    #[cfg(feature = "mechanical")]
+    pub struct Momentum = "kg·m/s", [kg 1, m 1, s -1];
+
+    /// Angular momentum in kilogram square meters per second, kg·m²/s, counted as joule seconds per radian
+    /// (kg·m²·s⁻¹·rad⁻¹), like [Torque]: a [MomentOfInertia] times an [AngularVelocity], and a [Torque] times a
+    /// [Second].
+    #[cfg(feature = "mechanical")]
+    pub struct AngularMomentum = "kg·m²/s", [kg 1, m 2, s -1, rad -1];
+
+    /// Moment of inertia in kilogram square meters, kg·m², counted per square radian (kg·m²·rad⁻²): times an
+    /// [AngularAcceleration] it is a [Torque], and ½·I·ω² is a [Joule].
+    #[cfg(feature = "mechanical")]
+    pub struct MomentOfInertia = "kg·m²", [kg 1, m 2, rad -2];
+
+    /// Surface tension in newtons per meter, N/m (kg·s⁻², SI Brochure, 9th ed., table 6); also a spring's stiffness.
+    #[cfg(feature = "mechanical")]
+    pub struct SurfaceTension = "N/m", [kg 1, s -2];
+
+    /// Dynamic viscosity in pascal seconds, Pa·s (kg·m⁻¹·s⁻¹, SI Brochure, 9th ed., table 6): water at 20 °C is about
+    /// 1 mPa·s.
+    #[cfg(feature = "mechanical")]
+    pub struct DynamicViscosity = "Pa·s", [kg 1, m -1, s -1];
+
+    /// Kinematic viscosity, or a diffusivity, in square meters per second, m²/s: a dynamic viscosity over a density.
+    /// The centistokes of oils is `Fixed<KinematicViscosity, Micro, T>`, 1 mm²/s.
+    #[cfg(feature = "mechanical")]
+    pub struct KinematicViscosity = "m²/s", [m 2, s -1];
+
+    /// Energy density in joules per cubic meter, J/m³ (kg·m⁻¹·s⁻², SI Brochure, 9th ed., table 6). The dimension of a
+    /// [Pascal], so of the kind `energy density`: a pressure is not one, and `Per<Joule, Volume>` becomes one only by
+    /// `as_energy_density`.
+    #[cfg(feature = "mechanical")]
+    pub struct EnergyDensity = "J/m³", [kg 1, m -1, s -2] kind "energy density";
+
+    /// Power density, or a volumetric heat source, in watts per cubic meter, W/m³ (kg·m⁻¹·s⁻³).
+    #[cfg(feature = "mechanical")]
+    pub struct PowerDensity = "W/m³", [kg 1, m -1, s -3];
+
     // Angle
 
     /// Angle in radians, rad: a base dimension of its own here, so an angle doesn't mix with a [Ratio].
@@ -214,6 +331,44 @@ crate::unit! {
     #[cfg(feature = "thermal")]
     pub struct DegreeCelsius = "°C", [k 1], Affine { factor: 1.0, offset: 273.15 };
 
+    /// Heat flux density in watts per square meter, W/m² (kg·s⁻³, SI Brochure, 9th ed., table 6): heat through a
+    /// surface. The same unit as [Irradiance], and converts to it.
+    #[cfg(feature = "thermal")]
+    pub struct HeatFluxDensity = "W/m²", [kg 1, s -3];
+
+    /// Heat capacity in joules per kelvin, J/K (kg·m²·s⁻²·K⁻¹, SI Brochure, 9th ed., table 6). `Per<Joule, Kelvin>`
+    /// converts to it; an [Entropy] doesn't.
+    #[cfg(feature = "thermal")]
+    pub struct HeatCapacity = "J/K", [kg 1, m 2, s -2, k -1];
+
+    /// Entropy in joules per kelvin, J/K (SI Brochure, 9th ed., table 6). The dimension of a [HeatCapacity], so of the
+    /// kind `entropy`: one becomes the other only by `as_entropy` and `as_heat_capacity`.
+    #[cfg(feature = "thermal")]
+    pub struct Entropy = "J/K", [kg 1, m 2, s -2, k -1] kind "entropy";
+
+    /// Specific heat capacity in joules per kilogram kelvin, J/(kg·K) (m²·s⁻²·K⁻¹, SI Brochure, 9th ed., table 6):
+    /// water is about 4186 J/(kg·K).
+    #[cfg(feature = "thermal")]
+    pub struct SpecificHeatCapacity = "J/(kg·K)", [m 2, s -2, k -1];
+
+    /// Thermal conductivity in watts per meter kelvin, W/(m·K) (kg·m·s⁻³·K⁻¹, SI Brochure, 9th ed., table 6): a
+    /// thermal pad's datasheet value.
+    #[cfg(feature = "thermal")]
+    pub struct ThermalConductivity = "W/(m·K)", [kg 1, m 1, s -3, k -1];
+
+    /// Thermal conductance in watts per kelvin, W/K (kg·m²·s⁻³·K⁻¹): the inverse of a [ThermalResistance].
+    #[cfg(feature = "thermal")]
+    pub struct ThermalConductance = "W/K", [kg 1, m 2, s -3, k -1];
+
+    /// Thermal resistance in kelvins per watt, K/W (kg⁻¹·m⁻²·s³·K): a heatsink's, a package's θJA. Times a [Watt] it
+    /// is a temperature rise in [Kelvin].
+    #[cfg(feature = "thermal")]
+    pub struct ThermalResistance = "K/W", [kg -1, m -2, s 3, k 1];
+
+    /// Heat transfer coefficient in watts per square meter kelvin, W/(m²·K) (kg·s⁻³·K⁻¹): convection from a surface.
+    #[cfg(feature = "thermal")]
+    pub struct HeatTransferCoefficient = "W/(m²·K)", [kg 1, s -3, k -1];
+
     // Chemical
 
     /// Amount of substance in moles, mol.
@@ -223,6 +378,36 @@ crate::unit! {
     /// Catalytic activity in katals, kat (mol·s⁻¹).
     #[cfg(feature = "chemical")]
     pub struct Katal = "kat", [mol 1, s -1];
+
+    /// Amount concentration (molarity) in moles per cubic meter, mol/m³ (SI Brochure, 9th ed., table 5); a mol/L is
+    /// [MolePerLitre], 10³ mol/m³.
+    #[cfg(feature = "chemical")]
+    pub struct MolarConcentration = "mol/m³", [mol 1, m -3];
+
+    /// Amount concentration in moles per litre, mol/L (10³ mol/m³): the chemist's molar, M.
+    #[cfg(feature = "chemical")]
+    pub struct MolePerLitre = "mol/L", [mol 1, m -3], Pow10(3);
+
+    /// Molality in moles per kilogram of solvent, mol/kg.
+    #[cfg(feature = "chemical")]
+    pub struct Molality = "mol/kg", [mol 1, kg -1];
+
+    /// Molar mass in kilograms per mole, kg/mol; the g/mol of tables is [GramPerMole].
+    #[cfg(feature = "chemical")]
+    pub struct MolarMass = "kg/mol", [kg 1, mol -1];
+
+    /// Molar mass in grams per mole, g/mol (10⁻³ kg/mol): water is about 18.015 g/mol.
+    #[cfg(feature = "chemical")]
+    pub struct GramPerMole = "g/mol", [kg 1, mol -1], Pow10(-3);
+
+    /// Molar energy in joules per mole, J/mol (kg·m²·s⁻²·mol⁻¹, SI Brochure, 9th ed., table 6).
+    #[cfg(feature = "chemical")]
+    pub struct MolarEnergy = "J/mol", [kg 1, m 2, s -2, mol -1];
+
+    /// Molar heat capacity in joules per mole kelvin, J/(mol·K) (SI Brochure, 9th ed., table 6): the gas constant R is
+    /// 8.314.. J/(mol·K).
+    #[cfg(feature = "chemical")]
+    pub struct MolarHeatCapacity = "J/(mol·K)", [kg 1, m 2, s -2, k -1, mol -1];
 
     // Photometric
 
@@ -237,6 +422,30 @@ crate::unit! {
     /// Illuminance in lux, lx (cd·rad²·m⁻², lm/m²).
     #[cfg(feature = "photometric")]
     pub struct Lux = "lx", [cd 1, rad 2, m -2];
+
+    /// Luminance in candelas per square meter, cd/m² (SI Brochure, 9th ed., table 5), the nit: a display's
+    /// brightness. Text input also takes `nit` and `nt`.
+    #[cfg(feature = "photometric")]
+    pub struct Nit = "cd/m²", [cd 1, m -2];
+
+    /// Luminous efficacy in lumens per watt, lm/W (cd·rad²·kg⁻¹·m⁻²·s³): an LED's light per electrical watt.
+    #[cfg(feature = "photometric")]
+    pub struct LuminousEfficacy = "lm/W", [cd 1, rad 2, kg -1, m -2, s 3];
+
+    // Radiometric
+
+    /// Irradiance in watts per square meter, W/m² (kg·s⁻³, SI Brochure, 9th ed., table 6): sunlight on a solar panel,
+    /// about 1000 W/m² at noon. The same unit as [HeatFluxDensity], and converts to it.
+    #[cfg(feature = "radiometric")]
+    pub struct Irradiance = "W/m²", [kg 1, s -3];
+
+    /// Radiant intensity in watts per steradian, W/sr (kg·m²·s⁻³·rad⁻², SI Brochure, 9th ed., table 6): an IR LED's.
+    #[cfg(feature = "radiometric")]
+    pub struct RadiantIntensity = "W/sr", [kg 1, m 2, s -3, rad -2];
+
+    /// Radiance in watts per square meter steradian, W/(m²·sr) (kg·s⁻³·rad⁻², SI Brochure, 9th ed., table 6).
+    #[cfg(feature = "radiometric")]
+    pub struct Radiance = "W/(m²·sr)", [kg 1, s -3, rad -2];
 
     // Radiation
 
@@ -255,6 +464,19 @@ crate::unit! {
     /// Energy in electron-volts, eV (1.602176634·10⁻¹⁹ J).
     #[cfg(feature = "radiation")]
     pub struct ElectronVolt = "eV", [kg 1, m 2, s -2], Exact(1602176634 / 1, pow10 -28);
+
+    /// Exposure to X and γ rays in coulombs per kilogram, C/kg (kg⁻¹·s·A, SI Brochure, 9th ed., table 6).
+    #[cfg(feature = "radiation")]
+    pub struct Exposure = "C/kg", [kg -1, s 1, a 1];
+
+    /// Absorbed dose rate in grays per second, Gy/s (m²·s⁻³, SI Brochure, 9th ed., table 6).
+    #[cfg(feature = "radiation")]
+    pub struct AbsorbedDoseRate = "Gy/s", [m 2, s -3];
+
+    /// Equivalent dose rate in sieverts per hour, Sv/h (1/3600 Sv/s): a dosimeter's µSv/h is
+    /// `Fixed<SievertPerHour, Micro, T>`.
+    #[cfg(feature = "radiation")]
+    pub struct SievertPerHour = "Sv/h", [m 2, s -3], Exact(1 / 3600);
 
     // Dimensionless
 
@@ -507,6 +729,17 @@ pub fn by_name(name: &str) -> Option<&'static UnitExpr> {
     let all = all.chain(CUSTOMARY);
     all.copied()
         .find(|expr| matches!(expr, UnitExpr::Named { name: n, .. } if *n == name))
+}
+
+/// Other spellings text input takes for the named unit `name` (the marker's name, `"Nit"`), next to the symbol it is
+/// written with: `nit` and `nt` for [Nit]'s cd/m². Empty for most units; a prefix goes before a spelling as before the
+/// symbol (`knit`).
+#[must_use]
+pub fn spellings(name: &str) -> &'static [&'static str] {
+    match name {
+        "Nit" => &["nit", "nt"],
+        _ => &[],
+    }
 }
 
 /// Cycles per second are hertz: the counted [Cycle] and the hertz of a clock are different dimensions (Hz is s⁻¹),

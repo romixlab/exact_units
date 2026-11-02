@@ -378,8 +378,19 @@ fn ratio_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> bool {
 }
 
 /// A named unit (no parentheses after a prefix).
-fn is_named<'t, E: Tree<'t>>(e: &E) -> bool {
-    matches!(e.node(), Some(Node::Named { .. }))
+/// Whether a prefix is written straight before this unit's symbol (`mV`, `mm/s`): a named unit whose symbol takes one,
+/// see [prefix_binds].
+pub(crate) fn takes_bare_prefix<'t, E: Tree<'t>>(e: &E) -> bool {
+    matches!(e.node(), Some(Node::Named { symbol, .. }) if prefix_binds(symbol))
+}
+
+/// Whether a prefix written straight before `symbol` means the prefix times the unit: `mV`, `mm/s`, `mN·m`. Not where
+/// the first factor has an exponent (`mm²` reads as (mm)², 10⁻⁶ m², and `mm³/s` as 10⁻⁹ m³/s) or already has a
+/// prefix (`kg/m³`, `kgf`): such a unit takes it on the whole of it in parentheses, `m(m²)`, as a compound unit does.
+pub(crate) fn prefix_binds(symbol: &str) -> bool {
+    let lead = symbol.split(['/', '·']).next().unwrap_or(symbol);
+    !lead.starts_with("kg")
+        && !lead.contains(['⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹', '⁻'])
 }
 
 #[expect(
@@ -444,7 +455,7 @@ pub fn write_unit<'t, E: Tree<'t>>(
         };
     }
     f.write_str(" ")?;
-    match (prefix, is_named(unit)) {
+    match (prefix, takes_bare_prefix(unit)) {
         (Prefix::Unit, _) => write_symbol(unit, f, 0),
         (p, true) => {
             f.write_str(p.symbol())?;
