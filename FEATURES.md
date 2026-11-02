@@ -233,10 +233,17 @@ non-linear named scales.
   `OpticalDepth` (τ, ½ of one, τ = −ln T), `MolarCentimeter` (feature `chemical`); aliases `LinearAttenuation`
   (μ, natural), `DecadicAttenuation` and `MolarAbsorptivity` (ε, printed AU/(M·cm)); μ converts to the α of
   `Per<Loss<Neper>, Meter>` by halving, closing the factor-2 bug; τ = ln 10 · A through `convert` /
-  `convert_rounded` / `fixed!`; `to_gain` into a ratio of powers is the transmittance T. Missing: pieces 2 and 4
-  (length and ultrasound rates) still landing. Book: "A level as a quantity" and "Absorbance and optical depth"
-  on the Decibels page. WireWeaver's crate walker learns the new `unit!` syntax with the wire_weaver side of
-  this item.
+  `convert_rounded` / `fixed!`; `to_gain` into a ratio of powers is the transmittance T. Done (piece 2, length,
+  ea0f331): `Metres100`, `Feet100` (feature `customary`) and `Kilometre`, lengths of their own so a rate prints as
+  its datasheet does ("dB/100 ft", "dB/100 m", "dB/km"); `Fixed::over` (a rate times a length, settled through
+  `f64`). Done (piece 4, ultrasound, b114829): `FrequencyScaledAttenuation` (dB per `CentimetreMegahertz`),
+  α(f) = α₀·f through `times_into` then `convert` (cm·MHz divided by hertz settles to a length by the product
+  table's dimension rule). Done (piece 7, book page): "Levels per length, time and frequency", tying pieces 2–5
+  together (attenuation per length, damping per time, the ultrasound rate, Beer-Lambert) and why Np/s, rad/s and
+  Hz stay apart, linked from the Decibels page; a new figure in `tools/book_plots`. Missing: piece 6 (wire and
+  serde for the new markers, both repos) still landing. Book: "A level as a quantity" and "Absorbance and optical
+  depth" on the Decibels page, "Levels per length, time and frequency". WireWeaver's crate walker learns the new
+  `unit!` syntax with the wire_weaver side of this item.
 - 📋 **LVL-4 Non-linear scales by name** (was STD-75) · `v0.5` — AWG, mpg ↔ L/100 km, Beaufort, Richter, shoe sizes: a named exact
   conversion function each, or out of scope with the reason written down.
 - 📋 **LVL-5 Complex level rates** (was STD-98) — `Level` / `LossLevel` and the rate forms of LVL-3 on `Complex` and

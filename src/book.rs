@@ -36,6 +36,8 @@ pages! {
     Thresholds = "levels/thresholds.md";
     #[cfg(all(feature = "levels", feature = "time", feature = "angle", feature = "counting"))]
     Damping = "levels/damping.md";
+    #[cfg(all(feature = "levels", feature = "mechanical", feature = "time", feature = "angle"))]
+    Rates = "levels/rates.md";
     Complex = "complex/complex.md";
     Iq = "complex/iq.md";
     Cordic = "complex/cordic.md";

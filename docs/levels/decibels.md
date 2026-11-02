@@ -216,4 +216,6 @@ The types close the two classic bugs. A lost factor 2 between μ and α can't ha
 
 The absorbance of a field ratio is that of the power ratio it stands for: `Per<Volt, Volt>` of 0.1 is 2 AU.
 
-More on thresholds, dBFS and complex levels: [Thresholds](thresholds.md).
+More on thresholds, dBFS and complex levels: [Thresholds](thresholds.md). A rate of a level over a length, a
+time or a frequency — attenuation per metre, damping per second, medical ultrasound's dB/(cm·MHz) — is
+[Levels per length, time and frequency](rates.md).

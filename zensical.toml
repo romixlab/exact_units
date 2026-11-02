@@ -63,6 +63,7 @@ nav = [
             { "Advanced" = [
                     "levels/thresholds.md",
                     "levels/damping.md",
+                    "levels/rates.md",
                 ]
             },
         ]
