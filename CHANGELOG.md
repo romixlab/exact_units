@@ -610,3 +610,4 @@ firmware that only needs units in its types builds without it; the bytes don't d
   selector appended, instead of bare U+264F: unqualified, most browsers and terminals render it as the Scorpio
   emoji rather than the apothecaries' minim sign it actually is.
 * `requantize` / `Requantizer::apply` by a factor whose denominator is above `i128::MAX` (a ratio of primes like `1/(3⁴⁰·4·7²²)`) rounded a quotient near a half or a whole wrongly for an `x` of 2⁹⁰ and up: the denominator was clamped to `i128::MAX`, so `i128::MAX` truncated to 1 (not 0) and 9·10³⁷ rounded to nearest to 1 (not 0). The quotient is now compared with a half exactly. The typed conversions are unchanged (they don't compile for such a factor). Found by the mutation tests.
+
