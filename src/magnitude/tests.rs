@@ -409,3 +409,42 @@ fn a_prime_to_the_power_0_is_dropped() {
         Ok(0)
     );
 }
+
+#[test]
+fn reduced_ratios_and_irrationals() {
+    // a prime on both sides cancels, however it is spelled
+    assert_eq!(Magnitude::ratio(7, 49), Magnitude::ratio(1, 7));
+    assert_eq!(Magnitude::ratio(7, 49).to_ratio(), Some((1, 7)));
+    assert_eq!(Magnitude::ratio(49, 7).to_ratio(), Some((7, 1)));
+    assert_eq!(
+        Magnitude::ratio(7 * 11, 49 * 13).to_ratio(),
+        Some((11, 7 * 13))
+    );
+    // a prime and the 2 that sorts before it keep their own exponents
+    assert_eq!(Magnitude::ratio(2 * 3, 1).to_ratio(), Some((6, 1)));
+    assert_eq!(Magnitude::ratio(3, 2).to_ratio(), Some((3, 2)));
+    // π, ln 2 and ln 10 are not fractions of integers, alone or with a prime
+    assert_eq!(Magnitude::PI.to_ratio(), None);
+    assert_eq!(Magnitude::LN2.to_ratio(), None);
+    assert_eq!(Magnitude::LN10.to_ratio(), None);
+    assert_eq!(Magnitude::PI.mul(Magnitude::ratio(3, 1)).to_ratio(), None);
+    assert_eq!(
+        Magnitude::PI.mul(Magnitude::PI.recip()).to_ratio(),
+        Some((1, 1))
+    );
+    // a half exponent is not a fraction either
+    assert_eq!(Magnitude::ratio(2, 1).sqrt().to_ratio(), None);
+    assert_eq!(Magnitude::ratio(4, 1).sqrt().to_ratio(), Some((2, 1)));
+}
+
+#[test]
+fn applied_to_floats_the_exact_path_is_taken_for_small_fractions() {
+    // 0.1 · 7 as a fraction is 7/10 = 0.7; the product of the floats is 0.7000000000000001
+    assert_eq!(Magnitude::pow10(-1).apply_f64(7.0), 0.7);
+    assert_eq!(Magnitude::ratio(3, 10).apply_f64(10.0), 3.0);
+    assert_eq!(Magnitude::ratio(1, 3).apply_f64(3.0), 1.0);
+    // a numerator past 2⁵³ takes the float factor and stays finite
+    let big = Magnitude::ratio(3u64.pow(40), 7);
+    assert!(big.apply_f64(1e290).is_finite());
+    assert!((big.apply_f64(1.0) / (3f64.powi(40) / 7.0) - 1.0).abs() < 1e-12);
+}

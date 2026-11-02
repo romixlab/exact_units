@@ -13,6 +13,7 @@
 mod arith;
 mod format;
 mod literal;
+mod magnitude;
 mod niche;
 mod no_panic;
 mod numeric;

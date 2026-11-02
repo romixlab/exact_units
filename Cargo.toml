@@ -92,6 +92,8 @@ shrink_wrap = { version = "0.2.0", git = "https://github.com/vhrdtech/wire_weave
 [dev-dependencies]
 # the reference the compile-time levels are tested against
 libm = { version = "0.2", default-features = false }
+num-bigint = { version = "0.4", default-features = false }
+num-rational = { version = "0.4.2", default-features = false, features = ["num-bigint"] }
 # serde round trips (tests/serde.rs, tests/props) and arbitrary text into the serde impls (tests/props/serde_input.rs):
 # a binary format without alloc and JSON
 postcard = { version = "1.1", default-features = false }
