@@ -163,7 +163,10 @@ pub(crate) fn text_reads_exactly(m: i64, e: i8, prefix: usize) {
     ][prefix];
     let s = format!("{m}e{e} {sym}V");
     let exp = i32::from(e) + k + 3;
-    let want = if exp >= 0 {
+    let want = if m == 0 {
+        // 0 · 10^anything is exactly 0, also where 10^exp is past i128
+        Some(0)
+    } else if exp >= 0 {
         10i128
             .checked_pow(exp.unsigned_abs())
             .and_then(|t| i128::from(m).checked_mul(t))
@@ -171,9 +174,8 @@ pub(crate) fn text_reads_exactly(m: i64, e: i8, prefix: usize) {
         let t = 10i128.checked_pow(exp.unsigned_abs());
         match t {
             Some(t) if i128::from(m) % t == 0 => Some(i128::from(m) / t),
-            Some(_) => None,
-            // 10^-exp past i128: only 0 is whole
-            None => (m == 0).then_some(0),
+            // 10^-exp past i128: no m but 0 (handled above) is whole
+            Some(_) | None => None,
         }
     };
     let want = want.and_then(|w| i32::try_from(w).ok());
@@ -278,6 +280,17 @@ mod tests {
         #[test]
         fn any_text(s in r"[ +-]?[0-9_.]{0,24}([eE][+-]?[0-9]{0,4})? ?(m|µ|u|k|M|Ki|da|%|‰|ppm|ppb)?(V|s|B|rad|dB)? ?|\PC{0,24}") {
             super::any_text(&s);
+        }
+    }
+
+    /// A zero mantissa reads as 0 whatever its exponent, also where 10^exp is past i128 (`0e32 MV` failed the
+    /// reference once, the parser was right).
+    #[test]
+    fn zero_with_any_exponent() {
+        for prefix in 0..7 {
+            for e in [-40, -32, -30, -1, 0, 1, 30, 32, 40] {
+                super::text_reads_exactly(0, e, prefix);
+            }
         }
     }
 
