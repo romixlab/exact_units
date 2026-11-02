@@ -88,19 +88,40 @@ assert_eq!(level.get(), 251);
 
 ## Neper
 
-The neper is the natural-log twin of the bel, $L_{\mathrm{Np}} = \ln(A_1/A_2)$. Between the two there is an exact factor:
+The neper is the natural-log twin of the bel. Like the dB, it gives one level for an amplitude and for the power that goes with it, so the power form carries a ½ (IEC 60027-3, ISO 80000-3):
+
+$$
+L_{\mathrm{Np}} = \ln\frac{A_1}{A_2} \quad \text{(amplitudes)} \qquad
+L_{\mathrm{Np}} = \frac{1}{2} \ln\frac{P_1}{P_2} \quad \text{(powers)}
+$$
+
+Between the neper and the dB there is one exact factor for both forms:
 
 $$
 1\ \mathrm{dB} = \frac{\ln 10}{20}\ \mathrm{Np} \approx 0.1151\ \mathrm{Np}
+\qquad
+1\ \mathrm{Np} = \frac{20}{\ln 10}\ \mathrm{dB} \approx 8.686\ \mathrm{dB}
 $$
 
-`exact_units` keeps $\ln 10$ as an exact symbol in a [`Magnitude`](../nomicon/magnitude.md), so this factor is exact too:
+<figure class="eu-figure" markdown="0">
+--8<-- "plots/neper_cable.svg"
+<figcaption>Line theory works in nepers because they fall out of the wave equation: V(x) = V<sub>0</sub>·e<sup>−γx</sup> with γ = α + jβ, so the amplitude is V<sub>0</sub>·e<sup>−αx</sup>. With α in Np/m, αx is the level in Np, no conversion factor needed. A datasheet's dB per 100 m becomes Np/m by dividing by 100 and multiplying by ln 10/20, so α ≈ 0.001151 × dB/100 m. The cable is a <a href="https://www.belden.com/products/cable/coax-triax-cable/50-ohm-coax-cable/8259">Belden 8259</a> RG-58: nominally 5.4 dB/100 ft at 100 MHz, velocity 66 %. Computed by <code>tools/book_plots</code> with the crate's <code>Magnitude</code>, <code>to_db</code> and <code>from_db_const</code>.</figcaption>
+</figure>
+
+`exact_units` has no neper unit. A level is computed in dB, the kind picks 20·lg or 10·lg, and the factor to Np is one [`Magnitude`](../nomicon/magnitude.md). It keeps $\ln 10$ as an exact symbol, so the factor is exact too:
 
 ```rust
-use exact_units::Magnitude;
+use exact_units::{Fixed, Magnitude, prefix::One, units::{Per, Volt, Watt}};
 
 let db_in_np = Magnitude::LN10.div(Magnitude::ratio(20, 1));
 assert!((db_in_np.to_f64() - core::f64::consts::LN_10 / 20.0).abs() < 1e-15);
+
+// 1 Np down: a voltage at 1/e and a power at 1/e² are one level
+let e = core::f64::consts::E;
+let volts = Fixed::<Per<Volt, Volt>, One, f64>::new(1.0 / e).to_db();
+let watts = Fixed::<Per<Watt, Watt>, One, f64>::new(1.0 / (e * e)).to_db();
+assert!((volts * db_in_np.to_f64() + 1.0).abs() < 1e-12);
+assert!((watts * db_in_np.to_f64() + 1.0).abs() < 1e-12);
 ```
 
 More on thresholds, dBFS and complex levels: [Thresholds](thresholds.md).

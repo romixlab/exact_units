@@ -5,10 +5,12 @@
 //! - `cordic_error.svg`: the error of `cordic::sin_cos_16` against `f64` sine over a turn, in Q15 steps.
 //! - `db_step.svg`: the step in dB between neighbouring stored gains of a `Fixed<Per<Volt, Volt>, Milli, u16>`.
 //! - `db_scale.svg`: a dB ruler with amplitude and power ratios, converter noise floors and the steps of stored values.
+//! - `neper_cable.svg`: a wave dying along an RG-58 cable, marked at 1, 2 and 3 Np, and 1 Np as one level of two ratios.
 //!
 //! `cargo run --manifest-path tools/book_plots/Cargo.toml -- docs/plots` (`just docs-build` does it).
 
 mod db_scale;
+mod neper_cable;
 mod svg;
 
 use std::{fs, path::Path, process::ExitCode};
@@ -36,6 +38,7 @@ fn main() -> ExitCode {
         ("cordic_error.svg", cordic_error()),
         ("db_step.svg", db_step()),
         ("db_scale.svg", db_scale::db_scale()),
+        ("neper_cable.svg", neper_cable::neper_cable()),
     ];
     for (name, svg) in plots {
         let path = dir.join(name);
