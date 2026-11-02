@@ -6,10 +6,10 @@ level: advanced
 
 A WireWeaver API names its types in Rust: `Fixed<Volt, Milli, i16>`. That is exact, but it is not what you think while you read a trait. You think "millivolts, 16 bits, up to 32.767 V".
 
-`ww_lsp` is a language server that writes that for you. It runs beside rust-analyzer and shows the exact_units type of each API item as an inlay hint, with the details on hover.
+[`ww_lsp`](https://github.com/romixlab/ww_lsp) is a language server that writes that for you. It runs beside rust-analyzer and shows the exact_units type of each API item as an inlay hint, with the details on hover.
 
 !!! warning "A prototype"
-    `ww_lsp` is a prototype. It is not published yet: there is no release to install and no public repository. This page shows what it does today.
+    [`ww_lsp`](https://github.com/romixlab/ww_lsp) is a prototype. It is not on crates.io yet, there are no releases, and what it does may change. This page shows what it does today.
 
 ## Inlay hints
 
@@ -63,22 +63,59 @@ It gives:
 
 `ww_lsp` has no table of its own for units and scales. It reads the unit symbols, dimensions, `Magnitude`s, storage limits and wire sizes from exact_units itself. When the crate changes, the hints change with it, and they cannot disagree with what the compiler does.
 
-## Try it
+## Install
 
-`ww_lsp` has two command-line forms that need no editor:
+You need a Rust toolchain. This builds `ww_lsp` from its repository and puts it in `~/.cargo/bin`:
 
 ```sh
-ww_lsp hints psu_api.rs            # FILE:LINE:COL  HINT  (ITEM)
-ww_lsp hover psu_api.rs:30:25      # the hover text at a position
+cargo install --locked --git https://github.com/romixlab/ww_lsp ww_lsp
+ww_lsp --version
 ```
 
-In an editor, the server is `ww_lsp serve` on stdin and stdout. Attach it to Rust files beside rust-analyzer and turn inlay hints on. It works in:
+Or clone the repository and run `just install` in it.
 
-- Neovim 0.11 and later: `vim.lsp.config('ww_lsp', { cmd = { 'ww_lsp', 'serve' }, filetypes = { 'rust' } })`, then `vim.lsp.enable('ww_lsp')` and `vim.lsp.inlay_hint.enable(true)`.
-- Helix: add `ww_lsp` to the Rust `language-servers` and set `display-inlay-hints = true`.
-- Zed: through a small extension that ships with `ww_lsp`.
+## Try it without an editor
 
-Both servers stay attached to the Rust buffer, so rust-analyzer is unchanged.
+`ww_lsp` prints the same analysis for a terminal. Give it any Rust file with a WireWeaver API:
+
+```sh
+ww_lsp hints my_api.rs            # FILE:LINE:COL  HINT  (ITEM)
+ww_lsp hover my_api.rs:30:25      # the hover text at a line and column
+```
+
+The repository has a bench power supply API to try, `crates/ww_lsp_core/tests/fixtures/psu_api.rs`.
+
+## Try it in an editor
+
+The server is `ww_lsp serve` on stdin and stdout. Attach it to Rust files beside rust-analyzer and turn inlay hints on. Both servers stay attached to the buffer, so rust-analyzer is unchanged.
+
+Neovim 0.11 and later:
+
+```lua
+vim.lsp.config('ww_lsp', {
+  cmd = { 'ww_lsp', 'serve' },
+  filetypes = { 'rust' },
+  root_markers = { 'Cargo.toml', '.git' },
+})
+vim.lsp.enable('ww_lsp')
+vim.lsp.inlay_hint.enable(true)
+```
+
+Helix, in `languages.toml`:
+
+```toml
+[language-server.ww_lsp]
+command = "ww_lsp"
+args = ["serve"]
+
+[[language]]
+name = "rust"
+language-servers = ["rust-analyzer", "ww_lsp"]
+```
+
+and `display-inlay-hints = true` under `[editor.lsp]` in `config.toml`.
+
+Zed starts only servers that an extension registers, so `ww_lsp` comes with a small extension, `editors/zed` in its repository. It is not in Zed's registry yet. The README of `ww_lsp` has the steps for it and for older Neovim.
 
 ## What it does not do yet
 

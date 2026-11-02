@@ -404,8 +404,10 @@
   color: #f24c44;
 }
 
-/* Reading level badge above a page title (overrides/partials/level.html, docs/levels.md): graphite for Basic, orange
-   for Advanced, solid graphite for Nomicon; the signal bars of the icon fill up with the level */
+/* Reading level badge above a page title (overrides/partials/level.html, docs/levels.md): a ladder in strength: Basic is a graphite
+   outline, Advanced an orange outline on a light orange tint, Nomicon a solid orange fill with white text and icon;
+   the signal bars of the icon fill up with the level. The fill is #c25400 in both schemes, not the brighter accent
+   #ff7100: white on it is 4.6:1 (WCAG AA), on #ff7100 only 2.8:1. */
 .md-typeset .eu-level {
   display: inline-flex;
   align-items: center;
@@ -442,17 +444,17 @@
   border-color: #4a4a4c59;
 }
 [data-md-color-scheme="default"] .md-typeset .eu-level--advanced {
-  color: #c25400;
-  border-color: #c2540066;
-  background-color: #ff71000d;
+  color: #b34c00;
+  border-color: #c2540099;
+  background-color: #ff71001a;
 }
 [data-md-color-scheme="default"] .md-typeset .eu-level--nomicon {
   color: #ffffff;
-  border-color: #4a4a4c;
-  background-color: #4a4a4c;
+  border-color: #c25400;
+  background-color: #c25400;
 }
 [data-md-color-scheme="default"] .md-typeset .eu-level--nomicon .eu-level__icon {
-  color: #ff8a2a;
+  color: #ffffff;
 }
 [data-md-color-scheme="slate"] .md-typeset .eu-level--basic {
   color: #c4c4c6;
@@ -460,16 +462,16 @@
 }
 [data-md-color-scheme="slate"] .md-typeset .eu-level--advanced {
   color: #ff8a2a;
-  border-color: #ff8a2a66;
-  background-color: #ff710014;
+  border-color: #ff8a2a99;
+  background-color: #ff71001f;
 }
 [data-md-color-scheme="slate"] .md-typeset .eu-level--nomicon {
-  color: #ececec;
-  border-color: #4a4a4c;
-  background-color: #4a4a4c;
+  color: #ffffff;
+  border-color: #c25400;
+  background-color: #c25400;
 }
 [data-md-color-scheme="slate"] .md-typeset .eu-level--nomicon .eu-level__icon {
-  color: #ff7100;
+  color: #ffffff;
 }
 @media screen and (min-width: 60em) {
   .md-typeset .grid.eu-level-cards {
