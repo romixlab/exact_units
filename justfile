@@ -23,7 +23,7 @@ verify:
 # catches, in mutants.out/. Needs cargo-mutants (`cargo install --locked cargo-mutants`); hours, so not in CI. Extra
 # flags pass through: `-f src/index.rs` for one file, `-j 8` for parallel jobs
 mutants *flags:
-    cargo mutants --features customary,serde {{flags}}
+    cargo mutants --features shrink_wrap,customary,serde {{flags}}
 
 # Fuzz one target of fuzz/ for SECONDS: the property functions of tests/props, coverage-guided. Needs a nightly
 # toolchain and cargo-fuzz (`rustup toolchain install nightly`, `cargo install cargo-fuzz`). Starts from the
