@@ -772,3 +772,42 @@ fn denominators_past_i64() {
     );
     assert_eq!(Fixed::<Radian, Tinier, i64>::new(1).to::<One, i64>(), None);
 }
+
+#[test]
+fn requantizer_denominators_past_i128() {
+    // 3^40 · 4 · 7^22 is above i128::MAX: the quotient is compared with a half exactly, not against the largest i128
+    let den = 3u128.pow(40) * 4 * 7u128.pow(22);
+    assert!(den > i128::MAX as u128);
+    let factor = Magnitude::ratio(1, 3u64.pow(40)).mul(Magnitude::ratio(1, 4 * 7u64.pow(22)));
+    assert_eq!(factor.to_ratio(), Some((1, den)));
+    let i64_kind = StorageKind::Int {
+        bits: 64,
+        signed: true,
+    };
+    let at = |x: i128, r| requantize(Repr::Int(x), &factor, i64_kind, r, Overflow::Checked);
+    let all = |x: i128, want: [i128; 5]| {
+        for (r, want) in MODES.into_iter().zip(want) {
+            assert_eq!(at(x, r), Some(Repr::Int(want)), "{x} {r:?}");
+        }
+    };
+    // MODES: Truncate, Floor, Ceil, NearestEven, NearestAway
+    // 0.8947 of a step above, and below
+    all(i128::MAX, [0, 0, 1, 1, 1]);
+    all(i128::MIN, [0, -1, 0, -1, -1]);
+    // 0.4733 and -0.4733: under half
+    let under = 90_000_000_000_000_000_000_000_000_000_000_000_000i128;
+    all(under, [0, 0, 1, 0, 0]);
+    all(-under, [0, -1, 0, 0, 0]);
+    // exactly half a step: the even neighbour is 0, away from zero is 1
+    let half = i128::try_from(den / 2).unwrap();
+    all(half, [0, 0, 1, 0, 1]);
+    all(-half, [0, -1, 0, 0, -1]);
+    // just over and under half
+    all(half + 1, [0, 0, 1, 1, 1]);
+    all(half - 1, [0, 0, 1, 0, 0]);
+    all(-half - 1, [0, -1, 0, -1, -1]);
+    all(-half + 1, [0, -1, 0, 0, 0]);
+    all(0, [0; 5]);
+    all(1, [0, 0, 1, 0, 0]);
+    all(-1, [0, -1, 0, 0, 0]);
+}

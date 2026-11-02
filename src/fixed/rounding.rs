@@ -445,6 +445,42 @@ impl Scaled {
     }
 }
 
+/// `p / den` rounded by `r` for any `den` of a [Magnitude](crate::Magnitude) ratio, up to `u128::MAX`: from 2¹²⁷ on
+/// `|p| <= den`, so the quotient is in `[-1, 1]` and half a step is compared exactly (clamping `den` to `i128::MAX`
+/// would round a quotient near a half or a whole wrongly).
+#[expect(
+    clippy::as_conversions,
+    clippy::cast_possible_wrap,
+    reason = "den is checked to be at most i128::MAX"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "0 < a < den, so den - a doesn't wrap; the result is -1, 0 or 1"
+)]
+fn div_wide(p: i128, den: u128, r: Rounding) -> i128 {
+    if den <= i128::MAX as u128 {
+        return div_i128(p, den as i128, r);
+    }
+    let a = p.unsigned_abs();
+    let neg = p < 0;
+    let sign = if neg { -1 } else { 1 };
+    if a == den {
+        return sign;
+    }
+    if a == 0 {
+        return 0;
+    }
+    let (above, tie) = (a > den - a, a == den - a);
+    let up = match r {
+        Rounding::Truncate => false,
+        Rounding::Floor => neg,
+        Rounding::Ceil => !neg,
+        Rounding::NearestAway => above || tie,
+        Rounding::NearestEven => above,
+    };
+    if up { sign } else { 0 }
+}
+
 /// A number type known at run time, the target of [requantize].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StorageKind {
@@ -557,11 +593,11 @@ pub struct Requantizer {
 
 #[derive(Copy, Clone, Debug)]
 enum Exact {
-    /// `num` (`None` past `i128`) and `den` (`i128::MAX` past it: rounds the same, every product is below it).
+    /// `num` (`None` past `i128`) and `den`.
     Ratio {
         num: Option<i128>,
         num_low: i128,
-        den: i128,
+        den: u128,
     },
     FixedPoint {
         m: u64,
@@ -583,7 +619,7 @@ impl Requantizer {
                 num: i128::try_from(num).ok(),
                 // the low 128 bits of num, two's complement, by design
                 num_low: num.cast_signed(),
-                den: i128::try_from(den).unwrap_or(i128::MAX),
+                den,
             }
         } else {
             let (m, shift) = factor.fixed_point();
@@ -658,7 +694,7 @@ impl Requantizer {
         let (exact, low) = match self.exact {
             Exact::Ratio { num, num_low, den } => match num.and_then(|n| x.checked_mul(n)) {
                 Some(p) => {
-                    let y = div_i128(p, den, r);
+                    let y = div_wide(p, den, r);
                     (Some(y), y)
                 }
                 // a whole factor: the result is beyond 128 bits, and modulo 2¹²⁸ still right
