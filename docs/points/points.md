@@ -35,6 +35,14 @@ assert_eq!(DegC::from_raw(2500).to_string(), "25 °C");
 - The origin carries the offset: 0 °C is 273.15 K, 0 °F is $45967/180$ K.
 - On the wire a `DegC` is its `i16`. The origin is only in the type.
 
+Where $5/9$ K and $45967/180$ K come from: water freezes at 32 °F and boils at 212 °F, 100 K apart, so 180 °F
+steps span 100 K and one °F step is $100/180 = 5/9$ K. 0 °F sits 32 of those steps below freezing (273.15 K),
+so its offset is $273.15 - 32 \cdot 5/9 = 5463/20 - 160/9 = 45967/180$ K — not $273.15 \cdot 5/9$, which would
+scale the freezing point itself rather than shift it by 32 steps. As a decimal that's 255.372222… K, repeating,
+so the crate keeps the exact fraction; a cross-check from the other end agrees: absolute zero is −459.67 °F,
+and $459.67 \cdot 5/9 = 45967/180$. A stored float (255.37222…) would round every conversion through 0 °F; the
+fraction doesn't.
+
 ## The algebra
 
 | Expression | Result |
