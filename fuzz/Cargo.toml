@@ -18,7 +18,7 @@ serde = ["exact_units/serde"]
 
 [dependencies]
 arbitrary = { version = "1", features = ["derive"] }
-exact_units = { path = ".." }
+exact_units = { path = "..", features = ["shrink_wrap"] }
 libfuzzer-sys = "0.4"
 serde = "1.0"
 serde_json = { version = "1.0", default-features = false, features = ["std"] }

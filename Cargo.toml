@@ -16,7 +16,7 @@ exclude = ["assets/", "docs_ext/", "fuzz/", "overrides/", "tools/", "pyproject.t
 [workspace]
 
 [features]
-default = ["std", "shrink_wrap"]
+default = ["std"]
 # std enables every unit group but `customary`, like ww_si's; with `shrink_wrap` also the owned wire mirrors
 std = ["shrink_wrap?/std", "serde?/std", "quantities"]
 defmt = ["dep:defmt", "shrink_wrap?/defmt"]

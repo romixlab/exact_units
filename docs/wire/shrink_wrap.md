@@ -4,7 +4,7 @@ level: advanced
 
 # The wire
 
-With the `shrink_wrap` feature (on by default) every type gets the wire format of [WireWeaver](https://github.com/vhrdtech/wire_weaver), `shrink_wrap`. The rule is simple: **a `Fixed` is its integer on the wire**. The unit, the scale and the bounds are in the API model, not in the bytes.
+With the `shrink_wrap` feature (opt-in, not a default) every type gets the wire format of [WireWeaver](https://github.com/vhrdtech/wire_weaver), `shrink_wrap`. The rule is simple: **a `Fixed` is its integer on the wire**. The unit, the scale and the bounds are in the API model, not in the bytes.
 
 ```mermaid
 graph LR

@@ -8,7 +8,7 @@ level: basic
 
 ## Pick the features
 
-The defaults (`std`, `shrink_wrap`) suit a host. A firmware turns them off and picks its unit groups:
+The default (`std`) suits a host; a host that talks to a device over the wire adds `shrink_wrap` too. A firmware turns the defaults off and picks its unit groups:
 
 ```toml
 [dependencies]

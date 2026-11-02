@@ -75,12 +75,12 @@ The API reference is on [docs.rs](https://docs.rs/exact_units).
 | unit groups   | `time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`, `radiation`, `dimensionless`, `information`, `counting`; `quantities` for all |
 | `customary`   | imperial, US customary and other units outside the SI (opt-in only)                                  |
 | `std`         | every unit group but `customary`; with `shrink_wrap` the owned wire mirrors                          |
-| `shrink_wrap` | the wire format of [WireWeaver](https://github.com/vhrdtech/wire_weaver); exact-width bit fields `U1`..`U64` / `I2`..`I64` |
+| `shrink_wrap` | the wire format of [WireWeaver](https://github.com/vhrdtech/wire_weaver); exact-width bit fields `U1`..`U64` / `I2`..`I64` (opt-in, not a default) |
 | `serde`       | `serde` for the numbers, `no_std` without alloc, bounds checked on reading; `"1.5 ms"` text with `serde::with_unit`; with `std` also `Magnitude` and `Offset` |
 | `defmt`       | `defmt::Format`                                                                                      |
 | `libm`        | `to_db` / `from_db` without `std`, from the pure-Rust `libm`                                         |
 
-Default: `std` and `shrink_wrap`. A firmware turns the defaults off and picks its unit groups:
+Default: `std`. A client that needs the wire format enables `shrink_wrap` too; a firmware turns the defaults off and picks its unit groups:
 
 ```toml
 exact_units = { version = "0.1", default-features = false, features = ["time", "electrical", "defmt"] }
