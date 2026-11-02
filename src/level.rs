@@ -15,6 +15,12 @@
 //!   IEC 60027-3). The form comes in at the edge, from the gain's [Kind](crate::Kind): [to_level](Fixed::to_level) from a gain
 //!   (V/V is ln, W/W ½·ln) and [to_gain](Fixed::to_gain) back. A plain [Ratio](crate::units::Ratio) has no level, at
 //!   both edges.
+//! - Beer-Lambert is defined on power, without the ½ of a level: [Absorbance] A = −lg T and [OpticalDepth] τ = −ln T
+//!   are exact scales of the loss base, (ln 10)/2 and ½ of a neper of loss. So τ = ln 10 · A by conversion, 1 AU is
+//!   10 dB, and the coefficient μ ([LinearAttenuation], natural) is twice the α of `Per<Loss<Neper>, Meter>` by
+//!   conversion too, not by a factor someone has to remember. T itself is [to_gain](Fixed::to_gain) into a ratio of
+//!   powers (`Per<Watt, Watt>`, `Per<Irradiance, Irradiance>`), in a float storage as an integer one takes whole
+//!   numbers only.
 //!
 //! ```
 //! # #[cfg(all(feature = "levels", feature = "electrical", feature = "mechanical"))] {
@@ -30,6 +36,40 @@
 //! let level: Fixed<Decibel, One, f64> = gain.to_level().unwrap();
 //! assert!((level.get() + 6.0206).abs() < 1e-4);
 //! assert!((level.as_loss().get() - 6.0206).abs() < 1e-4);
+//! # }
+//! ```
+//!
+//! Beer-Lambert, in integers: A = ε·l·c, and the same loss as a depth and as a transmittance:
+//!
+//! ```
+//! # #[cfg(all(feature = "levels", feature = "electrical", feature = "mechanical", feature = "chemical"))] {
+//! use exact_units::{Fixed, Rounding, prefix::{Micro, Milli, One}};
+//! use exact_units::units::{
+//!     Absorbance, Decibel, LinearAttenuation, Loss, Meter, MolarAbsorptivity, MolePerLitre, Neper, OpticalDepth, Per,
+//!     Watt,
+//! };
+//!
+//! // NADH at 340 nm, 6220 L/(mol·cm), at 100 µM in a 10 mm cuvette
+//! let epsilon = Fixed::<MolarAbsorptivity, One, u32>::new(6220);
+//! let path = Fixed::<Meter, Milli, u32>::new(10);
+//! let c = Fixed::<MolePerLitre, Micro, u32>::new(100);
+//! let a = (epsilon * path * c).convert::<Absorbance, Milli, u32>().unwrap();
+//! assert_eq!(a.get(), 622);
+//!
+//! // τ = ln 10 · A, rounded by name
+//! let tau = a.convert_rounded::<OpticalDepth, Milli, u32>(Rounding::NearestEven).unwrap();
+//! assert_eq!(tau.get(), 1432);
+//!
+//! // T = 10^(−A)
+//! let t = a.to_gain::<Per<Watt, Watt>, One, f64>().unwrap();
+//! assert!((t.get() - 0.2388).abs() < 1e-4);
+//!
+//! // a fibre's 0.2 dB/km: μ is twice α
+//! let fibre = Fixed::<Per<Loss<Decibel>, Meter>, Milli, f64>::new(0.2);
+//! let alpha = fibre.convert::<Per<Loss<Neper>, Meter>, Micro, f64>().unwrap();
+//! let mu = fibre.convert::<LinearAttenuation, Micro, f64>().unwrap();
+//! assert!((alpha.get() - 23.03).abs() < 0.01);
+//! assert!((mu.get() - 2.0 * alpha.get()).abs() < 1e-9);
 //! # }
 //! ```
 //!
@@ -70,9 +110,34 @@
 //! use exact_units::{Fixed, prefix::One, units::{AngularVelocity, Neper, Per, Second}};
 //! let _ = Fixed::<Per<Neper, Second>, One, f32>::new(3.0).convert::<AngularVelocity, One, f32>();
 //! ```
+//!
+//! An absorbance is a loss, and ln 10 isn't a fraction of integers, so an integer conversion to a depth names its
+//! rounding. A μ isn't a wavenumber either, however m⁻¹ it looks in SI:
+//!
+//! ```compile_fail
+//! # #[cfg(not(feature = "levels"))] compile_error!("needs levels");
+//! use exact_units::{Fixed, prefix::One, units::{Absorbance, Decibel}};
+//! let _ = Fixed::<Absorbance, One, f32>::new(1.0).convert::<Decibel, One, f32>();
+//! ```
+//!
+//! ```compile_fail
+//! # #[cfg(not(feature = "levels"))] compile_error!("needs levels");
+//! use exact_units::{Fixed, prefix::Milli, units::{Absorbance, OpticalDepth}};
+//! let _ = Fixed::<Absorbance, Milli, u32>::new(622).convert::<OpticalDepth, Milli, u32>();
+//! ```
+//!
+//! ```compile_fail
+//! # #[cfg(not(all(feature = "levels", feature = "mechanical")))] compile_error!("needs levels, mechanical");
+//! use exact_units::{Fixed, prefix::One, units::{LinearAttenuation, Wavenumber}};
+//! let _ = Fixed::<LinearAttenuation, One, f32>::new(0.02).convert::<Wavenumber, One, f32>();
+//! ```
 
 use crate::complex::{ComplexStorage, Policy};
-use crate::units::{Decibel, DecibelLoss, Neper, NeperLoss, Per};
+#[cfg(feature = "mechanical")]
+use crate::units::Meter;
+#[cfg(feature = "chemical")]
+use crate::units::MolarCentimeter;
+use crate::units::{Absorbance, Decibel, DecibelLoss, Neper, NeperLoss, OpticalDepth, Per};
 use crate::{Dim, Fixed, Unit, Unlimited};
 
 /// The dimension of a level signed as a gain, [Neper]'s: the counted base `Neper` of this crate.
@@ -159,6 +224,20 @@ impl<L: LossLevel, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Fixed<L, P
         Fixed::new_unchecked(B::neg(self.get()))
     }
 }
+
+/// The linear attenuation coefficient μ of a beam's power, natural: μ·x is an [OpticalDepth], `T = e^(−μx)`. Twice the
+/// α of `Per<Loss<Neper>, Meter>`, and [convert](Fixed::convert) halves it.
+#[cfg(feature = "mechanical")]
+pub type LinearAttenuation = Per<OpticalDepth, Meter>;
+
+/// The decadic attenuation coefficient of a beam's power: its product with a length is an [Absorbance],
+/// `T = 10^(−μ₁₀·x)`. A spectrometer's AU/cm is `Fixed<DecadicAttenuation, Hecto, _>`.
+#[cfg(feature = "mechanical")]
+pub type DecadicAttenuation = Per<Absorbance, Meter>;
+
+/// Molar absorptivity ε, the L/(mol·cm) of tables as AU/(M·cm): `A = ε·l·c`, whose product converts to an [Absorbance].
+#[cfg(feature = "chemical")]
+pub type MolarAbsorptivity = Per<Absorbance, MolarCentimeter>;
 
 /// `1` for a level signed as a gain, `-1` for a loss, or a compile error for any other unit: what
 /// [to_level](Fixed::to_level) and [to_gain](Fixed::to_gain) take.

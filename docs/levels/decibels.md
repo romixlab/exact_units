@@ -175,4 +175,45 @@ use exact_units::{Fixed, prefix::One, units::{Decibel, Loss}};
 let _ = Fixed::<Loss<Decibel>, One, f32>::new(3.0).convert::<Decibel, One, f32>();
 ```
 
+## Absorbance and optical depth
+
+Beer-Lambert is written on the transmitted power ratio T, without the ½ of a level. Both of its numbers are exact scales of the loss base:
+
+- `Absorbance` is A = −lg T. It's the loss in bels of power, so 1 AU is 10 dB, and it has no gain sign.
+- `OpticalDepth` is τ = −ln T, which is 2 × the loss in Np. So τ = ln 10 · A by conversion.
+- `LinearAttenuation`, `Per<OpticalDepth, Meter>`, is the coefficient μ of a beam's power. The α of `Per<Loss<Neper>, Meter>` is half of it, and `convert` does the halving.
+- `MolarAbsorptivity` is ε, the L/(mol·cm) of tables, printed AU/(M·cm). `ε·l·c` converts to an `Absorbance`.
+
+```rust
+use exact_units::{Fixed, Rounding, prefix::{Micro, Milli, One}};
+use exact_units::units::{
+    Absorbance, Decibel, LinearAttenuation, Loss, Meter, MolarAbsorptivity, MolePerLitre, Neper, OpticalDepth, Per, Watt,
+};
+
+// NADH at 340 nm, 6220 L/(mol·cm), at 100 µM in a 10 mm cuvette
+let epsilon = Fixed::<MolarAbsorptivity, One, u32>::new(6220);
+let path = Fixed::<Meter, Milli, u32>::new(10);
+let c = Fixed::<MolePerLitre, Micro, u32>::new(100);
+let a = (epsilon * path * c).convert::<Absorbance, Milli, u32>().unwrap();
+assert_eq!(a.to_string(), "622 mAU");
+
+// τ = ln 10 · A: ln 10 isn't a fraction of integers, so the rounding has a name
+let tau = a.convert_rounded::<OpticalDepth, Milli, u32>(Rounding::NearestEven).unwrap();
+assert_eq!(tau.get(), 1432);
+
+// T = 10^(−A), in a float: an integer storage takes whole numbers only
+let t = a.to_gain::<Per<Watt, Watt>, One, f64>().unwrap();
+assert!((t.get() - 0.2388).abs() < 1e-4);
+
+// a fibre's 0.2 dB/km is 23 µNp/m of field, and μ is twice that
+let fibre = Fixed::<Per<Loss<Decibel>, Meter>, Milli, f64>::new(0.2);
+let alpha = fibre.convert::<Per<Loss<Neper>, Meter>, Micro, f64>().unwrap();
+let mu = fibre.convert::<LinearAttenuation, Micro, f64>().unwrap();
+assert!((mu.get() / alpha.get() - 2.0).abs() < 1e-12);
+```
+
+The types close the two classic bugs. A lost factor 2 between μ and α can't happen by conversion, and a transmittance is a ratio of powers, so a plain `Ratio` has no absorbance.
+
+The absorbance of a field ratio is that of the power ratio it stands for: `Per<Volt, Volt>` of 0.1 is 2 AU.
+
 More on thresholds, dBFS and complex levels: [Thresholds](thresholds.md).

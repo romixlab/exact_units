@@ -351,6 +351,18 @@ crate::unit! {
     #[cfg(feature = "levels")]
     pub struct DecibelLoss = "dB", counted(NeperLoss), Exact(1 / 20, ln10 1);
 
+    /// Absorbance A = −lg T of a transmitted power ratio T, AU ((ln 10)/2 [NeperLoss], exactly): the loss in bels of
+    /// power, so 1 AU is 10 dB. Decadic, and positive for a decay as a [DecibelLoss] is; a lab's "OD". `Fixed<Absorbance,
+    /// Milli, _>` prints mAU. [to_gain](crate::Fixed::to_gain) into `Per<Watt, Watt>` is T.
+    #[cfg(feature = "levels")]
+    pub struct Absorbance = "AU", counted(NeperLoss), Exact(1 / 2, ln10 1);
+
+    /// Optical depth τ = −ln T of a transmitted power ratio T, τ (½ [NeperLoss], exactly): power falls as e^(−τ), its
+    /// field as e^(−τ/2), so 1 Np of loss is 2 of depth. τ = ln 10 · A of an [Absorbance], a conversion by name for
+    /// integers.
+    #[cfg(feature = "levels")]
+    pub struct OpticalDepth = "τ", counted(NeperLoss), Exact(1 / 2);
+
     // Thermal
 
     /// Thermodynamic temperature in kelvins, K.
@@ -417,6 +429,11 @@ crate::unit! {
     /// Amount concentration in moles per litre, mol/L (10³ mol/m³): the chemist's molar, M.
     #[cfg(feature = "chemical")]
     pub struct MolePerLitre = "mol/L", [mol 1, m -3], Pow10(3);
+
+    /// A concentration times a path length in molar centimeters, M·cm (10 mol/m²): what a molar absorptivity is per,
+    /// `Per<Absorbance, MolarCentimeter>` printing AU/(M·cm), the L/(mol·cm) of tables.
+    #[cfg(feature = "chemical")]
+    pub struct MolarCentimeter = "M·cm", [mol 1, m -2], Pow10(1);
 
     /// Molality in moles per kilogram of solvent, mol/kg.
     #[cfg(feature = "chemical")]
@@ -782,5 +799,9 @@ impl<P, T: crate::Storage, B: crate::Bounds<T>> crate::Fixed<Per<Cycle, Second>,
     }
 }
 
+#[cfg(all(feature = "levels", feature = "chemical"))]
+pub use crate::level::MolarAbsorptivity;
+#[cfg(all(feature = "levels", feature = "mechanical"))]
+pub use crate::level::{DecadicAttenuation, LinearAttenuation};
 #[cfg(feature = "levels")]
 pub use crate::level::{Level, Loss, LossLevel};

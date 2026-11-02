@@ -27,8 +27,8 @@
 //!   time, exactly; `to_db` / `from_db` at run time in `f64` and `f32` (feature `std` or `libm`). Nepers are the same
 //!   with [np!] and `to_np` / `from_np`.
 //! - [level] (feature `levels`): a level as a quantity, the neper on a base of its own and the decibel a scaled
-//!   unit of it, a loss on a second base (`Loss<Decibel>`, positive for a decay), rates like dB/m and Np/s, and the
-//!   edge to a gain (`to_level`, `to_gain`), where 10·lg or 20·lg comes in.
+//!   unit of it, a loss on a second base (`Loss<Decibel>`, positive for a decay), absorbance and optical depth,
+//!   rates like dB/m and Np/s, and the edge to a gain (`to_level`, `to_gain`), where 10·lg or 20·lg comes in.
 //! - [literal]: [fixed!] turns a decimal literal into the stored value of the [Fixed] or [Complex] its context names
 //!   at compile time, exactly rounded: `fixed!(0.1)` in Q30, no hand-computed `107_374_182`.
 //! - `serde` (feature `serde`): every number as the number it stores, bounds checked on reading, and

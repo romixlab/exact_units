@@ -63,8 +63,8 @@ angle = []
 # Kelvin, DegreeCelsius; HeatFluxDensity (W/m²), HeatCapacity and Entropy (J/K), SpecificHeatCapacity,
 # ThermalConductivity, ThermalConductance (W/K), ThermalResistance (K/W), HeatTransferCoefficient
 thermal = []
-# Mole, Katal; MolarConcentration (mol/m³), MolePerLitre, Molality, MolarMass, GramPerMole, MolarEnergy,
-# MolarHeatCapacity
+# Mole, Katal; MolarConcentration (mol/m³), MolePerLitre, MolarCentimeter, Molality, MolarMass, GramPerMole,
+# MolarEnergy, MolarHeatCapacity
 chemical = []
 # Candela, Lumen, Lux, Nit (cd/m²), LuminousEfficacy (lm/W)
 photometric = []
@@ -82,7 +82,7 @@ customary = []
 # Item, Sample, Frame, Packet, Line, Row, Record, Entry, Cycle, Block, Sector, Chunk, Char, Code: counted bases, each a dimension of its own
 counting = []
 # Neper, Decibel and their losses (Loss<Neper>, Loss<Decibel>): levels on a base of their own, rates of them (dB/m,
-# Np/s), and the edge to a gain (to_level, to_gain)
+# Np/s), and the edge to a gain (to_level, to_gain); Absorbance and OpticalDepth (Beer-Lambert)
 levels = []
 
 [dependencies]
