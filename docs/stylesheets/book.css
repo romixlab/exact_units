@@ -405,9 +405,9 @@
 }
 
 /* Reading level badge above a page title (overrides/partials/level.html, docs/levels.md): a ladder in strength: Basic is a graphite
-   outline, Advanced an orange outline on a light orange tint, Nomicon a solid orange fill with white text and icon;
-   the signal bars of the icon fill up with the level. The fill is #c25400 in both schemes, not the brighter accent
-   #ff7100: white on it is 4.6:1 (WCAG AA), on #ff7100 only 2.8:1. */
+   outline, Advanced an orange outline on a light orange tint, Nomicon a solid red fill with white text and icon;
+   the signal bars of the icon fill up with the level. Nomicon is VHRD red, #c8141c in both schemes (white on it is
+   5.9:1, WCAG AA), a solid fill with white text and icon. Advanced keeps the orange accent. */
 .md-typeset .eu-level {
   display: inline-flex;
   align-items: center;
@@ -450,8 +450,8 @@
 }
 [data-md-color-scheme="default"] .md-typeset .eu-level--nomicon {
   color: #ffffff;
-  border-color: #c25400;
-  background-color: #c25400;
+  border-color: #c8141c;
+  background-color: #c8141c;
 }
 [data-md-color-scheme="default"] .md-typeset .eu-level--nomicon .eu-level__icon {
   color: #ffffff;
@@ -467,8 +467,8 @@
 }
 [data-md-color-scheme="slate"] .md-typeset .eu-level--nomicon {
   color: #ffffff;
-  border-color: #c25400;
-  background-color: #c25400;
+  border-color: #c8141c;
+  background-color: #c8141c;
 }
 [data-md-color-scheme="slate"] .md-typeset .eu-level--nomicon .eu-level__icon {
   color: #ffffff;
