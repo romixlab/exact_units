@@ -606,3 +606,58 @@ fn with_unit_round_trips_derived_symbols() {
     assert!(read::<units::SpecificVolume, Milli, i32, exact_units::Unbounded>("5 L/kg").is_err());
     assert!(read::<units::Density, One, i32, exact_units::Unbounded>("5 g/m³").is_err());
 }
+
+/// A cable or fibre datasheet's own rate per length reads and writes as it prints, the number and the unit's own
+/// leading number (100, or the bare length itself) never confused for one another: `Decimal::parse` only ever
+/// consumes the text's own leading number, the unit's is matched as text afterwards.
+#[cfg(all(feature = "levels", feature = "mechanical", feature = "customary"))]
+#[test]
+fn with_unit_round_trips_attenuation_per_length() {
+    use exact_units::units::{Decibel, Feet100, Kilometre, Loss, Metres100, Per};
+
+    // Belden 8259 (RG-58): 5.4 dB/100 ft at 100 MHz, as the datasheet writes it
+    let per_100ft = Fixed::<Per<Loss<Decibel>, Feet100>, Centi, i32>::new(540);
+    assert_eq!(write(per_100ft), "5.4 dB/100 ft");
+    assert_eq!(
+        read::<Per<Loss<Decibel>, Feet100>, Centi, i32, exact_units::Unbounded>("5.4 dB/100 ft"),
+        Ok(540)
+    );
+    // the space after the number is optional, as for any unit
+    assert_eq!(
+        read::<Per<Loss<Decibel>, Feet100>, Centi, i32, exact_units::Unbounded>("5.4dB/100 ft"),
+        Ok(540)
+    );
+
+    // the same loss, as a metric datasheet writes it: 17.7 dB/100 m
+    let per_100m = Fixed::<Per<Loss<Decibel>, Metres100>, Centi, i32>::new(1770);
+    assert_eq!(write(per_100m), "17.7 dB/100 m");
+    assert_eq!(
+        read::<Per<Loss<Decibel>, Metres100>, Centi, i32, exact_units::Unbounded>("17.7 dB/100 m"),
+        Ok(1770)
+    );
+
+    // a fibre's 0.2 dB/km at 1550 nm
+    let per_km = Fixed::<Per<Loss<Decibel>, Kilometre>, Centi, i32>::new(20);
+    assert_eq!(write(per_km), "0.2 dB/km");
+    assert_eq!(
+        read::<Per<Loss<Decibel>, Kilometre>, Centi, i32, exact_units::Unbounded>("0.2 dB/km"),
+        Ok(20)
+    );
+
+    // a plain length in one of these markers: two numbers in a row, the first the value and the rest the unit's own
+    assert_eq!(write(Fixed::<Feet100, One, i32>::new(2)), "2 100 ft");
+    assert_eq!(
+        read::<Feet100, One, i32, exact_units::Unbounded>("2 100 ft"),
+        Ok(2)
+    );
+    assert_eq!(write(Fixed::<Metres100, One, i32>::new(3)), "3 100 m");
+    assert_eq!(
+        read::<Metres100, One, i32, exact_units::Unbounded>("3 100 m"),
+        Ok(3)
+    );
+    assert_eq!(write(Fixed::<Kilometre, One, i32>::new(5)), "5 km");
+    assert_eq!(
+        read::<Kilometre, One, i32, exact_units::Unbounded>("5 km"),
+        Ok(5)
+    );
+}

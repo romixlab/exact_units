@@ -73,9 +73,11 @@
 //! # }
 //! ```
 //!
-//! A cable's loss per length is a `Per<Loss<L>, X>`, printed and read as its datasheet writes it. [Kilometre],
-//! [Metres100] and [Feet100] are lengths of their own, not `Meter` in a prefixed scale: `with_unit` always writes a
-//! value in a unit's bare symbol ([write_unit](crate::tree::write_unit) with [Prefix::Unit](crate::Prefix::Unit)),
+//! A cable's loss per length is a `Per<Loss<L>, X>`, printed and read as its datasheet writes it.
+//! [Kilometre](crate::units::Kilometre), [Metres100](crate::units::Metres100) and
+//! [Feet100](crate::units::Feet100) are lengths of their own, not `Meter` in a prefixed scale: `with_unit` always
+//! writes a value in a unit's bare symbol ([write_unit](crate::tree::write_unit) with
+//! [Prefix::Unit](crate::Prefix::Unit)),
 //! never moving an SI prefix onto a plain metre inside a quotient, so "dB/km", "dB/100 m" and "dB/100 ft" each need
 //! their own length marker, as [Litre](crate::units::Litre) already does for volume.
 //!
@@ -468,7 +470,13 @@ impl<L: Unit, X: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds
     /// # }
     /// ```
     #[must_use]
-    pub fn over<P2: crate::FixedScale, T2: crate::Storage, PX: crate::FixedScale, TX: crate::Storage, BX: crate::Bounds<TX>>(
+    pub fn over<
+        P2: crate::FixedScale,
+        T2: crate::Storage,
+        PX: crate::FixedScale,
+        TX: crate::Storage,
+        BX: crate::Bounds<TX>,
+    >(
         self,
         length: Fixed<X, PX, TX, BX>,
     ) -> Option<Fixed<L, P2, T2>> {
