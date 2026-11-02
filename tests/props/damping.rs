@@ -5,7 +5,7 @@
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
 
-use super::reference::round_div;
+use super::reference::{assert_rounded, round_div};
 use core::f64::consts::{LN_10, TAU};
 use exact_units::prefix::{Micro, Milli, One};
 use exact_units::units::{
@@ -40,17 +40,21 @@ pub(crate) fn time_constant(d: i16, r: Rounding) {
     assert_eq!(tau.map(Fixed::get), want, "δ {d} mNp/s {r:?}");
 }
 
-/// `d` mNp/s of damping at ω₀ of `w` rad/s as a damping ratio in µ: `d · 1000 / w`; `None` for ω₀ = 0.
+/// `d` mNp/s of damping at ω₀ of `w` rad/s as a damping ratio in µ: `d · 1000 / w` rounded by `r`, checked by
+/// multiplying back (`assert_rounded`), not by a second division; `None` for ω₀ = 0.
 pub(crate) fn damping_ratio(d: i16, w: i16, r: Rounding) {
-    let want = quotient(i128::from(d) * 1000, i128::from(w), r).and_then(|z| i32::try_from(z).ok());
-    let delta = Fixed::<DampingCoefficient, Milli, i32>::new(i32::from(d));
-    let omega0 = Fixed::<AngularVelocity, One, i32>::new(i32::from(w));
-    let zeta = delta.damping_ratio::<_, _, _, Micro, i32>(omega0, r);
-    assert_eq!(
-        zeta.map(Fixed::get),
-        want,
-        "δ {d} mNp/s, ω₀ {w} rad/s {r:?}"
-    );
+    let delta = Fixed::<DampingCoefficient, Milli, i16>::new(d);
+    let omega0 = Fixed::<AngularVelocity, One, i16>::new(w);
+    let zeta = delta
+        .damping_ratio::<_, _, _, Micro, i32>(omega0, r)
+        .map(Fixed::get);
+    let n = i128::from(d) * 1000;
+    let w = i128::from(w);
+    assert_eq!(zeta.is_none(), w == 0, "δ {d} mNp/s, ω₀ {w} rad/s {r:?}");
+    if w != 0 {
+        let (p, by) = if w < 0 { (-n, -w) } else { (n, w) };
+        assert_rounded(p, by, r, i128::from(zeta.unwrap_or(0)));
+    }
 }
 
 /// ζ in (−1, 1) to Λ and back is ζ within a few ulps, and Λ agrees with `ζ = 1/√(1 + (2π/Λ)²)` read backwards.
@@ -81,6 +85,29 @@ fn every_i16() {
         for r in super::reference::MODES {
             zeta_to_q(x, r);
             time_constant(x, r);
+        }
+    }
+}
+
+/// ζ = δ/ω₀ over every i16 of one operand against the ends, small values, a power of 2 and ties of the other, and
+/// every i8 pair: a walk of every i16 pair is 2·10¹⁰ cases. The proptest samples the rest.
+#[cfg(not(kani))]
+#[test]
+fn damping_ratio_sweeps() {
+    const FEW: [i16; 10] = [i16::MIN, -1000, -8, -7, -1, 0, 1, 7, 1000, i16::MAX];
+    for x in i16::MIN..=i16::MAX {
+        for y in FEW {
+            for r in super::reference::MODES {
+                damping_ratio(x, y, r);
+                damping_ratio(y, x, r);
+            }
+        }
+    }
+    for d in i8::MIN..=i8::MAX {
+        for w in i8::MIN..=i8::MAX {
+            for r in super::reference::MODES {
+                damping_ratio(i16::from(d), i16::from(w), r);
+            }
         }
     }
 }
@@ -130,11 +157,29 @@ mod proofs {
     use super::*;
     use crate::reference::MODES;
 
-    /// Every pair of i16 and every mode, what the proptest samples (ζ ↔ Q and the time constant are walked whole by
-    /// `every_i16`).
-    #[kani::proof]
-    fn damping_ratio_i16() {
+    /// Every i16 δ and mode at one ω₀. A symbolic ω₀ is a symbolic 64-bit division in the library (`div_euclid`,
+    /// `rem_euclid`), which ran past 25 minutes for i16 pairs; a constant one folds away. `damping_ratio_sweeps` and
+    /// the proptest cover the divisors. ζ ↔ Q and the time constant are walked whole by `every_i16`.
+    fn at(w: i16) {
         let r = MODES[usize::from(kani::any_where(|i: &u8| *i < 5))];
-        damping_ratio(kani::any(), kani::any(), r);
+        damping_ratio(kani::any(), w, r);
+    }
+
+    /// An odd ω₀: no ties.
+    #[kani::proof]
+    fn damping_ratio_at_7() {
+        at(7);
+    }
+
+    /// An even ω₀ that isn't a power of 2: ties.
+    #[kani::proof]
+    fn damping_ratio_at_1000() {
+        at(1000);
+    }
+
+    /// A negative power of 2: the sign moves to the numerator, and the division is the shift.
+    #[kani::proof]
+    fn damping_ratio_at_minus_8() {
+        at(-8);
     }
 }
