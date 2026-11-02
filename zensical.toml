@@ -86,6 +86,7 @@ nav = [
     { "The wire" = [
             { "Advanced" = [
                     "wire/shrink_wrap.md",
+                    "wire/editor.md",
                 ]
             },
         ]
