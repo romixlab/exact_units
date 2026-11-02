@@ -22,7 +22,10 @@ The optional `serde` feature (`src/serde.rs`) is serde alone, `no_std` without a
 
 Docs: `docs/customary.md` (its tables are generated, `just customary-docs`); the rest lives on the WireWeaver docs
 site (`std_library/exact_units`, `magnitude`, `points`, `rounding`, `indices`), with the wire and client parts.
-Features and their status are tracked in wire_weaver's `FEATURES.md` (the `STD-*` items).
+Features and their status are tracked in this crate's own `FEATURES.md`, six areas: `NUM` (number core), `UNIT`
+(units and markers), `PT` (points and origins), `LVL` (levels), `CPX` (complex quantities), `IO` (numbers and units
+at the edges). An item about the wire, `ww_si`, codegen or WireWeaver integration stays in wire_weaver's own
+`FEATURES.md` (the `STD-*` items) instead.
 
 ## Commands
 
