@@ -4,9 +4,11 @@
 //! - `saturate_wrap.svg`: a Q15 sum past full scale, saturating (`Q15`) against wrapping (`Wrapping`).
 //! - `cordic_error.svg`: the error of `cordic::sin_cos_16` against `f64` sine over a turn, in Q15 steps.
 //! - `db_step.svg`: the step in dB between neighbouring stored gains of a `Fixed<Per<Volt, Volt>, Milli, u16>`.
+//! - `db_scale.svg`: a dB ruler with amplitude and power ratios, converter noise floors and the steps of stored values.
 //!
 //! `cargo run --manifest-path tools/book_plots/Cargo.toml -- docs/plots` (`just docs-build` does it).
 
+mod db_scale;
 mod svg;
 
 use std::{fs, path::Path, process::ExitCode};
@@ -33,6 +35,7 @@ fn main() -> ExitCode {
         ("saturate_wrap.svg", saturate_wrap()),
         ("cordic_error.svg", cordic_error()),
         ("db_step.svg", db_step()),
+        ("db_scale.svg", db_scale::db_scale()),
     ];
     for (name, svg) in plots {
         let path = dir.join(name);

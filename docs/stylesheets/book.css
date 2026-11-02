@@ -346,6 +346,39 @@
 .eu-svg .dash {
   stroke-dasharray: 4 3;
 }
+/* db_scale.svg: a tall drawing that keeps its text readable when a phone scales it down */
+.eu-svg text.lg {
+  font-size: 15px;
+}
+.eu-svg text.strong {
+  font-weight: 600;
+}
+.eu-svg tspan.sup {
+  font-size: 11px;
+}
+.eu-svg .tint-blue {
+  fill: var(--eu-blue);
+  opacity: 0.18;
+}
+.eu-svg .tint-accent {
+  fill: var(--eu-accent);
+  opacity: 0.18;
+}
+.eu-svg .db-fade {
+  fill: url(#eu-db-fade);
+}
+.eu-svg .db-green {
+  fill: url(#eu-db-green);
+}
+.eu-svg .db-purple {
+  fill: url(#eu-db-purple);
+}
+.eu-svg .db-green-key {
+  fill: var(--eu-green);
+}
+.eu-svg .db-purple-key {
+  fill: var(--eu-purple);
+}
 
 /* A code block that doesn't compile (its fence is `rust,compile_fail`): a red edge and a label */
 .md-typeset .eu-no-compile {

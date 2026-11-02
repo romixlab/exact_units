@@ -12,8 +12,8 @@ L_{\mathrm{dB}} = 10 \log_{10}\frac{P_1}{P_2} \quad \text{(powers: W)}
 $$
 
 <figure class="eu-figure" markdown="0">
---8<-- "figures/db_scale.svg"
-<figcaption>The same level is a different gain for an amplitude and for a power: −6 dB is half the voltage and a quarter of the power.</figcaption>
+--8<-- "plots/db_scale.svg"
+<figcaption>One ruler, two ratios: −6 dB is half the voltage and a quarter of the power. The bars hang from full scale. A green bar ends at the noise floor of an ideal N-bit ADC, 10·lg(1.5·4<sup>N</sup>) ≈ 6.02·N + 1.76 dB under a full-scale sine; real converters stop above it. A purple bar ends at the smallest step of a stored value. Computed by <code>tools/book_plots</code> with the crate's <code>to_db</code> and <code>from_db_const</code>.</figcaption>
 </figure>
 
 ## The kind picks the formula

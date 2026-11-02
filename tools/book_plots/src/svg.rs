@@ -66,6 +66,19 @@ impl Svg {
         );
     }
 
+    pub fn rect(&mut self, at: (f64, f64), size: (f64, f64), rx: f64, class: &str) {
+        let _ = write!(
+            self.out,
+            r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="{rx}" class="{class}"/>"#,
+            at.0, at.1, size.0, size.1
+        );
+    }
+
+    /// Markup the helpers don't cover, such as gradients in `<defs>`.
+    pub fn raw(&mut self, markup: &str) {
+        self.out.push_str(markup);
+    }
+
     /// A polyline through data points of a panel.
     pub fn path(&mut self, p: &Panel, points: &[(f64, f64)], class: &str) {
         let mut d = String::new();
