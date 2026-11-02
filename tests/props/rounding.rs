@@ -120,6 +120,45 @@ pub(crate) fn requantizes_at_run_time(
     }
 }
 
+/// A float `x` into an integer `T2` of the same scale, rounded by `r` and settled by `o`, against std's own rounding
+/// of a float (`floor`, `ceil`, `trunc`, `round_ties_even`, `round`): `NaN` is 0 and `None` for [Overflow::Checked],
+/// what has no `i128` (infinities, from 2¹²⁷ on) is the end of its sign saturated and 0 modulo 2⁶⁴ wrapped.
+#[cfg(not(kani))]
+pub(crate) fn float_requantizes<T2: Int>(x: f64, r: Rounding, o: Overflow) {
+    use exact_units::prefix::One;
+    let v: Fixed<Ratio, One, f64> = Fixed::new(x);
+    let (min, max) = (T2::MIN_INT, T2::MAX_INT);
+    let got = match o {
+        Overflow::Checked => v.to_rounded::<One, T2>(r).map(|f| f.get().into()),
+        Overflow::Saturate => Some(v.to_saturating::<One, T2>(r).get().into()),
+        Overflow::Wrap => Some(v.to_wrapping::<One, T2>(r).get().into()),
+    };
+    let y = match r {
+        Rounding::Floor => x.floor(),
+        Rounding::Ceil => x.ceil(),
+        Rounding::Truncate => x.trunc(),
+        Rounding::NearestEven => x.round_ties_even(),
+        Rounding::NearestAway => x.round(),
+    };
+    let want = if x.is_nan() {
+        (o != Overflow::Checked).then_some(0)
+    } else if y.abs() >= 2f64.powi(127) {
+        match o {
+            Overflow::Checked => None,
+            Overflow::Saturate => Some(if y < 0.0 { min } else { max }),
+            Overflow::Wrap => Some(0),
+        }
+    } else {
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            reason = "y is whole and below 2¹²⁷: exact"
+        )]
+        settle(y as i128, min, max, o)
+    };
+    assert_eq!(got, want, "{x:e} {r:?} {o:?} into {}", T2::NAME);
+}
+
 /// One proptest per pair of scales and pair of storages: inputs at the ends of `T`, near 0 and anywhere.
 macro_rules! scale_pairs {
     ($($name:ident: $p:ty => $p2:ty, $num:literal / $den:literal, [$($m:ident: $t:ident => $t2:ident),*];)*) => {$(
@@ -177,6 +216,51 @@ mod run_time {
                        signed: bool, r in strategy::mode(), o in strategy::policy()) {
             super::requantizes_at_run_time(x, num, den, bits, signed, r, o);
         }
+    }
+}
+
+/// Floats into integers: whole and fractional values at the ends of every storage, the huge, `NaN` and infinities.
+#[cfg(not(kani))]
+mod floats {
+    use super::float_requantizes;
+    use crate::strategy;
+    use proptest::prelude::*;
+    use proptest::sample::select;
+
+    fn float() -> impl Strategy<Value = f64> {
+        let fraction = select(&[0.0, 0.25, 0.5, 0.75, 0.999][..]);
+        prop_oneof![
+            4 => any::<u64>().prop_map(f64::from_bits),
+            4 => (strategy::i64(), -2i32..=2, fraction).prop_map(|(i, d, f)| i as f64 + f64::from(d) + f),
+            // 2^k and the floats next to it, up to 2^130
+            4 => (0u32..=130, -2i64..=2, any::<bool>()).prop_map(|(k, ulps, neg)| {
+                let x = f64::from_bits(2f64.powi(k as i32).to_bits().wrapping_add_signed(ulps));
+                if neg { -x } else { x }
+            }),
+            1 => select(&[f64::NAN, f64::INFINITY, f64::NEG_INFINITY, f64::MAX, f64::MIN, -0.0][..]),
+        ]
+    }
+
+    macro_rules! float_into {
+        ($($name:ident: $t:ty;)*) => {$(
+            proptest! {
+                #[test]
+                fn $name(x in float(), r in strategy::mode(), o in strategy::policy()) {
+                    float_requantizes::<$t>(x, r, o);
+                }
+            }
+        )*};
+    }
+
+    float_into! {
+        float_into_i8: i8;
+        float_into_i16: i16;
+        float_into_i32: i32;
+        float_into_i64: i64;
+        float_into_u8: u8;
+        float_into_u16: u16;
+        float_into_u32: u32;
+        float_into_u64: u64;
     }
 }
 

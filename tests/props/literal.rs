@@ -98,6 +98,35 @@ pub(crate) fn from_decimal_rounds<L: Lit>(num: i64, exp: i16) {
     }
 }
 
+/// A float storage's `from_decimal` is the nearest float, ties to even, as Rust's own correctly rounded parser has it:
+/// wherever that is a normal number. The ends (the largest and smallest normal numbers) are in, subnormals and
+/// overflow are a compile error, left out here.
+#[cfg(not(kani))]
+pub(crate) fn float_from_decimal_is_nearest(num: i64, exp: i16) {
+    // a literal whose whole value needs more than 128 bits is refused, as documented
+    if exp > 0
+        && 10u128
+            .checked_pow(u32::from(exp.unsigned_abs()))
+            .and_then(|ten| ten.checked_mul(u128::from(num.unsigned_abs())))
+            .is_none()
+    {
+        return;
+    }
+    let text = format!("{num}e{exp}");
+    let want: f64 = text.parse().expect("digits and an exponent");
+    if num != 0 && want.is_normal() {
+        let got =
+            Fixed::<Ratio, exact_units::prefix::One, f64>::from_decimal(Decimal::new(num, exp));
+        assert_eq!(got.get().to_bits(), want.to_bits(), "{text} as f64");
+    }
+    let want: f32 = text.parse().expect("digits and an exponent");
+    if num != 0 && want.is_normal() {
+        let got =
+            Fixed::<Ratio, exact_units::prefix::One, f32>::from_decimal(Decimal::new(num, exp));
+        assert_eq!(got.get().to_bits(), want.to_bits(), "{text} as f32");
+    }
+}
+
 /// A decimal written out parses back: `{num}e{exp}`, and with the point moved into the digits (`123.45e{exp + 2}`).
 /// `i64::MIN` is left out: its digits don't fit the positive `i64` the parser builds them in.
 #[cfg(not(kani))]
@@ -172,6 +201,21 @@ mod tests {
             from_decimal_rounds::<ThirdI16>(num, exp);
             from_decimal_rounds::<ThirdU16>(num, exp);
             from_decimal_rounds::<KiloI64>(num, exp);
+        }
+
+        #[test]
+        fn float_from_decimal(num in strategy::i64(), exp in -38i16..=38) {
+            float_from_decimal_is_nearest(num, exp);
+        }
+
+        /// Half an ulp below a power of two, where the nearest float is the power itself (a carry into the exponent):
+        /// `2^k · 10^j - d` with the digits just short of it.
+        #[test]
+        fn float_from_decimal_below_a_power_of_two(k in 0u32..=62, j in 0u32..=18, d in 0i64..=80) {
+            let scaled = 1i64.checked_shl(k).and_then(|p| p.checked_mul(10i64.pow(j)));
+            if let Some(scaled) = scaled {
+                float_from_decimal_is_nearest(scaled - d, -i16::try_from(j).unwrap());
+            }
         }
 
         #[test]

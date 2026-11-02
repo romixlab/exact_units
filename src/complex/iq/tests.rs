@@ -493,3 +493,20 @@ fn mean_at_least_compares_exactly() {
     assert!(big.mean_at_least(Q62::<i64>::new(i64::MIN), usize::MAX));
     assert!(big.mean_at_least(Q62::<u64>::new(1 << 62), 1));
 }
+
+#[test]
+fn equality_and_clone_tell_sums_apart() {
+    type C = Complex<crate::units::Ratio, One, i16>;
+    let sum = |a: C, b: C| {
+        let mut m = Mac::new();
+        m.mac(a, b);
+        m
+    };
+    let m = sum(C::new(3, 4), C::new(5, 6));
+    assert_eq!(m, sum(C::new(3, 4), C::new(5, 6)));
+    assert_ne!(m, sum(C::new(3, 4), C::new(5, 7)));
+    assert_ne!(m, sum(C::new(3, 4), C::new(6, 6)));
+    assert_ne!(m, Mac::default());
+    assert_eq!(m.clone().get(), m.get());
+    assert_ne!(m.clone().get(), (0, 0));
+}

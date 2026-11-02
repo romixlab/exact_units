@@ -449,4 +449,141 @@ mod tests {
         assert_eq!(Interval::level(1, 1, 1, 1).to_f32(), 10.0);
         assert_eq!(Interval::level(-1, 1, 1, 1).to_f64(), 0.1);
     }
+
+    /// `m · 2^e` with the top 53 bits of `m` all ones: the bits below are `rem`.
+    const ALL_ONES_53: u128 = u128::MAX << 75;
+
+    #[test]
+    fn round_float_rounds_to_the_nearest_mantissa() {
+        let half = 1u128 << 74;
+        let n = |m, e| Num { m, e };
+        // below, at and above half an ulp of the mantissa 2^52 (even): ties go down
+        assert_eq!(
+            n(TOP | (half - 1), -127).round_float(53, -1022, 1023),
+            Some((1 << 52, 0))
+        );
+        assert_eq!(
+            n(TOP | half, -127).round_float(53, -1022, 1023),
+            Some((1 << 52, 0))
+        );
+        assert_eq!(
+            n(TOP | (half + 1), -127).round_float(53, -1022, 1023),
+            Some(((1 << 52) + 1, 0))
+        );
+        // an odd mantissa 2^52 + 1: a tie goes up to the even 2^52 + 2
+        let odd = TOP | (1 << 75);
+        assert_eq!(
+            n(odd | half, -127).round_float(53, -1022, 1023),
+            Some(((1 << 52) + 2, 0))
+        );
+        assert_eq!(
+            n(odd | (half - 1), -127).round_float(53, -1022, 1023),
+            Some(((1 << 52) + 1, 0))
+        );
+        // the same for f32's 24 bits
+        let half32 = 1u128 << 103;
+        assert_eq!(
+            n(TOP | (half32 - 1), -127).round_float(24, -126, 127),
+            Some((1 << 23, 0))
+        );
+        assert_eq!(
+            n(TOP | half32, -127).round_float(24, -126, 127),
+            Some((1 << 23, 0))
+        );
+        assert_eq!(
+            n(TOP | (half32 + 1), -127).round_float(24, -126, 127),
+            Some(((1 << 23) + 1, 0))
+        );
+    }
+
+    #[test]
+    fn round_float_carries_into_the_exponent() {
+        let half = 1u128 << 74;
+        let n = |m, e| Num { m, e };
+        // 1.1111…1 (53 ones) plus anything above half an ulp is 2.0: mantissa 2^52 and one more binade
+        assert_eq!(
+            n(u128::MAX, -127).round_float(53, -1022, 1023),
+            Some((1 << 52, 1))
+        );
+        assert_eq!(
+            n(ALL_ONES_53 | (half + 1), -127).round_float(53, -1022, 1023),
+            Some((1 << 52, 1))
+        );
+        // the tie of an odd (all ones) mantissa goes up as well
+        assert_eq!(
+            n(ALL_ONES_53 | half, -127).round_float(53, -1022, 1023),
+            Some((1 << 52, 1))
+        );
+        // below half it stays
+        assert_eq!(
+            n(ALL_ONES_53 | (half - 1), -127).round_float(53, -1022, 1023),
+            Some(((1 << 53) - 1, 0))
+        );
+        assert_eq!(
+            n(u128::MAX, -127).round_float(24, -126, 127),
+            Some((1 << 23, 1))
+        );
+    }
+
+    #[test]
+    fn round_float_edges_of_the_exponent_range() {
+        let n = |m, e| Num { m, e };
+        // the leading bit of m is 2^(e + 127): the ends of the normal range are in, one beyond is out
+        assert_eq!(
+            n(TOP, 1023 - 127).round_float(53, -1022, 1023),
+            Some((1 << 52, 1023))
+        );
+        assert_eq!(n(TOP, 1024 - 127).round_float(53, -1022, 1023), None);
+        assert_eq!(
+            n(TOP, -1022 - 127).round_float(53, -1022, 1023),
+            Some((1 << 52, -1022))
+        );
+        assert_eq!(n(TOP, -1023 - 127).round_float(53, -1022, 1023), None);
+        assert_eq!(
+            n(TOP, 127 - 127).round_float(24, -126, 127),
+            Some((1 << 23, 127))
+        );
+        assert_eq!(n(TOP, 128 - 127).round_float(24, -126, 127), None);
+        assert_eq!(
+            n(TOP, -126 - 127).round_float(24, -126, 127),
+            Some((1 << 23, -126))
+        );
+        assert_eq!(n(TOP, -127 - 127).round_float(24, -126, 127), None);
+        // a carry past the top is out, a carry from just below the bottom is in
+        assert_eq!(n(u128::MAX, 1023 - 127).round_float(53, -1022, 1023), None);
+        assert_eq!(
+            n(u128::MAX, -1023 - 127).round_float(53, -1022, 1023),
+            Some((1 << 52, -1022))
+        );
+        assert_eq!(n(u128::MAX, -1024 - 127).round_float(53, -1022, 1023), None);
+    }
+
+    #[test]
+    fn floats_in_the_top_and_bottom_binades() {
+        // 10^308 and 10^-307 are floats of the top and bottom binades
+        assert_eq!(Interval::level(308, 1, 1, 1).to_f64(), 1e308);
+        assert_eq!(Interval::level(-307, 1, 1, 1).to_f64(), 1e-307);
+        assert_eq!(Interval::level(38, 1, 1, 1).to_f32(), 1e38_f32);
+        assert_eq!(Interval::level(-37, 1, 1, 1).to_f32(), 1e-37_f32);
+        // the largest and the smallest normal numbers
+        let pow2 = |e: i64| Interval {
+            lo: Num { m: TOP, e: e - 127 },
+            hi: Num { m: TOP, e: e - 127 },
+        };
+        assert_eq!(pow2(1023).to_f64(), 2f64.powi(1023));
+        assert_eq!(pow2(-1022).to_f64(), f64::MIN_POSITIVE);
+        assert_eq!(pow2(127).to_f32(), 2f32.powi(127));
+        assert_eq!(pow2(-126).to_f32(), f32::MIN_POSITIVE);
+    }
+
+    #[test]
+    fn a_value_half_an_ulp_below_a_power_of_two_rounds_up_to_it() {
+        // 2 - 1e-16 is nearer to 2 than to 2 - 2^-52
+        assert_eq!(
+            Interval::ratio(19_999_999_999_999_999, 10_000_000_000_000_000).to_f64(),
+            2.0
+        );
+        assert_eq!(Interval::ratio(1_999_999_999, 1_000_000_000).to_f32(), 2.0);
+        assert_eq!(Interval::ratio(1, 1).to_f64(), 1.0);
+    }
 }

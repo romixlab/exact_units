@@ -36,6 +36,28 @@ pub(crate) fn from_f32<T: Int>(x: f32) {
     assert_eq!(got, want, "{x:e} ({:#x})", x.to_bits());
 }
 
+/// `T::from_float(x)` is `Some` exactly for a whole `x` in `T`'s range, and then holds `x`.
+pub(crate) fn from_f64<T: Int>(x: f64) {
+    let got = T::from_float(x).map(Into::into);
+    #[expect(
+        clippy::float_cmp,
+        reason = "whole is an exact question: x equals its truncation or it doesn't"
+    )]
+    let whole = x == x.trunc();
+    // a whole f64 below 2¹⁰⁰ is an i128 exactly; anything from there on is past every storage
+    let want = if x.is_finite() && x.abs() < 1e30 && whole {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "whole and below 2¹⁰⁰: exact"
+        )]
+        let i = x as i128;
+        (T::MIN_INT..=T::MAX_INT).contains(&i).then_some(i)
+    } else {
+        None
+    };
+    assert_eq!(got, want, "{x:e} ({:#x})", x.to_bits());
+}
+
 /// `x` rounded toward zero, without std: the bits below the binary point cleared.
 fn trunc(x: f32) -> f32 {
     let bits = x.to_bits();
@@ -213,6 +235,51 @@ mod tests {
             super::from_f32::<u16>(x);
             super::from_f32::<u32>(x);
             super::from_f32::<u64>(x);
+        }
+    }
+
+    /// Every edge float, as an f64, into every integer storage.
+    #[test]
+    fn from_f64_at_the_ends() {
+        let mut edges: Vec<f64> = edges().into_iter().map(f64::from).collect();
+        // the f64 ends: 2^k and its neighbours, and the ends of the 64-bit storages
+        for k in 0..=66 {
+            let bits: u64 = (1023 + k) << 52;
+            for ulps in -3i64..=3 {
+                let x = f64::from_bits(bits.wrapping_add_signed(ulps));
+                edges.extend([x, -x]);
+            }
+        }
+        for x in edges {
+            super::from_f64::<i8>(x);
+            super::from_f64::<i16>(x);
+            super::from_f64::<i32>(x);
+            super::from_f64::<i64>(x);
+            super::from_f64::<u8>(x);
+            super::from_f64::<u16>(x);
+            super::from_f64::<u32>(x);
+            super::from_f64::<u64>(x);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn from_f64_anywhere(x in any::<u64>().prop_map(f64::from_bits)) {
+            super::from_f64::<i8>(x);
+            super::from_f64::<i32>(x);
+            super::from_f64::<i64>(x);
+            super::from_f64::<u32>(x);
+            super::from_f64::<u64>(x);
+        }
+
+        #[test]
+        fn from_f64_near_whole(i in crate::strategy::i64(), d in -2i32..=2, f in proptest::sample::select(&[0.0, 0.5, 0.25][..])) {
+            let x = i as f64 + f64::from(d) + f;
+            super::from_f64::<i8>(x);
+            super::from_f64::<i16>(x);
+            super::from_f64::<i32>(x);
+            super::from_f64::<i64>(x);
+            super::from_f64::<u64>(x);
         }
     }
 

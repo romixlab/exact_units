@@ -232,3 +232,36 @@ mod wire {
         assert_eq!(Frame::from_ww_bytes(bytes).unwrap(), frame);
     }
 }
+
+#[test]
+fn equality_tells_values_apart() {
+    let z = Complex::<Ratio, One, i16>::new(3, -4);
+    assert_eq!(z, Complex::new(3, -4));
+    assert_ne!(z, Complex::new(3, 4));
+    assert_ne!(z, Complex::new(-3, -4));
+    assert_ne!(z, Complex::new(0, 0));
+    // the policy is not part of the value
+    assert_eq!(z.with_overflow::<Wrapping>(), z);
+    assert_ne!(z.with_overflow::<Wrapping>(), Complex::new(3, 5));
+}
+
+#[test]
+fn clone_and_hash_keep_the_value() {
+    use std::hash::{BuildHasher, BuildHasherDefault, DefaultHasher};
+    let hash =
+        |z: &Complex<Ratio, One, i16>| BuildHasherDefault::<DefaultHasher>::default().hash_one(z);
+    let z = Complex::<Ratio, One, i16>::new(3, -4);
+    assert_eq!(z.clone().get(), (3, -4));
+    assert_eq!(hash(&z), hash(&Complex::new(3, -4)));
+    assert_ne!(hash(&z), hash(&Complex::new(3, 4)));
+    assert_ne!(hash(&z), hash(&Complex::new(-4, 3)));
+}
+
+#[test]
+fn add_assign_adds() {
+    let mut z = Complex::<Ratio, One, i16, Saturating>::of(3, -4);
+    z += Complex::of(10, 20);
+    assert_eq!(z.get(), (13, 16));
+    z += Complex::of(i16::MAX, i16::MIN);
+    assert_eq!(z.get(), (i16::MAX, 16 + i16::MIN));
+}

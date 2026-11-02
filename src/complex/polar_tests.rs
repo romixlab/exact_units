@@ -386,3 +386,13 @@ mod float {
         }
     }
 }
+
+#[test]
+fn equality_tells_values_apart() {
+    use crate::{Fixed, Polar};
+    let p = Polar::new(Fixed::<Ratio, One, i16>::new(50), 7u8);
+    assert_eq!(p, Polar::new(Fixed::new(50), 7u8));
+    assert_ne!(p, Polar::new(Fixed::new(51), 7u8));
+    assert_ne!(p, Polar::new(Fixed::new(50), 8u8));
+    assert_ne!(p, Polar::new(Fixed::new(51), 8u8));
+}

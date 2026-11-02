@@ -1448,6 +1448,69 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::cast_precision_loss,
+        clippy::as_conversions,
+        reason = "powers of two and the ends of the integer types, exact in f64 or compared as the nearest"
+    )]
+    fn from_float_at_the_ends() {
+        // not whole: refused, not truncated
+        assert_eq!(<i32 as Storage>::from_float(1.5), None);
+        assert_eq!(<i32 as Storage>::from_float(-1.5), None);
+        assert_eq!(<u8 as Storage>::from_float(0.5), None);
+        assert_eq!(<i32 as Storage>::from_float(1.0), Some(1));
+        assert_eq!(<i32 as Storage>::from_float(-0.0), Some(0));
+        assert_eq!(<i32 as Storage>::from_float(f64::NAN), None);
+        assert_eq!(<i32 as Storage>::from_float(f64::INFINITY), None);
+        assert_eq!(<i32 as Storage>::from_float(f64::NEG_INFINITY), None);
+        // exact ends are accepted, one past them not
+        assert_eq!(
+            <i32 as Storage>::from_float(f64::from(i32::MIN)),
+            Some(i32::MIN)
+        );
+        assert_eq!(
+            <i32 as Storage>::from_float(f64::from(i32::MAX)),
+            Some(i32::MAX)
+        );
+        assert_eq!(
+            <i32 as Storage>::from_float(f64::from(i32::MAX) + 1.0),
+            None
+        );
+        assert_eq!(
+            <i32 as Storage>::from_float(f64::from(i32::MIN) - 1.0),
+            None
+        );
+        assert_eq!(
+            <u32 as Storage>::from_float(f64::from(u32::MAX)),
+            Some(u32::MAX)
+        );
+        assert_eq!(
+            <u32 as Storage>::from_float(f64::from(u32::MAX) + 1.0),
+            None
+        );
+        assert_eq!(<u32 as Storage>::from_float(-1.0), None);
+        assert_eq!(<u32 as Storage>::from_float(0.0), Some(0));
+        assert_eq!(<i8 as Storage>::from_float(127.0), Some(127));
+        assert_eq!(<i8 as Storage>::from_float(128.0), None);
+        assert_eq!(<i8 as Storage>::from_float(-128.0), Some(-128));
+        assert_eq!(<i8 as Storage>::from_float(-129.0), None);
+        // 64 bits: the ends are not all f64, 2⁶³ is, and is no i64
+        let two63 = (1u64 << 63) as f64;
+        assert_eq!(<i64 as Storage>::from_float(two63), None);
+        assert_eq!(<i64 as Storage>::from_float(-two63), Some(i64::MIN));
+        let below = (1u64 << 63) - (1 << 10);
+        assert_eq!(
+            <i64 as Storage>::from_float(below as f64),
+            Some(below.cast_signed())
+        );
+        assert_eq!(<u64 as Storage>::from_float(2.0 * two63), None);
+        assert_eq!(<u64 as Storage>::from_float(two63), Some(1 << 63));
+        let below = u64::MAX - ((1 << 11) - 1);
+        assert_eq!(<u64 as Storage>::from_float(below as f64), Some(below));
+        assert_eq!(<u64 as Storage>::from_float(-two63), None);
+    }
+
+    #[test]
     #[should_panic(expected = "division by zero")]
     fn div_rounded_by_zero_panics_u8() {
         let _ = Storage::div_rounded(7u8, 0, crate::Rounding::NearestEven);

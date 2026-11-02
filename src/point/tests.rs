@@ -457,3 +457,18 @@ mod angle {
         let _: Linear = Linear;
     }
 }
+
+#[cfg(feature = "time")]
+#[test]
+fn equality_tells_points_apart() {
+    use crate::origins::UnixSecs;
+    type P = UnixSecs<i64>;
+    let p = P::from_raw(5);
+    assert_eq!(p, P::from_raw(5));
+    assert_ne!(p, P::from_raw(6));
+    assert_ne!(p, P::from_raw(-5));
+    assert_eq!(
+        p.partial_cmp(&P::from_raw(6)),
+        Some(core::cmp::Ordering::Less)
+    );
+}

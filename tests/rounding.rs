@@ -253,6 +253,71 @@ fn floats_round_once() {
     );
 }
 
+#[test]
+fn float_sources_settle_by_policy() {
+    let sat = |x: f64, r| {
+        Fixed::<Volt, One, f64>::new(x)
+            .to_saturating::<One, i16>(r)
+            .get()
+    };
+    // in range: the rounded value, not an end
+    assert_eq!(sat(2.5, Rounding::NearestEven), 2);
+    assert_eq!(sat(-2.5, Rounding::NearestEven), -2);
+    assert_eq!(sat(3.5, Rounding::NearestEven), 4);
+    assert_eq!(sat(1234.0, Rounding::Floor), 1234);
+    assert_eq!(sat(-1234.0, Rounding::Floor), -1234);
+    assert_eq!(sat(0.0, Rounding::Floor), 0);
+    // the ends and beyond
+    assert_eq!(sat(32767.0, Rounding::Floor), i16::MAX);
+    assert_eq!(sat(32766.0, Rounding::Floor), 32766);
+    assert_eq!(sat(32767.4, Rounding::NearestEven), i16::MAX);
+    assert_eq!(sat(-32768.0, Rounding::Floor), i16::MIN);
+    assert_eq!(sat(-32767.0, Rounding::Floor), -32767);
+    assert_eq!(sat(1e30, Rounding::Floor), i16::MAX);
+    assert_eq!(sat(-1e30, Rounding::Floor), i16::MIN);
+    assert_eq!(sat(f64::INFINITY, Rounding::Floor), i16::MAX);
+    assert_eq!(sat(f64::NEG_INFINITY, Rounding::Floor), i16::MIN);
+    let sat_u = |x: f64| {
+        Fixed::<Volt, One, f64>::new(x)
+            .to_saturating::<One, u64>(Rounding::Floor)
+            .get()
+    };
+    assert_eq!(sat_u(-1.0), 0);
+    assert_eq!(sat_u(1e19), 10_000_000_000_000_000_000);
+    assert_eq!(sat_u(1.8446744073709552e19), u64::MAX);
+    assert_eq!(sat_u(1e300), u64::MAX);
+    // the same into 64-bit signed: in range from both sides of 2⁶³
+    let sat_i = |x: f64| {
+        Fixed::<Volt, One, f64>::new(x)
+            .to_saturating::<One, i64>(Rounding::Floor)
+            .get()
+    };
+    assert_eq!(sat_i(9.0e18), 9_000_000_000_000_000_000);
+    assert_eq!(sat_i(-9.0e18), -9_000_000_000_000_000_000);
+    assert_eq!(sat_i(9.3e18), i64::MAX);
+    assert_eq!(sat_i(-9.3e18), i64::MIN);
+
+    // wrapping: modulo 2^bits of the whole value, 0 for what has no bits (infinities, 2¹²⁷ and up)
+    let wrap = |x: f64| {
+        Fixed::<Volt, One, f64>::new(x)
+            .to_wrapping::<One, i16>(Rounding::Floor)
+            .get()
+    };
+    assert_eq!(wrap(2.5), 2);
+    assert_eq!(wrap(-2.5), -3);
+    assert_eq!(wrap(65_537.0), 1);
+    assert_eq!(wrap(-65_537.0), -1);
+    assert_eq!(wrap(f64::INFINITY), 0);
+    assert_eq!(wrap(f64::NEG_INFINITY), 0);
+    assert_eq!(wrap(f64::NAN), 0);
+    assert_eq!(wrap(2f64.powi(127)), 0);
+    assert_eq!(wrap(-(2f64.powi(127))), 0);
+    assert_eq!(wrap(2f64.powi(126)), 0);
+    assert_eq!(wrap(2f64.powi(126) + 2f64.powi(80)), 0);
+    assert_eq!(wrap(2f64.powi(40) + 7.0), 7);
+    assert_eq!(wrap(-(2f64.powi(40)) - 7.0), -7);
+}
+
 exact_units::scale! {
     /// Steps of 1/1000 °, over the unit radian: the scale is π/180000, not a fraction of integers.
     struct MilliDegree = "m°", Exact(1 / 180000, pi 1);
