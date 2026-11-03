@@ -111,6 +111,10 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   J1939's 1-, 2- and 4-byte sets. Checked at compile time where the type is used: every code fits the storage,
   none is inside the bounds, no two overlap. The wire and serde refuse a number that is neither a value within
   the bounds nor a code. Book page "Niche codes and rails", `docs/maths/niches.md`.
+- 📋 **NUM-10 Measured constants as exact symbols** · `foundations` — μ₀ and G in `Magnitude` beside π, ln 2 and ln 10
+  (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
+  old 4π·10⁻⁷ only as the opt-in `Ampere1948`; a conversion that needs a symbol doesn't compile without a set, floats
+  included. P2401#3nov-0154, design: P2401 `design/foundations-review.md` §4.
 
 ## Units and markers (`UNIT`)
 
@@ -176,15 +180,15 @@ counted units, and the kinds that keep look-alike quantities apart.
 - 📋 **UNIT-7 The unit's identity and data form** · `foundations` — `UnitDef` per named unit with `UnitId { crate_name,
   name }`; `Scale` becomes `Magnitude` alone (no `Affine`, no `DegreeCelsius`); every type-level concept has a const
   data form with a (crate, name) identity and the same rules at run time (napier, `ww`). Identity is stated once in the
-  API schema or in a header, and a value carries a `UnitRef`, never a name or a crate string. P2401#3nov-0046, design:
-  P2401 `design/foundations-review.md` §1.
+  API schema or in a header; `SIExpr` stays as the run-time description a device sends once when a unit changes, never
+  per sample. P2401#3nov-0046, design: P2401 `design/foundations-review.md` §1.
 - 📋 **UNIT-8 Quantity specs: the ISQ hierarchy** · `foundations` — `QuantitySpec` / `QuantityDef` (system, parent, kind
   root, character), `quantity!`, `Of<Q, U>` in the unit slot, `QuantityExpr` replacing `Kind`: up the tree implicit,
   down by a named step, siblings and other kinds refused, `+` to the nearest common ancestor, products `Derived`. The
   foundation of UNIT-2. P2401#3nov-0046b, design: P2401 `design/foundations-review.md` §3.
 - 📋 **UNIT-9 Dimension systems** · `foundations` — `SystemDef` with a rule by dimension and a bridge table by quantity,
-  because Gaussian's D and P share a dimension and differ by 4π; `Natural` (ħ = c = 1) and `Gaussian` together, exact
-  from the 2019 constants; distinguished bases pass through untouched. P2401#3nov-0047, design: P2401
+  because Gaussian's D and P share a dimension and differ by a factor; `Natural` (ħ = c = 1) and `Gaussian` together,
+  exact, with μ₀ as a symbol (NUM-10); distinguished bases pass through untouched. P2401#3nov-0047, design: P2401
   `design/foundations-review.md` §4.
 - 📋 **UNIT-10 The dimension's shape** · `foundations` — a system's true bases in an array (SI: 7); rad, Np, NpLoss, bit
   and user counts as one list of distinguished dimensionless bases with no count limit (a const tree of `&'static`
