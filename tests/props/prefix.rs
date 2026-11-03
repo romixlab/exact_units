@@ -87,7 +87,7 @@ pub(crate) fn rescales<U: Int + Into<i128>>(
 }
 
 /// `U`'s ends.
-fn min_max<U: Int + Into<i128>>() -> (i128, i128) {
+pub(crate) fn min_max<U: Int + Into<i128>>() -> (i128, i128) {
     // the saturated ends of a value beyond every U
     let r = PrefixRatio::ONE;
     let min = r.requantize::<i128, U>(i128::MIN, Rounding::Truncate, Overflow::Saturate);

@@ -322,11 +322,17 @@ fn exact_where_floats_were_not() {
 /// The magnitude a float's bits (sign aside, `frac_bits` of fraction, `bias`) stand for, exactly; ∞'s bits give
 /// `2^(bias + 1)`, the next power of two past the largest finite one.
 fn float_value(pattern: u64, frac_bits: u32, bias: i32) -> BigRational {
-    let (field, frac) = ((pattern >> frac_bits) as i32, pattern & ((1 << frac_bits) - 1));
+    let (field, frac) = (
+        (pattern >> frac_bits) as i32,
+        pattern & ((1 << frac_bits) - 1),
+    );
     let (m, e) = if field == 0 {
         (frac, 1 - bias - frac_bits.cast_signed())
     } else {
-        (frac | (1 << frac_bits), field - bias - frac_bits.cast_signed())
+        (
+            frac | (1 << frac_bits),
+            field - bias - frac_bits.cast_signed(),
+        )
     };
     let p = BigRational::from_integer(BigInt::from(2).pow(e.unsigned_abs()));
     let p = if e < 0 { p.recip() } else { p };

@@ -494,3 +494,57 @@ fn applied_to_floats_the_exact_path_is_taken_for_small_fractions() {
     assert!(big.apply_f64(1e290).is_finite());
     assert!((big.apply_f64(1.0) / (3f64.powi(40) / 7.0) - 1.0).abs() < 1e-12);
 }
+
+/// The kernel's arithmetic by a magnitude: irrational ones and products past its room are refused, never a wrong
+/// number or a panic; a power of ten alone takes the `u64` path and agrees with the general one.
+#[test]
+fn kernel_refuses_what_it_cannot_hold() {
+    use crate::{Overflow, Rounding};
+    assert_eq!(
+        Magnitude::PI.apply_rounded::<i32, i32>(1, Rounding::Floor),
+        None
+    );
+    assert_eq!(Magnitude::PI.cmp_scaled(1, 3), None);
+    let root2 = Magnitude::pow2(1).sqrt();
+    assert_eq!(
+        root2.requantize::<u8, u8>(1, Rounding::Ceil, Overflow::Wrap),
+        None
+    );
+    // 4294967291^31 (31 · 32 bits) is past the room of the limbs
+    let big = Magnitude::ratio(4_294_967_291, 1).powi(31);
+    assert_eq!(big.apply_rounded::<u8, u8>(1, Rounding::Floor), None);
+    assert_eq!(big.cmp_scaled(1u8, 1u8), None);
+    // 4294967291^5 isn't
+    let fits = Magnitude::ratio(4_294_967_291, 1).powi(5);
+    assert_eq!(
+        fits.requantize::<u8, u8>(1, Rounding::Floor, Overflow::Saturate),
+        Some(255)
+    );
+    assert_eq!(
+        fits.recip()
+            .apply_rounded::<u128, u8>(u128::MAX, Rounding::Floor),
+        Some(0)
+    );
+    assert_eq!(
+        fits.cmp_scaled(1u8, 255),
+        Some(core::cmp::Ordering::Greater)
+    );
+    // a power of ten in u64, and the same through a factor of 3/3
+    let milli = Magnitude::pow10(-3);
+    let also = milli
+        .mul(Magnitude::ratio(3, 1))
+        .div(Magnitude::ratio(3, 1));
+    for x in [0i64, 1, 499, 500, 501, 1500, -2500, i64::MAX, i64::MIN] {
+        for r in [Rounding::Truncate, Rounding::NearestEven, Rounding::Ceil] {
+            assert_eq!(
+                milli.apply_rounded::<i64, i32>(x, r),
+                Magnitude::ratio(1, 1000).apply_rounded::<i64, i32>(x, r),
+                "{x} {r:?}"
+            );
+            assert_eq!(
+                also.apply_rounded::<i64, i32>(x, r),
+                milli.apply_rounded::<i64, i32>(x, r)
+            );
+        }
+    }
+}

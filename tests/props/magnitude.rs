@@ -9,7 +9,11 @@
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
 
-use exact_units::MAX_FACTORS;
+use super::prefix::min_max;
+use super::reference::{round_div, settle};
+use core::cmp::Ordering;
+use exact_units::num::Int;
+use exact_units::{MAX_FACTORS, Overflow, Rounding};
 use exact_units::{Magnitude, MagnitudeError};
 use num_bigint::BigInt;
 use num_rational::BigRational;
@@ -279,6 +283,62 @@ pub(crate) fn apply_int(num: &[(u64, u32)], den: &[(u64, u32)], x: i128) {
     assert_eq!(m.apply_int(x), want, "{x} · {n}/{d}");
 }
 
+/// `x · m` rounded by `r` and settled by `o` into `U` on the kernel ([Magnitude::requantize]), against the reference
+/// in `i128` (`round_div`, `settle`) where `x · num` and `den` fit; `apply` is `Some` exactly where the product is
+/// whole and fits, and `cmp_scaled` brackets the floor: `q <= x · m < q + 1`.
+pub(crate) fn requantizes<U: Int + Into<i128>>(
+    num: &[(u64, u32)],
+    den: &[(u64, u32)],
+    pow10: i8,
+    pow2: i8,
+    x: i64,
+    r: Rounding,
+    o: Overflow,
+) {
+    let (Some(n), Some(d)) = (number(num), number(den)) else {
+        return;
+    };
+    let Some(m) = Magnitude::checked_ratio(n, d)
+        .ok()
+        .and_then(|m| m.checked_mul(Magnitude::checked_pow10(pow10)?).ok())
+        .and_then(|m| m.checked_mul(Magnitude::checked_pow2(pow2).ok()?).ok())
+    else {
+        return;
+    };
+    let Some((a, b)) = m.to_ratio() else {
+        return;
+    };
+    let (Ok(a), Ok(b)) = (i128::try_from(a), i128::try_from(b)) else {
+        return;
+    };
+    let Some(p) = i128::from(x).checked_mul(a) else {
+        return;
+    };
+    let (min, max) = min_max::<U>();
+    let got = m.requantize::<i64, U>(x, r, o).map(Into::into);
+    assert_eq!(
+        got,
+        settle(round_div(p, b, r), min, max, o),
+        "{x} · {a}/{b} {r:?} {o:?}"
+    );
+    let exact = (p % b == 0 && (min..=max).contains(&(p / b))).then_some(p / b);
+    assert_eq!(m.apply::<i64, U>(x).map(Into::into), exact, "{x} · {a}/{b}");
+    let q = round_div(p, b, Rounding::Floor);
+    if let (Ok(q), Ok(q1)) = (i64::try_from(q), i64::try_from(q + 1)) {
+        let below = if p % b == 0 {
+            Ordering::Equal
+        } else {
+            Ordering::Greater
+        };
+        assert_eq!(m.cmp_scaled(x, q), Some(below), "{x} · {a}/{b} <=> {q}");
+        assert_eq!(
+            m.cmp_scaled(x, q1),
+            Some(Ordering::Less),
+            "{x} · {a}/{b} <=> {q1}"
+        );
+    }
+}
+
 mod tests {
     use super::*;
     use crate::strategy;
@@ -308,6 +368,14 @@ mod tests {
         #[test]
         fn applied_to_integers(num in parts(), den in parts(), x in prop_oneof![strategy::i64().prop_map(i128::from), any::<i128>()]) {
             apply_int(&num, &den, x);
+        }
+
+        #[test]
+        fn requantized_on_the_kernel(num in parts(), den in parts(), pow10 in -12i8..=12, pow2 in -40i8..=40, x in strategy::i64(), r in strategy::mode(), o in strategy::policy()) {
+            requantizes::<i8>(&num, &den, pow10, pow2, x, r, o);
+            requantizes::<u16>(&num, &den, pow10, pow2, x, r, o);
+            requantizes::<i32>(&num, &den, pow10, pow2, x, r, o);
+            requantizes::<u64>(&num, &den, pow10, pow2, x, r, o);
         }
 
         /// Several of the same prime across the two sides: 7/49, 49/7, 7·49/343.

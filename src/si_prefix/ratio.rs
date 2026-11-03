@@ -103,6 +103,22 @@ impl Prefix {
         })
     }
 
+    /// `x` in units of this prefix, in units of `to`: rounded by `r` and settled into `U` by `o`, exactly as
+    /// [PrefixRatio::requantize] does. `None` when either prefix is [Unknown](Prefix::Unknown), or where `o` is
+    /// [Overflow::Checked] and the result doesn't fit.
+    ///
+    /// ```
+    /// use exact_units::{Overflow, Prefix, Rounding};
+    ///
+    /// // 1234 µs in ms
+    /// let ms: Option<u16> = Prefix::Micro.rescale(1234u32, Prefix::Milli, Rounding::NearestEven, Overflow::Checked);
+    /// assert_eq!(ms, Some(1));
+    /// ```
+    #[must_use]
+    pub fn rescale<T: Int, U: Int>(self, x: T, to: Prefix, r: Rounding, o: Overflow) -> Option<U> {
+        self.ratio_to(to)?.requantize(x, r, o)
+    }
+
     /// Compares `a` in units of this prefix with `b` in units of `other`, exactly; `None` when either prefix is
     /// [Unknown](Prefix::Unknown).
     #[must_use]
