@@ -28,6 +28,13 @@ impl<U: Unit> fmt::Display for PrefixText<U> {
 /// The scale a prefix in the text puts on the number: `10^pow10 · 2^pow2`.
 #[derive(Copy, Clone)]
 pub(crate) struct TextPrefix {
+    #[cfg_attr(
+        not(feature = "serde"),
+        expect(
+            dead_code,
+            reason = "read by with_unit, for a Fixed in a float storage"
+        )
+    )]
     pub(crate) prefix: Prefix,
     pub(crate) pow10: i32,
     pub(crate) pow2: i32,

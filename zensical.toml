@@ -29,6 +29,7 @@ nav = [
     { "Doing maths" = [
             "maths/arithmetic.md",
             "maths/conversions.md",
+            "maths/fractions.md",
             "maths/bounds.md",
             { "Advanced" = [
                     "maths/rounding.md",

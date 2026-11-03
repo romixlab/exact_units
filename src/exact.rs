@@ -77,7 +77,8 @@ pub use tolerance::{OffTarget, Tolerance};
 /// Shown exactly, with an SI prefix: `{}` picks the largest power of 1000 that leaves at least 1 before the point
 /// (a ratio: %, ppm or ppb, the largest that leaves 0.1), `{:#}` writes the unit itself, [in_prefix](Self::in_prefix)
 /// the prefix given. The number is the decimal when it ends, else the repetend in parentheses when it is at most
-/// 12 digits long (`333.(3) kHz`), else the fraction (`1000/7919 kHz`). Text in any of these forms reads back
+/// 12 digits long (`333.(3) kHz`), else the fraction (`1000/7919 kHz`), as it is where the digits are more than text
+/// reads back (38 significant ones). Text in any of these forms reads back
 /// (`parse`, `serde::with_unit`). A rounded number is [to_rounded](Self::to_rounded) or [to_f64](Self::to_f64), by
 /// name: a format's precision (`{:.3}`) changes nothing.
 pub struct Exact<U> {

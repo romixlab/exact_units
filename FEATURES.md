@@ -127,16 +127,28 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
   old 4π·10⁻⁷ only as the opt-in `Ampere1948`; a conversion that needs a symbol doesn't compile without a set, floats
   included. P2401#3nov-0154, design: P2401 `design/foundations-review.md` §4.
-- 💡 **NUM-11 A runtime exact rational quantity** — a value of unit `U` as an exact fraction num/den (u128, refusing
-  on overflow rather than rounding), with add, sub, mul, div, compare and `to_rounded`, for values known only at run
-  time on the host. An STM32H7 PLL output is ref·(N + FRACN/8192)/(M·P), e.g. 24 MHz/8·(173 + 2730/8192) =
-  519 999 755.859375 Hz, and a DIVM or DIVP of 3 or 5 makes it non-dyadic. `Magnitude` can't add and `Fixed` fixes
-  the scale at compile time. embedded_bedrock's clock planner (RCC-1) keeps a small u128 ratio of its own until this
-  exists, and writes its results for firmware as `Fixed<Hertz, Rational<1, D>, u64>` constants.
-- 💡 **NUM-12 Signed relative error and a `Ppm` alias** — `Ppm<T>` next to `Ppb<T>`, and a signed relative error
-  (achieved against target, exact as a ratio) with a named tolerance check, so a derived setting like a UART divisor
-  or a CAN bit time states its error and its allowed tolerance in units, not as a bare float. From the same clock
-  planner (embedded_bedrock RCC-6).
+- ✅ **NUM-11 An exact rational quantity** — `exact_units::Exact<U>`: the unit in the type, the value an exact
+  fraction chosen at run time (`Fraction`: a sign and a `u128` num/den, always reduced), for values a host works out
+  that no fixed scale holds (an STM32H7 PLL output, 519.999755859375 MHz or 80/3 MHz). Not napier's job, which is
+  units known only at run time. `+ - * /` give `Option`, refusing on overflow, never rounding; by integers and
+  `Fraction`s; `Exact<U1> * Exact<U2>` is `Exact<Times<U1, U2>>` and `/` `Exact<Per<..>>` as NUM-6, `convert::<U2>()`
+  exact (Hz · s to `Ratio`), `recip::<Second>()` the period. Compare exact (256-bit cross products), also against any
+  `Fixed` across scales. `const fn` constructors (`new_in::<Mega>(1375, 10)`), `from_scaled` / `from_prefix`,
+  `from_fixed`, `to` exact or `None`, `to_rounded(Rounding)`, `to_f64`. Display: the decimal when it ends, a
+  repetend in parentheses up to 12 digits (`333.(3) kHz`), else the fraction, never cut, with an SI prefix picked or
+  given; `FromStr` reads every form back. serde (feature `serde`): the number as text or `(neg, num, den)`, a float
+  refused; `serde::with_unit` takes an `Exact` field (`"79.99998046875 MHz"`). `no_std`, no alloc, host-side
+  (48 bytes, `u128` library calls on Cortex-M): firmware gets `Fixed` consts. Properties `tests/props/exact.rs` (u128
+  against `BigRational`; the same code on `u16` as a Kani proof) and `tests/props/exact_text.rs`, fuzz target
+  `exact_text`, book page [Exact fractions](docs/maths/fractions.md). For embedded_bedrock's clock planner (RCC-1,
+  RCC-2), whose own `Ratio` and `Hz` it replaces.
+- ✅ **NUM-12 Signed relative error and a `Ppm` alias** — `Ppm<T>` (`Fixed<Ratio, Micro, T>`) next to `Ppb<T>`;
+  `achieved.rel_error(target)`, `(achieved − target) / target` as an exact signed `Exact<Ratio>` shown in %, ppm or
+  ppb (`-0.244140625 ppm` for FDCAN at 79.99998046875 MHz against 80 MHz), and `achieved.within(target,
+  Tolerance::ppm(1))`, the error or an `OffTarget` naming both values, the error and the tolerance; `Tolerance::ppm`,
+  `ppb`, `percent`, `of` (±0.25 %), `EXACT`, both ends in. Feature `dimensionless`. Doctests on the methods, book
+  page [Exact fractions](docs/maths/fractions.md#relative-error-and-tolerance). For the clock planner (RCC-6) and a
+  UART BRR.
 
 ## Units and markers (`UNIT`)
 

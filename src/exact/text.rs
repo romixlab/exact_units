@@ -64,8 +64,13 @@ pub(crate) fn scale(x: Fraction, pow2: i32, pow10: i32) -> Option<Fraction> {
     }
     let (p, p2, p5) = strip(x.numer());
     let (q, q2, q5) = strip(x.denom());
-    let twos = i64::from(p2) - i64::from(q2) + i64::from(pow2) + i64::from(pow10);
-    let fives = i64::from(p5) - i64::from(q5) + i64::from(pow10);
+    let twos = i64::from(p2)
+        .checked_sub(i64::from(q2))?
+        .checked_add(i64::from(pow2))?
+        .checked_add(i64::from(pow10))?;
+    let fives = i64::from(p5)
+        .checked_sub(i64::from(q5))?
+        .checked_add(i64::from(pow10))?;
     let power = |base: u128, e: i64| base.checked_pow(u32::try_from(e.unsigned_abs()).ok()?);
     let (mut num, mut den) = (p, q);
     let (two, five) = (power(2, twos)?, power(5, fives)?);
@@ -89,7 +94,7 @@ fn strip(mut n: u128) -> (u128, u32, u32) {
     let mut fives = 0u32;
     while n != 0 && n.is_multiple_of(5) {
         n /= 5;
-        fives += 1;
+        fives = fives.saturating_add(1);
     }
     (n, twos, fives)
 }

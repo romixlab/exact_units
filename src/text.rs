@@ -120,6 +120,7 @@ impl Decimal {
     }
 
     /// The same number times `10^k`.
+    #[cfg(feature = "serde")]
     pub(crate) fn times_pow10(self, k: i32) -> Decimal {
         Decimal {
             e: if self.m == 0 {
@@ -252,6 +253,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn levels_in_db() {
         let db = |s| Decimal::parse(s).and_then(|(d, _)| d.to_decibels());
         assert_eq!(

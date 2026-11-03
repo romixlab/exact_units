@@ -66,6 +66,7 @@ The API reference is on [docs.rs](https://docs.rs/exact_units).
 
 - **Exact or refused.** Scales are exact magnitudes (primes, π, ln 2, ln 10, roots), conversion factors are worked out at compile time, and a conversion that isn't exact returns `None` or doesn't compile.
 - **Zero cost.** `Fixed` is `#[repr(transparent)]` over its integer: the same bytes, and on Cortex-M the same instructions.
+- **Exact fractions at run time**: `Exact<Hertz>` of 80/3 MHz, worked out on a host, printed `26.(6) MHz`, read back from a config, compared with any `Fixed` exactly.
 - **Points and offsets**: °C against K, gauge pressure, register formulas, angles that wrap.
 - **Kinds and counted dimensions**: a V/V gain is not a duty cycle, samples are not bytes.
 - **Fixed point and levels**: Q15, Q31, binary angles, `fixed!(0.1)` and `db!(-3)` as compile-time constants.
@@ -75,12 +76,12 @@ The API reference is on [docs.rs](https://docs.rs/exact_units).
 
 | Feature       | What it adds                                                                                         |
 |---------------|------------------------------------------------------------------------------------------------------|
-| none          | `Dim`, `Magnitude`, `Fixed`, `Point` and their ops as plain Rust types, no dependencies              |
+| none          | `Dim`, `Magnitude`, `Fixed`, `Point`, `Exact` and their ops as plain Rust types, no dependencies     |
 | unit groups   | `time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`, `radiometric`, `radiation`, `fields`, `dimensionless`, `information`, `counting`, `levels`; `quantities` for all |
 | `customary`   | imperial, US customary and other units outside the SI (opt-in only)                                  |
 | `std`         | every unit group but `customary`; with `shrink_wrap` the owned wire mirrors                          |
 | `shrink_wrap` | the wire format of [WireWeaver](https://github.com/vhrdtech/wire_weaver); exact-width bit fields `U1`..`U64` / `I2`..`I64` (opt-in, not a default) |
-| `serde`       | `serde` for the numbers, `no_std` without alloc, bounds checked on reading; `"1.5 ms"` text with `serde::with_unit`; with `std` also `Magnitude` and `Offset` |
+| `serde`       | `serde` for the numbers, `no_std` without alloc, bounds checked on reading; `"1.5 ms"` text with `serde::with_unit` (for `Fixed` and `Exact`); with `std` also `Magnitude` and `Offset` |
 | `defmt`       | `defmt::Format`                                                                                      |
 | `libm`        | `to_db` / `from_db` without `std`, from the pure-Rust `libm`                                         |
 

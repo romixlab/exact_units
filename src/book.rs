@@ -21,6 +21,8 @@ pages! {
     Firmware = "start/firmware.md";
     Arithmetic = "maths/arithmetic.md";
     Conversions = "maths/conversions.md";
+    #[cfg(all(feature = "time", feature = "dimensionless"))]
+    Fractions = "maths/fractions.md";
     Bounds = "maths/bounds.md";
     Rounding = "maths/rounding.md";
     Overflow = "maths/overflow.md";

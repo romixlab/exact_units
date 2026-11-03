@@ -35,10 +35,10 @@ pub(crate) fn written(x: Fraction) {
     let s = x.to_string();
     reads_back(&x, &s);
     let mut den = x.denom();
-    while den % 2 == 0 {
+    while den.is_multiple_of(2) {
         den /= 2;
     }
-    while den % 5 == 0 {
+    while den.is_multiple_of(5) {
         den /= 5;
     }
     let terminates = den == 1;

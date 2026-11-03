@@ -39,21 +39,18 @@ fn canonical16(r: Fraction16) {
 
 /// `got` is `n/d` exactly, or `None` exactly where `n/d` in lowest terms doesn't fit (or, for a sum, `step_overflows`).
 fn exact16(got: Option<Fraction16>, n: i64, d: i64, step_overflows: bool) {
-    match got {
-        Some(r) => {
-            canonical16(r);
-            let (rn, rd) = signed16(r);
-            assert_eq!(
-                i128::from(rn) * i128::from(d),
-                i128::from(n) * i128::from(rd)
-            );
-        }
-        None => {
-            let g = gcd(n.unsigned_abs(), d.unsigned_abs()).max(1);
-            let fits = n.unsigned_abs() / g <= u64::from(u16::MAX)
-                && d.unsigned_abs() / g <= u64::from(u16::MAX);
-            assert!(step_overflows || !fits, "{n}/{d} fits, refused");
-        }
+    if let Some(r) = got {
+        canonical16(r);
+        let (rn, rd) = signed16(r);
+        assert_eq!(
+            i128::from(rn) * i128::from(d),
+            i128::from(n) * i128::from(rd)
+        );
+    } else {
+        let g = gcd(n.unsigned_abs(), d.unsigned_abs()).max(1);
+        let fits = u16::try_from(n.unsigned_abs() / g).is_ok()
+            && u16::try_from(d.unsigned_abs() / g).is_ok();
+        assert!(step_overflows || !fits, "{n}/{d} fits, refused");
     }
 }
 
@@ -127,6 +124,7 @@ pub(crate) fn ops16(a: Parts16, b: Parts16) {
 }
 
 #[cfg(not(kani))]
+#[expect(clippy::expect_used, reason = "a property fails by panicking")]
 pub(crate) mod big {
     use super::super::reference;
     use exact_units::prefix::{Kilo, Mega};
@@ -269,7 +267,8 @@ pub(crate) mod big {
         let x = Exact::from_fixed(a).expect("kHz in i32 fits");
         assert_eq!(x, Exact::int(i128::from(khz) * 1000));
         assert_eq!(x.to::<Kilo, i32>(), Some(a));
-        assert!(x == a && a == x);
+        assert!(x == a, "Exact == Fixed");
+        assert!(a == x, "Fixed == Exact");
         let (hz_a, hz_b) = (i128::from(khz) * 1000, i128::from(mhz) * 1_000_000);
         assert_eq!(x.partial_cmp(&b), Some(hz_a.cmp(&hz_b)));
         assert_eq!(b.partial_cmp(&x), Some(hz_b.cmp(&hz_a)));

@@ -3,6 +3,8 @@
 [default.extend-words]
 # therm, the unit symbol (customary units catalogue)
 thm = "thm"
+# a fraction's numerator, as num-rational names it (`Fraction::numer`, `BigRational::numer`)
+numer = "numer"
 
 [default.extend-identifiers]
 # an opaque Google Fonts kit id (docs_ext/eu_docs_ext/vendor.py), not a word
