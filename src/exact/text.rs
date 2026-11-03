@@ -23,10 +23,12 @@ pub(crate) enum Kind {
 }
 
 /// The number at the start of `s`, exactly, and the text after it: a decimal (`1.5`, `-2e-3`, `1_000`), one with its
-/// repetend in parentheses (`333.(3)`), or a fraction of two decimals (`1000/3`, a digit right after the `/`).
-pub(crate) fn number(s: &str) -> Result<(Fraction, &str), Kind> {
+/// repetend in parentheses (`333.(3)`), or a fraction of two decimals (`1000/3`, a digit right after the `/`). The
+/// value is `x · 10^e`, the power kept apart so that a prefix after the number cancels with it before anything
+/// overflows (`21e-39 QHz` is `21e-9 Hz`, [scale]).
+pub(crate) fn number(s: &str) -> Result<(Fraction, i32, &str), Kind> {
     if let Some(r) = repeating(s) {
-        return r;
+        return r.map(|(x, rest)| (x, 0, rest));
     }
     let Some((dec, rest)) = Decimal::parse(s) else {
         // digits that don't fit: a number, too long to hold
@@ -37,35 +39,59 @@ pub(crate) fn number(s: &str) -> Result<(Fraction, &str), Kind> {
             Kind::Form
         });
     };
-    let x = decimal(dec).ok_or(Kind::Fit)?;
+    let x = Fraction::from_parts(dec.neg, dec.m, 1).ok_or(Kind::Fit)?;
     let over = rest
         .strip_prefix('/')
         .filter(|r| r.starts_with(|c: char| c.is_ascii_digit()));
     let Some(over) = over else {
-        return Ok((x, rest));
+        return Ok((x, dec.e, rest));
     };
     let (den, rest) = Decimal::parse(over).ok_or(Kind::Fit)?;
-    let den = decimal(den).ok_or(Kind::Fit)?;
-    if den.is_zero() {
+    if den.m == 0 {
         return Err(Kind::Zero);
     }
-    Ok((x.checked_div(den).ok_or(Kind::Fit)?, rest))
+    let q = x
+        .checked_div(Fraction::from_parts(false, den.m, 1).ok_or(Kind::Fit)?)
+        .ok_or(Kind::Fit)?;
+    Ok((q, dec.e.saturating_sub(den.e), rest))
 }
 
-/// `±m · 10^e` as a fraction, `None` past `u128`.
-fn decimal(d: Decimal) -> Option<Fraction> {
-    Fraction::from_parts(d.neg, d.m, 1)?.checked_mul(pow10(d.e)?)
-}
-
-/// `10^e`, `None` past `u128`: in steps of `10^±38`, which fit, so a large exponent whose digits cancel still reads.
-fn pow10(mut e: i32) -> Option<Fraction> {
-    let mut x = Fraction::ONE;
-    while e != 0 {
-        let step = e.clamp(-38, 38);
-        x = x.checked_mul(Fraction::pow10(i8::try_from(step).ok()?)?)?;
-        e = e.checked_sub(step)?;
+/// `x · 2^pow2 · 10^pow10`, `None` exactly where that doesn't fit: the powers of 2 and 5 of `x` and of the factor
+/// are added up first, so the result is built in lowest terms and nothing larger is ever formed.
+pub(crate) fn scale(x: Fraction, pow2: i32, pow10: i32) -> Option<Fraction> {
+    if x.is_zero() {
+        return Some(x);
     }
-    Some(x)
+    let (p, p2, p5) = strip(x.numer());
+    let (q, q2, q5) = strip(x.denom());
+    let twos = i64::from(p2) - i64::from(q2) + i64::from(pow2) + i64::from(pow10);
+    let fives = i64::from(p5) - i64::from(q5) + i64::from(pow10);
+    let power = |base: u128, e: i64| base.checked_pow(u32::try_from(e.unsigned_abs()).ok()?);
+    let (mut num, mut den) = (p, q);
+    let (two, five) = (power(2, twos)?, power(5, fives)?);
+    if twos > 0 {
+        num = num.checked_mul(two)?;
+    } else {
+        den = den.checked_mul(two)?;
+    }
+    if fives > 0 {
+        num = num.checked_mul(five)?;
+    } else {
+        den = den.checked_mul(five)?;
+    }
+    Fraction::from_parts(x.is_negative(), num, den)
+}
+
+/// `n` without its factors 2 and 5, and how many of each it had; `n > 0`.
+fn strip(mut n: u128) -> (u128, u32, u32) {
+    let twos = n.trailing_zeros();
+    n >>= twos;
+    let mut fives = 0u32;
+    while n != 0 && n.is_multiple_of(5) {
+        n /= 5;
+        fives += 1;
+    }
+    (n, twos, fives)
 }
 
 /// `±int.pre(rep)`, if `s` starts with a number that has a repetend; `None` for any other text.
@@ -114,26 +140,30 @@ fn repeating(s: &str) -> Option<Result<(Fraction, &str), Kind>> {
 fn value(neg: bool, int: &str, pre: &str, rep: &str) -> Option<Fraction> {
     let whole = |t: &str| -> Option<u128> {
         t.bytes().try_fold(0u128, |n, c| {
-            n.checked_mul(10)?.checked_add(u128::from(c.checked_sub(b'0')?))
+            n.checked_mul(10)?
+                .checked_add(u128::from(c.checked_sub(b'0')?))
         })
     };
     let p10 = |n: usize| 10u128.checked_pow(u32::try_from(n).ok()?);
     let k = p10(pre.len())?;
     let head = whole(int)?.checked_mul(k)?.checked_add(whole(pre)?)?;
     let tail_den = k.checked_mul(p10(rep.len())?.checked_sub(1)?)?;
-    let x = Fraction::from_parts(false, head, k)?
-        .checked_add(Fraction::from_parts(false, whole(rep)?, tail_den)?)?;
+    let x = Fraction::from_parts(false, head, k)?.checked_add(Fraction::from_parts(
+        false,
+        whole(rep)?,
+        tail_den,
+    )?)?;
     Some(if neg { x.negate() } else { x })
 }
 
 /// The text `s` as a value of `U`: a number, then the unit with or without a prefix.
 pub(crate) fn read<U: Unit>(s: &str) -> Result<Exact<U>, Kind> {
-    let (x, rest) = number(s.trim())?;
+    let (x, e, rest) = number(s.trim())?;
     let p = prefix_of::<U>(rest.trim()).ok_or(Kind::Unit)?;
-    let scale = pow10(p.pow10)
-        .zip(i8::try_from(p.pow2).ok().and_then(Fraction::pow2))
-        .and_then(|(a, b)| a.checked_mul(b));
-    let v = scale.and_then(|k| x.checked_mul(k)).ok_or(Kind::Fit)?;
+    let v = e
+        .checked_add(p.pow10)
+        .and_then(|e| scale(x, p.pow2, e))
+        .ok_or(Kind::Fit)?;
     Ok(Exact::of(v))
 }
 
@@ -162,7 +192,7 @@ impl FromStr for Fraction {
     /// (`1000/3`), exactly; spaces around it are left out.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match number(s.trim()) {
-            Ok((x, "")) => Ok(x),
+            Ok((x, e, "")) => scale(x, 0, e).ok_or(ParseFractionError { kind: Kind::Fit }),
             Ok(_) => Err(ParseFractionError { kind: Kind::Form }),
             Err(kind) => Err(ParseFractionError { kind }),
         }

@@ -5,6 +5,8 @@
     reason = "each target calls a few of the property functions"
 )]
 
+#[path = "../../tests/props/exact_text.rs"]
+pub mod exact_text;
 #[path = "../../tests/props/panics.rs"]
 pub mod panics;
 #[path = "../../tests/props/reference.rs"]

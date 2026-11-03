@@ -48,15 +48,14 @@
 //! # }
 //! ```
 
-
 mod exact;
 pub mod with_unit;
 
 use crate::complex::{Complex, ComplexStorage, Polar};
 use crate::decibel::{Decibels, MAX_DECIMALS};
-use crate::text;
 use crate::fixed::write_prefix_unit;
 use crate::niche::{Clipped, Niched, Niches, Rails, RawValue};
+use crate::text;
 use crate::{Bounds, Fixed, FixedScale, Origin, Point, Storage, Unit, Unlimited};
 use ::serde::de::{self, Deserialize, Deserializer};
 use ::serde::ser::{Serialize, Serializer};

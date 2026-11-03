@@ -13,6 +13,9 @@
 mod arith;
 #[cfg(feature = "levels")]
 mod damping;
+mod exact;
+#[cfg(not(kani))]
+mod exact_text;
 mod format;
 #[cfg(feature = "levels")]
 mod level;
@@ -60,6 +63,30 @@ mod strategy {
     }
 
     ints!(i8 i16 i32 i64);
+
+    /// Anything, the ends, near 0, and powers of 2 and 10 (the denominators of prefixes and binary fractions).
+    pub(crate) fn u128s() -> impl Strategy<Value = u128> {
+        prop_oneof![
+            3 => any::<u128>(),
+            2 => any::<u64>().prop_map(u128::from),
+            1 => select(&[0, 1, 2, u128::MAX - 1, u128::MAX, 1 << 127][..]),
+            2 => 0..=100u128,
+            2 => (0u32..=127).prop_map(|e| 1u128 << e),
+            2 => (0u32..=38).prop_map(|e| 10u128.pow(e)),
+        ]
+    }
+
+    /// A fraction of [u128s], either sign.
+    pub(crate) fn fraction() -> impl Strategy<Value = exact_units::Fraction> {
+        (
+            any::<bool>(),
+            u128s(),
+            u128s().prop_filter("a denominator", |d| *d != 0),
+        )
+            .prop_map(|(neg, num, den)| {
+                exact_units::Fraction::from_parts(neg, num, den).unwrap_or_default()
+            })
+    }
 
     pub(crate) fn mode() -> impl Strategy<Value = Rounding> {
         select(&MODES[..])

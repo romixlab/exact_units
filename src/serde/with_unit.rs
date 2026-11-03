@@ -71,11 +71,11 @@
 //! ```
 
 use super::OutOfRange;
+use crate::exact::read_text as read_exact;
+use crate::fixed::write_prefix_unit;
 use crate::text::unit::{TextPrefix, UnitText, prefix_of};
 use crate::text::{Buf, Decimal};
-use crate::fixed::write_prefix_unit;
 use crate::tree::is_ratio;
-use crate::exact::read_text as read_exact;
 use crate::{Bounds, Exact, Fixed, FixedScale, ParseExactError, Storage, Unit};
 use ::serde::de::{self, Deserializer, Visitor};
 use ::serde::ser::Serializer;
@@ -221,12 +221,8 @@ impl<U: Unit> Value for Exact<U> {
     }
 
     fn read_text<E: de::Error>(s: &str) -> Result<Self, E> {
-        read_exact::<U>(s).map_err(|kind| {
-            E::custom(format_args!(
-                "{s:?} is {}",
-                ParseExactError::<U>::new(kind)
-            ))
-        })
+        read_exact::<U>(s)
+            .map_err(|kind| E::custom(format_args!("{s:?} is {}", ParseExactError::<U>::new(kind))))
     }
 
     fn expecting(f: &mut fmt::Formatter<'_>) -> fmt::Result {

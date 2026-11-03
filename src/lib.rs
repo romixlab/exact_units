@@ -77,9 +77,9 @@ pub mod serde;
 #[cfg(feature = "shrink_wrap")]
 mod si_expr;
 mod si_prefix;
+mod text;
 pub mod tree;
 mod unit;
-mod text;
 pub mod units;
 
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
@@ -89,12 +89,11 @@ pub use complex::{Admittance, Impedance};
 #[cfg(feature = "dimensionless")]
 pub use complex::{CQ15, CQ31};
 pub use complex::{Complex, ComplexStorage, Interleaved, IqStorage, Mac, NormStorage, Polar};
-#[cfg(feature = "dimensionless")]
-pub use exact::{OffTarget, Tolerance};
-pub use exact::{Exact, Fraction, InPrefix, ParseExactError, ParseFractionError};
-#[cfg(kani)]
 #[doc(hidden)]
 pub use exact::Fraction16;
+pub use exact::{Exact, Fraction, InPrefix, ParseExactError, ParseFractionError};
+#[cfg(feature = "dimensionless")]
+pub use exact::{OffTarget, Tolerance};
 #[cfg(feature = "angle")]
 pub use fixed::{Bam16, Bam32, PhaseBam16, PhaseBam32};
 pub use fixed::{

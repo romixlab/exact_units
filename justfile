@@ -37,7 +37,7 @@ mutants *flags:
 # Fuzz one target of fuzz/ for SECONDS: the property functions of tests/props, coverage-guided. Needs a nightly
 # toolchain and cargo-fuzz (`rustup toolchain install nightly`, `cargo install cargo-fuzz`). Starts from the
 # hand-written seeds in fuzz/seeds/TARGET; the corpus it grows (fuzz/corpus/TARGET) and a crash (fuzz/artifacts/TARGET)
-# stay out of git. Targets: decimal, decibels, names, wire_bytes, wire_values, serde_json. ASan keeps the stack of
+# stay out of git. Targets: decimal, decibels, names, wire_bytes, wire_values, serde_json, exact_text. ASan keeps the stack of
 # every allocation for good: 4 frames of it, so the deep recursion of unit trees doesn't grow it past the 2 GB limit
 [working-directory('fuzz')]
 fuzz target seconds="60":

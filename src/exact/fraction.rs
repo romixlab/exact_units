@@ -1,7 +1,7 @@
 //! [Fraction]: a signed exact rational, sign and magnitude in `u128`, always in lowest terms.
 //!
-//! The arithmetic is one macro over the unsigned type, so the same code is proved by Kani on `u16` (`Fraction16`,
-//! under `cfg(kani)`) and runs on `u128`.
+//! The arithmetic is one macro over the unsigned type: the same code runs on `u128` and, as the hidden `Fraction16`,
+//! on `u16`, small enough for Kani to prove over every input (`tests/props/exact.rs`).
 
 use crate::{Magnitude, Rounding};
 use core::cmp::Ordering;
@@ -288,9 +288,9 @@ fraction! {
     Fraction, u128
 }
 
-#[cfg(kani)]
 fraction! {
-    /// [Fraction] on `u16`: the same code, small enough for Kani to prove over every input.
+    /// [Fraction] on `u16`: the same code, small enough for Kani to prove over every input (`tests/props`). Not
+    /// API.
     #[doc(hidden)]
     Fraction16, u16
 }
@@ -325,25 +325,47 @@ impl Fraction {
 
     /// `10^e`, `None` past `u128` (|e| > 38).
     #[must_use]
-    #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable; u8 into u32")]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable; u8 into u32"
+    )]
     pub const fn pow10(e: i8) -> Option<Self> {
         let p = tri!(10u128.checked_pow(e.unsigned_abs() as u32));
         if e < 0 {
-            Some(Self { neg: false, num: 1, den: p })
+            Some(Self {
+                neg: false,
+                num: 1,
+                den: p,
+            })
         } else {
-            Some(Self { neg: false, num: p, den: 1 })
+            Some(Self {
+                neg: false,
+                num: p,
+                den: 1,
+            })
         }
     }
 
     /// `2^e`, `None` past `u128` (|e| > 127).
     #[must_use]
-    #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable; u8 into u32")]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable; u8 into u32"
+    )]
     pub const fn pow2(e: i8) -> Option<Self> {
         let p = tri!(1u128.checked_shl(e.unsigned_abs() as u32));
         if e < 0 {
-            Some(Self { neg: false, num: 1, den: p })
+            Some(Self {
+                neg: false,
+                num: 1,
+                den: p,
+            })
         } else {
-            Some(Self { neg: false, num: p, den: 1 })
+            Some(Self {
+                neg: false,
+                num: p,
+                den: 1,
+            })
         }
     }
 
@@ -369,7 +391,10 @@ impl Fraction {
     /// The whole number `r` rounds this to (`Floor`, `Ceil`, a nearest one), `None` past `i128`.
     #[must_use]
     pub fn round(self, r: Rounding) -> Option<i128> {
-        let (q, rem) = (self.num.checked_div(self.den)?, self.num.checked_rem(self.den)?);
+        let (q, rem) = (
+            self.num.checked_div(self.den)?,
+            self.num.checked_rem(self.den)?,
+        );
         // the magnitude away from zero by one, or not
         let up = rem != 0
             && match r {
@@ -419,9 +444,15 @@ impl Fraction {
         if m == 0 {
             return Some(Self::ZERO);
         }
-        let m = Self::from_parts(neg, u128::from(m), 1)?;
-        let p = Self::pow2(i8::try_from(e).ok()?)?;
-        m.checked_mul(p)
+        // m's own factors of 2 into the exponent, so 2^e is formed only as large as the value needs
+        let tz = m.trailing_zeros();
+        let (m, e) = (u128::from(m >> tz), e.checked_add(i32::try_from(tz).ok()?)?);
+        let p = 1u128.checked_mul(2u128.checked_pow(e.unsigned_abs())?)?;
+        if e >= 0 {
+            Self::from_parts(neg, m.checked_mul(p)?, 1)
+        } else {
+            Self::from_parts(neg, m, p)
+        }
     }
 }
 

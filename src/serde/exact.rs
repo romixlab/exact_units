@@ -49,8 +49,7 @@ impl Visitor<'_> for TextVisitor {
     }
 
     fn visit_str<E: de::Error>(self, s: &str) -> Result<Fraction, E> {
-        s.parse()
-            .map_err(|e| E::custom(format_args!("{s:?}: {e}")))
+        s.parse().map_err(|e| E::custom(format_args!("{s:?}: {e}")))
     }
 
     fn visit_i64<E: de::Error>(self, v: i64) -> Result<Fraction, E> {
@@ -66,7 +65,8 @@ impl Visitor<'_> for TextVisitor {
     }
 
     fn visit_u128<E: de::Error>(self, v: u128) -> Result<Fraction, E> {
-        Fraction::from_parts(false, v, 1).ok_or_else(|| E::custom("unreachable: a denominator of 1"))
+        Fraction::from_parts(false, v, 1)
+            .ok_or_else(|| E::custom("unreachable: a denominator of 1"))
     }
 
     /// A float's digits were rounded by the format's parser before it got here: refused, rule 2.

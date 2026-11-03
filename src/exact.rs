@@ -17,12 +17,10 @@ mod text;
 mod tolerance;
 
 use decimal::{Expansion, write_fraction};
-pub use fraction::Fraction;
-#[cfg(kani)]
-pub use fraction::Fraction16;
-pub use text::{ParseExactError, ParseFractionError};
+pub use fraction::{Fraction, Fraction16};
 #[cfg(feature = "serde")]
 pub(crate) use text::read as read_text;
+pub use text::{ParseExactError, ParseFractionError};
 #[cfg(feature = "dimensionless")]
 pub use tolerance::{OffTarget, Tolerance};
 
@@ -138,7 +136,9 @@ impl<U> Exact<U> {
     pub const fn new_in<P: FixedScale>(num: i128, den: u128) -> Self {
         match Self::checked_new_in::<P>(num, den) {
             Some(x) => x,
-            None => panic!("Exact::new_in: a zero denominator, a value past u128 or a scale with π"),
+            None => {
+                panic!("Exact::new_in: a zero denominator, a value past u128 or a scale with π")
+            }
         }
     }
 
@@ -315,7 +315,9 @@ impl<U: Unit> Exact<U> {
     /// The exact value of a [Fixed]: `None` for a float that is NaN or infinite, a scale with π or a root, and past
     /// `u128`.
     #[must_use]
-    pub fn from_fixed<P: FixedScale, T: Storage, B: Bounds<T>>(f: Fixed<U, P, T, B>) -> Option<Self> {
+    pub fn from_fixed<P: FixedScale, T: Storage, B: Bounds<T>>(
+        f: Fixed<U, P, T, B>,
+    ) -> Option<Self> {
         let x = match f.get().to_repr() {
             Repr::Int(i) => Fraction::int(i),
             Repr::Float(x) => Fraction::from_f64(x)?,
@@ -352,7 +354,8 @@ impl<U: Unit> Exact<U> {
     }
 
     /// This value written in the prefix `p`: `in_prefix(Prefix::Mega)` of 80/3 MHz is `26.(6) MHz`. Where the value
-    /// in that prefix doesn't fit `u128`, in the unit itself.
+    /// in that prefix doesn't fit `u128`, in the unit itself; a ratio in %, ‰, ppm or ppb, any other prefix as none
+    /// (the forms text reads back).
     #[must_use]
     pub const fn in_prefix(self, p: Prefix) -> InPrefix<U> {
         InPrefix { x: self, prefix: p }
@@ -414,6 +417,16 @@ impl<U: Unit> fmt::Debug for InPrefix<U> {
 /// `x` of `U` written in `prefix`, then the unit.
 fn write_in<U: Unit>(x: Fraction, prefix: Prefix, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let unit = &U::EXPR;
+    // a ratio is read with %, ‰, ppm, ppb or nothing: any other prefix is written as nothing, so it reads back
+    let ratio_prefix = matches!(
+        prefix,
+        Prefix::Unit | Prefix::Centi | Prefix::Milli | Prefix::Micro | Prefix::Nano
+    );
+    let prefix = if is_ratio(unit) && !ratio_prefix {
+        Prefix::Unit
+    } else {
+        prefix
+    };
     // a decimal prefix moves the point; any other scale divides
     let (scaled, shift) = match prefix.pow10() {
         Some(e) => (Some(x), i32::from(e).saturating_neg()),

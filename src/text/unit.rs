@@ -202,4 +202,3 @@ fn nameless_of<U: Unit>(t: &str) -> Option<Prefix> {
         })
         .flatten()
 }
-

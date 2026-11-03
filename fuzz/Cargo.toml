@@ -71,3 +71,10 @@ path = "fuzz_targets/serde_json.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "exact_text"
+path = "fuzz_targets/exact_text.rs"
+test = false
+doc = false
+bench = false

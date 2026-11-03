@@ -721,14 +721,29 @@ fn exact_as_its_number() {
         serde_json::from_str::<Fraction>("-3").unwrap(),
         Fraction::int(-3)
     );
-    let e = serde_json::from_str::<Fraction>("0.1").unwrap_err().to_string();
-    assert!(e.starts_with("0.1 is a float, rounded when it was read"), "{e}");
-    let e = serde_json::from_str::<Fraction>(r#""1/0""#).unwrap_err().to_string();
+    let e = serde_json::from_str::<Fraction>("0.1")
+        .unwrap_err()
+        .to_string();
+    assert!(
+        e.starts_with("0.1 is a float, rounded when it was read"),
+        "{e}"
+    );
+    let e = serde_json::from_str::<Fraction>(r#""1/0""#)
+        .unwrap_err()
+        .to_string();
     assert!(e.starts_with(r#""1/0": a fraction over 0"#), "{e}");
     let mut buf = [0u8; 64];
-    for parts in [(false, 2u128, 4u128), (true, 0, 1), (false, 0, 5), (false, 1, 0)] {
+    for parts in [
+        (false, 2u128, 4u128),
+        (true, 0, 1),
+        (false, 0, 5),
+        (false, 1, 0),
+    ] {
         let bytes = postcard::to_slice(&parts, &mut buf).unwrap().to_vec();
-        assert!(postcard::from_bytes::<Fraction>(&bytes).is_err(), "{parts:?}");
+        assert!(
+            postcard::from_bytes::<Fraction>(&bytes).is_err(),
+            "{parts:?}"
+        );
     }
 }
 
@@ -768,10 +783,19 @@ fn with_unit_reads_an_exact_exactly() {
         assert_eq!(p.tolerance, None);
     }
     let p = read(r#"{ "vco": "1 MHz", "tolerance": "5 ppm" }"#).unwrap();
-    assert_eq!(p.tolerance.map(Exact::get), Some(Fraction::new(5, 1_000_000)));
+    assert_eq!(
+        p.tolerance.map(Exact::get),
+        Some(Fraction::new(5, 1_000_000))
+    );
     for (text, why) in [
-        ("24 MV", r#""24 MV" is not in Hz (with or without an SI prefix)"#),
-        ("MHz", r#""MHz" is not a number with its unit, like "1.5 Hz""#),
+        (
+            "24 MV",
+            r#""24 MV" is not in Hz (with or without an SI prefix)"#,
+        ),
+        (
+            "MHz",
+            r#""MHz" is not a number with its unit, like "1.5 Hz""#,
+        ),
         (
             "1e99 MHz",
             r#""1e99 MHz" is a number past what a fraction of u128s holds exactly"#,

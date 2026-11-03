@@ -4,7 +4,8 @@
 use super::Fraction;
 use core::fmt;
 
-/// The longest repetend written as digits: past it, a value is written as its fraction (`1000/7919`).
+/// The longest repetend written as digits: past it, a value is written as its fraction (`1000/7919`), as it is where
+/// the digits are more than text reads back.
 pub(crate) const MAX_PERIOD: usize = 12;
 
 /// Room for every expansion written: 39 digits before the point, a pre-period of at most 128 (a denominator of
@@ -60,7 +61,30 @@ impl Expansion {
             }
         }
         e.shift(shift)?;
-        Some(e)
+        e.readable().then_some(e)
+    }
+
+    /// Whether text reads this back: the reader holds a decimal's significant digits in a `u128` (38 of them), and a
+    /// repetend's digits (each once) and those after the point too.
+    fn readable(&self) -> bool {
+        const DIGITS: usize = 38;
+        let digits = self.digits.get(..self.len).unwrap_or_default();
+        let first = digits.iter().position(|d| *d != 0).unwrap_or(self.len);
+        match self.rep {
+            None => {
+                let last = digits
+                    .iter()
+                    .rposition(|d| *d != 0)
+                    .map_or(0, |i| i.saturating_add(1));
+                last.saturating_sub(first) <= DIGITS
+            }
+            // read as (int·10^k + pre)·(10^r − 1) + rep over 10^k·(10^r − 1): every digit once, and those after the
+            // point, each fit
+            Some(_) => {
+                self.len.saturating_sub(first) <= DIGITS
+                    && self.len.saturating_sub(self.point) <= DIGITS
+            }
+        }
     }
 
     /// The digits of a whole number, none for 0.
@@ -133,7 +157,9 @@ impl Expansion {
                 r = r.checked_add(1)?;
             }
             // the shortest pre-period: a digit before the repetend that is its last digit joins it
-            while r > self.point && self.at(r.checked_sub(1)?)? == self.at(self.len.checked_sub(1)?)? {
+            while r > self.point
+                && self.at(r.checked_sub(1)?)? == self.at(self.len.checked_sub(1)?)?
+            {
                 r = r.checked_sub(1)?;
                 self.len = self.len.checked_sub(1)?;
             }
@@ -216,9 +242,9 @@ pub(crate) fn write_fraction(x: Fraction, f: &mut fmt::Formatter<'_>) -> fmt::Re
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::string::ToString;
+    use std::string::{String, ToString};
 
-    fn show(num: i128, den: u128, shift: i32) -> std::string::String {
+    fn show(num: i128, den: u128, shift: i32) -> String {
         match Expansion::of(Fraction::new(num, den), shift) {
             Some(e) => e.to_string(),
             None => "-".into(),
@@ -248,14 +274,24 @@ mod tests {
     }
 
     #[test]
-    fn every_digit_of_a_large_denominator() {
-        // 1/2¹²⁷: 127 digits after the point, all of them
+    fn digits_past_what_text_reads_are_a_fraction() {
+        // 1/2¹²⁷ has 89 significant digits, more than a u128 holds: the fraction, which reads back
         let x = Fraction::from_parts(false, 1, 1 << 127).unwrap();
-        let s = x.to_string();
-        assert_eq!(s.len(), 2 + 127);
-        assert!(s.ends_with("5"));
+        assert_eq!(x.to_string(), std::format!("1/{}", 1u128 << 127));
+        // 2⁻³⁸ has 27 significant digits, 38 after the point
+        assert_eq!(show(1, 1 << 38, 0).len(), 2 + 38);
+        // 2⁻⁶⁰ is 5⁶⁰·10⁻⁶⁰: 42 significant digits
+        assert_eq!(show(1, 1 << 60, 0), "-");
+        // leading zeros cost nothing
+        assert_eq!(
+            show(1, 1 << 40, -12),
+            "0.0000000000000000000000009094947017729282379150390625"
+        );
         let near = Fraction::from_parts(false, u128::MAX - 1, u128::MAX).unwrap();
         // u128::MAX = 3·5·17·257·641·65537·..: past 12 digits of period
-        assert_eq!(near.to_string(), std::format!("{}/{}", u128::MAX - 1, u128::MAX));
+        assert_eq!(
+            near.to_string(),
+            std::format!("{}/{}", u128::MAX - 1, u128::MAX)
+        );
     }
 }
