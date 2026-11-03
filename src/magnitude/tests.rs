@@ -205,6 +205,26 @@ fn primality() {
     assert!(!is_prime(65537 * 65539));
 }
 
+/// The three bases of `is_prime_u32` against the twelve of `is_prime`: every number below 2²⁰, every 4099th number
+/// up to 2³², the top of the range, and strong pseudoprimes to bases 2 (2047 ..), 2 and 3 (1373653), 2, 3 and 5
+/// (25326001) and 2, 3, 5 and 7 (3215031751); none is one to 2, 7 and 61 below 4,759,123,141.
+#[test]
+fn primality_u32() {
+    let check = |n: u32| assert_eq!(is_prime_u32(n), is_prime(u64::from(n)), "{n}");
+    (0..1 << 20).for_each(check);
+    (0..=u32::MAX).step_by(4099).for_each(check);
+    (u32::MAX - (1 << 16)..=u32::MAX).for_each(check);
+    for n in [
+        2047, 3277, 4033, 4681, 8321, 15841, 29341, 42799, 49141, 52633, 65281, 74665, 80581,
+        85489, 88357, 90751, 1373653, 25326001, 3215031751,
+    ] {
+        check(n);
+        assert!(!is_prime_u32(n), "{n}");
+    }
+    assert!(is_prime_u32(u32::MAX - 4)); // 4294967291, the largest u32 prime
+    assert!(!is_prime_u32(65521 * 65519));
+}
+
 #[test]
 fn apply() {
     let duty = Magnitude::ratio(1, 65535);

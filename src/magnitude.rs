@@ -540,6 +540,76 @@ pub(crate) const fn is_prime(n: u64) -> bool {
     true
 }
 
+/// `a · b mod m` for `a, b < m < 2³²`: the product fits a `u64`.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "a, b < 2³²: a · b fits u64; m is the n of is_prime_u32, above 61 here"
+)]
+const fn mul_mod32(a: u64, b: u64, m: u64) -> u64 {
+    a * b % m
+}
+
+/// [is_prime] for a `u32`, in 64 bits: Miller-Rabin with the bases 2, 7 and 61, which decide every number below
+/// 4,759,123,141 (Jaeschke, 1993), so no 128-bit product. What a magnitude read from the wire checks its primes with.
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable"
+)]
+#[expect(clippy::indexing_slicing, reason = "i < BASES.len(), the loop bound")]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "n >= 62 past the base checks, so n - 1 doesn't wrap; i < BASES.len(), s and r below 32, the bits of n"
+)]
+pub(crate) const fn is_prime_u32(n: u32) -> bool {
+    const BASES: [u64; 3] = [2, 7, 61];
+    let n = n as u64;
+    if n < 2 {
+        return false;
+    }
+    let mut i = 0;
+    while i < BASES.len() {
+        if n == BASES[i] {
+            return true;
+        }
+        if n.is_multiple_of(BASES[i]) {
+            return false;
+        }
+        i += 1;
+    }
+    let mut d = n - 1;
+    let mut s = 0;
+    while d.is_multiple_of(2) {
+        d /= 2;
+        s += 1;
+    }
+    let mut i = 0;
+    'bases: while i < BASES.len() {
+        // pow_mod in 64 bits
+        let (mut x, mut b, mut e) = (1, BASES[i], d);
+        while e > 0 {
+            if e & 1 == 1 {
+                x = mul_mod32(x, b, n);
+            }
+            b = mul_mod32(b, b, n);
+            e >>= 1;
+        }
+        i += 1;
+        if x == 1 || x == n - 1 {
+            continue;
+        }
+        let mut r = 1;
+        while r < s {
+            x = mul_mod32(x, x, n);
+            if x == n - 1 {
+                continue 'bases;
+            }
+            r += 1;
+        }
+        return false;
+    }
+    true
+}
+
 #[expect(clippy::arithmetic_side_effects, reason = "b != 0, the loop condition")]
 const fn gcd64(mut a: u64, mut b: u64) -> u64 {
     while b != 0 {
@@ -1004,7 +1074,7 @@ impl Magnitude {
             i32::from(irrational_x2.ln10),
         ];
         for f in primes {
-            if f.prime == 2 || f.prime == 5 || !is_prime(u64::from(f.prime)) {
+            if f.prime == 2 || f.prime == 5 || !is_prime_u32(f.prime) {
                 return Err(MagnitudeError::NotPrime);
             }
             w.add_prime(u64::from(f.prime), i32::from(f.exp))?;
