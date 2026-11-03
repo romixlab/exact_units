@@ -175,15 +175,21 @@ counted units, and the kinds that keep look-alike quantities apart.
   each a dimension of its own; `AVOGADRO` bridges `Particle` and mol exactly.
 - 📋 **UNIT-7 The unit's identity and data form** · `foundations` — `UnitDef` per named unit with `UnitId { crate_name,
   name }`; `Scale` becomes `Magnitude` alone (no `Affine`, no `DegreeCelsius`); every type-level concept has a const
-  data form with a (crate, name) identity and the same checks at run time (napier, `ww`); `SIExpr` carries the crate and
-  gets a catch-all. P2401#3nov-0046, design: P2401 `design/foundations-review.md` §1.
-- 📋 **UNIT-8 Quantity specs: the ISQ hierarchy** · `foundations` — `QuantitySpec` / `QuantityDef` (parent, kind root,
-  character), `quantity!`, `Of<Q, U>` in the unit slot, `QuantityExpr` replacing `Kind`: up the tree implicit, down by a
-  named step, siblings and other kinds refused, `+` to the nearest common ancestor, products `Derived`. The foundation
-  of UNIT-2. P2401#3nov-0046b, design: P2401 `design/foundations-review.md` §2.
-- 📋 **UNIT-9 Dimension systems** · `foundations` — `Dim` as positional exponents with a system tag and a `SystemDef`;
-  `np` and `np_loss` as fixed SI bases; `Natural` (ħ = c = 1) with exact bridges from the 2019 constants, Gaussian / ESU
-  / EMU later as a `SystemDef`. P2401#3nov-0047, design: P2401 `design/foundations-review.md` §3.
+  data form with a (crate, name) identity and the same rules at run time (napier, `ww`). Identity is stated once in the
+  API schema or in a header, and a value carries a `UnitRef`, never a name or a crate string. P2401#3nov-0046, design:
+  P2401 `design/foundations-review.md` §1.
+- 📋 **UNIT-8 Quantity specs: the ISQ hierarchy** · `foundations` — `QuantitySpec` / `QuantityDef` (system, parent, kind
+  root, character), `quantity!`, `Of<Q, U>` in the unit slot, `QuantityExpr` replacing `Kind`: up the tree implicit,
+  down by a named step, siblings and other kinds refused, `+` to the nearest common ancestor, products `Derived`. The
+  foundation of UNIT-2. P2401#3nov-0046b, design: P2401 `design/foundations-review.md` §3.
+- 📋 **UNIT-9 Dimension systems** · `foundations` — `SystemDef` with a rule by dimension and a bridge table by quantity,
+  because Gaussian's D and P share a dimension and differ by 4π; `Natural` (ħ = c = 1) and `Gaussian` together, exact
+  from the 2019 constants; distinguished bases pass through untouched. P2401#3nov-0047, design: P2401
+  `design/foundations-review.md` §4.
+- 📋 **UNIT-10 The dimension's shape** · `foundations` — a system's true bases in an array (SI: 7); rad, Np, NpLoss, bit
+  and user counts as one list of distinguished dimensionless bases with no count limit (a const tree of `&'static`
+  nodes, a `Vec` at run time); exponents in halves with no root flag, `UNib32` with zigzag in the schema; `strip(base)`
+  and `true_part()`. P2401#3nov-0134, design: P2401 `design/foundations-review.md` §2.
 
 ## Points and origins (`PT`)
 
@@ -208,8 +214,8 @@ and clocks with a named epoch.
   (TAI − 19 s), UTC through a versioned leap-second table on hosts; GPS week rollover as a `Seq` modulo 1024.
 - 📋 **PT-4 Time scales as references** · `foundations` — `ReferenceDef` (exact, run time, time scale); `TaiScale`,
   `PosixScale`, `DeviceMonotonic`; `UnixEpoch` moves off `UnitZero`; within a scale exact at compile time, across
-  through a `LeapTable` at run time. The foundation of PT-3. P2401#3nov-0047c, design: P2401
-  `design/foundations-review.md` §5.
+  through a `LeapTable` at run time behind a cargo feature, `InLeap` inside a leap second. The foundation of PT-3.
+  P2401#3nov-0047c, design: P2401 `design/foundations-review.md` §6.
 
 ## Levels (`LVL`)
 
@@ -267,7 +273,7 @@ non-linear named scales.
 - 📋 **LVL-6 Codecs: non-linear encodings beside `Fixed`** · `foundations` — `Coded<C, V>` with the bytes of the raw
   number, `Codec`, `CodecDef` as data (μ-law, A-law, gamma, exp, table), composing with `Niched`; a `Curve` trait for
   named conversions. The foundation of LVL-4 and of IO-3's SFLOAT. P2401#3nov-0047d, design: P2401
-  `design/foundations-review.md` §6.
+  `design/foundations-review.md` §7.
 
 ## Complex quantities (`CPX`)
 
@@ -358,7 +364,7 @@ the command line, databases, Arrow.
 - 📋 **IO-9 Unit names, a registry and notations** · `foundations` — `UnitNames` (Unicode and ASCII symbol, long name,
   aliases, UCUM code, `PrefixPolicy`), a `Registry` over static tables without a global, parsing with an expected
   dimension that refuses an ambiguous reading, `Notation` (Unicode, ASCII, UCUM, Typst). The foundation of IO-4, IO-2,
-  IO-5, IO-7. P2401#3nov-0047b, design: P2401 `design/foundations-review.md` §4.
+  IO-5, IO-7. P2401#3nov-0047b, design: P2401 `design/foundations-review.md` §5.
 
 ## Dropped and superseded
 

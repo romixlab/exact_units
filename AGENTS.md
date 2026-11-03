@@ -16,6 +16,10 @@ are part of WireWeaver's conformance corpus: a change to a derive attribute here
 `docs/evolution/rules.md` first. wire_weaver's crate walker reads this crate's source (the `cfg_attr(feature =
 "shrink_wrap", derive_shrink_wrap(..))` attributes and the `unit!` / `scale!` / `origin!` lines), so keep that shape.
 
+**The wire format is not a constraint.** It breaks freely until release and may break again over a major release.
+A design is never weighed by wire size or wire compatibility, and no in-memory limit exists because of the wire.
+Keeping wire_weaver's walker and conformance corpus in step is work to do, not a reason against a change.
+
 The optional `serde` feature (`src/serde.rs`) is serde alone, `no_std` without alloc: no `String`/`Vec` there
 (errors are `Display` types, text goes through `collect_str` and a stack buffer), `Magnitude`/`Offset` serde need
 `std`, the owned mirrors `std` and `shrink_wrap`. The module shares the crate's name, so paths in it start `::serde`.
