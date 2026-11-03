@@ -102,17 +102,17 @@ pub(crate) fn fixed_rescales<P: FixedScale, T: Storage + Int + Into<i128> + TryF
     r: Rounding,
     o: Overflow,
 ) {
-    let Some((pn, pd)) = scale(prefix) else {
+    let Some((p_num, p_den)) = scale(prefix) else {
         return;
     };
-    let (sn, sd) = P::SCALE.to_ratio().expect("a rational scale");
-    let (sn, sd) = (
-        i128::try_from(sn).expect("small"),
-        i128::try_from(sd).expect("small"),
+    let (s_num, s_den) = P::SCALE.to_ratio().expect("a rational scale");
+    let (s_num, s_den) = (
+        i128::try_from(s_num).expect("small"),
+        i128::try_from(s_den).expect("small"),
     );
     let (min, max) = min_max::<T>();
     // x · prefix / P
-    if let (Some(num), Some(den)) = (pn.checked_mul(sd), pd.checked_mul(sn))
+    if let (Some(num), Some(den)) = (p_num.checked_mul(s_den), p_den.checked_mul(s_num))
         && let Some(p) = i128::from(x).checked_mul(num)
     {
         let got = Fixed::<Ratio, P, T>::from_prefix(x, prefix, r, o).map(|f| f.get().into());
@@ -123,7 +123,7 @@ pub(crate) fn fixed_rescales<P: FixedScale, T: Storage + Int + Into<i128> + TryF
     let Ok(v) = T::try_from(x) else {
         return;
     };
-    if let (Some(num), Some(den)) = (sn.checked_mul(pd), sd.checked_mul(pn))
+    if let (Some(num), Some(den)) = (s_num.checked_mul(p_den), s_den.checked_mul(p_num))
         && let Some(p) = i128::from(x).checked_mul(num)
     {
         let got = Fixed::<Ratio, P, T>::new(v)

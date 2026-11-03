@@ -205,15 +205,15 @@ required-features = ["angle", "dimensionless", "electrical"]
 [profile.dev]
 split-debuginfo = "unpacked"
 
-[profile.test]
-split-debuginfo = "unpacked"
-
 # the exact references of the tests (BigRational) run a hundred times faster optimised
 [profile.dev.package.num-bigint]
 opt-level = 3
 
 [profile.dev.package.num-rational]
 opt-level = 3
+
+[profile.test]
+split-debuginfo = "unpacked"
 
 # `just install` / `just deploy`
 [profile.deploy]

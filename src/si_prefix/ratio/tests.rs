@@ -17,6 +17,8 @@ use crate::{FullScaleBits, Pow2Exp, Pow10Exp, Prefix, PrefixRatio, Rounding};
 use core::cmp::Ordering;
 use num_bigint::BigInt;
 use num_rational::BigRational;
+use std::format;
+use std::vec;
 use std::vec::Vec;
 
 const MODES: [Rounding; 5] = [

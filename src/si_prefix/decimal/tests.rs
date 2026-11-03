@@ -74,9 +74,10 @@ fn with_point(n: &BigInt, places: usize) -> String {
 fn rounded(v: &BigRational, places: usize) -> String {
     let k = BigRational::from_integer(BigInt::from(10).pow(u32::try_from(places).unwrap()));
     let x = abs(v) * k;
-    let (q, r) = (x.numer() / x.denom(), x.numer() % x.denom());
+    let (n, d) = x.into_raw();
+    let (q, r) = (&n / &d, &n % &d);
     let twice = r * 2;
-    let up = twice > *x.denom() || (twice == *x.denom() && &q % 2 == BigInt::from(1));
+    let up = twice > d || (twice == d && &q % 2 == BigInt::from(1));
     with_point(&if up { q + 1 } else { q }, places)
 }
 
