@@ -13,6 +13,7 @@ macro_rules! pages {
 pages! {
     Index = "index.md";
     Why = "start/why.md";
+    Exact = "start/exact.md";
     FirstSteps = "start/first_steps.md";
     Units = "start/units.md";
     Display = "start/display.md";

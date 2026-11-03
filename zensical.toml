@@ -15,6 +15,7 @@ nav = [
             "index.md",
             "levels.md",
             "start/why.md",
+            "start/exact.md",
         ]
     },
     { "First steps" = [

@@ -33,15 +33,16 @@ assert_eq!(size_of::<Micros<u32>>(), 4);       // the same bytes as the u32
 The book goes from easy to deep. Each page has a badge with its [reading level](levels.md).
 
 1. [Why](start/why.md): what goes wrong with a plain `u32`, and what the type fixes.
-2. [First steps](start/first_steps.md): `Fixed`, units, prefixes, printing, literals.
-3. [Doing maths](maths/arithmetic.md): arithmetic, conversions, bounds, rounding, overflow.
-4. [Fixed point](fixed_point/q_formats.md): Q15, Q31 and binary angles for DSP and motor control.
-5. [Points](points/points.md): temperatures, angles that wrap, sensor register formulas, indices.
-6. [Levels](levels/decibels.md): dB and neper, thresholds as integer compares.
-7. [Complex](complex/complex.md): impedances, IQ samples, CORDIC.
-8. [Your units](customary.md): customary units, and units of your own.
-9. [The wire](wire/shrink_wrap.md): the same bytes on the wire, the unit in the API, and how it looks in your editor.
-10. [Nomicon](nomicon/magnitude.md): exact magnitudes, how conversions are chosen, how the crate is tested.
+2. [What exact means](start/exact.md): the seven rules the crate holds itself to, and where it falls short today.
+3. [First steps](start/first_steps.md): `Fixed`, units, prefixes, printing, literals.
+4. [Doing maths](maths/arithmetic.md): arithmetic, conversions, bounds, rounding, overflow.
+5. [Fixed point](fixed_point/q_formats.md): Q15, Q31 and binary angles for DSP and motor control.
+6. [Points](points/points.md): temperatures, angles that wrap, sensor register formulas, indices.
+7. [Levels](levels/decibels.md): dB and neper, thresholds as integer compares.
+8. [Complex](complex/complex.md): impedances, IQ samples, CORDIC.
+9. [Your units](customary.md): customary units, and units of your own.
+10. [The wire](wire/shrink_wrap.md): the same bytes on the wire, the unit in the API, and how it looks in your editor.
+11. [Nomicon](nomicon/magnitude.md): exact magnitudes, how conversions are chosen, how the crate is tested.
 
 The [recipes](recipes/sensors.md) are short answers to common tasks.
 

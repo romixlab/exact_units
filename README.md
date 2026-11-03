@@ -14,6 +14,8 @@
 > Units of measure checked at compile time, with exact scales and the cases other unit crates leave out: a number with
 > its unit, scale and storage in the type, the same bytes as the plain integer, `no_std` and no alloc.
 
+**What exact means here:** no hidden gotchas. Every scale is an exact fraction times exact symbols (π, ln 2, ln 10), never a float. A conversion gives the exact value or refuses it, at compile time where it can. Anything that loses information (rounding, saturating, wrapping, going to a float) is a call or a type that names its policy. A measured constant of nature stays a symbol, and a number for it appears only where you ask for one, with its source. Conventions (which gallon, which ADC step) are names you pick, never defaults. The safe way is the short way, and each of these claims is checked by properties, proofs and tests. The book's [What exact means](https://exact.vhrd.tech/start/exact/) page has an example per rule, and lists where the crate falls short today.
+
 ```rust
 use exact_units::{Fixed, Micros, Point, origins::{Celsius, Fahrenheit}};
 use exact_units::prefix::{Centi, Kibi, Milli, One, Rational};

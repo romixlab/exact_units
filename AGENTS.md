@@ -27,6 +27,38 @@ Features and their status are tracked in this crate's own `FEATURES.md`, six are
 at the edges). An item about the wire, `ww_si`, codegen or WireWeaver integration stays in wire_weaver's own
 `FEATURES.md` (the `STD-*` items) instead.
 
+## What exact means
+
+"Exact" is the crate's promise: no hidden gotchas, everything explicit, safe by default. A design follows these seven
+rules; the book's page `docs/start/exact.md` shows each with a doctest. A design that would break one is either
+changed or stops and asks; where the crate breaks one today, the gap is filed (a P2401 task) and listed on that
+page under "Where the crate falls short today", never hidden.
+
+1. **Every scale is exact.** A scale, factor or offset is an exact rational times powers of exact symbols (π, ln 2,
+   ln 10): a `Magnitude` or an `Offset`, never an `f64`. A float is a storage or an edge, never a scale.
+2. **Exact, or refused.** A conversion, a literal, a parse or a wire read gives the exact value or refuses: `None`,
+   an `Err`, or a compile error where the compiler can tell (a `const { .. }` panic). Never the nearest value as if
+   it were the value.
+3. **Every lossy step is named.** Rounding, saturating, wrapping, truncating and going to a float happen only in a
+   call or a type that names the policy (`to_rounded(Rounding::NearestEven)`, `Saturating`, `Wrapping`, `to_f64`).
+   No `Default` for `Rounding`, no hidden `NearestEven`, no `From` that rounds.
+4. **Measured constants stay symbols.** Constants the SI fixes (c, h, e, k_B, N_A, Δν_Cs, K_cd) are exact numbers. A
+   measured one (μ₀ and ε₀, which since 2019 are 2αh/(e²c) and its kin; G; m_e; the dalton) is never digits in a
+   scale: it is a symbol of `Magnitude`, as π is, and a number for it appears only at an explicit edge that names a
+   versioned source (a CODATA set, by name and year). A unit fixed by a measured property carries
+   `Provenance::Conventional { source, year }`. Never bake a "standard" value in as a default (μ₀ = 4π·10⁻⁷ is
+   wrong since 2019).
+5. **Conventions are opt-ins.** Where reasonable people choose differently (which gallon, which mmHg, Vref/2ᴺ or
+   Vref/(2ᴺ − 1), 10·lg or 20·lg, peak or RMS, which origin), each choice has its own name and the user writes it;
+   the crate picks none by default (no bare `Gallon`, `customary` is opt-in, the level form comes from the kind). A
+   symbol or a name that reads two ways is a bug.
+6. **The safe path is the default one.** The shortest code checks: `to` is exact-or-`None`, a bounded type has no
+   `new`, the wire and serde check bounds, `new_unchecked` is `pub(crate)`. A faster or looser path costs a longer
+   name, and never adds work on Cortex-M where the old operation could not overflow.
+7. **Every claim is checked.** A doc that says "exact", "never", "always" or "the same bits" has a test that would
+   fail if it weren't so: a property against `tests/props/reference.rs`, a Kani proof, a whole walk, a fuzz target,
+   a doctest or a `compile_fail` block. A claim without one is a gap.
+
 ## Commands
 
 ```sh

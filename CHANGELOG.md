@@ -2,6 +2,7 @@
 
 ### 🚀 Features
 
+- What exact means, written down: seven rules the crate holds itself to (exact scales, exact or refused, every lossy step named, measured constants as symbols, conventions as opt-ins, the safe path by default, every claim checked). Book page "What exact means" under Home with a doctest per rule and the places the crate falls short today, a paragraph near the top of the README, and a section in AGENTS.md that designs follow.
 - `Fixed::convert_rounded::<U2, P2, T2>(r)`: `convert` into another unit, rounded by name, also by a factor with π, ln 2, ln 10 or a root in it between integer storages (dB to Np, ° to rad), with `to_rounded`'s accuracy.
 - `fixed!(17.7 in Decibel)` and `Fixed::from_decimal_in::<S>()`: a literal in another unit of the same dimension and kind, the nearest stored value at compile time. A factor that isn't a fraction of integers is rounded from an interval around the exact value (ln 10 and π to 2⁻⁶³), and a literal too close to halfway between two stored values is a compile error, never a guess.
 - README: a Book badge linking to https://exact.vhrd.tech, the Crates.io badge now links to the crate's page, and a docs.rs badge.
