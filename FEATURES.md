@@ -115,6 +115,16 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
   old 4π·10⁻⁷ only as the opt-in `Ampere1948`; a conversion that needs a symbol doesn't compile without a set, floats
   included. P2401#3nov-0154, design: P2401 `design/foundations-review.md` §4.
+- 💡 **NUM-11 A runtime exact rational quantity** — a value of unit `U` as an exact fraction num/den (u128, refusing
+  on overflow rather than rounding), with add, sub, mul, div, compare and `to_rounded`, for values known only at run
+  time on the host. An STM32H7 PLL output is ref·(N + FRACN/8192)/(M·P), e.g. 24 MHz/8·(173 + 2730/8192) =
+  519 999 755.859375 Hz, and a DIVM or DIVP of 3 or 5 makes it non-dyadic. `Magnitude` can't add and `Fixed` fixes
+  the scale at compile time. embedded_bedrock's clock planner (RCC-1) keeps a small u128 ratio of its own until this
+  exists, and writes its results for firmware as `Fixed<Hertz, Rational<1, D>, u64>` constants.
+- 💡 **NUM-12 Signed relative error and a `Ppm` alias** — `Ppm<T>` next to `Ppb<T>`, and a signed relative error
+  (achieved against target, exact as a ratio) with a named tolerance check, so a derived setting like a UART divisor
+  or a CAN bit time states its error and its allowed tolerance in units, not as a bare float. From the same clock
+  planner (embedded_bedrock RCC-6).
 
 ## Units and markers (`UNIT`)
 
