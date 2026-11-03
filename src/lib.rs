@@ -59,6 +59,7 @@ pub mod complex;
 pub mod cordic;
 pub mod decibel;
 mod declare;
+mod exact;
 mod fixed;
 #[cfg(feature = "counting")]
 mod index;
@@ -78,6 +79,7 @@ mod si_expr;
 mod si_prefix;
 pub mod tree;
 mod unit;
+mod text;
 pub mod units;
 
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
@@ -87,6 +89,12 @@ pub use complex::{Admittance, Impedance};
 #[cfg(feature = "dimensionless")]
 pub use complex::{CQ15, CQ31};
 pub use complex::{Complex, ComplexStorage, Interleaved, IqStorage, Mac, NormStorage, Polar};
+#[cfg(feature = "dimensionless")]
+pub use exact::{OffTarget, Tolerance};
+pub use exact::{Exact, Fraction, InPrefix, ParseExactError, ParseFractionError};
+#[cfg(kani)]
+#[doc(hidden)]
+pub use exact::Fraction16;
 #[cfg(feature = "angle")]
 pub use fixed::{Bam16, Bam32, PhaseBam16, PhaseBam32};
 pub use fixed::{
@@ -99,7 +107,7 @@ pub use fixed::{Bytes, Gibibytes, Kibibytes, Mebibytes};
 #[cfg(feature = "time")]
 pub use fixed::{Days, Hours, Hz, Micros, Millis, Minutes, Nanos, Secs};
 #[cfg(feature = "dimensionless")]
-pub use fixed::{Duty16, Percent, Permille, Ppb, Q15, Q31, UQ16_16};
+pub use fixed::{Duty16, Percent, Permille, Ppb, Ppm, Q15, Q31, UQ16_16};
 #[cfg(feature = "counting")]
 pub use index::{Index, IndexFrom1, Seq};
 pub use kind::{Kind, LevelForm};

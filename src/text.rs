@@ -1,8 +1,11 @@
 //! Numbers and units read from text at run time, without alloc and without a panic for any input: the decimal of
-//! [with_unit](super::with_unit) and of a level in dB.
+//! `serde::with_unit`, of `Exact` and of a level in dB.
 
+#[cfg(feature = "serde")]
 use crate::decibel::{Decibels, MAX_DECIMALS};
 use core::fmt;
+
+pub(crate) mod unit;
 
 /// A decimal number read from text, `±m · 10^e` exactly, `m` without trailing zeros (0 is `+0 · 10^0`).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -129,6 +132,7 @@ impl Decimal {
     }
 
     /// As a level in dB: `None` past `i64` or [MAX_DECIMALS].
+    #[cfg(feature = "serde")]
     pub(crate) fn to_decibels(self) -> Option<Decibels> {
         let (mut m, mut decimals) = (self.m, 0u8);
         if self.e >= 0 {

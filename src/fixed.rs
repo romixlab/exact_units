@@ -187,6 +187,10 @@ pub type PhaseBam32 =
 #[cfg(feature = "dimensionless")]
 pub type Ppb<T> = Fixed<crate::units::Ratio, prefix::Nano, T>;
 
+/// A fraction in parts per million (a crystal's tolerance, a baud rate's error), `Fixed<Ratio, Micro, T>`.
+#[cfg(feature = "dimensionless")]
+pub type Ppm<T> = Fixed<crate::units::Ratio, prefix::Micro, T>;
+
 /// A fraction in percent (100 is all of it), `Fixed<Ratio, Centi, T>`.
 #[cfg(feature = "dimensionless")]
 pub type Percent<T> = Fixed<crate::units::Ratio, prefix::Centi, T>;
