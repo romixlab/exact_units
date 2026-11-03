@@ -111,6 +111,15 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   J1939's 1-, 2- and 4-byte sets. Checked at compile time where the type is used: every code fits the storage,
   none is inside the bounds, no two overlap. The wire and serde refuse a number that is neither a value within
   the bounds nor a code. Book page "Niche codes and rails", `docs/maths/niches.md`.
+- 🚧 **NUM-13 Exact integer arithmetic at run-time scales, no f64 on a device** — `PrefixRatio`, the quotient of two
+  `Prefix` scales (`10^a · 2^b · (2^m − 1)/(2^n − 1)`, four bytes): `apply` (exact or `None`), `apply_rounded`,
+  `requantize` (named `Rounding` and `Overflow`) and `cmp_scaled` on any primitive integer, exact for every pair of
+  prefixes. One kernel of 32-bit limbs with 64-bit products, a `u64` path for a power of ten alone: no float and no
+  128-bit helper on a Cortex-M0+. `Prefix::ratio_to`, `cmp_scaled`, `cmp_scale`. Wire reads check a magnitude's
+  primes in 64 bits. Tests: `src/si_prefix/ratio/tests.rs` (every pair against `num-rational`), `tests/props/prefix.rs`.
+  Still open (P2401#3nov-1752): `Magnitude::apply_rounded` / `cmp_scaled`, `Prefix::scale_f32` in f32 for every
+  family, `Fixed::from_prefix` / `to_prefix`, an exact decimal writer at a run-time prefix. Then ww_si moves onto it
+  (wire_weaver STD-102).
 - 📋 **NUM-10 Measured constants as exact symbols** · `foundations` — μ₀ and G in `Magnitude` beside π, ln 2 and ln 10
   (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
   old 4π·10⁻⁷ only as the opt-in `Ampere1948`; a conversion that needs a symbol doesn't compile without a set, floats

@@ -24,6 +24,7 @@ mod numeric;
 #[cfg(not(kani))]
 mod panics;
 mod point;
+mod prefix;
 mod reference;
 mod rounding;
 #[cfg(all(not(kani), feature = "serde", feature = "std", feature = "shrink_wrap"))]

@@ -5,6 +5,10 @@ use crate::Magnitude;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
 
+mod ratio;
+
+pub use ratio::PrefixRatio;
+
 /// A scale chosen at run time: an SI prefix from quecto (10⁻³⁰) to quetta (10³⁰), a binary prefix (Ki .. Ti), or one
 /// of three families of exact scales that aren't named: [Pow10](Prefix::Pow10) (`10⁻⁴`), [Pow2](Prefix::Pow2) (`2⁻¹⁵`,
 /// a Q format) and [FullScale](Prefix::FullScale) (`1/65535`, a 16-bit duty).
