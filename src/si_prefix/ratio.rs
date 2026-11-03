@@ -76,7 +76,7 @@ const fn parts(p: Prefix) -> Option<(i8, i8, u8)> {
     clippy::arithmetic_side_effects,
     reason = "n is a FullScaleBits' 2..=32 here, so 32 - n is 0..=30"
 )]
-const fn full_scale(n: u8) -> u32 {
+pub(crate) const fn full_scale(n: u8) -> u32 {
     u32::MAX >> (32 - n as u32)
 }
 
@@ -165,6 +165,11 @@ impl PrefixRatio {
             num_bits: 0,
             den_bits: 0,
         })
+    }
+
+    /// The exponents of 10 and 2 and the bits of the full scales over and under: `(pow10, pow2, num_bits, den_bits)`.
+    pub(crate) const fn parts(self) -> (i8, i8, u8, u8) {
+        (self.pow10, self.pow2, self.num_bits, self.den_bits)
     }
 
     /// The power of two the ratio is, when it is one alone (between binary prefixes and `Pow2`s): `Some(10)` from

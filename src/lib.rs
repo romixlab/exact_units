@@ -114,7 +114,7 @@ pub use point::{
 pub use si_expr::SIExpr;
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use si_expr::SIExprOwned;
-pub use si_prefix::{FullScaleBits, Pow2Exp, Pow10Exp, Prefix, PrefixRatio};
+pub use si_prefix::{FullScaleBits, Pow2Exp, Pow10Exp, Prefix, PrefixDecimal, PrefixRatio};
 pub use tree::MAX_UNIT_DEPTH;
 #[doc(hidden)]
 pub use unit::exp as __dim_exp;

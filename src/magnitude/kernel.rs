@@ -26,10 +26,7 @@ impl Exact {
         clippy::indexing_slicing,
         reason = "i < w.len <= MAX_FACTORS, the loop bound"
     )]
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "i < w.len, the loop bound"
-    )]
+    #[expect(clippy::arithmetic_side_effects, reason = "i < w.len, the loop bound")]
     pub(crate) const fn of(m: &Magnitude) -> Option<Exact> {
         let w = Work::of(m);
         if w.irr[0] != 0 || w.irr[1] != 0 || w.irr[2] != 0 || w.pow10 % 2 != 0 || w.pow2 % 2 != 0 {

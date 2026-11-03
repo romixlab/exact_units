@@ -203,14 +203,19 @@ impl Limbs {
     }
 
     /// `self / m` toward 0, for `m >= 1`; whether the remainder is not 0.
+    pub(crate) fn div_small(&mut self, m: u32) -> bool {
+        self.div_rem_small(m) != 0
+    }
+
+    /// `self / m` toward 0, for `m >= 1`; the remainder (`self` itself and 1 for a zero `m`, which leaves the number
+    /// and says it is not exact).
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "m >= 1 (checked first: a zero m leaves the number and says it is not exact); rem < m < 2³², so \
-                  rem · 2³² + l < 2⁶⁴ and the quotient is below 2³²"
+        reason = "m >= 1 (checked first); rem < m < 2³², so rem · 2³² + l < 2⁶⁴ and the quotient is below 2³²"
     )]
-    pub(crate) fn div_small(&mut self, m: u32) -> bool {
+    pub(crate) fn div_rem_small(&mut self, m: u32) -> u32 {
         if m == 0 {
-            return true;
+            return 1;
         }
         let m = u64::from(m);
         let mut rem = 0u64;
@@ -220,7 +225,8 @@ impl Limbs {
             rem = cur % m;
         }
         self.trim();
-        rem != 0
+        // rem < m, a u32
+        low32(rem)
     }
 
     /// `self / 5^k` toward 0; whether the remainder is not 0.

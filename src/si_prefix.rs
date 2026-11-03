@@ -5,8 +5,10 @@ use crate::Magnitude;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
 
+mod decimal;
 mod ratio;
 
+pub use decimal::PrefixDecimal;
 pub use ratio::PrefixRatio;
 
 /// A scale chosen at run time: an SI prefix from quecto (10⁻³⁰) to quetta (10³⁰), a binary prefix (Ki .. Ti), or one
