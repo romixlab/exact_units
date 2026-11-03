@@ -22,6 +22,7 @@ pub mod prefix;
 mod product;
 pub(crate) use product::{Requant, check as check_product};
 mod rounding;
+mod runtime;
 pub(crate) use rounding::{
     div_i128 as round_div_i128, round_f64, settle as settle_i128, settle_f64,
 };

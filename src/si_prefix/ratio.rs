@@ -2,7 +2,7 @@
 
 use super::Prefix;
 use crate::num::Int;
-use crate::num::limbs::{Limbs, Mag, Rational, cmp_rescaled, low32, rescale, round_up};
+use crate::num::limbs::{self, Limbs, Mag, Rational, cmp_rescaled, low32, round_up};
 use crate::{Magnitude, Overflow, Rounding};
 use core::cmp::Ordering;
 use core::num::NonZeroU64;
@@ -364,9 +364,7 @@ impl PrefixRatio {
         {
             return Some((neg, Mag::of_u64(q), exact));
         }
-        let mut n = Limbs::of(low);
-        let exact = rescale(&self, &mut n, neg, r)?;
-        Some((neg, Mag::of_limbs(&n), exact))
+        limbs::scaled(&self, x, r)
     }
 }
 

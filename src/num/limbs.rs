@@ -373,6 +373,43 @@ pub(crate) fn rescale(s: &impl Rational, n: &mut Limbs, neg: bool, r: Rounding) 
     Some(!half && !sticky)
 }
 
+/// `x · s` rounded by `r`: its sign, magnitude and whether it is exact. `None` past [CAP] limbs.
+pub(crate) fn scaled<T: Int>(s: &impl Rational, x: T, r: Rounding) -> Option<(bool, Mag, bool)> {
+    let (neg, low) = x.to_parts();
+    let mut n = Limbs::of(low);
+    let exact = rescale(s, &mut n, neg, r)?;
+    Some((neg, Mag::of_limbs(&n), exact))
+}
+
+/// The product of two scales, `a · b`, as one: its numerator and denominator are the products of theirs (not
+/// reduced, which rounding doesn't need), so `x · a · b` is rounded once.
+pub(crate) struct Both<'a, A, B>(pub(crate) &'a A, pub(crate) &'a B);
+
+impl<A: Rational, B: Rational> Rational for Both<'_, A, B> {
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "each is within ±400 (a magnitude's exponents are i8 halves, a ratio's i8 sums)"
+    )]
+    fn pow2(&self) -> i32 {
+        self.0.pow2() + self.1.pow2()
+    }
+
+    fn mul_part(&self, n: &mut Limbs, den: bool) -> Option<()> {
+        self.0.mul_part(n, den)?;
+        self.1.mul_part(n, den)
+    }
+
+    fn div_den(&self, n: &mut Limbs) -> bool {
+        // floor(floor(n / a) / b) is floor(n / (a · b)), and it is exact only where both steps are
+        let lost = self.0.div_den(n);
+        lost | self.1.div_den(n)
+    }
+
+    fn den_is_one(&self) -> bool {
+        self.0.den_is_one() && self.1.den_is_one()
+    }
+}
+
 /// Compares the magnitudes `a · s` and `b`, exactly: `a · num · 2^pow2` against `b · den` (the power of 2 on the
 /// side where it is positive). `None` past [CAP] limbs.
 pub(crate) fn cmp_rescaled(s: &impl Rational, a: &mut Limbs, b: &mut Limbs) -> Option<Ordering> {

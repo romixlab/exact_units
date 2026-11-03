@@ -6,13 +6,14 @@
 use super::{MAX_FACTORS, Magnitude, Work};
 use crate::PrefixRatio;
 use crate::num::Int;
-use crate::num::limbs::{Limbs, Mag, Rational, cmp_rescaled, rescale};
+use crate::num::limbs::{Limbs, Mag, Rational, cmp_rescaled, scaled};
 use crate::{Overflow, Rounding};
 use core::cmp::Ordering;
 
 /// A rational magnitude as the kernel applies it: `5^pow5 · 2^pow2 · ∏ primes^exps`, the exponents whole (half the
-/// doubled ones a [Magnitude] stores).
-struct Exact {
+/// doubled ones a [Magnitude] stores). Built in `const` code, so a scale known at compile time is one at run time.
+#[derive(Copy, Clone)]
+pub(crate) struct Exact {
     pow5: i32,
     pow2: i32,
     primes: [u32; MAX_FACTORS],
@@ -21,10 +22,17 @@ struct Exact {
 
 impl Exact {
     /// The magnitude's parts, `None` when it isn't a fraction of integers.
-    fn of(m: &Magnitude) -> Option<Exact> {
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "i < w.len <= MAX_FACTORS, the loop bound"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < w.len, the loop bound"
+    )]
+    pub(crate) const fn of(m: &Magnitude) -> Option<Exact> {
         let w = Work::of(m);
-        let even = |e: i32| e % 2 == 0;
-        if w.irr != [0; 3] || !even(w.pow10) || !even(w.pow2) {
+        if w.irr[0] != 0 || w.irr[1] != 0 || w.irr[2] != 0 || w.pow10 % 2 != 0 || w.pow2 % 2 != 0 {
             return None;
         }
         let mut x = Exact {
@@ -34,18 +42,14 @@ impl Exact {
             exps: [0; MAX_FACTORS],
         };
         // a Magnitude holds at most MAX_FACTORS primes, so Work::of gives no more
-        for ((p, e), (to_p, to_e)) in w
-            .primes
-            .iter()
-            .zip(&w.exps)
-            .take(w.len)
-            .zip(x.primes.iter_mut().zip(x.exps.iter_mut()))
-        {
-            if !even(*e) {
+        let mut i = 0;
+        while i < w.len && i < MAX_FACTORS {
+            if w.exps[i] % 2 != 0 {
                 return None;
             }
-            *to_p = *p;
-            *to_e = e / 2;
+            x.primes[i] = w.primes[i];
+            x.exps[i] = w.exps[i] / 2;
+            i += 1;
         }
         Some(x)
     }
@@ -208,10 +212,6 @@ impl Magnitude {
         if let Some(p) = self.pow10_ratio() {
             return p.scaled(x, r);
         }
-        let k = Exact::of(self)?;
-        let (neg, low) = x.to_parts();
-        let mut n = Limbs::of(low);
-        let exact = rescale(&k, &mut n, neg, r)?;
-        Some((neg, Mag::of_limbs(&n), exact))
+        scaled(&Exact::of(self)?, x, r)
     }
 }

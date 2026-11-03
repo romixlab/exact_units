@@ -10,7 +10,11 @@
 use super::reference::{round_div, settle};
 use core::cmp::Ordering;
 use exact_units::num::Int;
-use exact_units::{FullScaleBits, Overflow, Pow2Exp, Pow10Exp, Prefix, PrefixRatio, Rounding};
+use exact_units::units::Ratio;
+use exact_units::{
+    Fixed, FixedScale, FullScaleBits, Overflow, Pow2Exp, Pow10Exp, Prefix, PrefixRatio, Rounding,
+    Storage,
+};
 
 /// The prefix of family `which` (0 named, 1 `Pow10`, 2 `Pow2`, 3 `FullScale`) with `param`, if there is one.
 pub(crate) fn prefix(which: u8, param: i8) -> Option<Prefix> {
@@ -25,7 +29,7 @@ pub(crate) fn prefix(which: u8, param: i8) -> Option<Prefix> {
 }
 
 /// A prefix's scale as `(num, den)` in `i128`, where both fit.
-fn scale(p: Prefix) -> Option<(i128, i128)> {
+pub(crate) fn scale(p: Prefix) -> Option<(i128, i128)> {
     let pow = |b: i128, e: i8| {
         let m = b.checked_pow(u32::from(e.unsigned_abs()))?;
         Some(if e < 0 { (1, m) } else { (m, 1) })
@@ -84,6 +88,55 @@ pub(crate) fn rescales<U: Int + Into<i128>>(
         exact,
         "{x} {from:?} -> {to:?}"
     );
+}
+
+/// `x` at `prefix` as a `Fixed` of scale `P` and storage `T` ([Fixed::from_prefix]), and a stored `x` at `prefix`
+/// ([Fixed::to_prefix]), against `x · num / den` rounded and settled by the reference in `i128`, where that fits.
+#[expect(
+    clippy::expect_used,
+    reason = "a property fails by panicking: the scales of the tests are rational"
+)]
+pub(crate) fn fixed_rescales<P: FixedScale, T: Storage + Int + Into<i128> + TryFrom<i64>>(
+    x: i64,
+    prefix: Prefix,
+    r: Rounding,
+    o: Overflow,
+) {
+    let Some((pn, pd)) = scale(prefix) else {
+        return;
+    };
+    let (sn, sd) = P::SCALE.to_ratio().expect("a rational scale");
+    let (sn, sd) = (
+        i128::try_from(sn).expect("small"),
+        i128::try_from(sd).expect("small"),
+    );
+    let (min, max) = min_max::<T>();
+    // x · prefix / P
+    if let (Some(num), Some(den)) = (pn.checked_mul(sd), pd.checked_mul(sn))
+        && let Some(p) = i128::from(x).checked_mul(num)
+    {
+        let got = Fixed::<Ratio, P, T>::from_prefix(x, prefix, r, o).map(|f| f.get().into());
+        let want = settle(round_div(p, den, r), min, max, o);
+        assert_eq!(got, want, "{x} {prefix:?} -> {} {r:?} {o:?}", P::NAME);
+    }
+    // a stored x · P / prefix
+    let Ok(v) = T::try_from(x) else {
+        return;
+    };
+    if let (Some(num), Some(den)) = (sn.checked_mul(pd), sd.checked_mul(pn))
+        && let Some(p) = i128::from(x).checked_mul(num)
+    {
+        let got = Fixed::<Ratio, P, T>::new(v)
+            .to_prefix::<i32>(prefix, r, o)
+            .map(i128::from);
+        let want = settle(
+            round_div(p, den, r),
+            i128::from(i32::MIN),
+            i128::from(i32::MAX),
+            o,
+        );
+        assert_eq!(got, want, "{x} {} -> {prefix:?} {r:?} {o:?}", P::NAME);
+    }
 }
 
 /// `U`'s ends.
@@ -163,6 +216,19 @@ mod run_time {
             super::rescales::<u16>(x, from, to, r, o);
             super::rescales::<i32>(x, from, to, r, o);
             super::rescales::<u64>(x, from, to, r, o);
+        }
+
+        #[test]
+        fn fixed_rescales(x in strategy::i64(), prefix in prefix(), r in strategy::mode(), o in strategy::policy()) {
+            use exact_units::prefix::{FullScale, FullScaleMax, Kibi, Milli, One, Pow2, Pow10, Rational};
+            super::fixed_rescales::<Milli, i32>(x, prefix, r, o);
+            super::fixed_rescales::<One, u16>(x, prefix, r, o);
+            super::fixed_rescales::<Kibi, i64>(x, prefix, r, o);
+            super::fixed_rescales::<Pow10<-4>, i32>(x, prefix, r, o);
+            super::fixed_rescales::<Pow2<-15>, i16>(x, prefix, r, o);
+            super::fixed_rescales::<Rational<1, 12>, u32>(x, prefix, r, o);
+            super::fixed_rescales::<FullScale<Rational<33, 10>, 12>, u16>(x, prefix, r, o);
+            super::fixed_rescales::<FullScaleMax<One, 16>, i64>(x, prefix, r, o);
         }
 
         #[test]
