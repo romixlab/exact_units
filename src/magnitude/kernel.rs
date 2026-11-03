@@ -3,53 +3,71 @@
 //! no 128-bit arithmetic is linked unless a 128-bit type is used. An irrational magnitude (π, ln 2, ln 10, a half
 //! exponent) has no such value and gives `None`, as does a product past the kernel's room (see each method).
 
-use super::{MAX_FACTORS, Magnitude, Work};
+use super::{MAX_FACTORS, Magnitude, PrimePower};
 use crate::PrefixRatio;
 use crate::num::Int;
 use crate::num::limbs::{Limbs, Mag, Rational, cmp_rescaled, scaled};
 use crate::{Overflow, Rounding};
 use core::cmp::Ordering;
 
-/// A rational magnitude as the kernel applies it: `5^pow5 · 2^pow2 · ∏ primes^exps`, the exponents whole (half the
-/// doubled ones a [Magnitude] stores). Built in `const` code, so a scale known at compile time is one at run time.
+/// A rational magnitude as the kernel applies it: `5^(pow10/2) · 2^((pow10 + pow2)/2) · ∏ prime^(exp/2)`, read from the
+/// magnitude in place (a copy of one is 104 bytes). Made by [Exact::of], which checks that every exponent is whole.
 #[derive(Copy, Clone)]
-pub(crate) struct Exact {
-    pow5: i32,
-    pow2: i32,
-    primes: [u32; MAX_FACTORS],
-    exps: [i32; MAX_FACTORS],
+pub(crate) struct Exact<'a>(&'a Magnitude);
+
+impl<'a> Exact<'a> {
+    /// The magnitude for the kernel, `None` when it isn't a fraction of integers.
+    pub(crate) const fn of(m: &'a Magnitude) -> Option<Exact<'a>> {
+        if whole(m) { Some(Exact(m)) } else { None }
+    }
+
+    /// The whole exponents of 5 and 2.
+    fn pow5_pow2(self) -> (i32, i32) {
+        let pow10 = i32::from(self.0.pow10);
+        let pow2 = self.0.rest.as_ref().map_or(0, |r| i32::from(r.pow2));
+        (pow10 / 2, i32::midpoint(pow10, pow2))
+    }
+
+    /// The other primes, used slots first: an empty slot ends them.
+    fn factors(self) -> &'a [Option<PrimePower>] {
+        self.0.rest.as_ref().map_or(&[], |r| &r.factors)
+    }
 }
 
-impl Exact {
-    /// The magnitude's parts, `None` when it isn't a fraction of integers.
-    #[expect(
-        clippy::indexing_slicing,
-        reason = "i < w.len <= MAX_FACTORS, the loop bound"
-    )]
-    #[expect(clippy::arithmetic_side_effects, reason = "i < w.len, the loop bound")]
-    pub(crate) const fn of(m: &Magnitude) -> Option<Exact> {
-        let w = Work::of(m);
-        if w.irr[0] != 0 || w.irr[1] != 0 || w.irr[2] != 0 || w.pow10 % 2 != 0 || w.pow2 % 2 != 0 {
-            return None;
-        }
-        let mut x = Exact {
-            pow5: w.pow10 / 2,
-            pow2: i32::midpoint(w.pow10, w.pow2),
-            primes: [1; MAX_FACTORS],
-            exps: [0; MAX_FACTORS],
-        };
-        // a Magnitude holds at most MAX_FACTORS primes, so Work::of gives no more
-        let mut i = 0;
-        while i < w.len && i < MAX_FACTORS {
-            if w.exps[i] % 2 != 0 {
-                return None;
-            }
-            x.primes[i] = w.primes[i];
-            x.exps[i] = w.exps[i] / 2;
-            i += 1;
-        }
-        Some(x)
+/// A prime and its whole exponent, `None` for an empty slot: the end of the primes.
+fn prime(f: Option<PrimePower>) -> Option<(u32, i32)> {
+    f.map(|f| (f.prime, i32::from(f.exp) / 2))
+}
+
+/// Whether `m` is a fraction of integers: no power of π, ln 2 or ln 10, every exponent whole (its doubled form even).
+#[expect(
+    clippy::indexing_slicing,
+    reason = "i < MAX_FACTORS, the loop bound and the array's length"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "i < MAX_FACTORS, the loop bound"
+)]
+pub(crate) const fn whole(m: &Magnitude) -> bool {
+    if m.pow10 % 2 != 0 {
+        return false;
     }
+    let Some(rest) = &m.rest else {
+        return true;
+    };
+    if rest.pow2 % 2 != 0 || rest.irrational.is_some() {
+        return false;
+    }
+    let mut i = 0;
+    while i < MAX_FACTORS {
+        if let Some(f) = rest.factors[i]
+            && f.exp % 2 != 0
+        {
+            return false;
+        }
+        i += 1;
+    }
+    true
 }
 
 /// `n · p^k` in place, by the largest powers of `p` a `u32` holds; `None` past the room of [Limbs].
@@ -81,17 +99,19 @@ fn div_pow(n: &mut Limbs, p: u32, k: u32) -> bool {
     lost | n.div_small(acc)
 }
 
-impl Rational for Exact {
+impl Rational for Exact<'_> {
     fn pow2(&self) -> i32 {
-        self.pow2
+        self.pow5_pow2().1
     }
 
     fn mul_part(&self, n: &mut Limbs, den: bool) -> Option<()> {
         let side = |e: i32| if den { e < 0 } else { e > 0 };
-        if side(self.pow5) {
-            n.mul_pow5(self.pow5.unsigned_abs())?;
+        let pow5 = self.pow5_pow2().0;
+        if side(pow5) {
+            n.mul_pow5(pow5.unsigned_abs())?;
         }
-        for (&p, &e) in self.primes.iter().zip(&self.exps) {
+        for &f in self.factors() {
+            let Some((p, e)) = prime(f) else { break };
             if side(e) {
                 mul_pow(n, p, e.unsigned_abs())?;
             }
@@ -101,10 +121,12 @@ impl Rational for Exact {
 
     fn div_den(&self, n: &mut Limbs) -> bool {
         let mut lost = false;
-        if self.pow5 < 0 {
-            lost |= n.div_pow5(self.pow5.unsigned_abs());
+        let pow5 = self.pow5_pow2().0;
+        if pow5 < 0 {
+            lost |= n.div_pow5(pow5.unsigned_abs());
         }
-        for (&p, &e) in self.primes.iter().zip(&self.exps) {
+        for &f in self.factors() {
+            let Some((p, e)) = prime(f) else { break };
             if e < 0 {
                 lost |= div_pow(n, p, e.unsigned_abs());
             }
@@ -113,7 +135,12 @@ impl Rational for Exact {
     }
 
     fn den_is_one(&self) -> bool {
-        self.pow5 >= 0 && self.exps.iter().all(|&e| e >= 0)
+        self.pow5_pow2().0 >= 0
+            && self
+                .factors()
+                .iter()
+                .map_while(|&f| prime(f))
+                .all(|(_, e)| e >= 0)
     }
 }
 

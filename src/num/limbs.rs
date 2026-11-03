@@ -21,11 +21,14 @@ pub(crate) struct Limbs {
 impl Limbs {
     /// The number of up to 128 bits in `low`, least significant limb first.
     pub(crate) fn of(low: [u32; 4]) -> Limbs {
-        let mut d = [0; CAP];
-        for (to, from) in d.iter_mut().zip(low) {
+        // built in place: an array made first and moved in is a memcpy of the whole room
+        let mut n = Limbs {
+            d: [0; CAP],
+            len: 4,
+        };
+        for (to, from) in n.d.iter_mut().zip(low) {
             *to = from;
         }
-        let mut n = Limbs { d, len: 4 };
         n.trim();
         n
     }

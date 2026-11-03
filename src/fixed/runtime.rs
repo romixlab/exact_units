@@ -3,23 +3,31 @@
 
 use super::{Bounds, Fixed, FixedScale, Overflow, Rounding, Storage};
 use crate::Prefix;
-use crate::magnitude::Exact;
+use crate::magnitude::{Exact, whole};
 use crate::num::Int;
 use crate::num::limbs::{Both, scaled};
 use crate::{Magnitude, Unit};
+use core::marker::PhantomData;
 
-/// `m` for the kernel, a compile error where it isn't a fraction of integers: a `Fixed` of such a scale (π/180) and
-/// integer storage has no exact run-time conversion to a prefix.
-#[expect(
-    clippy::panic,
-    reason = "const fn, evaluated in a const block: the panic is a compile error where the scale is irrational"
-)]
-const fn exact_of(m: Magnitude) -> Exact {
-    match Exact::of(&m) {
-        Some(e) => e,
-        None => panic!(
-            "the scale is not a fraction of integers: no exact conversion to a run-time prefix"
-        ),
+/// `P`'s scale and its reciprocal as `'static` references, for the kernel to read in place; a compile error where the
+/// scale isn't a fraction of integers: a `Fixed` of such a scale (π/180) and integer storage has no exact run-time
+/// conversion to a prefix.
+struct Scale<P>(PhantomData<P>);
+
+impl<P: FixedScale> Scale<P> {
+    const SCALE: &'static Magnitude = &P::SCALE;
+
+    const RECIP: &'static Magnitude = &P::SCALE.recip();
+
+    const WHOLE: () = assert!(
+        whole(&P::SCALE),
+        "the scale is not a fraction of integers: no exact conversion to a run-time prefix"
+    );
+
+    /// `m` for the kernel, after `WHOLE` has checked it.
+    fn exact(m: &'static Magnitude) -> Option<Exact<'static>> {
+        let () = Self::WHOLE;
+        Exact::of(m)
     }
 }
 
@@ -72,7 +80,7 @@ impl<U: Unit, P: FixedScale, T: Storage + Int, B: Bounds<T>> Fixed<U, P, T, B> {
         let (neg, mag, _) = if let Some(p) = P::RUNTIME {
             prefix.ratio_to(p)?.scaled(x, r)?
         } else {
-            let k = const { exact_of(P::SCALE.recip()) };
+            let k = Scale::<P>::exact(Scale::<P>::RECIP)?;
             scaled(&Both(&prefix.ratio_to(Prefix::Unit)?, &k), x, r)?
         };
         let v: T = mag.settle(neg, o)?;
@@ -102,7 +110,7 @@ impl<U: Unit, P: FixedScale, T: Storage + Int, B: Bounds<T>> Fixed<U, P, T, B> {
         let (neg, mag, _) = if let Some(p) = P::RUNTIME {
             p.ratio_to(prefix)?.scaled(self.value, r)?
         } else {
-            let k = const { exact_of(P::SCALE) };
+            let k = Scale::<P>::exact(Scale::<P>::SCALE)?;
             scaled(&Both(&k, &Prefix::Unit.ratio_to(prefix)?), self.value, r)?
         };
         mag.settle(neg, o)
