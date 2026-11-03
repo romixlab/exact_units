@@ -16,6 +16,10 @@
 //!   `"-3.01"`, which reads back exactly (a JSON number reads too: `-3.01`, `6`); in a binary one its two stored
 //!   numbers, `(num, decimals)`.
 //!
+//! - [Exact](crate::Exact) and [Fraction](crate::Fraction): in a human-readable format the exact number as text, in
+//!   the unit itself (`"333.(3)"`, `"80000000"`, `"1000/7919"`; an integer reads too, a float is refused, its digits
+//!   already rounded), in a binary one `(negative, numerator, denominator)` in lowest terms.
+//!
 //! Reading checks what construction checks and never builds a value that breaks it: a [Fixed] or an
 //! index outside its [Bounds], an [IndexFrom1](crate::IndexFrom1) of 0, a level with more than
 //! [MAX_DECIMALS] decimals. The error names the value and the bound:
@@ -45,6 +49,7 @@
 //! ```
 
 
+mod exact;
 pub mod with_unit;
 
 use crate::complex::{Complex, ComplexStorage, Polar};

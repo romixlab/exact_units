@@ -696,3 +696,89 @@ fn with_unit_round_trips_frequency_scaled_attenuation() {
         Ok(5)
     );
 }
+
+/// An `Exact` and a `Fraction`: the number in the unit itself as text in JSON, `(neg, num, den)` in postcard; an
+/// integer reads too, a float and a triple not in lowest terms don't.
+#[test]
+fn exact_as_its_number() {
+    use exact_units::units::Hertz;
+    use exact_units::{Exact, Fraction};
+
+    let f = Exact::<Hertz>::new(1_000_000, 3);
+    round_trip(&f, r#""333333.(3)""#, (false, 1_000_000u128, 3u128));
+    round_trip(&Fraction::new(-7, 2), r#""-3.5""#, (true, 7u128, 2u128));
+    round_trip(&Fraction::ZERO, r#""0""#, (false, 0u128, 1u128));
+    round_trip(
+        &Fraction::new(1, 7919),
+        r#""1/7919""#,
+        (false, 1u128, 7919u128),
+    );
+    assert_eq!(
+        serde_json::from_str::<Exact<Hertz>>("48000000").unwrap(),
+        Exact::int(48_000_000)
+    );
+    assert_eq!(
+        serde_json::from_str::<Fraction>("-3").unwrap(),
+        Fraction::int(-3)
+    );
+    let e = serde_json::from_str::<Fraction>("0.1").unwrap_err().to_string();
+    assert!(e.starts_with("0.1 is a float, rounded when it was read"), "{e}");
+    let e = serde_json::from_str::<Fraction>(r#""1/0""#).unwrap_err().to_string();
+    assert!(e.starts_with(r#""1/0": a fraction over 0"#), "{e}");
+    let mut buf = [0u8; 64];
+    for parts in [(false, 2u128, 4u128), (true, 0, 1), (false, 0, 5), (false, 1, 0)] {
+        let bytes = postcard::to_slice(&parts, &mut buf).unwrap().to_vec();
+        assert!(postcard::from_bytes::<Fraction>(&bytes).is_err(), "{parts:?}");
+    }
+}
+
+/// `with_unit` on an `Exact`: written as `{}` with its prefix, read in every form, refused in another unit.
+#[test]
+fn with_unit_reads_an_exact_exactly() {
+    use exact_units::units::Hertz;
+    use exact_units::{Exact, Fraction};
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Pll {
+        #[serde(with = "exact_units::serde::with_unit")]
+        vco: Exact<Hertz>,
+        #[serde(with = "exact_units::serde::with_unit::option", default)]
+        tolerance: Option<Exact<Ratio>>,
+    }
+
+    let read = |s: &str| serde_json::from_str::<Pll>(s).map_err(|e| e.to_string());
+    let p = read(r#"{ "vco": "519.999755859375 MHz", "tolerance": "0.25 %" }"#).unwrap();
+    assert_eq!(p.vco, Exact::new(33_279_984_375, 64));
+    assert_eq!(p.tolerance, Some(Exact::new(1, 400)));
+    assert_eq!(
+        serde_json::to_string(&p).unwrap(),
+        r#"{"vco":"519.999755859375 MHz","tolerance":"0.25 %"}"#
+    );
+    for (text, num, den) in [
+        ("24 MHz", 24_000_000, 1),
+        ("24MHz", 24_000_000, 1),
+        ("24e6 Hz", 24_000_000, 1),
+        ("1000/3 kHz", 1_000_000, 3),
+        ("333.(3) kHz", 1_000_000, 3),
+        ("0.5 kHz", 500, 1),
+        ("1.5 mHz", 3, 2000),
+    ] {
+        let p = read(&std::format!(r#"{{ "vco": "{text}" }}"#)).unwrap();
+        assert_eq!(p.vco, Exact::new(num, den), "{text}");
+        assert_eq!(p.tolerance, None);
+    }
+    let p = read(r#"{ "vco": "1 MHz", "tolerance": "5 ppm" }"#).unwrap();
+    assert_eq!(p.tolerance.map(Exact::get), Some(Fraction::new(5, 1_000_000)));
+    for (text, why) in [
+        ("24 MV", r#""24 MV" is not in Hz (with or without an SI prefix)"#),
+        ("MHz", r#""MHz" is not a number with its unit, like "1.5 Hz""#),
+        (
+            "1e99 MHz",
+            r#""1e99 MHz" is a number past what a fraction of u128s holds exactly"#,
+        ),
+        ("1/0 Hz", r#""1/0 Hz" is a fraction over 0"#),
+    ] {
+        let e = read(&std::format!(r#"{{ "vco": "{text}" }}"#)).unwrap_err();
+        assert!(e.starts_with(why), "{text}: {e}");
+    }
+}

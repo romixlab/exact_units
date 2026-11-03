@@ -21,6 +21,8 @@ pub use fraction::Fraction;
 #[cfg(kani)]
 pub use fraction::Fraction16;
 pub use text::{ParseExactError, ParseFractionError};
+#[cfg(feature = "serde")]
+pub(crate) use text::read as read_text;
 #[cfg(feature = "dimensionless")]
 pub use tolerance::{OffTarget, Tolerance};
 

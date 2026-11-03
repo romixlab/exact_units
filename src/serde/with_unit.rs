@@ -1,6 +1,6 @@
-//! A [Fixed] field as text with its unit, `"1.5 ms"`: `#[serde(with = "exact_units::serde::with_unit")]`, and
-//! [option] for an `Option<Fixed<..>>`. No alloc: the text is written with `collect_str` and read from the `&str`
-//! the format hands over.
+//! A [Fixed] or an [Exact] field as text with its unit, `"1.5 ms"`: `#[serde(with =
+//! "exact_units::serde::with_unit")]`, and [option] for an `Option` of one. No alloc: the text is written with
+//! `collect_str` and read from the `&str` the format hands over.
 //!
 //! Written as `{:#}` writes it: the value in the unit itself, exact where the steps are a fraction of integers
 //! whose decimal ends (`0.0015 s`, a [Q15](crate::Q15) of 0.8 as `0.79998779296875`), the shortest float form
@@ -22,6 +22,30 @@
 //! - outside the bounds, as the plain number is: `6000 ms is out of 1..=5000 ms (Second, u16)`.
 //!
 //! A float storage takes the nearest float to the value, worked out in `f64`.
+//!
+//! An [Exact] field is written as `{}` writes it, with the prefix it picks: `"79.99998046875 MHz"`, `"333.(3) kHz"`,
+//! `"1000/7919 kHz"`. It reads what a `Fixed` of its unit reads, a repetend in parentheses and a fraction too
+//! (`"1000/3 kHz"`), always exactly: there are no steps to miss and no storage to pass, so the refusals are another
+//! unit, not a number, and a number past what a fraction of `u128`s holds.
+//!
+//! ```
+//! # #[cfg(feature = "time")] {
+//! use exact_units::{Exact, units::Hertz};
+//!
+//! #[derive(serde::Serialize, serde::Deserialize)]
+//! struct Clock {
+//!     #[serde(with = "exact_units::serde::with_unit")]
+//!     target: Exact<Hertz>,
+//! }
+//!
+//! let c: Clock = serde_json::from_str(r#"{ "target": "79.99998046875 MHz" }"#).unwrap();
+//! assert_eq!(c.target, Exact::new(2_559_999_375, 32));
+//! let c: Clock = serde_json::from_str(r#"{ "target": "80000/3 kHz" }"#).unwrap();
+//! assert_eq!(serde_json::to_string(&c).unwrap(), r#"{"target":"26.(6) MHz"}"#);
+//! let e = serde_json::from_str::<Clock>(r#"{ "target": "24 MV" }"#).err().unwrap();
+//! assert!(e.to_string().starts_with(r#""24 MV" is not in Hz (with or without an SI prefix)"#));
+//! # }
+//! ```
 //!
 //! ```
 //! # #[cfg(feature = "electrical")] {
@@ -51,40 +75,57 @@ use crate::text::unit::{TextPrefix, UnitText, prefix_of};
 use crate::text::{Buf, Decimal};
 use crate::fixed::write_prefix_unit;
 use crate::tree::is_ratio;
-use crate::{Bounds, Fixed, FixedScale, Storage, Unit};
+use crate::exact::read_text as read_exact;
+use crate::{Bounds, Exact, Fixed, FixedScale, ParseExactError, Storage, Unit};
 use ::serde::de::{self, Deserializer, Visitor};
 use ::serde::ser::Serializer;
 use core::fmt::{self, Write};
 use core::marker::PhantomData;
 
-/// Writes `value` as `{:#}` does: `"1.5 ms"` is written `"0.0015 s"`.
-pub fn serialize<S: Serializer, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>>(
-    value: &Fixed<U, P, T, B>,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    serializer.collect_str(&format_args!("{value:#}"))
+/// A value [with_unit](super::with_unit) writes and reads as text: a [Fixed] (written as `{:#}`, read exactly into
+/// its scale and storage) or an [Exact] (written as `{}`, with the prefix it picks, read exactly). Sealed.
+pub trait Value: Copy + sealed::Sealed {
+    #[doc(hidden)]
+    fn write_text<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error>;
+
+    #[doc(hidden)]
+    fn read_text<E: de::Error>(s: &str) -> Result<Self, E>;
+
+    #[doc(hidden)]
+    fn expecting(f: &mut fmt::Formatter<'_>) -> fmt::Result;
 }
 
-/// Reads text with a unit, exactly into the field's scale and storage, or fails saying why.
-pub fn deserialize<'de, D: Deserializer<'de>, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>>(
-    deserializer: D,
-) -> Result<Fixed<U, P, T, B>, D::Error> {
+mod sealed {
+    pub trait Sealed {}
+
+    impl<U, P, T: crate::Storage, B: crate::Bounds<T>> Sealed for crate::Fixed<U, P, T, B> {}
+
+    impl<U> Sealed for crate::Exact<U> {}
+}
+
+/// Writes `value` as text with its unit: a [Fixed] as `{:#}` writes it (`"1.5 ms"` is written `"0.0015 s"`), an
+/// [Exact] as `{}` does (`"79.99998046875 MHz"`).
+pub fn serialize<S: Serializer, V: Value>(value: &V, serializer: S) -> Result<S::Ok, S::Error> {
+    value.write_text(serializer)
+}
+
+/// Reads text with a unit, exactly into the field's type, or fails saying why.
+pub fn deserialize<'de, D: Deserializer<'de>, V: Value>(deserializer: D) -> Result<V, D::Error> {
     deserializer.deserialize_str(TextVisitor(PhantomData))
 }
 
-/// [with_unit](super::with_unit) for an `Option<Fixed<..>>`: `None` is serde's none (`null`), `Some` the text.
-/// Add `#[serde(default)]` for a field that may be left out.
+/// [with_unit](super::with_unit) for an `Option<Fixed<..>>` or an `Option<Exact<..>>`: `None` is serde's none
+/// (`null`), `Some` the text. Add `#[serde(default)]` for a field that may be left out.
 pub mod option {
-    use super::{TextVisitor, WithUnit};
-    use crate::{Bounds, Fixed, FixedScale, Storage, Unit};
+    use super::{TextVisitor, Value, WithUnit};
     use ::serde::de::{self, Deserializer, Visitor};
     use ::serde::ser::Serializer;
     use core::fmt;
     use core::marker::PhantomData;
 
     /// `None` as none, `Some` as [serialize](super::serialize) writes it.
-    pub fn serialize<S: Serializer, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>>(
-        value: &Option<Fixed<U, P, T, B>>,
+    pub fn serialize<S: Serializer, V: Value>(
+        value: &Option<V>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
         match value {
@@ -94,30 +135,20 @@ pub mod option {
     }
 
     /// None, or text read as [deserialize](super::deserialize) reads it.
-    #[expect(clippy::type_complexity, reason = "the signature serde's `with` calls")]
-    pub fn deserialize<
-        'de,
-        D: Deserializer<'de>,
-        U: Unit,
-        P: FixedScale,
-        T: Storage,
-        B: Bounds<T>,
-    >(
+    pub fn deserialize<'de, D: Deserializer<'de>, V: Value>(
         deserializer: D,
-    ) -> Result<Option<Fixed<U, P, T, B>>, D::Error> {
+    ) -> Result<Option<V>, D::Error> {
         deserializer.deserialize_option(OptionVisitor(PhantomData))
     }
 
-    struct OptionVisitor<U, P, T, B>(PhantomData<(U, P, T, B)>);
+    struct OptionVisitor<V>(PhantomData<V>);
 
-    impl<'de, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Visitor<'de>
-        for OptionVisitor<U, P, T, B>
-    {
-        type Value = Option<Fixed<U, P, T, B>>;
+    impl<'de, V: Value> Visitor<'de> for OptionVisitor<V> {
+        type Value = Option<V>;
 
         fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             f.write_str("none, or ")?;
-            TextVisitor::<U, P, T, B>(PhantomData).expecting(f)
+            TextVisitor::<V>(PhantomData).expecting(f)
         }
 
         fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
@@ -138,28 +169,34 @@ pub mod option {
 }
 
 /// A value written as text, for [option] and collections.
-struct WithUnit<U, P, T: Storage, B: Bounds<T>>(Fixed<U, P, T, B>);
+struct WithUnit<V>(V);
 
-impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> ::serde::Serialize for WithUnit<U, P, T, B> {
+impl<V: Value> ::serde::Serialize for WithUnit<V> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serialize(&self.0, serializer)
+        self.0.write_text(serializer)
     }
 }
 
-struct TextVisitor<U, P, T, B>(PhantomData<(U, P, T, B)>);
+struct TextVisitor<V>(PhantomData<V>);
 
-impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Visitor<'_> for TextVisitor<U, P, T, B> {
-    type Value = Fixed<U, P, T, B>;
+impl<V: Value> Visitor<'_> for TextVisitor<V> {
+    type Value = V;
 
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "a number with its unit, like \"1.5{}\"",
-            UnitText::<U>(PhantomData)
-        )
+        V::expecting(f)
     }
 
     fn visit_str<E: de::Error>(self, s: &str) -> Result<Self::Value, E> {
+        V::read_text(s)
+    }
+}
+
+impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Value for Fixed<U, P, T, B> {
+    fn write_text<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(&format_args!("{self:#}"))
+    }
+
+    fn read_text<E: de::Error>(s: &str) -> Result<Self, E> {
         read::<U, P, T, B>(s).map_err(|kind| {
             E::custom(TextError::<U, P, T, B> {
                 input: s,
@@ -167,6 +204,37 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Visitor<'_> for TextVisit
                 _type: PhantomData,
             })
         })
+    }
+
+    fn expecting(f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "a number with its unit, like \"1.5{}\"",
+            UnitText::<U>(PhantomData)
+        )
+    }
+}
+
+impl<U: Unit> Value for Exact<U> {
+    fn write_text<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+
+    fn read_text<E: de::Error>(s: &str) -> Result<Self, E> {
+        read_exact::<U>(s).map_err(|kind| {
+            E::custom(format_args!(
+                "{s:?} is {}",
+                ParseExactError::<U>::new(kind)
+            ))
+        })
+    }
+
+    fn expecting(f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "an exact number with its unit, like \"1.5{0}\" or \"1000/3{0}\"",
+            UnitText::<U>(PhantomData)
+        )
     }
 }
 
