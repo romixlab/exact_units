@@ -313,7 +313,7 @@ fn pow5(k: u32) -> u32 {
     clippy::cast_possible_truncation,
     reason = "the low 32 bits are what is asked for"
 )]
-const fn low32(x: u64) -> u32 {
+pub(crate) const fn low32(x: u64) -> u32 {
     x as u32
 }
 
@@ -331,6 +331,60 @@ pub(crate) const fn round_up(r: Rounding, neg: bool, odd: bool, half: bool, stic
         Rounding::NearestAway => half,
         Rounding::NearestEven => half && (sticky || odd),
     }
+}
+
+/// A positive rational scale as the kernel applies it: `2^pow2 · num / den`, `num` and `den` products of `u32`
+/// factors. What [PrefixRatio](crate::PrefixRatio) and a rational [Magnitude](crate::Magnitude) are to the kernel.
+pub(crate) trait Rational {
+    /// The exponent of 2.
+    fn pow2(&self) -> i32;
+
+    /// `n · num`, or `n · den` for `den`, in place; `None` past [CAP] limbs.
+    fn mul_part(&self, n: &mut Limbs, den: bool) -> Option<()>;
+
+    /// `n / den` toward 0, in place; whether the remainder was not 0.
+    fn div_den(&self, n: &mut Limbs) -> bool;
+
+    /// Whether `den` is 1.
+    fn den_is_one(&self) -> bool;
+}
+
+/// `n · s` rounded by `r` (`neg` the sign of the value), in place; whether it is exact. `None` past [CAP] limbs.
+pub(crate) fn rescale(s: &impl Rational, n: &mut Limbs, neg: bool, r: Rounding) -> Option<bool> {
+    s.mul_part(n, false)?;
+    let p = s.pow2();
+    if p > 0 {
+        n.shl(p.unsigned_abs())?;
+    }
+    if n.is_zero() || (p >= 0 && s.den_is_one()) {
+        return Some(true);
+    }
+    // twice the quotient: its lowest bit says whether the fraction is a half or more
+    n.shl(1)?;
+    let mut sticky = s.div_den(n);
+    if p < 0 {
+        sticky |= n.shr(p.unsigned_abs());
+    }
+    let half = n.limb(0) & 1 == 1;
+    n.shr(1);
+    if round_up(r, neg, n.limb(0) & 1 == 1, half, sticky) {
+        n.increment()?;
+    }
+    Some(!half && !sticky)
+}
+
+/// Compares the magnitudes `a · s` and `b`, exactly: `a · num · 2^pow2` against `b · den` (the power of 2 on the
+/// side where it is positive). `None` past [CAP] limbs.
+pub(crate) fn cmp_rescaled(s: &impl Rational, a: &mut Limbs, b: &mut Limbs) -> Option<Ordering> {
+    s.mul_part(a, false)?;
+    s.mul_part(b, true)?;
+    let p = s.pow2();
+    if p > 0 {
+        a.shl(p.unsigned_abs())?;
+    } else {
+        b.shl(p.unsigned_abs())?;
+    }
+    Some(a.cmp(&b))
 }
 
 /// A magnitude as settling needs it: its bits, whether it is a power of 2, and its low 128 bits.

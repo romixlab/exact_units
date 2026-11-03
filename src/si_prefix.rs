@@ -580,17 +580,21 @@ impl Prefix {
         }
     }
 
-    /// `x` in units of this prefix as a number in the unit itself, in `f32`, as [scale_f64](Self::scale_f64).
+    /// `x` in units of this prefix as a number in the unit itself, in `f32`, as [scale_f64](Self::scale_f64), and
+    /// without `f64` code: an SI prefix by exact powers of ten in `f32`, a binary one and `Pow2` by one exact power of
+    /// two, any other scale ([FullScale](Prefix::FullScale), `Pow10`) rounded once from the exact product
+    /// ([PrefixRatio::apply_f32]). NaN for [Unknown](Prefix::Unknown).
     #[must_use]
     pub fn scale_f32(&self, x: f32) -> f32 {
-        match self.si_pow10() {
-            Some(e) => crate::num::scale_f32(x, e),
-            #[expect(
-                clippy::as_conversions,
-                clippy::cast_possible_truncation,
-                reason = "rounding the f64 result to the f32 asked for"
-            )]
-            None => self.scale_f64(f64::from(x)) as f32,
+        if let Some(e) = self.si_pow10() {
+            return crate::num::scale_f32(x, e);
+        }
+        match self.ratio_to(Prefix::Unit) {
+            Some(r) => match r.as_pow2() {
+                Some(e) => x * crate::num::pow2_f32(e),
+                None => r.apply_f32(x),
+            },
+            None => f32::NAN,
         }
     }
 

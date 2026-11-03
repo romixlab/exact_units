@@ -158,6 +158,20 @@ pub fn scale_f32(x: f32, exp: i8) -> f32 {
     if exp >= 0 { x * p } else { x / p }
 }
 
+/// `2^e` in `f32`, exact for every `i8`: a normal number for `e` in -126..=127, a subnormal below.
+#[must_use]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "e is an i8, so e + 127 is in -1..=254 and e + 149 in 21..=276, below 32 where it shifts"
+)]
+pub fn pow2_f32(e: i8) -> f32 {
+    let e = i32::from(e);
+    match u32::try_from(e + 127) {
+        Ok(b) if b >= 1 => f32::from_bits(b << 23),
+        _ => f32::from_bits(1 << (e + 149).unsigned_abs()),
+    }
+}
+
 /// The float functions `core` lacks: from libm when it is on, so every target computes the same bits, else from
 /// std. What levels in dB and the polar form of a [Complex](crate::Complex) take.
 #[cfg(any(feature = "std", feature = "libm"))]

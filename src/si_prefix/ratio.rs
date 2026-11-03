@@ -2,7 +2,7 @@
 
 use super::Prefix;
 use crate::num::Int;
-use crate::num::limbs::{Limbs, Mag, round_up};
+use crate::num::limbs::{Limbs, Mag, Rational, cmp_rescaled, low32, rescale, round_up};
 use crate::{Magnitude, Overflow, Rounding};
 use core::cmp::Ordering;
 use core::num::NonZeroU64;
@@ -138,6 +138,30 @@ impl PrefixRatio {
         }
     }
 
+    /// `10^e` as a ratio.
+    pub(crate) const fn of_pow10(e: i8) -> Option<PrefixRatio> {
+        if e < -126 || e > 126 {
+            return None;
+        }
+        Some(PrefixRatio {
+            pow10: e,
+            pow2: 0,
+            num_bits: 0,
+            den_bits: 0,
+        })
+    }
+
+    /// The power of two the ratio is, when it is one alone (between binary prefixes and `Pow2`s): `Some(10)` from
+    /// `Kibi` to `Unit`.
+    #[must_use]
+    pub const fn as_pow2(&self) -> Option<i8> {
+        if self.pow10 == 0 && self.num_bits == 0 && self.den_bits == 0 {
+            Some(self.pow2)
+        } else {
+            None
+        }
+    }
+
     /// The other way: `to`'s scale over `from`'s.
     #[must_use]
     #[expect(
@@ -213,70 +237,69 @@ impl PrefixRatio {
         let m = if let (Some(p), Some(a), Some(b)) = (self.as_pow10(), u64_of(la), u64_of(lb)) {
             cmp_pow10(a, p, b)
         } else {
-            // a · num <=> b · den
-            let (mut l, mut r) = (Limbs::of(la), Limbs::of(lb));
-            self.num(&mut l)?;
-            self.recip().num(&mut r)?;
-            l.cmp(&r)
+            cmp_rescaled(self, &mut Limbs::of(la), &mut Limbs::of(lb))?
         };
         Some(if sa < 0 { m.reverse() } else { m })
     }
 
-    /// `x` times the numerator of the ratio, in place: `5^pow10 · 2^(pow10 + pow2) · (2^n − 1)` where those are
-    /// above 1.
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "the exponents are i8, so their sum fits i32"
-    )]
-    fn num(self, x: &mut Limbs) -> Option<()> {
-        let (p, s) = (
-            i32::from(self.pow10),
-            i32::from(self.pow10) + i32::from(self.pow2),
-        );
-        if p > 0 {
-            x.mul_pow5(p.unsigned_abs())?;
+    /// `x · self` as the `f32` nearest the exact product, ties to even: one rounding, subnormals and the overflow to
+    /// ±∞ as IEEE 754 rounds them. NaN and ±∞ come back as they are, ±0 keeps its sign. In integers through the
+    /// kernel, no float arithmetic: what a Cortex-M without an FPU converts a float across prefixes with.
+    #[must_use]
+    pub fn apply_f32(&self, x: f32) -> f32 {
+        let b = x.to_bits();
+        let (exp, frac) = ((b >> 23) & 0xFF, b & 0x7F_FFFF);
+        if exp == 0xFF || (exp == 0 && frac == 0) {
+            return x;
         }
-        if self.num_bits > 0 {
-            x.mul_small(full_scale(self.num_bits))?;
-        }
-        if s > 0 {
-            x.shl(s.unsigned_abs())?;
-        }
-        Some(())
+        let (m, e) = float_parts(exp, frac, 23, 127);
+        let mag = self.round_to_float(u64::from(m), e, &F32);
+        // round_to_float gives the 31 bits of a magnitude for F32
+        f32::from_bits((b & (1 << 31)) | u32::try_from(mag).unwrap_or(0x7F80_0000))
     }
 
-    /// `x · self` rounded by `r`: its sign, magnitude, and whether it is exact. A power of ten alone on a magnitude
-    /// of up to 64 bits (between SI prefixes) in `u64`, anything else in [Limbs]. `None` past the room of `Limbs`,
-    /// which no ratio reaches for any integer up to 128 bits: the room is sized from the fields' types (see `CAP`),
-    /// and a test walks every pair of prefixes at the ends of `u128` and `i128`.
-    fn scaled<T: Int>(self, x: T, r: Rounding) -> Option<(bool, Mag, bool)> {
-        let (neg, low) = x.to_parts();
-        if let (Some(p), Some(m)) = (self.as_pow10(), u64_of(low))
-            && let Some((q, exact)) = scale_pow10(m, p, r, neg)
-        {
-            return Some((neg, Mag::of_u64(q), exact));
+    /// `x · self` as the `f64` nearest the exact product, ties to even, as [apply_f32](Self::apply_f32).
+    #[must_use]
+    pub fn apply_f64(&self, x: f64) -> f64 {
+        let b = x.to_bits();
+        let (exp, frac) = ((b >> 52) & 0x7FF, b & ((1 << 52) - 1));
+        if exp == 0x7FF || (exp == 0 && frac == 0) {
+            return x;
         }
-        let mut n = Limbs::of(low);
-        let exact = self.scaled_limbs(&mut n, neg, r)?;
-        Some((neg, Mag::of_limbs(&n), exact))
+        let (m, e) = float_parts(exp, frac, 52, 1023);
+        f64::from_bits((b & (1 << 63)) | self.round_to_float(m, e, &F64))
     }
 
-    /// [scaled](Self::scaled) in [Limbs], in place; whether the result is exact.
+    /// The bits of the magnitude of the float in `f` nearest to `m · 2^e · self` (`m` not 0), ties to even. With
+    /// `D` the denominator of the ratio (`5^-pow10 · (2^d − 1)`, the powers of 2 go to the exponent), the numerator
+    /// is shifted left so that its quotient by `D` has at least `prec + 2` bits, the bits below the result's last
+    /// one say half and sticky. The room: at most 53 + 293 (5¹²⁶) + 32 + 2 bits, well within [Limbs].
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "the exponents are i8, so their sum fits i32"
+        reason = "exponents: e within ±1100, pow10 and pow2 within ±126, the shifts below 400, so every sum fits i32;                   bits(q) >= prec + 2 so shift >= 2 and shift - 1 >= 1; m <= 2^prec + 1 after rounding, prec <= 53"
     )]
-    fn scaled_limbs(self, n: &mut Limbs, neg: bool, r: Rounding) -> Option<bool> {
-        self.num(n)?;
-        let (p, s) = (
-            i32::from(self.pow10),
-            i32::from(self.pow10) + i32::from(self.pow2),
-        );
-        if n.is_zero() || (p >= 0 && s >= 0 && self.den_bits == 0) {
-            return Some(true);
+    fn round_to_float(self, m: u64, e: i32, f: &FloatFormat) -> u64 {
+        let inf = (u64::from(2 * f.bias + 1)) << (f.prec - 1);
+        // past the room of Limbs, which no ratio reaches (see above): a quiet NaN, never a wrong number
+        let nan = inf | (1 << (f.prec - 2));
+        let mut n = Limbs::of([low32(m), low32(m >> 32), 0, 0]);
+        let p = i32::from(self.pow10);
+        if p > 0 && n.mul_pow5(p.unsigned_abs()).is_none() {
+            return nan;
         }
-        // twice the quotient: its lowest bit says whether the fraction is a half or more
-        n.shl(1)?;
+        if self.num_bits > 0 && n.mul_small(full_scale(self.num_bits)).is_none() {
+            return nan;
+        }
+        // bits(D) at most: 5^k < 2^(2.33·k + 1), 2^d − 1 < 2^d
+        let den = if p < 0 {
+            p.unsigned_abs() * 233 / 100 + 1
+        } else {
+            0
+        } + u32::from(self.den_bits);
+        let l = (f.prec + 2 + den).saturating_sub(n.bits());
+        if n.shl(l).is_none() {
+            return nan;
+        }
         let mut sticky = false;
         if p < 0 {
             sticky |= n.div_pow5(p.unsigned_abs());
@@ -284,15 +307,132 @@ impl PrefixRatio {
         if self.den_bits > 0 {
             sticky |= n.div_small(full_scale(self.den_bits));
         }
-        if s < 0 {
-            sticky |= n.shr(s.unsigned_abs());
-        }
+        // the quotient q is the product times 2^-(e + pow10 + pow2 - l); its last kept bit has the weight 2^lsb
+        let q_exp = e + p + i32::from(self.pow2) - i32::try_from(l).unwrap_or(0);
+        let bits = i32::try_from(n.bits()).unwrap_or(0);
+        let lsb = (q_exp + bits - i32::try_from(f.prec).unwrap_or(0)).max(f.min_lsb);
+        let shift = (lsb - q_exp).unsigned_abs();
+        sticky |= n.shr(shift - 1);
         let half = n.limb(0) & 1 == 1;
         n.shr(1);
-        if round_up(r, neg, n.limb(0) & 1 == 1, half, sticky) {
-            n.increment()?;
+        let mut r = u64::from(n.limb(0)) | (u64::from(n.limb(1)) << 32);
+        if half && (sticky || r & 1 == 1) {
+            r += 1;
         }
-        Some(!half && !sticky)
+        let mut lsb = lsb;
+        if r == 1 << f.prec {
+            r >>= 1;
+            lsb += 1;
+        }
+        if r < 1 << (f.prec - 1) {
+            // subnormal (lsb is then min_lsb) or 0: no exponent field
+            return r;
+        }
+        let biased = lsb + i32::try_from(f.prec - 1 + f.bias).unwrap_or(0);
+        match u64::try_from(biased) {
+            Ok(b) if b <= u64::from(2 * f.bias) => {
+                (b << (f.prec - 1)) | (r & ((1 << (f.prec - 1)) - 1))
+            }
+            _ => inf,
+        }
+    }
+
+    /// `x · self` rounded by `r`: its sign, magnitude, and whether it is exact. A power of ten alone on a magnitude
+    /// of up to 64 bits (between SI prefixes) in `u64`, anything else in [Limbs]. `None` past the room of `Limbs`,
+    /// which no ratio reaches for any integer up to 128 bits: the room is sized from the fields' types (see `CAP`),
+    /// and a test walks every pair of prefixes at the ends of `u128` and `i128`.
+    pub(crate) fn scaled<T: Int>(self, x: T, r: Rounding) -> Option<(bool, Mag, bool)> {
+        let (neg, low) = x.to_parts();
+        if let (Some(p), Some(m)) = (self.as_pow10(), u64_of(low))
+            && let Some((q, exact)) = scale_pow10(m, p, r, neg)
+        {
+            return Some((neg, Mag::of_u64(q), exact));
+        }
+        let mut n = Limbs::of(low);
+        let exact = rescale(&self, &mut n, neg, r)?;
+        Some((neg, Mag::of_limbs(&n), exact))
+    }
+}
+
+impl Rational for PrefixRatio {
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the exponents are i8, so their sum fits i32"
+    )]
+    fn pow2(&self) -> i32 {
+        i32::from(self.pow10) + i32::from(self.pow2)
+    }
+
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "pow10 is an i8, so its negation fits i32"
+    )]
+    fn mul_part(&self, n: &mut Limbs, den: bool) -> Option<()> {
+        let (p, bits) = if den {
+            (-i32::from(self.pow10), self.den_bits)
+        } else {
+            (i32::from(self.pow10), self.num_bits)
+        };
+        if p > 0 {
+            n.mul_pow5(p.unsigned_abs())?;
+        }
+        if bits > 0 {
+            n.mul_small(full_scale(bits))?;
+        }
+        Some(())
+    }
+
+    fn div_den(&self, n: &mut Limbs) -> bool {
+        let mut sticky = false;
+        if self.pow10 < 0 {
+            sticky |= n.div_pow5(u32::from(self.pow10.unsigned_abs()));
+        }
+        if self.den_bits > 0 {
+            sticky |= n.div_small(full_scale(self.den_bits));
+        }
+        sticky
+    }
+
+    fn den_is_one(&self) -> bool {
+        self.pow10 >= 0 && self.den_bits == 0
+    }
+}
+
+/// A binary IEEE 754 format: the bits of its significand with the hidden one, its exponent bias, and the exponent of
+/// the last bit of a subnormal (`1 - bias - (prec - 1)`).
+struct FloatFormat {
+    prec: u32,
+    bias: u32,
+    min_lsb: i32,
+}
+
+const F32: FloatFormat = FloatFormat {
+    prec: 24,
+    bias: 127,
+    min_lsb: -149,
+};
+
+const F64: FloatFormat = FloatFormat {
+    prec: 53,
+    bias: 1023,
+    min_lsb: -1074,
+};
+
+/// A finite, non-zero float's magnitude `m · 2^e` from its exponent field and fraction (`frac_bits` wide).
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "exp is the exponent field, below 2^11, so the sums fit i32; 1 << frac_bits with frac_bits <= 52"
+)]
+fn float_parts<M>(exp: M, frac: M, frac_bits: u32, bias: i32) -> (M, i32)
+where
+    M: Copy + Into<u64> + core::ops::BitOr<Output = M> + core::ops::Shl<u32, Output = M> + From<u8>,
+{
+    let field = i32::try_from(exp.into()).unwrap_or(0);
+    let lsb = |field: i32| field - bias - i32::try_from(frac_bits).unwrap_or(0);
+    if field == 0 {
+        (frac, lsb(1))
+    } else {
+        (frac | (M::from(1) << frac_bits), lsb(field))
     }
 }
 
