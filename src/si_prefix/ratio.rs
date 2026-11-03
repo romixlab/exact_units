@@ -2,7 +2,7 @@
 
 use super::Prefix;
 use crate::num::Int;
-use crate::num::limbs::{self, Limbs, Mag, Rational, cmp_rescaled, low32, round_up};
+use crate::num::limbs::{self, Both, Limbs, Mag, Rational, cmp_rescaled, low32, round_up};
 use crate::{Magnitude, Overflow, Rounding};
 use core::cmp::Ordering;
 use core::num::NonZeroU64;
@@ -124,6 +124,13 @@ impl Prefix {
     #[must_use]
     pub fn cmp_scaled<T: Int>(self, a: T, other: Prefix, b: T) -> Option<Ordering> {
         self.ratio_to(other)?.cmp_scaled(a, b)
+    }
+
+    /// Compares a float `a` in units of this prefix with `b` in units of `other`, exactly
+    /// ([PrefixRatio::cmp_scaled_f32]); `None` for NaN or when either prefix is [Unknown](Prefix::Unknown).
+    #[must_use]
+    pub fn cmp_scaled_f32<T: Int>(self, a: f32, other: Prefix, b: T) -> Option<Ordering> {
+        self.ratio_to(other)?.cmp_scaled_f32(a, b)
     }
 
     /// Compares this prefix's scale with `other`'s, exactly: `Less` for the finer one. `None` when either is
@@ -260,6 +267,54 @@ impl PrefixRatio {
         } else {
             cmp_rescaled(self, &mut Limbs::of(la), &mut Limbs::of(lb))?
         };
+        Some(if sa < 0 { m.reverse() } else { m })
+    }
+
+    /// Compares `a · self` with `b`, exactly, for a float `a`: its value is `±m · 2^e` with integers `m` and `e`, so
+    /// the comparison is one of integers on the kernel, no float arithmetic. ±∞ is beyond every integer; `None` for
+    /// NaN.
+    ///
+    /// ```
+    /// use exact_units::Prefix;
+    /// use core::cmp::Ordering;
+    ///
+    /// // 0.1 as an f32 is 0.100000001490116.. of a volt, above 100 mV
+    /// let r = Prefix::Unit.ratio_to(Prefix::Milli).unwrap();
+    /// assert_eq!(r.cmp_scaled_f32(0.1, 100u32), Some(Ordering::Greater));
+    /// assert_eq!(r.cmp_scaled_f32(0.5, 500u32), Some(Ordering::Equal));
+    /// assert_eq!(r.cmp_scaled_f32(f32::NAN, 0u8), None);
+    /// ```
+    #[must_use]
+    pub fn cmp_scaled_f32<T: Int>(&self, a: f32, b: T) -> Option<Ordering> {
+        if a.is_nan() {
+            return None;
+        }
+        let (nb, lb) = b.to_parts();
+        let sb = match (lb == [0; 4], nb) {
+            (true, _) => 0i8,
+            (false, true) => -1,
+            (false, false) => 1,
+        };
+        let sa = if a == 0.0 {
+            0i8
+        } else if a.is_sign_negative() {
+            -1
+        } else {
+            1
+        };
+        if sa != sb || sa == 0 {
+            return Some(sa.cmp(&sb));
+        }
+        if a.is_infinite() {
+            return Some(sa.cmp(&0));
+        }
+        let bits = a.to_bits();
+        let (m, e) = float_parts((bits >> 23) & 0xFF, bits & 0x7F_FFFF, 23, 127);
+        let m = cmp_rescaled(
+            &Both(self, &Pow2(e)),
+            &mut Limbs::of([m, 0, 0, 0]),
+            &mut Limbs::of(lb),
+        )?;
         Some(if sa < 0 { m.reverse() } else { m })
     }
 
@@ -414,6 +469,27 @@ impl Rational for PrefixRatio {
 
     fn den_is_one(&self) -> bool {
         self.pow10 >= 0 && self.den_bits == 0
+    }
+}
+
+/// `2^e` as a scale of the kernel, for a float's exponent.
+struct Pow2(i32);
+
+impl Rational for Pow2 {
+    fn pow2(&self) -> i32 {
+        self.0
+    }
+
+    fn mul_part(&self, _: &mut Limbs, _: bool) -> Option<()> {
+        Some(())
+    }
+
+    fn div_den(&self, _: &mut Limbs) -> bool {
+        false
+    }
+
+    fn den_is_one(&self) -> bool {
+        true
     }
 }
 

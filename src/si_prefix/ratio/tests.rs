@@ -521,3 +521,48 @@ fn scale_f32_past_pow10_15() {
     }
     assert!(Prefix::Unknown(3).scale_f32(1.0).is_nan());
 }
+
+/// [PrefixRatio::cmp_scaled_f32] against the exact comparison, for every prefix to `Unit` and some pairs, the
+/// integers at their ends and near the float.
+#[test]
+fn compares_f32_exactly() {
+    let xs = some_f32();
+    let mut ratios: Vec<(Prefix, Prefix)> = every_prefix()
+        .into_iter()
+        .map(|p| (p, Prefix::Unit))
+        .collect();
+    let some = some_prefixes();
+    ratios.extend(some.iter().flat_map(|&a| some.iter().map(move |&b| (a, b))));
+    for (i, (from, to)) in ratios.into_iter().enumerate() {
+        let ratio = from.ratio_to(to).unwrap();
+        let k = scale(from) / scale(to);
+        let step = if i < 300 { 23 } else { 401 };
+        for &x in xs.iter().step_by(step) {
+            if x.is_nan() {
+                assert_eq!(ratio.cmp_scaled_f32(x, 0i32), None);
+                continue;
+            }
+            // the exact value; the integers next to it, and the ends
+            let v = x.is_finite().then(|| {
+                let v = float_value(u64::from(x.to_bits() & 0x7FFF_FFFF), 23, 127) * &k;
+                if x.is_sign_negative() { -v } else { v }
+            });
+            let near = v.as_ref().map_or([0, 1, -1], |v| {
+                let f = v.floor().to_integer();
+                [f.clone() - 1, f.clone(), f + 1].map(|b| i128::try_from(b).unwrap_or(0))
+            });
+            for b in near.into_iter().chain([0, 1, -1, i128::MAX, i128::MIN]) {
+                let want = match &v {
+                    Some(v) => v.cmp(&BigRational::from_integer(b.into())),
+                    None if x > 0.0 => Ordering::Greater,
+                    None => Ordering::Less,
+                };
+                assert_eq!(
+                    ratio.cmp_scaled_f32(x, b),
+                    Some(want),
+                    "{from:?} -> {to:?}: {x:e} <=> {b}"
+                );
+            }
+        }
+    }
+}
