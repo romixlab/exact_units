@@ -243,7 +243,8 @@ const fn factor<U: Unit, U2: Unit>() -> Fraction {
     );
     assert!(
         U::KIND.same(U2::KIND),
-        "an Exact converts only between units of the same kind: V/V is not A/A or a Ratio, V/A is not an Ohm"
+        "an Exact converts only between units of the same kind: V/V is not A/A or a Ratio, V/A is not an Ohm \
+         (U/U to a Ratio is the named step as_ratio)"
     );
     assert!(
         !U::EXPR.has_offset() && !U2::EXPR.has_offset(),
@@ -393,6 +394,38 @@ impl<U: Unit> Exact<U> {
             .find(|e| at_least(*e))
             .and_then(Prefix::si_from_pow10)
             .unwrap_or(Prefix::Quecto)
+    }
+}
+
+/// A quotient `U/U` (Hz/Hz, V/V) is not a plain [Ratio](crate::units::Ratio): these are the named steps between them,
+/// as for [Fixed].
+#[cfg(feature = "dimensionless")]
+impl<U> Exact<Per<U, U>> {
+    /// The same number as a plain ratio: what the quotient was a ratio of is gone. Two periods of a 4.8 MHz clock in
+    /// cycles of a 199 MHz one:
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "time", feature = "dimensionless"))] {
+    /// use exact_units::{Exact, prefix::Mega, units::Hertz};
+    ///
+    /// let hclk = Exact::<Hertz>::new_in::<Mega>(199, 1);
+    /// let ref_ck = Exact::<Hertz>::new_in::<Mega>(48, 10);
+    /// let cycles = ((hclk * 2).unwrap() / ref_ck).unwrap().as_ratio();
+    /// assert_eq!(cycles, Exact::new(995, 12));
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn as_ratio(self) -> Exact<crate::units::Ratio> {
+        Exact::of(self.value)
+    }
+}
+
+#[cfg(feature = "dimensionless")]
+impl Exact<crate::units::Ratio> {
+    /// The same number as a quotient `U/U`: `as_gain::<Volt>()` is a voltage gain.
+    #[must_use]
+    pub const fn as_gain<U>(self) -> Exact<Per<U, U>> {
+        Exact::of(self.value)
     }
 }
 

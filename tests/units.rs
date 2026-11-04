@@ -74,7 +74,7 @@ fn prefix_names() {
 /// of their own.
 #[test]
 fn kinds_of_markers() {
-    use exact_units::{Fixed, Kind, LevelForm, prefix::One};
+    use exact_units::{Exact, Fixed, Kind, LevelForm, prefix::One};
     use units::{Ampere, Ohm, Ratio, Siemens, Times, Volt, Watt};
 
     let volt = <Volt as Unit>::DIM;
@@ -108,6 +108,10 @@ fn kinds_of_markers() {
     assert_eq!(gm.as_conductance().as_transconductance(), gm);
     let r = Fixed::<Ohm, One, u8>::new(50);
     assert_eq!(r.as_transimpedance().as_resistance(), r);
+    // and an Exact's, as a Fixed's
+    let q = (Exact::<Volt>::new(3, 2) / Exact::<Volt>::int(-2)).unwrap();
+    assert_eq!(q.as_ratio(), Exact::<Ratio>::new(-3, 4));
+    assert_eq!(q.as_ratio().as_gain::<Volt>(), q);
 
     // decibels by kind: 20·lg for V/V and A/A, 10·lg for W/W
     let db = |x: f64, y: f64| (x - y).abs() < 1e-12;

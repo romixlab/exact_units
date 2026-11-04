@@ -64,6 +64,18 @@ assert_eq!((f * t).unwrap().convert::<Ratio>(), Some(Exact::int(48)));
 assert_eq!(f.recip::<Second>().unwrap().to_string(), "20.8(3) µs");
 ```
 
+A quotient of one unit, Hz/Hz or V/V, is a ratio of that quantity and not a plain `Ratio`, as for `Fixed`. `as_ratio()` is the named step, and `as_gain::<U>()` the one back:
+
+```rust
+use exact_units::{Exact, prefix::Mega, units::Hertz};
+
+let hclk = Exact::<Hertz>::new_in::<Mega>(199, 1);
+let ref_ck = Exact::<Hertz>::new_in::<Mega>(48, 10);
+// two ref_ck periods in hclk cycles
+let cycles = ((hclk * 2).unwrap() / ref_ck).unwrap().as_ratio();
+assert_eq!(cycles.to_string(), "82.91(6)");
+```
+
 Units of other dimensions don't convert, as for `Fixed`:
 
 ```rust,compile_fail
