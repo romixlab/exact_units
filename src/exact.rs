@@ -17,7 +17,7 @@ mod text;
 mod tolerance;
 
 use decimal::{Expansion, write_fraction};
-pub use fraction::{Fraction, Fraction16};
+pub use fraction::{Fraction, Fraction8};
 #[cfg(feature = "serde")]
 pub(crate) use text::read as read_text;
 pub use text::{ParseExactError, ParseFractionError};
@@ -188,13 +188,13 @@ impl<U> Exact<U> {
         Self::of(self.value.abs())
     }
 
-    /// `self + rhs`, `None` where a step overflows ([Fraction::checked_add]).
+    /// `self + rhs`, `None` only when the result doesn't fit ([Fraction::checked_add]).
     #[must_use]
     pub const fn checked_add(self, rhs: Self) -> Option<Self> {
         Some(Self::of(tri!(self.value.checked_add(rhs.value))))
     }
 
-    /// `self - rhs`, `None` where a step overflows.
+    /// `self - rhs`, `None` only when the result doesn't fit.
     #[must_use]
     pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
         Some(Self::of(tri!(self.value.checked_sub(rhs.value))))

@@ -90,7 +90,7 @@ pub use complex::{Admittance, Impedance};
 pub use complex::{CQ15, CQ31};
 pub use complex::{Complex, ComplexStorage, Interleaved, IqStorage, Mac, NormStorage, Polar};
 #[doc(hidden)]
-pub use exact::Fraction16;
+pub use exact::Fraction8;
 pub use exact::{Exact, Fraction, InPrefix, ParseExactError, ParseFractionError};
 #[cfg(feature = "dimensionless")]
 pub use exact::{OffTarget, Tolerance};

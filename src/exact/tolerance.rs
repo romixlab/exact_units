@@ -1,6 +1,6 @@
 //! The relative error of an achieved value against its target, exact, and a named tolerance it is checked against.
 
-use super::Exact;
+use super::{Exact, Fraction};
 use crate::Unit;
 use crate::prefix::{Centi, Micro, Nano};
 use crate::units::Ratio;
@@ -76,7 +76,8 @@ impl fmt::Display for Tolerance {
 
 impl<U: Unit> Exact<U> {
     /// The signed relative error of this value against `target`, `(self − target) / target`, exactly: −0.244140625
-    /// ppm for 79.99998046875 MHz against 80 MHz. `None` for a target of 0 and where a step overflows.
+    /// ppm for 79.99998046875 MHz against 80 MHz, worked out as `self / target − 1`. `None` for a target of 0 and where
+    /// that quotient doesn't fit, which needs an error near 2¹²⁸ times its own denominator.
     ///
     /// ```
     /// # #[cfg(feature = "time")] {
@@ -90,8 +91,10 @@ impl<U: Unit> Exact<U> {
     /// ```
     #[must_use]
     pub fn rel_error(self, target: Self) -> Option<Exact<Ratio>> {
-        let d = self.get().checked_sub(target.get())?;
-        Some(Exact::of(d.checked_div(target.get())?))
+        // a quotient cancels crosswise, so it is refused only where it doesn't fit; achieved − target first would
+        // put the two denominators together
+        let q = self.get().checked_div(target.get())?;
+        Some(Exact::of(q.checked_sub(Fraction::ONE)?))
     }
 
     /// This value's relative error against `target` if it is within `tolerance`, else why not, naming both values:

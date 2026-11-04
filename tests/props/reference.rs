@@ -167,3 +167,17 @@ pub(crate) const LN10: i128 = 230_258_509_299_404_568_401_799_145_468;
 
 /// The denominator of [LN10].
 pub(crate) const LN10_DEN: i128 = 10_i128.pow(29);
+
+/// `±num/den` as an exact rational, in lowest terms.
+#[cfg(not(any(kani, fuzzing)))]
+pub(crate) fn rational(neg: bool, num: u128, den: u128) -> num_rational::BigRational {
+    let n = num_bigint::BigInt::from(num);
+    num_rational::BigRational::new(if neg { -n } else { n }, den.into())
+}
+
+/// Whether `r` in lowest terms has a numerator and a denominator of at most `u128::MAX`.
+#[cfg(not(any(kani, fuzzing)))]
+pub(crate) fn fits_u128(r: &num_rational::BigRational) -> bool {
+    let max = num_bigint::BigInt::from(u128::MAX);
+    r.numer().magnitude() <= max.magnitude() && *r.denom() <= max
+}

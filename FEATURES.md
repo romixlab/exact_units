@@ -130,7 +130,8 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
 - ✅ **NUM-11 An exact rational quantity** — `exact_units::Exact<U>`: the unit in the type, the value an exact
   fraction chosen at run time (`Fraction`: a sign and a `u128` num/den, always reduced), for values a host works out
   that no fixed scale holds (an STM32H7 PLL output, 519.999755859375 MHz or 80/3 MHz). Not napier's job, which is
-  units known only at run time. `+ - * /` give `Option`, refusing on overflow, never rounding; by integers and
+  units known only at run time. `+ - * /` give `Option`, refusing only a result whose lowest terms don't fit (add and sub take their cross terms
+  in 256 bits), never rounding; by integers and
   `Fraction`s; `Exact<U1> * Exact<U2>` is `Exact<Times<U1, U2>>` and `/` `Exact<Per<..>>` as NUM-6, `convert::<U2>()`
   exact (Hz · s to `Ratio`), `recip::<Second>()` the period. Compare exact (256-bit cross products), also against any
   `Fixed` across scales. `const fn` constructors (`new_in::<Mega>(1375, 10)`), `from_scaled` / `from_prefix`,
@@ -139,7 +140,8 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   given; `FromStr` reads every form back. serde (feature `serde`): the number as text or `(neg, num, den)`, a float
   refused; `serde::with_unit` takes an `Exact` field (`"79.99998046875 MHz"`). `no_std`, no alloc, host-side
   (48 bytes, `u128` library calls on Cortex-M): firmware gets `Fixed` consts. Properties `tests/props/exact.rs` (u128
-  against `BigRational`; the same code on `u16` as a Kani proof) and `tests/props/exact_text.rs`, fuzz target
+  against `BigRational`; the same code walked whole on `u8`, its pieces as Kani proofs on
+  `u8` limbs) and `tests/props/exact_text.rs`, fuzz target
   `exact_text`, book page [Exact fractions](docs/maths/fractions.md). For embedded_bedrock's clock planner (RCC-1,
   RCC-2), whose own `Ratio` and `Hz` it replaces.
 - ✅ **NUM-12 Signed relative error and a `Ppm` alias** — `Ppm<T>` (`Fixed<Ratio, Micro, T>`) next to `Ppb<T>`;

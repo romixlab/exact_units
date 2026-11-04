@@ -1,18 +1,20 @@
 //! Property 11: the arithmetic of a `Fraction` against exact rationals. On `u128` against `BigRational`: a sum,
-//! difference, product or quotient is the exact value in lowest terms (a zero `+0/1`), a product or quotient is
-//! refused exactly where that doesn't fit, a sum or difference also where a step of Knuth's form overflows, and the
-//! order is the exact one. Rounding to an integer is the reference's, `to_f64` is the nearest float (a tie to even),
+//! difference, product or quotient is the exact value in lowest terms (a zero `+0/1`), refused exactly where that
+//! doesn't fit (a sum whose cross terms pass 2¹²⁸ too, with a strategy aimed at that window), and the order is the
+//! exact one. Rounding to an integer is the reference's, `to_f64` is the nearest float (a tie to even),
 //! `from_f64` the float's exact value. An `Exact` and a `Fixed` convert and compare as the integers they are. On
-//! `u16` (`Fraction16`, the same code) against `i64` arithmetic, also as Kani proofs over every input.
+//! `u8` (`Fraction8`, the same code) against `i64` arithmetic: drawn, and walked whole over every pair of `u8`
+//! numerators with denominators at both ends. The pieces (widening multiply, add, divide, gcd) are Kani proofs on
+//! `u8` limbs in `src/exact/fraction.rs`; the whole operations on `u128` are too large a SAT problem for Kani.
 #![expect(
     clippy::arithmetic_side_effects,
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
 
-use exact_units::Fraction16;
+use exact_units::Fraction8;
 
 /// `±num/den`, `den > 0`.
-pub(crate) type Parts16 = (bool, u16, u16);
+pub(crate) type Parts8 = (bool, u8, u8);
 
 /// The greatest common divisor, `gcd(0, n) = n`.
 fn gcd(mut a: u64, mut b: u64) -> u64 {
@@ -23,13 +25,13 @@ fn gcd(mut a: u64, mut b: u64) -> u64 {
 }
 
 /// `a` as a signed numerator and a denominator.
-fn signed16(a: Fraction16) -> (i64, i64) {
+fn signed8(a: Fraction8) -> (i64, i64) {
     let n = i64::from(a.numer());
     (if a.is_negative() { -n } else { n }, i64::from(a.denom()))
 }
 
 /// In lowest terms, and a zero as `+0/1`.
-fn canonical16(r: Fraction16) {
+fn canonical8(r: Fraction8) {
     assert!(r.denom() >= 1);
     assert_eq!(gcd(u64::from(r.numer()), u64::from(r.denom())), 1, "{r:?}");
     if r.is_zero() {
@@ -37,90 +39,51 @@ fn canonical16(r: Fraction16) {
     }
 }
 
-/// `got` is `n/d` exactly, or `None` exactly where `n/d` in lowest terms doesn't fit (or, for a sum, `step_overflows`).
-fn exact16(got: Option<Fraction16>, n: i64, d: i64, step_overflows: bool) {
+/// `got` is `n/d` exactly, or `None` exactly where `n/d` in lowest terms doesn't fit.
+fn exact8(got: Option<Fraction8>, n: i64, d: i64) {
     if let Some(r) = got {
-        canonical16(r);
-        let (rn, rd) = signed16(r);
+        canonical8(r);
+        let (rn, rd) = signed8(r);
         assert_eq!(
             i128::from(rn) * i128::from(d),
             i128::from(n) * i128::from(rd)
         );
     } else {
         let g = gcd(n.unsigned_abs(), d.unsigned_abs()).max(1);
-        let fits = u16::try_from(n.unsigned_abs() / g).is_ok()
-            && u16::try_from(d.unsigned_abs() / g).is_ok();
-        assert!(step_overflows || !fits, "{n}/{d} fits, refused");
+        let fits = u8::try_from(n.unsigned_abs() / g).is_ok()
+            && u8::try_from(d.unsigned_abs() / g).is_ok();
+        assert!(!fits, "{n}/{d} fits, refused");
     }
 }
 
-/// Whether a step of Knuth's sum overflows `u16`: the cross terms over the denominators' common factor, their sum,
-/// the denominator.
-fn sum_steps_overflow16(a: Fraction16, b: Fraction16) -> bool {
-    if a.is_zero() || b.is_zero() {
-        return false;
-    }
-    let max = u64::from(u16::MAX);
-    let (an, ad, bn, bd) = (
-        u64::from(a.numer()),
-        u64::from(a.denom()),
-        u64::from(b.numer()),
-        u64::from(b.denom()),
-    );
-    let d1 = gcd(ad, bd);
-    let (x, y) = (an * (bd / d1), bn * (ad / d1));
-    if x > max || y > max {
-        return true;
-    }
-    let t = if a.is_negative() == b.is_negative() {
-        x + y
-    } else {
-        x.abs_diff(y)
-    };
-    if t > max {
-        return true;
-    }
-    t != 0 && (ad / d1) * (bd / gcd(t, d1)) > max
-}
-
-/// Every operation of two `Fraction16`s against `i64` arithmetic: exact or refused as documented, in lowest terms,
+/// Every operation of two `Fraction8`s against `i64` arithmetic: exact or refused as documented, in lowest terms,
 /// ordered exactly. `None` where a part is a zero denominator.
-pub(crate) fn ops16(a: Parts16, b: Parts16) {
+pub(crate) fn ops8(a: Parts8, b: Parts8) {
     let (Some(a), Some(b)) = (
-        Fraction16::from_parts(a.0, a.1, a.2),
-        Fraction16::from_parts(b.0, b.1, b.2),
+        Fraction8::from_parts(a.0, a.1, a.2),
+        Fraction8::from_parts(b.0, b.1, b.2),
     ) else {
         assert!(a.2 == 0 || b.2 == 0);
         return;
     };
-    canonical16(a);
-    let ((an, ad), (bn, bd)) = (signed16(a), signed16(b));
-    exact16(
-        a.checked_add(b),
-        an * bd + bn * ad,
-        ad * bd,
-        sum_steps_overflow16(a, b),
-    );
-    exact16(
-        a.checked_sub(b),
-        an * bd - bn * ad,
-        ad * bd,
-        sum_steps_overflow16(a, b.negate()),
-    );
-    exact16(a.checked_mul(b), an * bn, ad * bd, false);
+    canonical8(a);
+    let ((an, ad), (bn, bd)) = (signed8(a), signed8(b));
+    exact8(a.checked_add(b), an * bd + bn * ad, ad * bd);
+    exact8(a.checked_sub(b), an * bd - bn * ad, ad * bd);
+    exact8(a.checked_mul(b), an * bn, ad * bd);
     if b.is_zero() {
         assert_eq!(a.checked_div(b), None);
     } else {
         let (n, d) = (an * bd, ad * bn);
         let (n, d) = if d < 0 { (-n, -d) } else { (n, d) };
-        exact16(a.checked_div(b), n, d, false);
+        exact8(a.checked_div(b), n, d);
     }
     assert_eq!(
         a.compare(b),
         (an * bd).cmp(&(bn * ad)),
         "{a:?} against {b:?}"
     );
-    assert_eq!(a.negate().checked_add(a), Some(Fraction16::ZERO));
+    assert_eq!(a.negate().checked_add(a), Some(Fraction8::ZERO));
 }
 
 #[cfg(not(kani))]
@@ -130,32 +93,14 @@ pub(crate) mod big {
     use exact_units::prefix::{Kilo, Mega};
     use exact_units::units::Hertz;
     use exact_units::{Exact, Fixed, Fraction, Rounding};
-    use num_bigint::BigInt;
     use num_rational::BigRational;
 
     pub(crate) fn big(x: Fraction) -> BigRational {
-        let n = BigInt::from(x.numer());
-        BigRational::new(
-            if x.is_negative() { -n } else { n },
-            BigInt::from(x.denom()),
-        )
+        reference::rational(x.is_negative(), x.numer(), x.denom())
     }
 
-    fn fits(r: &BigRational) -> bool {
-        let max = BigInt::from(u128::MAX);
-        *r.numer() <= max && -r.numer() <= max && *r.denom() <= max
-    }
-
-    /// The greatest common divisor, `gcd(0, n) = n`.
-    fn gcd(mut a: u128, mut b: u128) -> u128 {
-        while b != 0 {
-            (a, b) = (b, a % b);
-        }
-        a
-    }
-
-    /// `got` is `want` in lowest terms (zero as `+0/1`), or `None` where `want` doesn't fit or `step_overflows`.
-    fn exact(got: Option<Fraction>, want: &BigRational, step_overflows: bool) {
+    /// `got` is `want` in lowest terms (zero as `+0/1`), or `None` exactly where `want` doesn't fit.
+    fn exact(got: Option<Fraction>, want: &BigRational) {
         match got {
             Some(r) => {
                 assert_eq!(&big(r), want);
@@ -166,45 +111,42 @@ pub(crate) mod big {
                     assert!(!r.is_negative() && r.denom() == 1);
                 }
             }
-            None => assert!(step_overflows || !fits(want), "{want} fits, refused"),
+            None => assert!(!reference::fits_u128(want), "{want} fits, refused"),
         }
-    }
-
-    /// Whether a step of Knuth's sum overflows `u128`.
-    fn sum_steps_overflow(a: Fraction, b: Fraction) -> bool {
-        if a.is_zero() || b.is_zero() {
-            return false;
-        }
-        let (an, ad, bn, bd) = (a.numer(), a.denom(), b.numer(), b.denom());
-        let d1 = gcd(ad, bd);
-        let (Some(x), Some(y)) = (an.checked_mul(bd / d1), bn.checked_mul(ad / d1)) else {
-            return true;
-        };
-        let t = if a.is_negative() == b.is_negative() {
-            match x.checked_add(y) {
-                Some(t) => t,
-                None => return true,
-            }
-        } else {
-            x.abs_diff(y)
-        };
-        t != 0 && (ad / d1).checked_mul(bd / gcd(t, d1)).is_none()
     }
 
     /// Every operation of two fractions against `BigRational`.
     pub(crate) fn arith(a: Fraction, b: Fraction) {
         let (ra, rb) = (big(a), big(b));
-        exact(a.checked_add(b), &(&ra + &rb), sum_steps_overflow(a, b));
-        exact(a.checked_sub(b), &(&ra - &rb), sum_steps_overflow(a, -b));
-        exact(a.checked_mul(b), &(&ra * &rb), false);
+        exact(a.checked_add(b), &(&ra + &rb));
+        exact(a.checked_sub(b), &(&ra - &rb));
+        exact(a.checked_mul(b), &(&ra * &rb));
         if b.is_zero() {
             assert_eq!(a.checked_div(b), None);
             assert_eq!(b.checked_recip(), None);
         } else {
-            exact(a.checked_div(b), &(&ra / &rb), false);
+            exact(a.checked_div(b), &(&ra / &rb));
         }
         assert_eq!(a.cmp(&b), ra.cmp(&rb), "{a:?} against {b:?}");
         assert_eq!(a == b, ra == rb);
+    }
+
+    /// A sum whose cross terms pass 2¹²⁸ but whose lowest terms fit: `a = s − b` for a small `s` and a large `b`, so
+    /// `a + b` is `s`, `s − a` is `b` and `a − s` is `−b`, each exact. Skipped where `a` itself doesn't fit.
+    pub(crate) fn sum_in_the_window(s: Fraction, b: Fraction) {
+        let a = &big(s) - &big(b);
+        if !reference::fits_u128(&a) {
+            return;
+        }
+        let a = Fraction::from_parts(
+            a.numer() < &0.into(),
+            a.numer().magnitude().try_into().expect("fits"),
+            a.denom().magnitude().try_into().expect("fits"),
+        )
+        .expect("den > 0");
+        arith(a, b);
+        assert_eq!(a.checked_add(b), Some(s), "{a:?} + {b:?}");
+        assert_eq!(s.checked_sub(a), Some(b), "{s:?} - {a:?}");
     }
 
     /// `round` of `num/den` is the reference's.
@@ -254,7 +196,7 @@ pub(crate) mod big {
                     assert_eq!(big(r), want);
                     assert_eq!(r.to_f64(), x);
                 }
-                None => assert!(!fits(&want), "{x} fits, refused"),
+                None => assert!(!reference::fits_u128(&want), "{x} fits, refused"),
             },
         }
     }
@@ -291,24 +233,30 @@ mod tests {
     use super::big;
     use proptest::prelude::*;
 
-    fn parts16() -> impl Strategy<Value = super::Parts16> {
-        let n = prop_oneof![
-            3 => any::<u16>(),
-            1 => proptest::sample::select(&[0u16, 1, 2, 255, 256, u16::MAX - 1, u16::MAX][..]),
-            2 => 0u16..=64,
-        ];
-        (any::<bool>(), n.clone(), n)
+    fn parts8() -> impl Strategy<Value = super::Parts8> {
+        (any::<bool>(), any::<u8>(), any::<u8>())
     }
 
     proptest! {
         #[test]
-        fn ops_on_u16(a in parts16(), b in parts16()) {
-            super::ops16(a, b);
+        fn ops_on_u8(a in parts8(), b in parts8()) {
+            super::ops8(a, b);
         }
 
         #[test]
         fn ops_on_u128(a in strategy::fraction(), b in strategy::fraction()) {
             big::arith(a, b);
+        }
+
+        /// Large denominators that share a factor with each other and none with the small sum: the cross terms pass
+        /// 2¹²⁸.
+        #[test]
+        fn sums_in_the_window(
+            s in (any::<bool>(), 0u128..=1000, 1u128..=1000),
+            b in (any::<bool>(), (1u128 << 100)..=u128::MAX, (1u128 << 64)..=(1u128 << 120)),
+        ) {
+            let f = |(neg, n, d)| exact_units::Fraction::from_parts(neg, n, d).unwrap_or_default();
+            big::sum_in_the_window(f(s), f(b));
         }
 
         #[test]
@@ -332,6 +280,25 @@ mod tests {
         }
     }
 
+    /// Every pair of `u8` numerators, both signs, over denominators at both ends (1, 3, 128, 255): every refusal
+    /// of a sum, difference, product and quotient against the exact value.
+    #[test]
+    fn walk_u8() {
+        const DENS: [u8; 4] = [1, 3, 128, 255];
+        for an in 0..=u8::MAX {
+            for bn in 0..=u8::MAX {
+                for ad in DENS {
+                    for bd in DENS {
+                        for (na, nb) in [(false, false), (false, true), (true, false), (true, true)]
+                        {
+                            super::ops8((na, an, ad), (nb, bn, bd));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// The PLL values of an STM32H7 clock tree, which the planner works out.
     #[test]
     fn pll_values() {
@@ -351,17 +318,5 @@ mod tests {
     #[test]
     fn small_float_with_trailing_zeros() {
         big::from_f64(f64::from_bits(4_265_076_838_150_819_824));
-    }
-}
-
-#[cfg(kani)]
-mod proofs {
-    /// Every pair of `u16` fractions: add, sub, mul, div and compare exact or refused as documented.
-    #[kani::proof]
-    #[kani::unwind(50)]
-    fn ops_on_u16() {
-        let (a, b): (super::Parts16, super::Parts16) = (kani::any(), kani::any());
-        kani::assume(a.2 != 0 && b.2 != 0);
-        super::ops16(a, b);
     }
 }

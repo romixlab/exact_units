@@ -1,7 +1,7 @@
 //! [Fraction]: a signed exact rational, sign and magnitude in `u128`, always in lowest terms.
 //!
-//! The arithmetic is one macro over the unsigned type: the same code runs on `u128` and, as the hidden `Fraction16`,
-//! on `u16`, small enough for Kani to prove over every input (`tests/props/exact.rs`).
+//! The arithmetic is one macro over the unsigned type: the same code runs on `u128` and, as the hidden `Fraction8`,
+//! on `u8`, small enough to walk whole (`tests/props/exact.rs`) and to prove its pieces with Kani (`proofs` below).
 
 use crate::{Magnitude, Rounding};
 use core::cmp::Ordering;
@@ -109,13 +109,12 @@ macro_rules! fraction {
                 Self { neg: false, ..self }
             }
 
-            /// `self + rhs`, `None` where a step overflows: the sum of the numerators over the denominators'
-            /// common factor (Knuth's form, which keeps the steps small) can overflow for a sum whose lowest terms
-            /// would fit.
+            /// `self + rhs`, `None` only when the result in lowest terms doesn't fit. Knuth's form (TAOCP 4.5.1): the
+            /// cross terms over the denominators' common factor, taken in twice the width, then reduced.
             #[must_use]
             #[expect(
                 clippy::arithmetic_side_effects,
-                reason = "d1 >= 1 divides both denominators, d2 >= 1 divides t and d1 (t != 0); x >= y where x - y"
+                reason = "d1 >= 1 divides both denominators, d2 >= 1 divides d1 (t != 0)"
             )]
             pub const fn checked_add(self, rhs: Self) -> Option<Self> {
                 if self.num == 0 {
@@ -127,25 +126,30 @@ macro_rules! fraction {
                 let d1 = Self::gcd(self.den, rhs.den);
                 let (ad, bd) = (self.den / d1, rhs.den / d1);
                 // a/b against c/d is a·(d/d1) against c·(b/d1): the same order, the same difference over b·d/d1
-                let x = tri!(self.num.checked_mul(bd));
-                let y = tri!(rhs.num.checked_mul(ad));
+                let x = Self::wide_mul(self.num, bd);
+                let y = Self::wide_mul(rhs.num, ad);
                 let (neg, t) = if self.neg == rhs.neg {
-                    (self.neg, tri!(x.checked_add(y)))
-                } else if x >= y {
-                    (self.neg, x - y)
+                    // past twice the width, t/d2 is past the width: d2 <= d1 fits it
+                    (self.neg, tri!(Self::wide_add(x, y)))
+                } else if !Self::wide_lt(x, y) {
+                    (self.neg, Self::wide_sub(x, y))
                 } else {
-                    (rhs.neg, y - x)
+                    (rhs.neg, Self::wide_sub(y, x))
                 };
-                if t == 0 {
+                if t.0 == 0 && t.1 == 0 {
                     return Some(Self::ZERO);
                 }
-                // gcd(t, b·d/d1) is gcd(t, d1) (Knuth, TAOCP 4.5.1)
-                let d2 = Self::gcd(t, d1);
+                // gcd(t, b·d/d1) is gcd(t, d1), and gcd(t, d1) is gcd(t mod d1, d1)
+                let d2 = Self::gcd(Self::wide_divrem(t, d1).1, d1);
+                let (q, _) = Self::wide_divrem(t, d2);
+                if q.0 != 0 {
+                    return None;
+                }
                 let den = tri!(ad.checked_mul(rhs.den / d2));
-                Some(Self { neg, num: t / d2, den })
+                Some(Self { neg, num: q.1, den })
             }
 
-            /// `self - rhs`, `None` where a step overflows, as for [checked_add](Self::checked_add).
+            /// `self - rhs`, `None` only when the result in lowest terms doesn't fit.
             #[must_use]
             pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
                 self.checked_add(rhs.negate())
@@ -229,6 +233,60 @@ macro_rules! fraction {
                 let hi = p11 + (p01 >> H) + (p10 >> H) + (mid >> H);
                 (hi, lo)
             }
+
+            /// `a + b` in twice the width, `None` past it.
+            const fn wide_add(a: ($u, $u), b: ($u, $u)) -> Option<($u, $u)> {
+                let (lo, carry) = a.1.overflowing_add(b.1);
+                let hi = tri!(a.0.checked_add(b.0));
+                let hi = if carry { tri!(hi.checked_add(1)) } else { hi };
+                Some((hi, lo))
+            }
+
+            /// `a - b` in twice the width, `a >= b`.
+            const fn wide_sub(a: ($u, $u), b: ($u, $u)) -> ($u, $u) {
+                let (lo, borrow) = a.1.overflowing_sub(b.1);
+                let hi = a.0.wrapping_sub(b.0).wrapping_sub(if borrow { 1 } else { 0 });
+                (hi, lo)
+            }
+
+            /// `a < b` in twice the width.
+            const fn wide_lt(a: ($u, $u), b: ($u, $u)) -> bool {
+                a.0 < b.0 || (a.0 == b.0 && a.1 < b.1)
+            }
+
+            /// `n / d` and `n % d` of a number in twice the width, `d != 0`: binary long division, one bit at a
+            /// time, the remainder doubled without overflowing (`2r >= d` as `r >= d - r`).
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "d != 0; r < d throughout, so d - r >= 1, and 2r is formed only where it is below d; i counts \
+                          down from twice the width"
+            )]
+            const fn wide_divrem(n: ($u, $u), d: $u) -> (($u, $u), $u) {
+                if n.0 == 0 {
+                    return ((0, n.1 / d), n.1 % d);
+                }
+                const BITS: u32 = <$u>::BITS;
+                let (mut qh, mut ql, mut r): ($u, $u, $u) = (0, 0, 0);
+                let mut i = 2 * BITS;
+                while i > 0 {
+                    i -= 1;
+                    let bit = if i >= BITS { (n.0 >> (i - BITS)) & 1 } else { (n.1 >> i) & 1 };
+                    // r·2 + bit against d: below 2d, so the quotient's next bit is 0 or 1
+                    let one = if r >= d - r {
+                        r = r - (d - r) + bit;
+                        true
+                    } else if bit == 1 && r * 2 == d - 1 {
+                        r = 0;
+                        true
+                    } else {
+                        r = r * 2 + bit;
+                        false
+                    };
+                    qh = (qh << 1) | (ql >> (BITS - 1));
+                    ql = (ql << 1) | if one { 1 } else { 0 };
+                }
+                ((qh, ql), r)
+            }
         }
 
         impl Default for $name {
@@ -272,7 +330,8 @@ fraction! {
     ///
     /// Arithmetic is exact or refused: `checked_*` give `None` on overflow and for a division by zero, never a
     /// rounded value. Multiply, divide and compare refuse only a result that doesn't fit (compare never: the cross
-    /// products are taken in 256 bits); add and subtract can also refuse where a step overflows.
+    /// products are taken in 256 bits). Every operation refuses exactly the results whose lowest terms don't fit: add
+    /// and subtract take their cross terms in 256 bits too.
     ///
     /// ```
     /// use exact_units::Fraction;
@@ -289,10 +348,62 @@ fraction! {
 }
 
 fraction! {
-    /// [Fraction] on `u16`: the same code, small enough for Kani to prove over every input (`tests/props`). Not
-    /// API.
+    /// [Fraction] on `u8`: the same code, small enough to walk whole in a test (`tests/props/exact.rs`) and for Kani
+    /// to prove its pieces over every input (`proofs` below). Not API.
     #[doc(hidden)]
-    Fraction16, u16
+    Fraction8, u8
+}
+
+/// Kani proofs of the pieces of the arithmetic on `u8` limbs, against `u16` arithmetic: the widening multiply, add,
+/// subtract, compare, the long division and the gcd, each over every input. The whole operations on small values are
+/// walked whole in `tests/props/exact.rs`.
+#[cfg(kani)]
+mod proofs {
+    use super::Fraction8 as F;
+
+    fn wide(x: (u8, u8)) -> u16 {
+        (u16::from(x.0) << 8) | u16::from(x.1)
+    }
+
+    #[kani::proof]
+    fn wide_mul() {
+        let (a, b): (u8, u8) = (kani::any(), kani::any());
+        assert_eq!(wide(F::wide_mul(a, b)), u16::from(a) * u16::from(b));
+    }
+
+    #[kani::proof]
+    fn wide_add_sub_lt() {
+        let (a, b): ((u8, u8), (u8, u8)) = (kani::any(), kani::any());
+        assert_eq!(F::wide_add(a, b).map(wide), wide(a).checked_add(wide(b)));
+        assert_eq!(F::wide_lt(a, b), wide(a) < wide(b));
+        if wide(a) >= wide(b) {
+            assert_eq!(wide(F::wide_sub(a, b)), wide(a) - wide(b));
+        }
+    }
+
+    #[kani::proof]
+    #[kani::unwind(17)]
+    fn wide_divrem() {
+        let (n, d): ((u8, u8), u8) = (kani::any(), kani::any());
+        kani::assume(d != 0);
+        let (q, r) = F::wide_divrem(n, d);
+        assert_eq!(wide(q), wide(n) / u16::from(d));
+        assert_eq!(u16::from(r), wide(n) % u16::from(d));
+    }
+
+    /// The gcd divides both, and what is left of them has no common factor: Euclid on u8 takes at most 13 steps.
+    #[kani::proof]
+    #[kani::unwind(14)]
+    fn gcd() {
+        let (a, b): (u8, u8) = (kani::any(), kani::any());
+        let g = F::gcd(a, b);
+        if a == 0 && b == 0 {
+            assert_eq!(g, 0);
+            return;
+        }
+        assert!(g != 0 && a % g == 0 && b % g == 0);
+        assert_eq!(F::gcd(a / g, b / g), 1);
+    }
 }
 
 impl Fraction {

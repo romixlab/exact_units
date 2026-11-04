@@ -180,4 +180,5 @@ These places break a rule above. Each is known and tracked, and until it is fixe
 - **Integer `/` truncates**, as the storage's own `/` does: 3 V / 2 A is 1 V/A. `per_into` and `times_into` name a rounding.
 - **`+` without bounds is the storage's own `+`**: a panic on overflow in a debug build, a wrap in a release build. Bounds `Saturating`, `Wrapping` or `checked_add` say what you mean.
 - **`to_rounded` across $\pi$, $\ln 2$ or $\ln 10$** works with a 64-bit approximation of the factor, so within $|x| \cdot 2^{-64}$ of a rounding step it can be one step off.
+- **`Exact` and `Fraction` on `u128` are checked by drawn inputs, not proved.** That every operation is exact or refused only past `u128`, that `to_f64` is the nearest float and that every printed form reads back are properties drawn against `BigRational` and fuzzed. The same arithmetic code is walked whole on `u8`, and its pieces (the 256-bit multiply, add, division and the gcd) are Kani proofs on `u8` limbs, but no proof or walk covers the `u128` operations themselves.
 - **`{:#}` printing** falls back to a float where the exact decimal doesn't end, without marking the text as approximate.

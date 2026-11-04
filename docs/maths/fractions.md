@@ -72,7 +72,7 @@ use exact_units::{Exact, units::{Hertz, Second}};
 let _ = Exact::<Hertz>::int(1).convert::<Second>();
 ```
 
-Multiply and divide cancel crosswise first, so they refuse only a result that doesn't fit. Add and subtract use Knuth's form. It keeps the steps small, but a step can still overflow where the sum would fit, and then the result is `None`. Comparing never overflows: the cross products are taken in 256 bits.
+Every operation refuses exactly the results that don't fit, in lowest terms. Multiply and divide cancel crosswise first. Add and subtract use Knuth's form with the cross terms in 256 bits, then reduce, so a sum that fits is never refused for a step that didn't. Comparing never overflows: its cross products are taken in 256 bits too.
 
 ## To and from `Fixed`
 
