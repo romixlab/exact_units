@@ -568,8 +568,30 @@ crate::unit! {
     // Dimensionless
 
     /// A fraction: a duty cycle, a probability, a scale factor, an efficiency (dimensionless, 1). 0.5 is half, not a
-    /// level in decibels. Written with `%`, `‰`, `ppm`, `ppb` for `Centi`, `Milli`, `Micro`, `Nano`. Any quantity times a ratio keeps its
-    /// unit (48 V · 0.5 = 24 V).
+    /// level in decibels. Written with `%`, `‰`, `ppm`, `ppb` for `Centi`, `Milli`, `Micro`, `Nano`.
+    ///
+    /// A quantity times a ratio is the same quantity (48 V · 0.5 = 24 V), but the operator keeps the written form, as
+    /// every product does: `Fixed<Volt, ..> * Fixed<Ratio, ..>` is a `Fixed<Times<Volt, Ratio>, ..>` and `Exact<Volt> *
+    /// Exact<Ratio>` an `Exact<Times<Volt, Ratio>>`. Both `convert` back to `Volt`, exactly. An `Exact` also has the
+    /// step that keeps its unit, `scaled`. A `Mul<Exact<Ratio>>` that kept it can't be written: it would overlap
+    /// `Exact<U> * Exact<U2>`.
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{Exact, Fixed, prefix::Milli, units::{Ratio, Volt}};
+    ///
+    /// // Fixed: the product converts to Volt
+    /// let v = Fixed::<Volt, Milli, i32>::new(48_000);
+    /// let half = Fixed::<Ratio, Milli, i32>::new(500);
+    /// assert_eq!((v * half).convert::<Volt, Milli, i32>(), Some(Fixed::new(24_000)));
+    ///
+    /// // Exact: scaled keeps Volt, the product converts to it
+    /// let v = Exact::<Volt>::int(48);
+    /// let half = Exact::<Ratio>::new(1, 2);
+    /// assert_eq!(v.scaled(half), Some(Exact::int(24)));
+    /// assert_eq!((v * half).unwrap().convert::<Volt>(), Some(Exact::int(24)));
+    /// # }
+    /// ```
     #[cfg(feature = "dimensionless")]
     pub struct Ratio = "", [];
 

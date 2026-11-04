@@ -112,6 +112,14 @@ fn kinds_of_markers() {
     let q = (Exact::<Volt>::new(3, 2) / Exact::<Volt>::int(-2)).unwrap();
     assert_eq!(q.as_ratio(), Exact::<Ratio>::new(-3, 4));
     assert_eq!(q.as_ratio().as_gain::<Volt>(), q);
+    // scaled by a ratio keeps the unit, refusing what doesn't fit
+    let v = Exact::<Volt>::new(3, 2);
+    assert_eq!(v.scaled(Exact::new(2, 3)), Some(Exact::int(1)));
+    assert_eq!(
+        (v * Exact::<Ratio>::new(2, 3)).unwrap().convert::<Volt>(),
+        Some(Exact::int(1))
+    );
+    assert_eq!(Exact::<Volt>::int(i128::MAX).scaled(Exact::int(4)), None);
 
     // decibels by kind: 20·lg for V/V and A/A, 10·lg for W/W
     let db = |x: f64, y: f64| (x - y).abs() < 1e-12;

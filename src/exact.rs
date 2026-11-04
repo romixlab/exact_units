@@ -421,6 +421,30 @@ impl<U> Exact<Per<U, U>> {
 }
 
 #[cfg(feature = "dimensionless")]
+impl<U> Exact<U> {
+    /// `self · k` in `U` itself: a quantity times a [Ratio](crate::units::Ratio) is the same quantity. `None` where
+    /// the result doesn't fit. `self * k` is the same number as an `Exact<Times<U, Ratio>>`, which `convert`s back;
+    /// a `Mul` that kept `U` would overlap `Exact<U> * Exact<U2>`, so this is the named step.
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "time", feature = "dimensionless"))] {
+    /// use exact_units::{Exact, prefix::Mega, units::{Hertz, Ratio}};
+    ///
+    /// // an STM32H7 VCO: ref_ck · (N + FRACN/8192)
+    /// let ref_ck = Exact::<Hertz>::new_in::<Mega>(8, 1);
+    /// let n = Exact::<Ratio>::int(99);
+    /// let fracn = Exact::<Ratio>::new(4096, 8192);
+    /// let vco = ref_ck.scaled((n + fracn).unwrap()).unwrap();
+    /// assert_eq!(vco.to_string(), "796 MHz");
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn scaled(self, k: Exact<crate::units::Ratio>) -> Option<Self> {
+        self.checked_scale(k.value)
+    }
+}
+
+#[cfg(feature = "dimensionless")]
 impl Exact<crate::units::Ratio> {
     /// The same number as a quotient `U/U`: `as_gain::<Volt>()` is a voltage gain.
     #[must_use]

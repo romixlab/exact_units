@@ -51,6 +51,7 @@ const BAD: Exact<Hertz> = Exact::new(1, 0);
 
 - `Exact<U> ± Exact<U>`.
 - `Exact<U> * n` and `/ n` for an `i128` or a `Fraction`.
+- `x.scaled(r)` for an `Exact<Ratio>` keeps `U`: a quantity times a ratio is the same quantity. `x * r` is the same number as an `Exact<Times<U, Ratio>>`, which `convert`s back. A `*` that kept `U` would overlap the product of two `Exact`s, so the step has a name.
 - `Exact<U1> * Exact<U2>` is an `Exact<Times<U1, U2>>`, and `/` an `Exact<Per<U1, U2>>`, as for `Fixed`.
 
 `convert::<U2>()` names the unit a product is. It converts between units of one dimension and kind, exactly. `recip::<U2>()` is `1 / x` in a unit of the reciprocal dimension, so the period of a frequency is `f.recip::<Second>()`:
