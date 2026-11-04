@@ -64,6 +64,22 @@ mod strategy {
 
     ints!(i8 i16 i32 i64);
 
+    /// A magnitude (as an `i64`) at the edge of the kernel's `u32` path: about `u32::MAX` and `2^32`, and whole steps,
+    /// halves and their neighbours of `10^9` and `10^10` up to past `2^32`.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the values are within 6·10¹⁰, far inside i64"
+    )]
+    pub(crate) fn u32_edge() -> impl Strategy<Value = i64> {
+        let edge = i64::from(u32::MAX);
+        prop_oneof![
+            3 => (edge - 1000)..=(edge + 1000),
+            2 => (0i64..=5, 0i64..=1, -2i64..=2, 9u32..=10)
+                .prop_map(|(k, half, d, e)| k * 10i64.pow(e) + half * 5 * 10i64.pow(e - 1) + d),
+            1 => 0i64..=100,
+        ]
+    }
+
     /// Anything, the ends, near 0, and powers of 2 and 10 (the denominators of prefixes and binary fractions).
     pub(crate) fn u128s() -> impl Strategy<Value = u128> {
         prop_oneof![

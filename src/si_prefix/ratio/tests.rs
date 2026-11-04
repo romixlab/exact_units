@@ -222,6 +222,96 @@ fn compares_like_the_reference() {
     }
 }
 
+/// The `u32` path (a magnitude of up to 32 bits, a power of ten up to `10^9`) and the `u64` path past it round
+/// alike: every power of ten from `10^-22` to `10^22`, at the edges of both (`u32::MAX`, `2^32`, `u64::MAX`, whole
+/// steps and halves of `10^9` and `10^10` and their neighbours), against the reference.
+#[test]
+fn the_u32_path_rounds_like_the_reference() {
+    let mut values: Vec<i128> = vec![0, 1, 4, 5, 6, 9, 10, 11];
+    for e in [9u32, 10, 19] {
+        let p = 10i128.pow(e);
+        for k in [1, 2, 4, 5] {
+            for base in [k * p, k * p + p / 2] {
+                values.extend([base - 1, base, base + 1]);
+            }
+        }
+    }
+    let edges = [
+        u32::MAX as i128,
+        1 << 32,
+        i32::MAX as i128,
+        1 << 31,
+        u64::MAX as i128,
+        i64::MAX as i128,
+    ];
+    for e in edges {
+        values.extend([e - 1, e, e + 1]);
+    }
+    let values: Vec<i128> = values
+        .iter()
+        .flat_map(|&v| [v, -v])
+        .filter(|&v| u64::try_from(v.unsigned_abs()).is_ok())
+        .collect();
+    for p in -22i8..=22 {
+        let ratio = PrefixRatio::of_pow10(p).unwrap();
+        let k = BigRational::from_integer(BigInt::from(10).pow(p.unsigned_abs().into()));
+        let k = if p < 0 { k.recip() } else { k };
+        for &x in &values {
+            let q = BigRational::from_integer(x.into()) * &k;
+            for r in MODES {
+                let rounded = round(&q, r);
+                for o in POLICIES {
+                    if let Ok(x) = u32::try_from(x) {
+                        check!(ratio, &rounded, x, r, o, u8, i32, u32, u64);
+                    }
+                    if let Ok(x) = i32::try_from(x) {
+                        check!(ratio, &rounded, x, r, o, i8, i32, u32, i64);
+                    }
+                    if let Ok(x) = u64::try_from(x) {
+                        check!(ratio, &rounded, x, r, o, u32, u64);
+                    }
+                    if let Ok(x) = i64::try_from(x) {
+                        check!(ratio, &rounded, x, r, o, i32, i64);
+                    }
+                }
+            }
+            for &y in &values {
+                let want = q.cmp(&BigRational::from_integer(y.into()));
+                if let (Ok(a), Ok(b)) = (u32::try_from(x), u32::try_from(y)) {
+                    assert_eq!(ratio.cmp_scaled(a, b), Some(want), "{x} · 10^{p} <=> {y}");
+                }
+                if let (Ok(a), Ok(b)) = (i64::try_from(x), i64::try_from(y)) {
+                    assert_eq!(ratio.cmp_scaled(a, b), Some(want), "{x} · 10^{p} <=> {y}");
+                }
+            }
+        }
+    }
+}
+
+/// The SI fast path of [Prefix::ratio_to] gives what the general one does, for every pair of prefixes, and the
+/// table behind it is [Prefix::si_from_pow10]'s inverse.
+#[test]
+fn ratio_to_takes_the_fast_path_alike() {
+    let prefixes = every_prefix();
+    for &from in &prefixes {
+        for &to in &prefixes {
+            assert_eq!(
+                from.ratio_to(to),
+                super::ratio_of_parts(from, to),
+                "{from:?} -> {to:?}"
+            );
+        }
+        if let Some(e) = from.si_pow10() {
+            assert_eq!(Prefix::si_from_pow10(e), Some(from));
+        }
+    }
+    for e in i8::MIN..=i8::MAX {
+        if let Some(p) = Prefix::si_from_pow10(e) {
+            assert_eq!(p.si_pow10(), Some(e));
+        }
+    }
+}
+
 /// The room of the kernel holds every pair of prefixes at the largest magnitudes: nothing is refused for it.
 #[test]
 fn every_pair_fits_the_room() {

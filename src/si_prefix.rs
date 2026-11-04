@@ -112,6 +112,9 @@ pub enum Prefix {
     Unknown(u16),
 }
 
+/// What `Prefix::si_exp` gives for a prefix that isn't SI: no SI exponent is -128.
+pub(crate) const NOT_SI: i8 = i8::MIN;
+
 /// The exponent of [Prefix::Pow10]: -63..=63, not an SI prefix's (`-3` is `Milli`).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -345,7 +348,17 @@ impl Prefix {
     /// of arithmetic across prefixes, no [Magnitude] built.
     #[must_use]
     pub const fn si_pow10(&self) -> Option<i8> {
-        Some(match self {
+        match self.si_exp() {
+            NOT_SI => None,
+            e => Some(e),
+        }
+    }
+
+    /// [si_pow10](Self::si_pow10) with [NOT_SI] for none: a match of constants alone, which compiles to one table
+    /// load (a match of `Option`s is a jump table, a branch per prefix).
+    #[inline(always)]
+    pub(crate) const fn si_exp(self) -> i8 {
+        match self {
             Prefix::Quetta => 30,
             Prefix::Ronna => 27,
             Prefix::Yotta => 24,
@@ -378,8 +391,8 @@ impl Prefix {
             | Prefix::Pow10(_)
             | Prefix::Pow2(_)
             | Prefix::FullScale(_)
-            | Prefix::Unknown(_) => return None,
-        })
+            | Prefix::Unknown(_) => NOT_SI,
+        }
     }
 
     /// The SI prefix that is `10^e`, `None` when there is none (`10⁻⁴`: [from_pow10](Self::from_pow10) gives it as

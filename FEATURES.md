@@ -117,8 +117,8 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   prefixes; `Prefix::ratio_to`, `rescale`, `cmp_scaled`, `cmp_scale`. The same on a rational `Magnitude`
   (`None` for an irrational one). `Fixed::from_prefix` / `to_prefix` between a `Fixed` and a number at a run-time
   prefix. `Prefix::decimal`: the exact decimal of an integer at a run-time prefix (rounded only at a precision, a
-  decimal that doesn't end cut and marked `…`). One kernel of 32-bit limbs with 64-bit products, a `u64` path for a
-  power of ten alone: no float and no 128-bit helper on a Cortex-M0+. Floats only where the value is one:
+  decimal that doesn't end cut and marked `…`). One kernel of 32-bit limbs with 64-bit products, a `u32` and a `u64`
+  path for a power of ten alone: no float and no 128-bit helper on a Cortex-M0+. Floats only where the value is one:
   `Prefix::scale_f32` in `f32` for every family, `PrefixRatio::apply_f32` / `apply_f64` (correctly rounded),
   `cmp_scaled_f32` (exact). Wire reads check a magnitude's primes in 64 bits. Tests: `src/si_prefix/ratio/tests.rs`
   and `src/si_prefix/decimal/tests.rs` against `num-rational`, `tests/props/prefix.rs` and `magnitude.rs` against

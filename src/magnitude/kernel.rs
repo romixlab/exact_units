@@ -6,7 +6,7 @@
 use super::{MAX_FACTORS, Magnitude, PrimePower};
 use crate::PrefixRatio;
 use crate::num::Int;
-use crate::num::limbs::{Limbs, Mag, Rational, cmp_rescaled, scaled};
+use crate::num::limbs::{self, Limbs, Mag, Rational, cmp_rescaled, scaled};
 use crate::{Overflow, Rounding};
 use core::cmp::Ordering;
 
@@ -211,12 +211,7 @@ impl Magnitude {
         let x = Exact::of(self)?;
         let (na, la) = a.to_parts();
         let (nb, lb) = b.to_parts();
-        let sign = |neg: bool, l: [u32; 4]| match (l == [0; 4], neg) {
-            (true, _) => 0i8,
-            (false, true) => -1,
-            (false, false) => 1,
-        };
-        let (sa, sb) = (sign(na, la), sign(nb, lb));
+        let (sa, sb) = (limbs::sign(na, la), limbs::sign(nb, lb));
         if sa != sb || sa == 0 {
             return Some(sa.cmp(&sb));
         }
@@ -224,7 +219,7 @@ impl Magnitude {
         Some(if sa < 0 { m.reverse() } else { m })
     }
 
-    /// The magnitude as a [PrefixRatio] when it is a power of ten alone: the fast path in `u64`.
+    /// The magnitude as a [PrefixRatio] when it is a power of ten alone: the fast path in `u32` and `u64`.
     fn pow10_ratio(&self) -> Option<PrefixRatio> {
         PrefixRatio::of_pow10(self.as_pow10()?)
     }

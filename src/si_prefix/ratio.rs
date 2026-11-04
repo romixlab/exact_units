@@ -1,6 +1,6 @@
 //! [PrefixRatio]: the quotient of two [Prefix] scales, and the exact integer arithmetic across prefixes on it.
 
-use super::Prefix;
+use super::{NOT_SI, Prefix};
 use crate::num::Int;
 use crate::num::limbs::{self, Both, Limbs, Mag, Rational, cmp_rescaled, low32, round_up};
 use crate::{Magnitude, Overflow, Rounding};
@@ -67,6 +67,28 @@ const fn parts(p: Prefix) -> Option<(i8, i8, u8)> {
     })
 }
 
+/// [Prefix::ratio_to] of any two prefixes. Out of line: inlined, its match on the prefix merges with the SI fast
+/// path's table loads into one jump table, a branch per prefix.
+#[inline(never)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "each exponent is within ±63 (Pow10Exp, Pow2Exp; the SI and binary prefixes within it), so a \
+              difference of two is within ±126, an i8"
+)]
+const fn ratio_of_parts(from: Prefix, to: Prefix) -> Option<PrefixRatio> {
+    let (Some((p1, q1, f1)), Some((p2, q2, f2))) = (parts(from), parts(to)) else {
+        return None;
+    };
+    // a full scale on both sides of the same bits cancels: equal scales give 1
+    let (num_bits, den_bits) = if f1 == f2 { (0, 0) } else { (f2, f1) };
+    Some(PrefixRatio {
+        pow10: p1 - p2,
+        pow2: q1 - q2,
+        num_bits,
+        den_bits,
+    })
+}
+
 /// `2^n − 1` for `n` in 1..=32.
 #[expect(
     clippy::as_conversions,
@@ -86,21 +108,21 @@ impl Prefix {
     #[must_use]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "each exponent is within ±63 (Pow10Exp, Pow2Exp; the SI and binary prefixes within it), so a \
-                  difference of two is within ±126, an i8"
+        reason = "an SI exponent is within ±30, so a difference of two is within ±60, an i8"
     )]
+    #[inline]
     pub const fn ratio_to(self, to: Prefix) -> Option<PrefixRatio> {
-        let (Some((p1, q1, f1)), Some((p2, q2, f2))) = (parts(self), parts(to)) else {
-            return None;
-        };
-        // a full scale on both sides of the same bits cancels: equal scales give 1
-        let (num_bits, den_bits) = if f1 == f2 { (0, 0) } else { (f2, f1) };
-        Some(PrefixRatio {
-            pow10: p1 - p2,
-            pow2: q1 - q2,
-            num_bits,
-            den_bits,
-        })
+        // two SI prefixes, the common case: the difference of their exponents, each one table load
+        let (e1, e2) = (self.si_exp(), to.si_exp());
+        if e1 != NOT_SI && e2 != NOT_SI {
+            return Some(PrefixRatio {
+                pow10: e1 - e2,
+                pow2: 0,
+                num_bits: 0,
+                den_bits: 0,
+            });
+        }
+        ratio_of_parts(self, to)
     }
 
     /// `x` in units of this prefix, in units of `to`: rounded by `r` and settled into `U` by `o`, exactly as
@@ -153,6 +175,7 @@ impl PrefixRatio {
     /// The power of ten the ratio is, when it is one alone (between two SI prefixes or `Pow10`s): `Some(3)` from
     /// `Kilo` to `Unit`.
     #[must_use]
+    #[inline(always)]
     pub const fn as_pow10(&self) -> Option<i8> {
         if self.pow2 == 0 && self.num_bits == 0 && self.den_bits == 0 {
             Some(self.pow10)
@@ -223,6 +246,7 @@ impl PrefixRatio {
 
     /// `x · self`, exactly: `None` when that isn't whole or doesn't fit `U`.
     #[must_use]
+    #[inline]
     pub fn apply<T: Int, U: Int>(&self, x: T) -> Option<U> {
         let (neg, mag, exact) = self.scaled(x, Rounding::Truncate)?;
         if exact {
@@ -234,6 +258,7 @@ impl PrefixRatio {
 
     /// `x · self` rounded by `r`; `None` when the result doesn't fit `U`.
     #[must_use]
+    #[inline]
     pub fn apply_rounded<T: Int, U: Int>(&self, x: T, r: Rounding) -> Option<U> {
         self.requantize(x, r, Overflow::Checked)
     }
@@ -241,6 +266,7 @@ impl PrefixRatio {
     /// `x · self` rounded by `r` and settled into `U` by `o`: `None` only where `o` is [Overflow::Checked] and the
     /// result doesn't fit. Wrapping keeps the exact result's low bits, however large it is.
     #[must_use]
+    #[inline]
     pub fn requantize<T: Int, U: Int>(&self, x: T, r: Rounding, o: Overflow) -> Option<U> {
         let (neg, mag, _) = self.scaled(x, r)?;
         mag.settle(neg, o)
@@ -253,16 +279,13 @@ impl PrefixRatio {
     pub fn cmp_scaled<T: Int>(&self, a: T, b: T) -> Option<Ordering> {
         let (na, la) = a.to_parts();
         let (nb, lb) = b.to_parts();
-        let sign = |neg: bool, l: [u32; 4]| match (l == [0; 4], neg) {
-            (true, _) => 0i8,
-            (false, true) => -1,
-            (false, false) => 1,
-        };
-        let (sa, sb) = (sign(na, la), sign(nb, lb));
+        let (sa, sb) = (limbs::sign(na, la), limbs::sign(nb, lb));
         if sa != sb || sa == 0 {
             return Some(sa.cmp(&sb));
         }
-        let m = if let (Some(p), Some(a), Some(b)) = (self.as_pow10(), u64_of(la), u64_of(lb)) {
+        let m = if let (Some(p), [a, 0, 0, 0], [b, 0, 0, 0]) = (self.as_pow10(), la, lb) {
+            cmp_pow10_u32(a, p, b)
+        } else if let (Some(p), Some(a), Some(b)) = (self.as_pow10(), u64_of(la), u64_of(lb)) {
             cmp_pow10(a, p, b)
         } else {
             cmp_rescaled(self, &mut Limbs::of(la), &mut Limbs::of(lb))?
@@ -290,11 +313,7 @@ impl PrefixRatio {
             return None;
         }
         let (nb, lb) = b.to_parts();
-        let sb = match (lb == [0; 4], nb) {
-            (true, _) => 0i8,
-            (false, true) => -1,
-            (false, false) => 1,
-        };
+        let sb = limbs::sign(nb, lb);
         let sa = if a == 0.0 {
             0i8
         } else if a.is_sign_negative() {
@@ -414,17 +433,30 @@ impl PrefixRatio {
     }
 
     /// `x · self` rounded by `r`: its sign, magnitude, and whether it is exact. A power of ten alone on a magnitude
-    /// of up to 64 bits (between SI prefixes) in `u64`, anything else in [Limbs]. `None` past the room of `Limbs`,
+    /// of up to 32 bits (between SI prefixes, the common case) in `u32` with a `u32 · u32` product, of up to 64 bits
+    /// in `u64`, anything else in [Limbs]: a 32-bit core divides a `u32` in one instruction and a `u64` in a call. `None` past the room of `Limbs`,
     /// which no ratio reaches for any integer up to 128 bits: the room is sized from the fields' types (see `CAP`),
     /// and a test walks every pair of prefixes at the ends of `u128` and `i128`.
+    #[inline(always)]
     pub(crate) fn scaled<T: Int>(self, x: T, r: Rounding) -> Option<(bool, Mag, bool)> {
         let (neg, low) = x.to_parts();
+        if let (Some(p), [m, 0, 0, 0]) = (self.as_pow10(), low)
+            && let Some((q, exact)) = scale_pow10_u32(m, p, r, neg)
+        {
+            return Some((neg, q, exact));
+        }
+        self.scaled_wide(neg, low, r)
+    }
+
+    /// [scaled](Self::scaled) past the `u32` path: out of line, so that the `u32` path inlines alone.
+    #[inline(never)]
+    fn scaled_wide(self, neg: bool, low: [u32; 4], r: Rounding) -> Option<(bool, Mag, bool)> {
         if let (Some(p), Some(m)) = (self.as_pow10(), u64_of(low))
             && let Some((q, exact)) = scale_pow10(m, p, r, neg)
         {
             return Some((neg, Mag::of_u64(q), exact));
         }
-        limbs::scaled(&self, x, r)
+        limbs::scaled_parts(&self, neg, low, r)
     }
 }
 
@@ -567,6 +599,59 @@ fn pow10_u64(k: u32) -> Option<NonZeroU64> {
         .ok()
         .and_then(|k| POW10.get(k))
         .and_then(|&p| NonZeroU64::new(p))
+}
+
+/// `10^k` for `k` in 0..=9, the powers a `u32` holds; `None` above.
+fn pow10_u32(k: u32) -> Option<u32> {
+    const POW10: [u32; 10] = [
+        1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
+    ];
+    usize::try_from(k).ok().and_then(|k| POW10.get(k)).copied()
+}
+
+/// `m · 10^p` rounded by `r` (`neg` the sign) for a `u32` magnitude, and whether it is exact: the product of two
+/// `u32` in a `u64`, the quotient in `u32`, the same bits as [scale_pow10]. `None` for `p` above 9, for the `u64`
+/// path to do.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "u32 · u32 fits u64; d is not 0 (a power of ten), rem < d so d - rem doesn't wrap; d >= 10 where the \
+              quotient is taken, so q <= u32::MAX / 10 and q + 1 fits"
+)]
+#[inline(always)]
+fn scale_pow10_u32(m: u32, p: i8, r: Rounding, neg: bool) -> Option<(Mag, bool)> {
+    let k = u32::from(p.unsigned_abs());
+    if p >= 0 {
+        let d = pow10_u32(k)?;
+        return Some((Mag::of_u64(u64::from(m) * u64::from(d)), true));
+    }
+    let (q, rem, d) = match pow10_u32(k) {
+        Some(d) => (m / d, m % d, Some(d)),
+        // 10^10 and up is above every u32: the quotient is 0 and the fraction below 0.5
+        None => (0, m, None),
+    };
+    if rem == 0 {
+        return Some((Mag::of_u32(q), true));
+    }
+    let (half, sticky) = match d {
+        // the fraction rem / d at least a half, and not exactly a half
+        Some(d) => (rem >= d - rem, rem != d - rem),
+        None => (false, true),
+    };
+    let up = round_up(r, neg, q & 1 == 1, half, sticky);
+    Some((Mag::of_u32(if up { q + 1 } else { q }), false))
+}
+
+/// `a · 10^p` against `b`, magnitudes of up to 32 bits, neither 0: `u32 · u32` products in `u64`, no division.
+#[expect(clippy::arithmetic_side_effects, reason = "u32 · u32 fits u64")]
+fn cmp_pow10_u32(a: u32, p: i8, b: u32) -> Ordering {
+    let k = u32::from(p.unsigned_abs());
+    match (pow10_u32(k), p >= 0) {
+        (Some(d), true) => (u64::from(a) * u64::from(d)).cmp(&u64::from(b)),
+        (Some(d), false) => u64::from(a).cmp(&(u64::from(b) * u64::from(d))),
+        // 10^10 and up times a non-zero u32 is above every u32
+        (None, true) => Ordering::Greater,
+        (None, false) => Ordering::Less,
+    }
 }
 
 /// `m · 10^p` rounded by `r` (`neg` the sign) in `u64`, and whether it is exact; `None` where the product leaves

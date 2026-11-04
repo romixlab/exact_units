@@ -241,6 +241,27 @@ mod run_time {
             super::compares(a, pa, b, pb);
         }
 
+        /// At the edge of the kernel's `u32` path: magnitudes about `u32::MAX` and `2^32` (one side `u32`, the other
+        /// `u64`), between powers of ten about `10^9` and `10^10` (the largest a `u32` holds and the first past it).
+        /// Random inputs from all of `i64` almost never land there.
+        #[test]
+        fn rescales_at_the_u32_edge(base in strategy::u32_edge(), neg: bool, e in -21i8..=21, f in -21i8..=21, r in strategy::mode(), o in strategy::policy()) {
+            let x = if neg { -base } else { base };
+            let (from, to) = (super::prefix(1, e).unwrap_or(Prefix::Unit), super::prefix(1, f).unwrap_or(Prefix::Unit));
+            super::rescales::<u32>(x, from, to, r, o);
+            super::rescales::<i32>(x, from, to, r, o);
+            super::rescales::<i64>(x, from, to, r, o);
+            super::brackets(x, from, to);
+        }
+
+        /// The comparison at the same edge, of two magnitudes about `2^32`.
+        #[test]
+        fn compares_at_the_u32_edge(a in strategy::u32_edge(), b in strategy::u32_edge(), e in -21i8..=21, f in -21i8..=21) {
+            let (pa, pb) = (super::prefix(1, e).unwrap_or(Prefix::Unit), super::prefix(1, f).unwrap_or(Prefix::Unit));
+            super::compares(a, pa, b, pb);
+            super::compares(-a, pa, -b, pb);
+        }
+
         /// Ties: a value that is the exact half of a step of the target, and its neighbours.
         #[test]
         fn rescales_near_ties(k in 1i64..=1_000_000, d in -1i64..=1, e in 1i8..=12, r in strategy::mode(), o in strategy::policy()) {
@@ -265,7 +286,7 @@ mod proofs {
         POLICIES[usize::from(kani::any_where(|i: &u8| *i < 3))]
     }
 
-    /// A prefix of a few that cover the kernel's paths: SI steps (the `u64` path), a binary prefix, a Q7 step and an
+    /// A prefix of a few that cover the kernel's paths: SI steps (the `u32` path), a binary prefix, a Q7 step and an
     /// 8-bit full scale (the limbs).
     fn some_prefix() -> Prefix {
         const SOME: [Prefix; 6] = [

@@ -70,17 +70,6 @@ impl Limbs {
         }
     }
 
-    /// Whether the number is a power of 2.
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "len >= 1 where len - 1 is taken"
-    )]
-    fn is_pow2(&self) -> bool {
-        self.len > 0
-            && self.limb(self.len - 1).is_power_of_two()
-            && self.d.iter().take(self.len - 1).all(|&l| l == 0)
-    }
-
     /// `self · m`; `None` past [CAP] limbs.
     #[expect(
         clippy::arithmetic_side_effects,
@@ -326,6 +315,17 @@ pub(crate) const fn low32(x: u64) -> u32 {
     x as u32
 }
 
+/// The sign of a value from its sign bit and magnitude limbs: -1, 0 or 1. The limbs are or-ed, not compared as an
+/// array, which `opt-level = "z"` makes a `memcmp` call.
+pub(crate) const fn sign(neg: bool, l: [u32; 4]) -> i8 {
+    let [a, b, c, d] = l;
+    match (a | b | c | d == 0, neg) {
+        (true, _) => 0,
+        (false, true) => -1,
+        (false, false) => 1,
+    }
+}
+
 /// Whether a magnitude of `q` (`odd` its lowest bit) plus a fraction rounds up by `r`: `half` says the fraction is at
 /// least a half, `sticky` that it is not exactly a half or 0. `neg` is the sign of the value.
 #[expect(
@@ -385,6 +385,16 @@ pub(crate) fn rescale(s: &impl Rational, n: &mut Limbs, neg: bool, r: Rounding) 
 /// `x · s` rounded by `r`: its sign, magnitude and whether it is exact. `None` past [CAP] limbs.
 pub(crate) fn scaled<T: Int>(s: &impl Rational, x: T, r: Rounding) -> Option<(bool, Mag, bool)> {
     let (neg, low) = x.to_parts();
+    scaled_parts(s, neg, low, r)
+}
+
+/// [scaled] of the value with sign `neg` and magnitude limbs `low`.
+pub(crate) fn scaled_parts(
+    s: &impl Rational,
+    neg: bool,
+    low: [u32; 4],
+    r: Rounding,
+) -> Option<(bool, Mag, bool)> {
     let mut n = Limbs::of(low);
     let exact = rescale(s, &mut n, neg, r)?;
     Some((neg, Mag::of_limbs(&n), exact))
@@ -433,11 +443,10 @@ pub(crate) fn cmp_rescaled(s: &impl Rational, a: &mut Limbs, b: &mut Limbs) -> O
     Some(a.cmp(&b))
 }
 
-/// A magnitude as settling needs it: its bits, whether it is a power of 2, and its low 128 bits.
+/// A magnitude as settling needs it: its bits and its low 128 bits.
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct Mag {
     bits: u32,
-    pow2: bool,
     low: [u32; 4],
 }
 
@@ -447,11 +456,24 @@ impl Mag {
         clippy::arithmetic_side_effects,
         reason = "leading_zeros of a u64 is at most 64"
     )]
+    #[inline(always)]
     pub(crate) const fn of_u64(m: u64) -> Mag {
         Mag {
             bits: 64 - m.leading_zeros(),
-            pow2: m.is_power_of_two(),
             low: [low32(m), low32(m >> 32), 0, 0],
+        }
+    }
+
+    /// The magnitude `m`.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "leading_zeros of a u32 is at most 32"
+    )]
+    #[inline(always)]
+    pub(crate) const fn of_u32(m: u32) -> Mag {
+        Mag {
+            bits: 32 - m.leading_zeros(),
+            low: [m, 0, 0, 0],
         }
     }
 
@@ -459,18 +481,22 @@ impl Mag {
     pub(crate) fn of_limbs(n: &Limbs) -> Mag {
         Mag {
             bits: n.bits(),
-            pow2: n.is_pow2(),
             low: [n.limb(0), n.limb(1), n.limb(2), n.limb(3)],
         }
     }
 
     /// The value of this magnitude, negated when `neg`, into `U` by `o`: `None` where `o` is [Overflow::Checked] and
     /// it doesn't fit.
+    #[inline(always)]
     pub(crate) fn settle<U: Int>(self, neg: bool, o: Overflow) -> Option<U> {
         let neg = neg && self.bits != 0;
         let fits = if U::SIGNED {
-            // -2^(BITS - 1) is the one magnitude of BITS bits a negative value may have
-            self.bits < U::BITS || (neg && self.pow2 && self.bits == U::BITS)
+            // -2^(BITS - 1) is the one magnitude of BITS bits a negative value may have; BITS <= 128, so low holds
+            // all of a magnitude of BITS bits
+            self.bits < U::BITS
+                || (neg
+                    && self.bits == U::BITS
+                    && self.low.iter().map(|l| l.count_ones()).sum::<u32>() == 1)
         } else {
             !neg && self.bits <= U::BITS
         };
