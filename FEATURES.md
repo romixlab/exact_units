@@ -4,7 +4,7 @@ This file is the single source of truth for what `exact_units` supports, what is
 planned, for humans and AI agents alike.
 
 Until 2 Nov 2026 these items lived in wire_weaver's `FEATURES.md` under its `STD` area, because `exact_units`
-had no tracker of its own; a session claiming an id with `tpm work claim STD` in an `exact_units` worktree
+had no tracker of its own; a session claiming the next free id for `STD` in an `exact_units` worktree
 couldn't see wire_weaver's file and handed out the same id twice (STD-92). They moved here on 2 Nov 2026, split
 the same day into six areas of their own (below), each numbered from 1 in build order (by first commit); every
 entry keeps a "(was STD-xx)" note, and the full old-id to new-id table is at the end of this file. `STD-84` was
@@ -25,8 +25,8 @@ concerns both crates carries a pointer to the `exact_units` id it depends on.
   - 🧪 done and tested on the host, the check on hardware is still open (the note says what to check)
 - **Target** is the release an item is planned for; no tag means not scheduled.
 - **IDs** (`NUM-2`, `CPX-6`) are stable: never renumber or reuse one. New items take the next free number of
-  their area, even when inserted in the middle of it (`tpm work claim AREA` in this crate's worktree prints the
-  next free one, e.g. `tpm work claim LVL`). Use the ID in commit messages, CHANGELOG entries and code `TODO`s.
+  their area, even when inserted in the middle of it (claiming the next id for an area in this crate's worktree
+  prints the next free one, e.g. for `LVL`). Use the ID in commit messages, CHANGELOG entries and code `TODO`s.
   When talking to people, name an ID with a short slug from its title (`CPX-6 polar-form-and-levels`), never bare.
 - Items are grouped by area, and within an area by status: done first, then open items ordered by target. When
   finishing work, update the item in the same change: mark it ✅, move it up to the done items of its area
@@ -165,7 +165,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
 - 📋 **NUM-10 Measured constants as exact symbols** · `foundations` — μ₀ and G in `Magnitude` beside π, ln 2 and ln 10
   (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
   old 4π·10⁻⁷ only as the opt-in `Ampere1948`; a conversion that needs a symbol doesn't compile without a set, floats
-  included. P2401#3nov-0154, design: P2401 `design/foundations-review.md` §4.
+  included.
 - ✅ **NUM-11 An exact rational quantity** — `exact_units::Exact<U>`: the unit in the type, the value an exact
   fraction chosen at run time (`Fraction`: a sign and a `u128` num/den, always reduced), for values a host works out
   that no fixed scale holds (an STM32H7 PLL output, 519.999755859375 MHz or 80/3 MHz). Not napier's job, which is
@@ -258,19 +258,18 @@ counted units, and the kinds that keep look-alike quantities apart.
   name }`; `Scale` becomes `Magnitude` alone (no `Affine`, no `DegreeCelsius`); every type-level concept has a const
   data form with a (crate, name) identity and the same rules at run time (napier, `ww`). Identity is stated once in the
   API schema or in a header; `SIExpr` stays as the run-time description a device sends once when a unit changes, never
-  per sample. P2401#3nov-0046, design: P2401 `design/foundations-review.md` §1.
+  per sample.
 - 📋 **UNIT-8 Quantity specs: the ISQ hierarchy** · `foundations` — `QuantitySpec` / `QuantityDef` (system, parent, kind
   root, character), `quantity!`, `Of<Q, U>` in the unit slot, `QuantityExpr` replacing `Kind`: up the tree implicit,
   down by a named step, siblings and other kinds refused, `+` to the nearest common ancestor, products `Derived`. The
-  foundation of UNIT-2. P2401#3nov-0046b, design: P2401 `design/foundations-review.md` §3.
+  foundation of UNIT-2.
 - 📋 **UNIT-9 Dimension systems** · `foundations` — `SystemDef` with a rule by dimension and a bridge table by quantity,
   because Gaussian's D and P share a dimension and differ by a factor; `Natural` (ħ = c = 1) and `Gaussian` together,
-  exact, with μ₀ as a symbol (NUM-10); distinguished bases pass through untouched. P2401#3nov-0047, design: P2401
-  `design/foundations-review.md` §4.
+  exact, with μ₀ as a symbol (NUM-10); distinguished bases pass through untouched.
 - 📋 **UNIT-10 The dimension's shape** · `foundations` — a system's true bases in an array (SI: 7); rad, Np, NpLoss, bit
   and user counts as one list of distinguished dimensionless bases with no count limit (a const tree of `&'static`
   nodes, a `Vec` at run time); exponents in halves with no root flag, `UNib32` with zigzag in the schema; `strip(base)`
-  and `true_part()`. P2401#3nov-0134, design: P2401 `design/foundations-review.md` §2.
+  and `true_part()`.
 
 ## Points and origins (`PT`)
 
@@ -296,7 +295,6 @@ and clocks with a named epoch.
 - 📋 **PT-4 Time scales as references** · `foundations` — `ReferenceDef` (exact, run time, time scale); `TaiScale`,
   `PosixScale`, `DeviceMonotonic`; `UnixEpoch` moves off `UnitZero`; within a scale exact at compile time, across
   through a `LeapTable` at run time behind a cargo feature, `InLeap` inside a leap second. The foundation of PT-3.
-  P2401#3nov-0047c, design: P2401 `design/foundations-review.md` §6.
 
 ## Levels (`LVL`)
 
@@ -353,8 +351,7 @@ non-linear named scales.
   LVL-3's remaining pieces land.
 - 📋 **LVL-6 Codecs: non-linear encodings beside `Fixed`** · `foundations` — `Coded<C, V>` with the bytes of the raw
   number, `Codec`, `CodecDef` as data (μ-law, A-law, gamma, exp, table), composing with `Niched`; a `Curve` trait for
-  named conversions. The foundation of LVL-4 and of IO-3's SFLOAT. P2401#3nov-0047d, design: P2401
-  `design/foundations-review.md` §7.
+  named conversions. The foundation of LVL-4 and of IO-3's SFLOAT.
 
 ## Complex quantities (`CPX`)
 
@@ -445,7 +442,7 @@ the command line, databases, Arrow.
 - 📋 **IO-9 Unit names, a registry and notations** · `foundations` — `UnitNames` (Unicode and ASCII symbol, long name,
   aliases, UCUM code, `PrefixPolicy`), a `Registry` over static tables without a global, parsing with an expected
   dimension that refuses an ambiguous reading, `Notation` (Unicode, ASCII, UCUM, Typst). The foundation of IO-4, IO-2,
-  IO-5, IO-7. P2401#3nov-0047b, design: P2401 `design/foundations-review.md` §5.
+  IO-5, IO-7.
 
 ## Dropped and superseded
 

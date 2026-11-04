@@ -125,7 +125,7 @@ language = "en"
 # No navigation.instant / .prefetch: Zensical 0.0.74's instant-nav click handling has a race that gets worse
 # with round-trip latency (100% reproducible over real network, confirmed down to a 3-page project with none of
 # this repo's own JS or CSS); clicking Next/Previous eventually does nothing until the page is reloaded from the
-# root. Notes for an upstream issue: tpm prj/P2401-wireweaver/design/upstream-zensical-instant-nav.md
+# root. Notes for an upstream issue are kept in our internal design notes.
 features = [
     "content.code.annotate",
     "content.code.copy",

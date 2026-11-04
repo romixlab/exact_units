@@ -1,5 +1,7 @@
 ## Unreleased
 
+docs: internal references removed
+
 ### 🚀 Features
 
 - Book: the library pages wire_weaver's docs site carried under `std_library` (`exact_units`, `magnitude`,

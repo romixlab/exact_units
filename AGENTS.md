@@ -38,7 +38,7 @@ at the edges). An item about the wire, `ww_si`, codegen or WireWeaver integratio
 
 "Exact" is the crate's promise: no hidden gotchas, everything explicit, safe by default. A design follows these seven
 rules; the book's page `docs/start/exact.md` shows each with a doctest. A design that would break one is either
-changed or stops and asks; where the crate breaks one today, the gap is filed (a P2401 task) and listed on that
+changed or stops and asks; where the crate breaks one today, the gap is filed as a task and listed on that
 page under "Where the crate falls short today", never hidden.
 
 1. **Every scale is exact.** A scale, factor or offset is an exact rational times powers of exact symbols (π, ln 2,
@@ -137,5 +137,5 @@ a fix in its own commit.
 
 Every user-visible change gets an entry under `## Unreleased` in `CHANGELOG.md` in the same commit
 (`### ⚠️ Breaking`, `### 🚀 Features`, `### 🐛 Fixes`). Conventional Commits with a scope (`feat(fixed): ...`),
-a body saying what and why. Work happens on a session branch; it reaches `main` only through `tpm land`, which
-releases it (version bump and changelog section). Sessions never bump the version and never push.
+a body saying what and why. Work happens on a session branch; it reaches `main` only through the release step, which
+bumps the version and finalizes the changelog section. Sessions never bump the version and never push.

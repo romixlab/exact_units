@@ -15,7 +15,7 @@ use shrink_wrap::prelude::*;
 /// walk stops at [MAX_UNIT_DEPTH](crate::MAX_UNIT_DEPTH) levels.
 ///
 /// On the wire a nibble for the variant, then its fields: `Volt` is the name, the symbol, its [Dim] and [Scale].
-// TODO(P2401#1nov-1805): a `validate = ..` here that refuses a tree deeper than MAX_UNIT_DEPTH, on reading (borrowed and
+// TODO: a `validate = ..` here that refuses a tree deeper than MAX_UNIT_DEPTH, on reading (borrowed and
 // owned) and before writing, once shrink_wrap runs validate on enums and on write. Until then the encoder writes a
 // tree of any depth, the owned reader stops at shrink_wrap's 128 nesting levels (124 nodes), the borrowed one reads
 // the top node only, and every walk stops at MAX_UNIT_DEPTH. A typed unit is checked at compile time (Unit::DEPTH).
