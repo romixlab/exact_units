@@ -298,15 +298,17 @@ const fn angle_unit_name(n: u8) -> Option<&'static str> {
 /// [Dim]: [Watt](crate::units::Watt), [VoltAmpere](crate::units::VoltAmpere) and [Var](crate::units::Var) share a
 /// dimension but only [Watt] is really [RadiantIntensity](crate::units::RadiantIntensity) times a
 /// [Steradian](crate::units::Steradian), so a bare [Dim] match would wrongly say yes for the other two.
-#[expect(
-    clippy::indexing_slicing,
-    reason = "i < table.len(), the loop bound"
-)]
+#[expect(clippy::indexing_slicing, reason = "i < table.len(), the loop bound")]
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "i < table.len(), the loop bound, so i + 1 fits usize"
 )]
-const fn known_angle_step(low: Dim<'_>, low_kind: Kind<'_>, high: Dim<'_>, high_kind: Kind<'_>) -> bool {
+const fn known_angle_step(
+    low: Dim<'_>,
+    low_kind: Kind<'_>,
+    high: Dim<'_>,
+    high_kind: Kind<'_>,
+) -> bool {
     let table = crate::products::TABLE;
     let mut i = 0;
     while i < table.len() {

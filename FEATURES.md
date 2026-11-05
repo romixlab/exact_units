@@ -155,7 +155,13 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   angle (Lambert's law), not a bare product, so no entry is honest. Doctests on the two photometric/time entries;
   a feature-gated unit test per pair, named and not, including `assert_is_a_product` (a generic fn whose
   `UnitMul` bound only compiles when the product really exists, so a table/`known_angle_step` mismatch is a
-  compile error, not a silent drift).
+  compile error, not a silent drift). `known_angle_step` doesn't keep its own list of pairs (review, user): the
+  `products!` macro also builds `products::TABLE`, a `&[ProductEntry]` of every line's three sides' real `Dim` and
+  `Kind`, each row behind that line's own `#[cfg(..)]` (an individual array element can carry `#[cfg(..)]` on
+  stable Rust, so a feature left off drops that row, not just that impl); `known_angle_step` scans `TABLE` for a
+  side matching `low` and an output matching `high`, so an angle product `products.rs` gains or loses changes what
+  the hint sees with nothing else to touch. A test walks `TABLE` and asserts every entry differing only by rad is
+  a hit (checked non-vacuous by breaking `known_angle_step` on purpose and watching the test catch it).
 - 📋 **NUM-10 Measured constants as exact symbols** · `foundations` — μ₀ and G in `Magnitude` beside π, ln 2 and ln 10
   (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
   old 4π·10⁻⁷ only as the opt-in `Ampere1948`; a conversion that needs a symbol doesn't compile without a set, floats
