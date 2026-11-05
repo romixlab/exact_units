@@ -291,57 +291,33 @@ const fn angle_unit_name(n: u8) -> Option<&'static str> {
 }
 
 /// Whether `low` (fewer radians) reaches `high` (more) in one step of this crate's own product table
-/// ([products](crate::products)): the exact [Dim] and [Kind] of one side of a real `UnitMul`/`UnitDiv` entry, read
-/// straight off the real unit types ([Unit::DIM], [Unit::KIND]) and gated the same way `products.rs` gates that
-/// entry, so a feature left off here never claims a step the build didn't actually give it. [Kind] as well as
+/// ([products::TABLE](crate::products::TABLE)): scans every entry for a side whose [Dim] and [Kind] match `low`
+/// exactly, the entry's output matching `high` — the table doesn't care which of its two factors that side was,
+/// so both are tried. Never a separate list of pairs to keep in step with `products.rs` by hand: an entry added,
+/// changed or removed there changes what this sees in the same build, nothing here to update. [Kind] as well as
 /// [Dim]: [Watt](crate::units::Watt), [VoltAmpere](crate::units::VoltAmpere) and [Var](crate::units::Var) share a
 /// dimension but only [Watt] is really [RadiantIntensity](crate::units::RadiantIntensity) times a
 /// [Steradian](crate::units::Steradian), so a bare [Dim] match would wrongly say yes for the other two.
-const fn known_angle_step(
-    _low: Dim<'_>,
-    _low_kind: Kind<'_>,
-    _high: Dim<'_>,
-    _high_kind: Kind<'_>,
-) -> bool {
-    #[cfg(all(feature = "time", feature = "angle"))]
-    if _low.same(crate::units::Hertz::DIM)
-        && _low_kind.same(crate::units::Hertz::KIND)
-        && _high.same(crate::units::AngularVelocity::DIM)
-        && _high_kind.same(crate::units::AngularVelocity::KIND)
-    {
-        return true;
-    }
-    #[cfg(all(feature = "time", feature = "angle"))]
-    if _low.same(crate::units::HertzPerSecond::DIM)
-        && _low_kind.same(crate::units::HertzPerSecond::KIND)
-        && _high.same(crate::units::AngularAcceleration::DIM)
-        && _high_kind.same(crate::units::AngularAcceleration::KIND)
-    {
-        return true;
-    }
-    #[cfg(all(feature = "mechanical", feature = "angle"))]
-    if _low.same(crate::units::Torque::DIM)
-        && _low_kind.same(crate::units::Torque::KIND)
-        && _high.same(crate::units::Joule::DIM)
-        && _high_kind.same(crate::units::Joule::KIND)
-    {
-        return true;
-    }
-    #[cfg(all(feature = "photometric", feature = "angle"))]
-    if _low.same(crate::units::Candela::DIM)
-        && _low_kind.same(crate::units::Candela::KIND)
-        && _high.same(crate::units::Lumen::DIM)
-        && _high_kind.same(crate::units::Lumen::KIND)
-    {
-        return true;
-    }
-    #[cfg(all(feature = "radiometric", feature = "angle", feature = "electrical"))]
-    if _low.same(crate::units::RadiantIntensity::DIM)
-        && _low_kind.same(crate::units::RadiantIntensity::KIND)
-        && _high.same(crate::units::Watt::DIM)
-        && _high_kind.same(crate::units::Watt::KIND)
-    {
-        return true;
+#[expect(
+    clippy::indexing_slicing,
+    reason = "i < table.len(), the loop bound"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "i < table.len(), the loop bound, so i + 1 fits usize"
+)]
+const fn known_angle_step(low: Dim<'_>, low_kind: Kind<'_>, high: Dim<'_>, high_kind: Kind<'_>) -> bool {
+    let table = crate::products::TABLE;
+    let mut i = 0;
+    while i < table.len() {
+        let entry = &table[i];
+        let o_matches = entry.o.0.same(high) && entry.o.1.same(high_kind);
+        let a_matches = entry.a.0.same(low) && entry.a.1.same(low_kind);
+        let b_matches = entry.b.0.same(low) && entry.b.1.same(low_kind);
+        if o_matches && (a_matches || b_matches) {
+            return true;
+        }
+        i += 1;
     }
     false
 }
@@ -718,6 +694,34 @@ mod tests {
             msg.as_str(),
             " — not a named step: converts through Times<RadiantIntensity, Radian²>, then convert"
         );
+    }
+
+    #[test]
+    fn every_angle_differing_table_entry_is_a_named_step() {
+        // Walks products::TABLE itself (not a hand-picked list of pairs): for every entry whose `a` or `b` side
+        // differs from its `o` only by rad (one radian or one steradian, whichever the build has), that's exactly
+        // the shape known_angle_step must say yes to — it reads the very table this test walks, so this also
+        // catches an angle product added to products.rs without `known_angle_step` noticing, were that still
+        // possible (it scans the table now, so it can't drift from it, but the property is worth keeping true).
+        for entry in crate::products::TABLE {
+            for side in [entry.a, entry.b] {
+                let Some(diff) = side.0.checked_div(entry.o.0) else {
+                    continue;
+                };
+                if !is_only_rad(diff) {
+                    continue;
+                }
+                let (low, low_kind, high, high_kind) = if diff.rad < 0 {
+                    (side.0, side.1, entry.o.0, entry.o.1)
+                } else {
+                    (entry.o.0, entry.o.1, side.0, side.1)
+                };
+                assert!(
+                    known_angle_step(low, low_kind, high, high_kind),
+                    "a product table entry differs only by rad but known_angle_step misses it"
+                );
+            }
+        }
     }
 
     /// `Msg::new()` filled with `CAP - 1` single-byte pushes: one byte short of the cap.

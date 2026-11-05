@@ -14,28 +14,48 @@ impl<U: crate::Unit> crate::UnitDiv<crate::units::Ratio> for U {
     type Output = U;
 }
 
+/// One side of a [ProductEntry]: a unit's real [Dim](crate::Dim) and [Kind](crate::Kind), the two things
+/// [Fixed::convert](crate::Fixed::convert) itself checks.
+pub(crate) type Side = (crate::Dim<'static>, crate::Kind<'static>);
+
+/// One line of the product table (`A * B = O`), its three sides' real `Dim` and `Kind` read straight off the unit
+/// types: what [TABLE] holds, so [known_angle_step](crate::conv_error::known_angle_step) can scan the table
+/// itself for an angle-crossing step instead of keeping a separate list that could drift from it.
+pub(crate) struct ProductEntry {
+    pub(crate) a: Side,
+    pub(crate) b: Side,
+    pub(crate) o: Side,
+}
+
 /// `A * B = C;` gives `A · B`, `B · A`, `C / A` and `C / B`, and checks at compile time that the SI exponents of `A`
-/// and `B` add up to those of `C` and that none of them has an offset scale (°C).
+/// and `B` add up to those of `C` and that none of them has an offset scale (°C). Each line's `#[cfg(..)]` must
+/// come before any doc comment on it (a macro_rules limitation: a repeated `#[doc = ..]` ahead of another meta is
+/// ambiguous), and also gates that line's row of [TABLE].
 macro_rules! products {
-    ($($(#[$meta:meta])* $a:ident * $b:ident = $o:ident;)*) => {
+    ($(#[$cfg:meta] $(#[doc = $doc:literal])* $a:ident * $b:ident = $o:ident;)*) => {
         $(
-            $(#[$meta])*
+            #[$cfg]
+            $(#[doc = $doc])*
             impl crate::UnitMul<crate::units::$b> for crate::units::$a {
                 type Output = crate::units::$o;
             }
-            $(#[$meta])*
+            #[$cfg]
+            $(#[doc = $doc])*
             impl crate::UnitMul<crate::units::$a> for crate::units::$b {
                 type Output = crate::units::$o;
             }
-            $(#[$meta])*
+            #[$cfg]
+            $(#[doc = $doc])*
             impl crate::UnitDiv<crate::units::$a> for crate::units::$o {
                 type Output = crate::units::$b;
             }
-            $(#[$meta])*
+            #[$cfg]
+            $(#[doc = $doc])*
             impl crate::UnitDiv<crate::units::$b> for crate::units::$o {
                 type Output = crate::units::$a;
             }
-            $(#[$meta])*
+            #[$cfg]
+            $(#[doc = $doc])*
             const _: () = {
                 assert!(
                     <crate::units::$a as crate::Unit>::DIM
@@ -51,6 +71,28 @@ macro_rules! products {
                 );
             };
         )*
+
+        /// Every line of the macro call below, as a [ProductEntry] each, in the same order, each still behind its
+        /// own `#[cfg(..)]`.
+        pub(crate) const TABLE: &[ProductEntry] = &[
+            $(
+                #[$cfg]
+                ProductEntry {
+                    a: (
+                        <crate::units::$a as crate::Unit>::DIM,
+                        <crate::units::$a as crate::Unit>::KIND,
+                    ),
+                    b: (
+                        <crate::units::$b as crate::Unit>::DIM,
+                        <crate::units::$b as crate::Unit>::KIND,
+                    ),
+                    o: (
+                        <crate::units::$o as crate::Unit>::DIM,
+                        <crate::units::$o as crate::Unit>::KIND,
+                    ),
+                },
+            )*
+        ];
     };
 }
 
@@ -81,6 +123,7 @@ products! {
     Torque * Second = AngularMomentum;
     #[cfg(all(feature = "angle", feature = "time"))]
     AngularVelocity * Second = Radian;
+    #[cfg(all(feature = "time", feature = "angle"))]
     /// ```
     /// # #[cfg(all(feature = "time", feature = "angle"))] {
     /// use exact_units::{Fixed, prefix::One, units::{AngularVelocity, Hertz, Radian}};
@@ -91,7 +134,6 @@ products! {
     /// assert_eq!((f * one_rad).convert::<AngularVelocity, One, i32>(), Some(Fixed::new(50)));
     /// # }
     /// ```
-    #[cfg(all(feature = "time", feature = "angle"))]
     Hertz * Radian = AngularVelocity;
     #[cfg(all(feature = "time", feature = "angle"))]
     HertzPerSecond * Radian = AngularAcceleration;
@@ -107,6 +149,7 @@ products! {
     Hertz * Second = Ratio;
     #[cfg(feature = "time")]
     HertzPerSecond * Second = Hertz;
+    #[cfg(all(feature = "photometric", feature = "angle"))]
     /// ```
     /// # #[cfg(all(feature = "photometric", feature = "angle"))] {
     /// use exact_units::{Fixed, prefix::One, units::{Candela, Lumen, Steradian}};
@@ -117,7 +160,6 @@ products! {
     /// assert_eq!((i * sr).convert::<Lumen, One, i32>(), Some(Fixed::new(240)));
     /// # }
     /// ```
-    #[cfg(all(feature = "photometric", feature = "angle"))]
     Candela * Steradian = Lumen;
     #[cfg(all(feature = "radiometric", feature = "angle", feature = "electrical"))]
     RadiantIntensity * Steradian = Watt;
