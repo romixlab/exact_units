@@ -268,9 +268,8 @@ const fn is_only_rad(d: Dim<'_>) -> bool {
         && d.counted[0].is_none()
 }
 
-/// `n`, as plain (non-superscript) digits, `-` before a negative one: for `Radian` in [push_angle_hint], where a
-/// `Dim`'s own exponents are superscript but this one stands for a repeated operator, not a power written on a
-/// unit symbol.
+/// `n` widened into an `i32`, for [push_angle_hint]'s `push_superscript(widen_u8(n))`: `const fn`, where `From` is
+/// not const on stable.
 #[expect(
     clippy::as_conversions,
     reason = "const fn: From is not const on stable; n is a u8, widening into i32 exactly"
@@ -281,7 +280,7 @@ const fn widen_u8(n: u8) -> i32 {
 
 /// When `diff` (`A::DIM` divided by `B::DIM`) is only an angle ([is_only_rad]), the hint that names the actual
 /// operation from `A` and `B`'s real names: `Torque × Radian is Joule` when `A`'s dimension has fewer radians than
-/// `B`'s (multiplying by an angle gets from `A` to `B`), `Hertz / Radian is AngularVelocity` the other way, with
+/// `B`'s (multiplying by an angle gets from `A` to `B`), `AngularVelocity / Radian is Hertz` the other way, with
 /// the angle's own exponent written when crossing it takes more than one step. Does nothing otherwise.
 const fn push_angle_hint<A: Unit, B: Unit>(mut msg: Msg, diff: Dim<'_>) -> Msg {
     if !is_only_rad(diff) {

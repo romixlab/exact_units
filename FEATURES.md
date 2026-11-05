@@ -127,9 +127,9 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   (`src/conv_error.rs`, no alloc: a stack buffer that drops a push whole rather than split a multi-byte char in half,
   `core::str::from_utf8`, `panic!("{}", msg)`) names both units (type name and symbol from `EXPR`) and dimensions,
   and the dimension left when one divides the other (`rad⁻¹` for a torque and a joule); where that leftover is only
-  an angle, a hint names the real operation from the two units themselves (`Torque × Radian is Joule`, `Hertz /
-  Radian is AngularVelocity`, the operator and exponent from the sign and size of the angle left over, never a fixed
-  example). A kind mismatch names both kinds. Used by every refused conversion in `Fixed` (`convert`, `to`,
+  an angle, a hint names the real operation from the two units themselves (`Torque × Radian is Joule`,
+  `AngularVelocity / Radian is Hertz`, the operator and exponent from the sign and size of the angle left over,
+  never a fixed example). A kind mismatch names both kinds. Used by every refused conversion in `Fixed` (`convert`, `to`,
   `convert_rounded`, their `Exact` paths) and `Exact` (`convert`, `recip`), and by a decimal literal's unit check
   (`fixed!(.. in S)`); `Complex` and `Point` get it through `Fixed`'s checks (`Complex::convert` delegates, `Point`'s
   cross-unit origins are a trait-bound error already, out of scope). `Torque * Radian = Joule` added to the product
