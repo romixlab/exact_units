@@ -139,7 +139,23 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   reason. Unit tests in `src/conv_error.rs` (`push_dim` with negative and half exponents, `push_superscript`, the
   angle hint both ways and when it doesn't apply, the buffer's cap). Compile-fail snapshots:
   `tests/compile_fail/{dim_mismatch,dim_mismatch_angle_hint,kind_mismatch,literal_mismatch}.{rs,stderr}`.
-  P2401#5nov-0954.
+  P2401#5nov-0954. The angle hint no longer claims a named step for every angle-differing pair unconditionally
+  (P2401#5nov-1340): `known_angle_step` (`src/conv_error.rs`) walks the same `cfg`-gated shape as `products.rs`,
+  comparing each side's real `Unit::DIM` and `Unit::KIND` (never a name, so `Watt`/`VoltAmpere`/`Var` sharing a
+  dimension don't share a step), and a two-radian gap is named through `Steradian`, never a nonexistent `Radian²`
+  (`Candela × Steradian is Lumen`). An angle-differing pair with no entry — by choice, or because the gap is
+  neither one radian nor one steradian — gets a fallback that never calls itself named: the `Times`/`Per` compound
+  a caller would really have to build first: `Nit` to `Lux` reads `— not a named step: converts through Times<Nit,
+  Radian²>, then convert`, never the false claim that `Nit × Radian² is Lux`. Closed the gap for `Hertz * Radian =
+  AngularVelocity`, `HertzPerSecond * Radian = AngularAcceleration`, `Candela * Steradian = Lumen` and
+  `RadiantIntensity * Steradian = Watt` (each a real one-step hint now), and for `MomentOfInertia *
+  AngularVelocity = AngularMomentum`, `MomentOfInertia * AngularAcceleration = Torque` and `Torque * Second =
+  AngularMomentum` (products their own doc comments in `units.rs` already claimed, now backed). Left `Nit`/`Lux`
+  and `Radiance`/`Irradiance` two steps on purpose: illuminance and radiance integrate over a cosine-weighted solid
+  angle (Lambert's law), not a bare product, so no entry is honest. Doctests on the two photometric/time entries;
+  a feature-gated unit test per pair, named and not, including `assert_is_a_product` (a generic fn whose
+  `UnitMul` bound only compiles when the product really exists, so a table/`known_angle_step` mismatch is a
+  compile error, not a silent drift).
 - 📋 **NUM-10 Measured constants as exact symbols** · `foundations` — μ₀ and G in `Magnitude` beside π, ln 2 and ln 10
   (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
   old 4π·10⁻⁷ only as the opt-in `Ampere1948`; a conversion that needs a symbol doesn't compile without a set, floats

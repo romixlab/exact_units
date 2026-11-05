@@ -73,8 +73,28 @@ products! {
     Torque * AngularVelocity = Watt;
     #[cfg(all(feature = "mechanical", feature = "angle"))]
     Torque * Radian = Joule;
+    #[cfg(all(feature = "mechanical", feature = "angle"))]
+    MomentOfInertia * AngularVelocity = AngularMomentum;
+    #[cfg(all(feature = "mechanical", feature = "angle"))]
+    MomentOfInertia * AngularAcceleration = Torque;
+    #[cfg(all(feature = "mechanical", feature = "angle", feature = "time"))]
+    Torque * Second = AngularMomentum;
     #[cfg(all(feature = "angle", feature = "time"))]
     AngularVelocity * Second = Radian;
+    /// ```
+    /// # #[cfg(all(feature = "time", feature = "angle"))] {
+    /// use exact_units::{Fixed, prefix::One, units::{AngularVelocity, Hertz, Radian}};
+    ///
+    /// let f = Fixed::<Hertz, One, i32>::new(50);
+    /// let one_rad = Fixed::<Radian, One, i32>::new(1);
+    /// // 50 Hz · 1 rad is 50 of Hz·rad, a named step away from rad/s
+    /// assert_eq!((f * one_rad).convert::<AngularVelocity, One, i32>(), Some(Fixed::new(50)));
+    /// # }
+    /// ```
+    #[cfg(all(feature = "time", feature = "angle"))]
+    Hertz * Radian = AngularVelocity;
+    #[cfg(all(feature = "time", feature = "angle"))]
+    HertzPerSecond * Radian = AngularAcceleration;
     #[cfg(all(feature = "mechanical", feature = "time"))]
     Speed * Second = Meter;
     #[cfg(all(feature = "mechanical", feature = "time"))]
@@ -87,4 +107,18 @@ products! {
     Hertz * Second = Ratio;
     #[cfg(feature = "time")]
     HertzPerSecond * Second = Hertz;
+    /// ```
+    /// # #[cfg(all(feature = "photometric", feature = "angle"))] {
+    /// use exact_units::{Fixed, prefix::One, units::{Candela, Lumen, Steradian}};
+    ///
+    /// let i = Fixed::<Candela, One, i32>::new(120);
+    /// let sr = Fixed::<Steradian, One, i32>::new(2);
+    /// // a luminous flux is its intensity times the solid angle it fills
+    /// assert_eq!((i * sr).convert::<Lumen, One, i32>(), Some(Fixed::new(240)));
+    /// # }
+    /// ```
+    #[cfg(all(feature = "photometric", feature = "angle"))]
+    Candela * Steradian = Lumen;
+    #[cfg(all(feature = "radiometric", feature = "angle", feature = "electrical"))]
+    RadiantIntensity * Steradian = Watt;
 }

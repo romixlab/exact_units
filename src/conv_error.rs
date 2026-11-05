@@ -278,27 +278,111 @@ const fn widen_u8(n: u8) -> i32 {
     n as i32
 }
 
-/// When `diff` (`A::DIM` divided by `B::DIM`) is only an angle ([is_only_rad]), the hint that names the actual
-/// operation from `A` and `B`'s real names: `Torque × Radian is Joule` when `A`'s dimension has fewer radians than
-/// `B`'s (multiplying by an angle gets from `A` to `B`), `AngularVelocity / Radian is Hertz` the other way, with
-/// the angle's own exponent written when crossing it takes more than one step. Does nothing otherwise.
+/// The name of the one angle marker that spans `n` radians on its own: [Radian](crate::units::Radian) for one,
+/// [Steradian](crate::units::Steradian) for two (a solid angle is a plane one squared) — the only angle bases this
+/// crate names more than a scale apart from a plain radian. `None` for any other `n`, where no single named unit
+/// spans it, so [push_angle_hint] never claims a step through a type that doesn't exist.
+const fn angle_unit_name(n: u8) -> Option<&'static str> {
+    match n {
+        1 => Some("Radian"),
+        2 => Some("Steradian"),
+        _ => None,
+    }
+}
+
+/// Whether `low` (fewer radians) reaches `high` (more) in one step of this crate's own product table
+/// ([products](crate::products)): the exact [Dim] and [Kind] of one side of a real `UnitMul`/`UnitDiv` entry, read
+/// straight off the real unit types ([Unit::DIM], [Unit::KIND]) and gated the same way `products.rs` gates that
+/// entry, so a feature left off here never claims a step the build didn't actually give it. [Kind] as well as
+/// [Dim]: [Watt](crate::units::Watt), [VoltAmpere](crate::units::VoltAmpere) and [Var](crate::units::Var) share a
+/// dimension but only [Watt] is really [RadiantIntensity](crate::units::RadiantIntensity) times a
+/// [Steradian](crate::units::Steradian), so a bare [Dim] match would wrongly say yes for the other two.
+const fn known_angle_step(
+    _low: Dim<'_>,
+    _low_kind: Kind<'_>,
+    _high: Dim<'_>,
+    _high_kind: Kind<'_>,
+) -> bool {
+    #[cfg(all(feature = "time", feature = "angle"))]
+    if _low.same(crate::units::Hertz::DIM)
+        && _low_kind.same(crate::units::Hertz::KIND)
+        && _high.same(crate::units::AngularVelocity::DIM)
+        && _high_kind.same(crate::units::AngularVelocity::KIND)
+    {
+        return true;
+    }
+    #[cfg(all(feature = "time", feature = "angle"))]
+    if _low.same(crate::units::HertzPerSecond::DIM)
+        && _low_kind.same(crate::units::HertzPerSecond::KIND)
+        && _high.same(crate::units::AngularAcceleration::DIM)
+        && _high_kind.same(crate::units::AngularAcceleration::KIND)
+    {
+        return true;
+    }
+    #[cfg(all(feature = "mechanical", feature = "angle"))]
+    if _low.same(crate::units::Torque::DIM)
+        && _low_kind.same(crate::units::Torque::KIND)
+        && _high.same(crate::units::Joule::DIM)
+        && _high_kind.same(crate::units::Joule::KIND)
+    {
+        return true;
+    }
+    #[cfg(all(feature = "photometric", feature = "angle"))]
+    if _low.same(crate::units::Candela::DIM)
+        && _low_kind.same(crate::units::Candela::KIND)
+        && _high.same(crate::units::Lumen::DIM)
+        && _high_kind.same(crate::units::Lumen::KIND)
+    {
+        return true;
+    }
+    #[cfg(all(feature = "radiometric", feature = "angle", feature = "electrical"))]
+    if _low.same(crate::units::RadiantIntensity::DIM)
+        && _low_kind.same(crate::units::RadiantIntensity::KIND)
+        && _high.same(crate::units::Watt::DIM)
+        && _high_kind.same(crate::units::Watt::KIND)
+    {
+        return true;
+    }
+    false
+}
+
+/// When `diff` (`A::DIM` divided by `B::DIM`) is only an angle ([is_only_rad]), the hint that crosses it: when
+/// [known_angle_step] says the product table really has that step, `A`'s and `B`'s real names around the angle
+/// marker that carries it (`Torque × Radian is Joule` when `A`'s dimension has fewer radians than `B`'s, `Candela ×
+/// Steradian is Lumen` when the gap is two), the same wording whichever direction `A`/`B` come in, since the
+/// product table doesn't care which side the caller started from. Where there's no such entry (by choice, or
+/// because the gap isn't one radian or one steradian), a fallback that never calls it named: the `Times`/`Per`
+/// compound a caller would actually have to build, then convert from. Does nothing when `diff` isn't only an
+/// angle.
 const fn push_angle_hint<A: Unit, B: Unit>(mut msg: Msg, diff: Dim<'_>) -> Msg {
     if !is_only_rad(diff) {
         return msg;
     }
     let n = diff.rad.unsigned_abs();
-    msg = msg.push(" — cross it with a named step: ");
-    msg = push_name(msg, A::EXPR);
-    msg = msg.push(if diff.rad < 0 {
-        " × Radian"
+    let (low_dim, low_kind, high_dim, high_kind) = if diff.rad < 0 {
+        (A::DIM, A::KIND, B::DIM, B::KIND)
     } else {
-        " / Radian"
-    });
+        (B::DIM, B::KIND, A::DIM, A::KIND)
+    };
+    if let Some(angle_unit) = angle_unit_name(n)
+        && known_angle_step(low_dim, low_kind, high_dim, high_kind)
+    {
+        msg = msg.push(" — cross it with a named step: ");
+        msg = push_name(msg, A::EXPR);
+        msg = msg.push(if diff.rad < 0 { " × " } else { " / " });
+        msg = msg.push(angle_unit);
+        msg = msg.push(" is ");
+        return push_name(msg, B::EXPR);
+    }
+    msg = msg.push(" — not a named step: converts through ");
+    msg = msg.push(if diff.rad < 0 { "Times<" } else { "Per<" });
+    msg = push_name(msg, A::EXPR);
+    msg = msg.push(", Radian");
     if n != 1 {
         msg = msg.push_superscript(widen_u8(n));
     }
-    msg = msg.push(" is ");
-    push_name(msg, B::EXPR)
+    msg = msg.push(">, then convert");
+    msg
 }
 
 /// The panic for two units whose dimension differs (`Fixed::convert`, `Exact::convert`, a literal's unit): both
@@ -414,10 +498,12 @@ mod tests {
 
     // two markers of the shape the angle hint cares about, without depending on the `mechanical` / `angle`
     // features that `units::Torque` and `units::Joule` need: a torque's dimension (kg·m²·s⁻²·rad⁻¹) and its
-    // energy (kg·m²·s⁻²), one radian apart.
+    // energy (kg·m²·s⁻²), one radian apart. `Energy`'s own kind (not `units::Joule`'s plain one) keeps this pair
+    // from ever matching the real `Torque * Radian = Joule` entry of `known_angle_step`, whether or not those
+    // features are on: these two test the fallback wording, the feature-gated tests below the named one.
     crate::unit! {
         struct Torque = "N·m", [kg 1, m 2, s -2, rad -1];
-        struct Energy = "J", [kg 1, m 2, s -2];
+        struct Energy = "J", [kg 1, m 2, s -2] kind "test-only";
     }
 
     #[test]
@@ -463,12 +549,13 @@ mod tests {
 
     #[test]
     fn angle_hint_multiplies_when_a_has_fewer_radians() {
-        // Torque's rad is -1, Energy's is 0: Torque × Radian is Energy.
+        // Torque's rad is -1, Energy's is 0: crossing Torque to Energy multiplies by Radian. No product table
+        // entry backs this invented pair (that's the point), so the fallback names the Times<..> instead.
         let diff = Torque::DIM.checked_div(Energy::DIM).unwrap();
         let msg = push_angle_hint::<Torque, Energy>(Msg::new(), diff);
         assert_eq!(
             msg.as_str(),
-            " — cross it with a named step: Torque × Radian is Energy"
+            " — not a named step: converts through Times<Torque, Radian>, then convert"
         );
     }
 
@@ -479,7 +566,7 @@ mod tests {
         let msg = push_angle_hint::<Energy, Torque>(Msg::new(), diff);
         assert_eq!(
             msg.as_str(),
-            " — cross it with a named step: Energy / Radian is Torque"
+            " — not a named step: converts through Per<Energy, Radian>, then convert"
         );
     }
 
@@ -489,6 +576,148 @@ mod tests {
         let not_only_rad = Dim::new(0, 0, 1, 0, 0, 0, 0).with_rad(1);
         let msg = push_angle_hint::<Torque, Energy>(Msg::new(), not_only_rad);
         assert_eq!(msg.as_str(), "");
+    }
+
+    /// Compiles only when `A * B = O` is really a `UnitMul` entry of the product table: used by the tests below to
+    /// confirm a "named step" hint isn't just a [known_angle_step] `Dim`/`Kind` coincidence with nothing backing
+    /// it (P2401#5nov-1340's own worry: the lookup table and `products.rs` drifting apart). `cfg`-gated the same
+    /// as its callers so it's never dead code when none of them are built.
+    #[cfg(any(
+        all(feature = "time", feature = "angle"),
+        all(feature = "mechanical", feature = "angle"),
+        all(feature = "photometric", feature = "angle"),
+        all(feature = "radiometric", feature = "angle", feature = "electrical"),
+    ))]
+    fn assert_is_a_product<A: crate::UnitMul<B, Output = O>, B: Unit, O: Unit>() {}
+
+    // The angle-differing pairs of named units this crate ships (the P2401#5nov-1340 walk): one test per pair,
+    // each gated on the features its units need, so `cargo test` only sees it when the units exist. A "named step"
+    // test also asserts the real product with `assert_is_a_product`; a "not a named step" one is a pair that
+    // differs only by a radian or a steradian but was left out of `products.rs` on purpose (the ready note says
+    // why for each).
+
+    #[cfg(all(feature = "time", feature = "angle"))]
+    #[test]
+    fn hertz_times_radian_is_angular_velocity_a_named_step() {
+        use crate::units::{AngularVelocity, Hertz, Radian};
+        assert_is_a_product::<Hertz, Radian, AngularVelocity>();
+        let diff = Hertz::DIM.checked_div(AngularVelocity::DIM).unwrap();
+        let msg = push_angle_hint::<Hertz, AngularVelocity>(Msg::new(), diff);
+        assert_eq!(
+            msg.as_str(),
+            " — cross it with a named step: Hertz × Radian is AngularVelocity"
+        );
+    }
+
+    #[cfg(all(feature = "time", feature = "angle"))]
+    #[test]
+    fn hertz_per_second_times_radian_is_angular_acceleration_a_named_step() {
+        use crate::units::{AngularAcceleration, HertzPerSecond, Radian};
+        assert_is_a_product::<HertzPerSecond, Radian, AngularAcceleration>();
+        let diff = HertzPerSecond::DIM
+            .checked_div(AngularAcceleration::DIM)
+            .unwrap();
+        let msg = push_angle_hint::<HertzPerSecond, AngularAcceleration>(Msg::new(), diff);
+        assert_eq!(
+            msg.as_str(),
+            " — cross it with a named step: HertzPerSecond × Radian is AngularAcceleration"
+        );
+    }
+
+    #[cfg(all(feature = "mechanical", feature = "angle"))]
+    #[test]
+    fn real_torque_times_radian_is_joule_a_named_step() {
+        use crate::units::{Joule, Radian, Torque as RealTorque};
+        assert_is_a_product::<RealTorque, Radian, Joule>();
+        let diff = RealTorque::DIM.checked_div(Joule::DIM).unwrap();
+        let msg = push_angle_hint::<RealTorque, Joule>(Msg::new(), diff);
+        assert_eq!(
+            msg.as_str(),
+            " — cross it with a named step: Torque × Radian is Joule"
+        );
+    }
+
+    #[cfg(all(feature = "photometric", feature = "angle"))]
+    #[test]
+    fn candela_times_steradian_is_lumen_a_named_step() {
+        use crate::units::{Candela, Lumen, Steradian};
+        assert_is_a_product::<Candela, Steradian, Lumen>();
+        let diff = Candela::DIM.checked_div(Lumen::DIM).unwrap();
+        let msg = push_angle_hint::<Candela, Lumen>(Msg::new(), diff);
+        assert_eq!(
+            msg.as_str(),
+            " — cross it with a named step: Candela × Steradian is Lumen"
+        );
+    }
+
+    #[cfg(all(feature = "radiometric", feature = "angle", feature = "electrical"))]
+    #[test]
+    fn radiant_intensity_times_steradian_is_watt_a_named_step() {
+        use crate::units::{RadiantIntensity, Steradian, Watt};
+        assert_is_a_product::<RadiantIntensity, Steradian, Watt>();
+        let diff = RadiantIntensity::DIM.checked_div(Watt::DIM).unwrap();
+        let msg = push_angle_hint::<RadiantIntensity, Watt>(Msg::new(), diff);
+        assert_eq!(
+            msg.as_str(),
+            " — cross it with a named step: RadiantIntensity × Steradian is Watt"
+        );
+    }
+
+    #[cfg(all(feature = "angle", feature = "dimensionless"))]
+    #[test]
+    fn radian_and_ratio_is_not_a_named_step() {
+        // the crate's own design (Radian's doc comment): angle is a base dimension of its own so it never mixes
+        // with a plain Ratio, so there's no product crossing them even though they differ only by one radian.
+        use crate::units::{Radian, Ratio};
+        let diff = Ratio::DIM.checked_div(Radian::DIM).unwrap();
+        let msg = push_angle_hint::<Ratio, Radian>(Msg::new(), diff);
+        assert_eq!(
+            msg.as_str(),
+            " — not a named step: converts through Times<Ratio, Radian>, then convert"
+        );
+    }
+
+    #[cfg(all(feature = "photometric", feature = "angle"))]
+    #[test]
+    fn nit_and_lux_is_not_a_named_step() {
+        // illuminance (lux) is not luminance (nit) times a solid angle: the real relation integrates luminance
+        // over the cosine-weighted solid angle (Lambert's law), not a bare product, so this is left out even
+        // though the two differ only by a steradian.
+        use crate::units::{Lux, Nit};
+        let diff = Nit::DIM.checked_div(Lux::DIM).unwrap();
+        let msg = push_angle_hint::<Nit, Lux>(Msg::new(), diff);
+        assert_eq!(
+            msg.as_str(),
+            " — not a named step: converts through Times<Nit, Radian²>, then convert"
+        );
+    }
+
+    #[cfg(feature = "radiometric")]
+    #[test]
+    fn radiance_and_irradiance_is_not_a_named_step() {
+        // the radiometric analogue of nit/lux, same reason: no bare product, Lambert's law in the way.
+        use crate::units::{Irradiance, Radiance};
+        let diff = Radiance::DIM.checked_div(Irradiance::DIM).unwrap();
+        let msg = push_angle_hint::<Radiance, Irradiance>(Msg::new(), diff);
+        assert_eq!(
+            msg.as_str(),
+            " — not a named step: converts through Times<Radiance, Radian²>, then convert"
+        );
+    }
+
+    #[cfg(all(feature = "radiometric", feature = "angle", feature = "electrical"))]
+    #[test]
+    fn radiant_intensity_and_volt_ampere_is_not_a_named_step() {
+        // VoltAmpere shares Watt's dimension but not its kind (an apparent power, never a plain power by
+        // `convert`): known_angle_step must tell them apart by kind, not dimension alone, so RadiantIntensity ×
+        // Steradian stays Watt's step only, never VoltAmpere's.
+        use crate::units::{RadiantIntensity, VoltAmpere};
+        let diff = RadiantIntensity::DIM.checked_div(VoltAmpere::DIM).unwrap();
+        let msg = push_angle_hint::<RadiantIntensity, VoltAmpere>(Msg::new(), diff);
+        assert_eq!(
+            msg.as_str(),
+            " — not a named step: converts through Times<RadiantIntensity, Radian²>, then convert"
+        );
     }
 
     /// `Msg::new()` filled with `CAP - 1` single-byte pushes: one byte short of the cap.
