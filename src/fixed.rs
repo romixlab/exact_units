@@ -900,28 +900,20 @@ impl Conversion {
 
     /// From unit `U` in scale `P` to `U2` in `P2`: both units' exact factors to SI and the same dimension, else a
     /// compile error; `rounding` as for [of](Self::of).
-    #[expect(
-        clippy::panic,
-        reason = "a compile error in const code (a panic at run time), as documented: units without an exact factor to SI"
-    )]
     const fn between<U: Unit, P: FixedScale, U2: Unit, P2: FixedScale, T: Storage, T2: Storage>(
         rounding: bool,
     ) -> Self {
-        assert!(
-            U::DIM.same(U2::DIM),
-            "a Fixed converts only between units of the same dimension (a pound-force is not a pound)"
-        );
-        assert!(
-            U::KIND.same(U2::KIND),
-            "a Fixed converts only between units of the same kind: V/V is not A/A or a Ratio, V/A is not an Ohm \
-             (cross kinds with a named step: as_ratio, as_resistance, as_phase, ..)"
-        );
-        assert!(
-            !U::EXPR.has_offset() && !U2::EXPR.has_offset(),
-            "a unit with an offset converts as a Point, not a Fixed"
-        );
+        if !U::DIM.same(U2::DIM) {
+            crate::conv_error::dim_mismatch::<U, U2>("a Fixed");
+        }
+        if !U::KIND.same(U2::KIND) {
+            crate::conv_error::kind_mismatch::<U, U2>("a Fixed");
+        }
+        if U::EXPR.has_offset() || U2::EXPR.has_offset() {
+            crate::conv_error::has_offset::<U, U2>("a Fixed");
+        }
         let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
-            panic!("a Fixed converts only between units with an exact factor to SI")
+            crate::conv_error::no_exact_factor::<U, U2>("a Fixed")
         };
         Self::by::<T, T2>(from.mul(P::SCALE).div(to.mul(P2::SCALE)), rounding)
     }

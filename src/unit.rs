@@ -854,7 +854,7 @@ pub(crate) fn write_superscript(f: &mut fmt::Formatter<'_>, exp: i32) -> fmt::Re
 }
 
 /// A digit (`d` below 10) in superscript.
-const fn superscript_digit(d: u32) -> &'static str {
+pub(crate) const fn superscript_digit(d: u32) -> &'static str {
     match d {
         0 => "⁰",
         1 => "¹",

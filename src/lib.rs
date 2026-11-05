@@ -56,6 +56,7 @@ struct ReadmeDoctests;
 mod book;
 
 pub mod complex;
+mod conv_error;
 pub mod cordic;
 pub mod decibel;
 mod declare;

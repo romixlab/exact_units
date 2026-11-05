@@ -71,6 +71,8 @@ products! {
     Watt * Second = Joule;
     #[cfg(all(feature = "electrical", feature = "mechanical", feature = "angle"))]
     Torque * AngularVelocity = Watt;
+    #[cfg(all(feature = "mechanical", feature = "angle"))]
+    Torque * Radian = Joule;
     #[cfg(all(feature = "angle", feature = "time"))]
     AngularVelocity * Second = Radian;
     #[cfg(all(feature = "mechanical", feature = "time"))]

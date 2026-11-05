@@ -237,21 +237,17 @@ impl<U> Exact<U> {
     reason = "a compile error in const code (evaluated in const blocks), as documented"
 )]
 const fn factor<U: Unit, U2: Unit>() -> Fraction {
-    assert!(
-        U::DIM.same(U2::DIM),
-        "an Exact converts only between units of the same dimension"
-    );
-    assert!(
-        U::KIND.same(U2::KIND),
-        "an Exact converts only between units of the same kind: V/V is not A/A or a Ratio, V/A is not an Ohm \
-         (U/U to a Ratio is the named step as_ratio)"
-    );
-    assert!(
-        !U::EXPR.has_offset() && !U2::EXPR.has_offset(),
-        "a unit with an offset (°C) has no exact value of its own: its points are against an origin"
-    );
+    if !U::DIM.same(U2::DIM) {
+        crate::conv_error::dim_mismatch::<U, U2>("an Exact");
+    }
+    if !U::KIND.same(U2::KIND) {
+        crate::conv_error::kind_mismatch::<U, U2>("an Exact");
+    }
+    if U::EXPR.has_offset() || U2::EXPR.has_offset() {
+        crate::conv_error::has_offset::<U, U2>("an Exact");
+    }
     let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
-        panic!("an Exact converts only between units with an exact factor to SI")
+        crate::conv_error::no_exact_factor::<U, U2>("an Exact")
     };
     match Fraction::from_magnitude(&from.div(to)) {
         Some(f) => f,
@@ -265,16 +261,14 @@ const fn factor<U: Unit, U2: Unit>() -> Fraction {
     reason = "a compile error in const code (evaluated in const blocks), as documented"
 )]
 const fn recip_factor<U: Unit, U2: Unit>() -> Fraction {
-    assert!(
-        U::DIM.mul(U2::DIM).is_one(),
-        "recip goes into a unit of the reciprocal dimension (1/Hz is s)"
-    );
-    assert!(
-        !U::EXPR.has_offset() && !U2::EXPR.has_offset(),
-        "a unit with an offset (°C) has no exact value of its own"
-    );
+    if !U::DIM.mul(U2::DIM).is_one() {
+        crate::conv_error::recip_mismatch::<U, U2>();
+    }
+    if U::EXPR.has_offset() || U2::EXPR.has_offset() {
+        crate::conv_error::has_offset::<U, U2>("an Exact's recip");
+    }
     let (Some(a), Some(b)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
-        panic!("recip needs units with an exact factor to SI")
+        crate::conv_error::no_exact_factor::<U, U2>("an Exact's recip")
     };
     match Fraction::from_magnitude(&a.mul(b).recip()) {
         Some(f) => f,

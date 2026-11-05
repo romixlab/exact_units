@@ -285,25 +285,18 @@ impl Decimal {
 
 /// The scale of a literal in unit `S` against stored values of `P · U`, `U · P / S`, or a compile error for units
 /// that don't convert ([Fixed::convert]'s rules).
-#[expect(
-    clippy::panic,
-    reason = "a compile error in const code (a panic at run time), as documented: units that don't convert"
-)]
 const fn scale_in<S: Unit, U: Unit, P: FixedScale>() -> Magnitude {
-    assert!(
-        S::DIM.same(U::DIM),
-        "a literal in another unit takes one of the same dimension"
-    );
-    assert!(
-        S::KIND.same(U::KIND),
-        "a literal in another unit takes one of the same kind: a loss is not a gain, V/V is not a Ratio"
-    );
-    assert!(
-        !S::EXPR.has_offset() && !U::EXPR.has_offset(),
-        "a unit with an offset converts as a Point, not a Fixed"
-    );
+    if !S::DIM.same(U::DIM) {
+        crate::conv_error::dim_mismatch::<S, U>("a literal's unit");
+    }
+    if !S::KIND.same(U::KIND) {
+        crate::conv_error::kind_mismatch::<S, U>("a literal's unit");
+    }
+    if S::EXPR.has_offset() || U::EXPR.has_offset() {
+        crate::conv_error::has_offset::<S, U>("a literal's unit");
+    }
     let (Some(from), Some(to)) = (S::EXPR.magnitude(), U::EXPR.magnitude()) else {
-        panic!("a literal in another unit needs both units' exact factors to SI")
+        crate::conv_error::no_exact_factor::<S, U>("a literal's unit")
     };
     to.mul(P::SCALE).div(from)
 }
