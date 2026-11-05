@@ -8,6 +8,7 @@ fn compile_fail() {
     let t = trybuild::TestCases::new();
     t.pass("tests/compile_fail/pass_marker.rs");
     t.compile_fail("tests/compile_fail/dim_mismatch.rs");
+    t.compile_fail("tests/compile_fail/dim_mismatch_angle_hint.rs");
     t.compile_fail("tests/compile_fail/kind_mismatch.rs");
     t.compile_fail("tests/compile_fail/literal_mismatch.rs");
 }

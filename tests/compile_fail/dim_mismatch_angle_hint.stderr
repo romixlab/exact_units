@@ -1,0 +1,33 @@
+error[E0080]: evaluation panicked: a Fixed converts only between units of the same dimension: Hertz (Hz) is s⁻¹, not AngularVelocity (rad/s) which is s⁻¹·rad; they differ by rad⁻¹ — cross it with a named step: Hertz × Radian is AngularVelocity
+ --> src/fixed.rs
+  |
+  |         let c = const { Conversion::between::<U, P, U2, P2, T, T2>(false) };
+  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::Fixed::<exact_units::units::Hertz, exact_units::prefix::One, i32>::convert::<exact_units::units::AngularVelocity, exact_units::prefix::One, i32>::{constant#0}` failed inside this call
+  |
+note: inside `exact_units::fixed::Conversion::between::<Hertz, One, AngularVelocity, One, i32, i32>`
+ --> src/fixed.rs
+  |
+  |             crate::conv_error::dim_mismatch::<U, U2>("a Fixed");
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `exact_units::conv_error::dim_mismatch::<Hertz, AngularVelocity>`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/conv_error.rs
+  |
+  |     panic!("{}", msg.as_str())
+  |     -------------------------- in this macro invocation
+
+note: erroneous constant encountered
+ --> src/fixed.rs
+  |
+  |         let c = const { Conversion::between::<U, P, U2, P2, T, T2>(false) };
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+note: the above error was encountered while instantiating `fn Fixed::<Hertz, One, i32>::convert::<AngularVelocity, One, i32>`
+ --> tests/compile_fail/dim_mismatch_angle_hint.rs:6:13
+  |
+6 |     let _ = Fixed::<Hertz, One, i32>::new(5).convert::<AngularVelocity, One, i32>();
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

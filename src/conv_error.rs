@@ -11,9 +11,10 @@
 use crate::unit::superscript_digit;
 use crate::{Dim, Kind, Unit, UnitExpr};
 
-/// Text written into a buffer on the stack, for a `panic!("{}", msg.as_str())` right after. A push past
-/// [Msg::CAP] is dropped: a cut-off message is still readable, and no message built here comes close to the cap (a
-/// unit's name and symbol are a handful of characters, a `Dim` at most a few dozen).
+/// Text written into a buffer on the stack, for a `panic!("{}", msg.as_str())` right after. A push that wouldn't
+/// fit whole is dropped whole (never split a char in half: [as_str](Self::as_str) always decodes); a cut-off
+/// message is still readable, and no message built here comes close to [Msg::CAP] (a unit's name and symbol are a
+/// handful of characters, a `Dim` at most a few dozen).
 struct Msg {
     bytes: [u8; Msg::CAP],
     len: usize,
@@ -45,6 +46,8 @@ impl Msg {
         self
     }
 
+    /// `s` whole, or not at all: dropped past [Self::CAP] rather than split, so a multi-byte char (`·`, `⁻`, `²`)
+    /// is never cut in half and left at the end of the buffer for [as_str](Self::as_str) to fail to decode.
     #[expect(clippy::indexing_slicing, reason = "i < bytes.len(), the loop bound")]
     #[expect(
         clippy::arithmetic_side_effects,
@@ -52,6 +55,12 @@ impl Msg {
     )]
     const fn push(mut self, s: &str) -> Self {
         let bytes = s.as_bytes();
+        let Some(end) = self.len.checked_add(bytes.len()) else {
+            return self;
+        };
+        if end > self.bytes.len() {
+            return self;
+        }
         let mut i = 0;
         while i < bytes.len() {
             self = self.push_byte(bytes[i]);
@@ -76,7 +85,8 @@ impl Msg {
         match self.bytes.split_at_checked(self.len) {
             Some((head, _)) => match core::str::from_utf8(head) {
                 Ok(s) => s,
-                // only whole strs are ever pushed in, so this never happens
+                // push never writes part of a str, so the bytes written are whole strs end to end: always valid
+                // utf8, this arm is unreachable in practice but a `str` here would be unsound without it
                 Err(_) => "(a conversion message that did not decode)",
             },
             None => "(a conversion message past its own buffer)",
@@ -258,9 +268,43 @@ const fn is_only_rad(d: Dim<'_>) -> bool {
         && d.counted[0].is_none()
 }
 
+/// `n`, as plain (non-superscript) digits, `-` before a negative one: for `Radian` in [push_angle_hint], where a
+/// `Dim`'s own exponents are superscript but this one stands for a repeated operator, not a power written on a
+/// unit symbol.
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable; n is a u8, widening into i32 exactly"
+)]
+const fn widen_u8(n: u8) -> i32 {
+    n as i32
+}
+
+/// When `diff` (`A::DIM` divided by `B::DIM`) is only an angle ([is_only_rad]), the hint that names the actual
+/// operation from `A` and `B`'s real names: `Torque × Radian is Joule` when `A`'s dimension has fewer radians than
+/// `B`'s (multiplying by an angle gets from `A` to `B`), `Hertz / Radian is AngularVelocity` the other way, with
+/// the angle's own exponent written when crossing it takes more than one step. Does nothing otherwise.
+const fn push_angle_hint<A: Unit, B: Unit>(mut msg: Msg, diff: Dim<'_>) -> Msg {
+    if !is_only_rad(diff) {
+        return msg;
+    }
+    let n = diff.rad.unsigned_abs();
+    msg = msg.push(" — cross it with a named step: ");
+    msg = push_name(msg, A::EXPR);
+    msg = msg.push(if diff.rad < 0 {
+        " × Radian"
+    } else {
+        " / Radian"
+    });
+    if n != 1 {
+        msg = msg.push_superscript(widen_u8(n));
+    }
+    msg = msg.push(" is ");
+    push_name(msg, B::EXPR)
+}
+
 /// The panic for two units whose dimension differs (`Fixed::convert`, `Exact::convert`, a literal's unit): both
-/// units by name, symbol and dimension, and (when it fits a `Dim`) the dimension left when `A`'s divides `B`'s —
-/// `rad⁻¹` for a torque and a joule.
+/// units by name, symbol and dimension, the dimension left when `A`'s divides `B`'s (when it fits a `Dim`) — `rad⁻¹`
+/// for a torque and a joule — and, where that leftover is only an angle, [push_angle_hint]'s named-step hint.
 #[expect(
     clippy::panic,
     reason = "a compile error in const code (a panic at run time), as documented at every call site"
@@ -278,11 +322,7 @@ pub(crate) const fn dim_mismatch<A: Unit, B: Unit>(what: &str) -> ! {
     if let Some(diff) = A::DIM.checked_div(B::DIM) {
         msg = msg.push("; they differ by ");
         msg = push_dim(msg, diff);
-        if is_only_rad(diff) {
-            msg = msg.push(
-                " — cross it with a named step through a unit of angle (a torque times a radian is a joule)",
-            );
-        }
+        msg = push_angle_hint::<A, B>(msg, diff);
     }
     panic!("{}", msg.as_str())
 }
@@ -367,4 +407,137 @@ pub(crate) const fn no_exact_factor<A: Unit, B: Unit>(what: &str) -> ! {
     msg = push_unit(msg, B::EXPR);
     msg = msg.push(" (one leaves what a Magnitude holds: more than 12 primes, or past ±63½)");
     panic!("{}", msg.as_str())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // two markers of the shape the angle hint cares about, without depending on the `mechanical` / `angle`
+    // features that `units::Torque` and `units::Joule` need: a torque's dimension (kg·m²·s⁻²·rad⁻¹) and its
+    // energy (kg·m²·s⁻²), one radian apart.
+    crate::unit! {
+        struct Torque = "N·m", [kg 1, m 2, s -2, rad -1];
+        struct Energy = "J", [kg 1, m 2, s -2];
+    }
+
+    #[test]
+    fn push_dim_writes_negative_exponents() {
+        let msg = push_dim(Msg::new(), Torque::DIM);
+        assert_eq!(msg.as_str(), "kg·m²·s⁻²·rad⁻¹");
+    }
+
+    #[test]
+    fn push_dim_writes_half_exponents_of_a_root() {
+        // V²/Hz, kg²·m⁴·s⁻⁵·A⁻² with `root` set (the module doc's own example): shown halved, the odd one
+        // (s⁻⁵, odd) in superscript with `ᐟ²`, the even ones (kg, m, A) plainly halved.
+        let d = Dim {
+            s: -5,
+            m: 4,
+            kg: 2,
+            a: -2,
+            k: 0,
+            mol: 0,
+            cd: 0,
+            rad: 0,
+            bit: 0,
+            root: true,
+            counted: [None; crate::MAX_COUNTED],
+        };
+        let msg = push_dim(Msg::new(), d);
+        assert_eq!(msg.as_str(), "kg·m²·s⁻⁵ᐟ²·A⁻¹");
+    }
+
+    #[test]
+    fn push_dim_of_a_ratio_is_one() {
+        assert_eq!(push_dim(Msg::new(), Dim::ONE).as_str(), "1");
+    }
+
+    #[test]
+    fn push_superscript_writes_signed_digits() {
+        assert_eq!(Msg::new().push_superscript(0).as_str(), "⁰");
+        assert_eq!(Msg::new().push_superscript(2).as_str(), "²");
+        assert_eq!(Msg::new().push_superscript(12).as_str(), "¹²");
+        assert_eq!(Msg::new().push_superscript(-1).as_str(), "⁻¹");
+        assert_eq!(Msg::new().push_superscript(-23).as_str(), "⁻²³");
+    }
+
+    #[test]
+    fn angle_hint_multiplies_when_a_has_fewer_radians() {
+        // Torque's rad is -1, Energy's is 0: Torque × Radian is Energy.
+        let diff = Torque::DIM.checked_div(Energy::DIM).unwrap();
+        let msg = push_angle_hint::<Torque, Energy>(Msg::new(), diff);
+        assert_eq!(
+            msg.as_str(),
+            " — cross it with a named step: Torque × Radian is Energy"
+        );
+    }
+
+    #[test]
+    fn angle_hint_divides_when_a_has_more_radians() {
+        // the other way round: Energy's rad is 0, Torque's is -1, so going from Energy to Torque divides.
+        let diff = Energy::DIM.checked_div(Torque::DIM).unwrap();
+        let msg = push_angle_hint::<Energy, Torque>(Msg::new(), diff);
+        assert_eq!(
+            msg.as_str(),
+            " — cross it with a named step: Energy / Radian is Torque"
+        );
+    }
+
+    #[test]
+    fn angle_hint_does_nothing_when_more_than_angle_differs() {
+        // kg differs too (a mass, not only an angle): no hint, same as a dimension that doesn't differ at all.
+        let not_only_rad = Dim::new(0, 0, 1, 0, 0, 0, 0).with_rad(1);
+        let msg = push_angle_hint::<Torque, Energy>(Msg::new(), not_only_rad);
+        assert_eq!(msg.as_str(), "");
+    }
+
+    /// `Msg::new()` filled with `CAP - 1` single-byte pushes: one byte short of the cap.
+    fn almost_full() -> Msg {
+        let mut msg = Msg::new();
+        for _ in 0..Msg::CAP - 1 {
+            msg = msg.push("a");
+        }
+        msg
+    }
+
+    #[test]
+    fn push_drops_a_multi_byte_push_whole_rather_than_split_it() {
+        // one byte short of the cap, a 2-byte char must not be split (which would leave a dangling byte that
+        // `as_str` can't decode): it's dropped whole, so the content is unchanged. No `alloc` here (the crate is
+        // `no_std`, no alloc): two independent buffers compared instead of cloning one's `&str` before mutating it.
+        let before = almost_full();
+        assert_eq!(before.as_str().len(), Msg::CAP - 1);
+        let after = almost_full().push("·");
+        assert_eq!(
+            after.as_str(),
+            before.as_str(),
+            "a push past the cap must change nothing"
+        );
+    }
+
+    #[test]
+    fn push_takes_a_multi_byte_char_that_fits_exactly() {
+        let mut msg = Msg::new();
+        for _ in 0..Msg::CAP - 2 {
+            msg = msg.push("a");
+        }
+        msg = msg.push("·"); // 2 bytes, exactly fills the last 2 of CAP
+        let s = msg.as_str();
+        assert_eq!(s.len(), Msg::CAP);
+        assert!(s.ends_with('·'));
+    }
+
+    #[test]
+    fn push_past_the_cap_stays_a_valid_whole_prefix() {
+        // "·" is 2 bytes; CAP (320) is a multiple of 2, so this lands exactly on the cap with no partial char.
+        let mut msg = Msg::new();
+        for _ in 0..200 {
+            msg = msg.push("·");
+        }
+        let s = msg.as_str();
+        assert_eq!(s.len(), Msg::CAP);
+        assert!(s.chars().all(|c| c == '·'));
+        assert_eq!(s.chars().count(), Msg::CAP / "·".len());
+    }
 }

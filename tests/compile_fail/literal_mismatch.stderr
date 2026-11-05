@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: a literal's unit converts only between units of the same dimension: Torque (N·m) is kg·m²·s⁻²·rad⁻¹, not Joule (J) which is kg·m²·s⁻²; they differ by rad⁻¹ — cross it with a named step through a unit of angle (a torque times a radian is a joule)
+error[E0080]: evaluation panicked: a literal's unit converts only between units of the same dimension: Torque (N·m) is kg·m²·s⁻²·rad⁻¹, not Joule (J) which is kg·m²·s⁻²; they differ by rad⁻¹ — cross it with a named step: Torque × Radian is Joule
  --> src/literal.rs
   |
   |             const AT: Self = Self::from_decimal_in::<S>(Decimal::new(N, E));

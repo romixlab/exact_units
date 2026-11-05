@@ -124,17 +124,22 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   and `src/si_prefix/decimal/tests.rs` against `num-rational`, `tests/props/prefix.rs` and `magnitude.rs` against
   the `i128` reference. Next: ww_si moves onto it (wire_weaver STD-102).
 - ✅ **NUM-14 Readable compile errors for a refused conversion** — a shared `const` message builder
-  (`src/conv_error.rs`, no alloc: a stack buffer, `core::str::from_utf8`, `panic!("{}", msg)`) names both units (type
-  name and symbol from `EXPR`) and dimensions, and the dimension left when one divides the other (`rad⁻¹` for a
-  torque and a joule), with a hint where the difference is only an angle; a kind mismatch names both kinds. Used by
-  every refused conversion in `Fixed` (`convert`, `to`, `convert_rounded`, their `Exact` paths) and `Exact`
-  (`convert`, `recip`), and by a decimal literal's unit check (`fixed!(.. in S)`); `Complex` and `Point` get it
-  through `Fixed`'s checks (`Complex::convert` delegates, `Point`'s cross-unit origins are a trait-bound error
-  already, out of scope). `Torque * Radian = Joule` added to the product table so the angle hint names a real
-  operation. `cargo check` alone never reaches these (they panic only post-monomorphization, during codegen) on this
-  crate's own rustc, before and after; only `cargo build` does — a `pass()` fixture (`tests/compile_fail/pass_marker.rs`)
-  makes trybuild build instead of check its batch for that reason. Compile-fail snapshots:
-  `tests/compile_fail/{dim,kind,literal}_mismatch.{rs,stderr}`. P2401#5nov-0954.
+  (`src/conv_error.rs`, no alloc: a stack buffer that drops a push whole rather than split a multi-byte char in half,
+  `core::str::from_utf8`, `panic!("{}", msg)`) names both units (type name and symbol from `EXPR`) and dimensions,
+  and the dimension left when one divides the other (`rad⁻¹` for a torque and a joule); where that leftover is only
+  an angle, a hint names the real operation from the two units themselves (`Torque × Radian is Joule`, `Hertz /
+  Radian is AngularVelocity`, the operator and exponent from the sign and size of the angle left over, never a fixed
+  example). A kind mismatch names both kinds. Used by every refused conversion in `Fixed` (`convert`, `to`,
+  `convert_rounded`, their `Exact` paths) and `Exact` (`convert`, `recip`), and by a decimal literal's unit check
+  (`fixed!(.. in S)`); `Complex` and `Point` get it through `Fixed`'s checks (`Complex::convert` delegates, `Point`'s
+  cross-unit origins are a trait-bound error already, out of scope). `Torque * Radian = Joule` added to the product
+  table so the angle hint names a real operation. `cargo check` alone never reaches these (they panic only
+  post-monomorphization, during codegen) on this crate's own rustc, before and after; only `cargo build` does — a
+  `pass()` fixture (`tests/compile_fail/pass_marker.rs`) makes trybuild build instead of check its batch for that
+  reason. Unit tests in `src/conv_error.rs` (`push_dim` with negative and half exponents, `push_superscript`, the
+  angle hint both ways and when it doesn't apply, the buffer's cap). Compile-fail snapshots:
+  `tests/compile_fail/{dim_mismatch,dim_mismatch_angle_hint,kind_mismatch,literal_mismatch}.{rs,stderr}`.
+  P2401#5nov-0954.
 - 📋 **NUM-10 Measured constants as exact symbols** · `foundations` — μ₀ and G in `Magnitude` beside π, ln 2 and ln 10
   (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
   old 4π·10⁻⁷ only as the opt-in `Ampere1948`; a conversion that needs a symbol doesn't compile without a set, floats

@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: a Fixed converts only between units of the same dimension: Torque (N·m) is kg·m²·s⁻²·rad⁻¹, not Joule (J) which is kg·m²·s⁻²; they differ by rad⁻¹ — cross it with a named step through a unit of angle (a torque times a radian is a joule)
+error[E0080]: evaluation panicked: a Fixed converts only between units of the same dimension: Torque (N·m) is kg·m²·s⁻²·rad⁻¹, not Joule (J) which is kg·m²·s⁻²; they differ by rad⁻¹ — cross it with a named step: Torque × Radian is Joule
  --> src/fixed.rs
   |
   |         let c = const { Conversion::between::<U, P, U2, P2, T, T2>(false) };
