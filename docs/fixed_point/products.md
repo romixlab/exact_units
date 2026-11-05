@@ -50,6 +50,8 @@ assert_eq!(q.get(), 8192); // 0.25
 | `checked_times(b)` | `None`, in the operands' scale |
 | `saturating_times`, `wrapping_times` | at the ends, or modulo $2^n$ |
 
+The `_per` twins (`per_into`, `checked_per`, `saturating_per`, `wrapping_per`) do the same for `a / b`.
+
 The famous Q15 corner is $(-1) \cdot (-1) = 1$, which Q15 can't hold:
 
 ```rust

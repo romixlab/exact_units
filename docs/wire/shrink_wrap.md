@@ -130,6 +130,7 @@ The `serde` feature gives the same rule to any serde format: a value is its stor
 
 - `Fixed`, `Point` and the indices: the stored number.
 - `Complex`: `{ re, im }`.
+- `Polar`: `{ abs, arg }`, each part as above.
 - `Decibels`: the decimal as text in JSON or TOML, `"-3.01"`.
 
 Reading checks the bounds, as construction does. A field marked `with_unit` reads and writes text with its unit, exactly into the field's scale:

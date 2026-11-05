@@ -107,6 +107,26 @@ assert_eq!(MilliK::from_raw(298_155).to::<Celsius, Centi, i16>(), None);
 
 The factor and the offset are worked out at compile time: at run time a multiply, an add and a divide by constants.
 
+## Origins the crate ships
+
+`exact_units::origins` has these:
+
+| Origin | Unit | Offset | Notes |
+|---|---|---|---|
+| `AbsoluteZero` | K | 0 | thermodynamic temperature |
+| `Celsius` | K | 273.15 | SI Brochure 2.3.4 |
+| `Rankine` | K | 0 | shown in steps of 5/9 K |
+| `Fahrenheit` | K | 45967/180 | shown in steps of 5/9 K (NIST SP 811 B.8) |
+| `Vacuum` | Pa | 0 | absolute pressure |
+| `Gauge` | Pa | 0 from ambient | converts only with the ambient pressure, see [Register formulas](registers.md#pressure-against-the-ambient) |
+| `AboveStandardAtmosphere` | Pa | 101325 | gauge with the reference stated |
+| `Angle<Turn>` | rev | 0 | wraps every turn, see [Angles as points](wrapping.md) |
+| `Angle<Degree>` | ° | 0 | wraps every 360° |
+| `Angle<Radian>` | rad | 0 | wraps every 2π (float storages only) |
+| `UnixEpoch` | s | 0 | 1970-01-01 00:00:00 UTC, POSIX time (feature `time`), aliased as `UnixSecs`/`UnixMillis`/`UnixMicros`/`UnixNanos` |
+
+A crate declares its own with `origin!`, from the unit's zero or above another origin: [Your own units](../units/declare.md#origin).
+
 ## More points
 
 - Pressure: `Vacuum` (absolute) and `Gauge` (against the ambient, known only at run time).

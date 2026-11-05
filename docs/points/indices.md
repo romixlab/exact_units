@@ -43,7 +43,10 @@ type Slot = Index<Item, u8, Range<0, 7>>;
 let last = Slot::try_new(7).unwrap();
 assert!(Slot::try_new(8).is_err());
 assert_eq!(last.checked_add(Fixed::new(1)), None);
+assert_eq!(last.checked_sub(Fixed::new(7)), Some(Slot::try_new(0).unwrap()));
 ```
+
+`checked_sub` and `checked_distance` (index − index) return `None` instead of panicking, the same way.
 
 ## IndexFrom1
 
@@ -81,6 +84,7 @@ assert_eq!(b.get(), 4);
 assert!(a.is_before(b));
 // 10 frames forward, a Fixed<Frame, One, u8, Wrapping>
 assert_eq!(a.distance(b).get(), 10);
+assert_eq!(a.next().get(), 251); // one step forward, wrapping_add(1)
 ```
 
 A `Seq` has no `<`: serial order isn't transitive, and two numbers exactly half the ring apart have no order at all (`serial_cmp` returns `None`).

@@ -2,6 +2,17 @@
 
 ### 🚀 Features
 
+- Book: the library pages wire_weaver's docs site carried under `std_library` (`exact_units`, `magnitude`,
+  `points`, `rounding`, `indices`, `customary`, `units_in_the_model`) moved here, where they belong (P2401#5nov-1344).
+  The book gained: variable-length wire storages `UNib32`/`UVlq32`/`UVlq64`/`Nibble` and `Gibibytes<T>`/`Count<Of,
+  T>` aliases on [First steps](docs/start/first_steps.md); `Eq`/`Ord`/`Hash` staying within one exact type on
+  [Arithmetic](docs/maths/arithmetic.md); the `_per` twins of `times_into` on [Products and
+  requantization](docs/fixed_point/products.md); `Polar`'s `{ abs, arg }` serde form on [The
+  wire](docs/wire/shrink_wrap.md); the full table of origins the crate ships, `AbsoluteZero` to `UnixEpoch`, on
+  [Points and amounts](docs/points/points.md); and `Seq::next()` / `Index::checked_distance` on [Indices and
+  sequence numbers](docs/points/indices.md). Nothing else there was missing: wire_weaver's pages kept only the API
+  model, `ww`, Python, dynamic-client and wire-bytes side, each linking back here for the library part.
+  `AGENTS.md` and `README.md` no longer point to the WireWeaver docs site for the library's own pages.
 - Readable compile errors for a refused conversion (NUM-14): a shared `const` message builder names both units (type name and symbol), their dimensions, and the dimension left when one divides the other (`rad⁻¹` for a torque and a joule); where that leftover is only an angle, a hint names the real operation from the two units themselves (`Torque × Radian is Joule`, `AngularVelocity / Radian is Hertz`), never a fixed example. A kind mismatch now names both kinds. Was a fixed, generic sentence naming neither unit (`Fixed::<Torque, One, i32>::new(5).convert::<Joule, One, i32>()` used to say only "a Fixed converts only between units of the same dimension (a pound-force is not a pound)"; now the panic's first line names Torque, Joule and `rad⁻¹`). Covers every refused conversion in `Fixed` and `Exact` and a decimal literal's unit (`fixed!(.. in S)`); `Complex` gets it through `Fixed`'s checks. `Torque * Radian = Joule` added to the product table, so the angle hint names a real operation. Unit tests for the message builder itself and compile-fail snapshots with `trybuild`: `tests/compile_fail/`. P2401#5nov-0954.
 - `Exact::scaled(Exact<Ratio>)` (NUM-11): a quantity times a ratio in its own unit, `None` where it doesn't fit. `Exact<U> * Exact<Ratio>` stays an `Exact<Times<U, Ratio>>` that `convert`s back, since a `Mul` keeping `U` would overlap the generic product. `units::Ratio`'s doc said any quantity times a ratio keeps its unit, which held for neither `Fixed` nor `Exact` operators: it now says what holds for each (the product converts back; `scaled` keeps the unit), with a doctest for each.
 - `Exact<Per<U, U>>::as_ratio()` and `Exact<Ratio>::as_gain::<U>()` (NUM-11): the named steps between a quotient of one unit (Hz/Hz, V/V) and a plain `Ratio`, as `Fixed` has them. `convert::<Ratio>()` on such a quotient is still a compile error, and its message now names `as_ratio`. For embedded_bedrock's clock planner, which needs "two ref_ck periods in hclk cycles" and the APB-to-kernel clock ratio of ES0491 2.18.4.

@@ -25,8 +25,9 @@ assert_eq!(v.to_string(), "1250 mV");
 | `Secs<T>`, `Millis<T>`, `Micros<T>`, `Nanos<T>` | `Fixed<Second, One / Milli / Micro / Nano, T>` |
 | `Minutes<T>`, `Hours<T>`, `Days<T>` | `Fixed<Minute / Hour / Day, One, T>` |
 | `Hz<T>` | `Fixed<Hertz, One, T>` |
-| `Bytes<T>`, `Kibibytes<T>`, `Mebibytes<T>` | `Fixed<Byte, One / Kibi / Mebi, T>` |
+| `Bytes<T>`, `Kibibytes<T>`, `Mebibytes<T>`, `Gibibytes<T>` | `Fixed<Byte, One / Kibi / Mebi / Gibi, T>` |
 | `Percent<T>`, `Permille<T>`, `Ppb<T>` | `Fixed<Ratio, Centi / Milli / Nano, T>` |
+| `Count<Of, T>` | `Fixed<Of, One, T>`: a count of things that aren't a unit |
 | `Duty16` | `Fixed<Ratio, Rational<1, 65535>, u16>`: 65535 is 100 % |
 | `Q15<U>`, `Q31<U>` | fixed point, see [Q formats](../fixed_point/q_formats.md) |
 | `Bam16`, `Bam32` | binary angles, see [Binary angles](../fixed_point/bam.md) |
@@ -92,6 +93,10 @@ let narrow = v.to::<Milli, U5>().unwrap(); // 0 ..= 31 fits 5 bits
 assert_eq!(narrow.to::<Milli, u8>(), Some(v));
 assert_eq!(Fixed::<Volt, Milli, u8>::new(32).to::<Milli, U5>(), None);
 ```
+
+The same feature adds variable-length integers, `UNib32`, `UVlq32`, `UVlq64` and `Nibble` (trait `Storage`,
+`UnsignedStorage` for the unsigned ones): a small number takes fewer bytes on the wire than a large one, instead of
+the fixed width a plain integer storage takes.
 
 ## Arithmetic, briefly
 

@@ -91,4 +91,4 @@ When the product doesn't fit the storage, or should land in another scale, the m
 
 ## Comparing
 
-`==`, `<` and `sort` compare the stored numbers of one type. Values with different [bounds](bounds.md) but the same unit, scale and storage compare too.
+`==`, `<` and `sort` compare the stored numbers of one type. Values with different [bounds](bounds.md) but the same unit, scale and storage compare too: `PartialEq` and `PartialOrd` reach across bounds. `Eq`, `Ord` and `Hash` are stricter and stay within one exact type, bounds included, since a `HashMap` key or a sort needs a total, consistent order.

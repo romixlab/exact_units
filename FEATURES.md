@@ -46,7 +46,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   `shrink_wrap` (wire format, `SIExpr`, through `#[wire(..)]` fields the same bytes as before), `std` and `defmt`
   behind features. `ww_si` re-exports it and keeps the runtime side (`Quantity`, `AnyQuantity`, `Timed`); units are
   named `exact_units::..` in the model (a counted base costs 6 bytes more on the wire). Walked and snapshotted like an
-  API crate. [exact_units](docs/std_library/exact_units.md), `exact_units/tests`, CI legs without features and on
+  API crate. [exact_units](docs/index.md), `exact_units/tests`, CI legs without features and on
   thumbv6m. Moved to a repository of its own, [romixlab/exact_units](https://github.com/romixlab/exact_units), with its
   history (28 Oct 2026): wire_weaver takes it by git, its snapshot is saved from that source into
   `wire_weaver_snapshots/other_repos` (`ww api save --dep exact_units --snapshots-dir`).
@@ -57,7 +57,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   decode and construction; information and counting units, exact `to`, `Quantity::to_fixed` / `from_fixed`,
   `core::time::Duration`, checked / wrapping / saturating ops, `Display` (`1500 µs`); in the API model as an instance
   of one generic definition with `B` explicit, so introspection shows the unit. Same code as a plain field on
-  Cortex-M (DER-20). [exact_units](docs/std_library/exact_units.md), conformance `stdlib.si.fixed.*`,
+  Cortex-M (DER-20). [exact_units](docs/start/first_steps.md), conformance `stdlib.si.fixed.*`,
   `tests/quantities`.
 - ✅ **NUM-3 One exact magnitude for every scale** (was STD-62) · `v0.5` — `exact_units::Magnitude`, a canonical product of prime
   powers (2 and 5 as powers of 10 and 2) with powers of π, ln 2 and ln 10, whole or half exponents: every scale
@@ -67,7 +67,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   ±63½ is a compile error. `Fixed::to` computes its factor at compile time: not a fraction of integers, or a multiply
   that doesn't fit 64 bits (storages up to 32 bits) / 128 bits, doesn't compile, never a rounding. Q formats `Q15`,
   `Q31`, `UQ16_16`, binary angles `Bam16`, `Bam32`. Replaces `ExactScale` in `Scale::Exact` (104 bytes in memory, a
-  decimal prefix 2 bytes on the wire). [Exact magnitudes](docs/std_library/magnitude.md), conformance
+  decimal prefix 2 bytes on the wire). [Exact magnitudes](docs/nomicon/magnitude.md), conformance
   `stdlib.si.magnitude.*` (derive, dynamic, Python; C waits on API-26).
 - ✅ **NUM-4 Named rounding and overflow policies** (was STD-63) · `v0.5` — `to()` stays exact or `None`; lossy conversions name
   their rounding (`Rounding`: truncate, floor, ceil, nearest ties-to-even, nearest ties-away) and overflow policy
@@ -76,7 +76,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   policy is in the bounds marker: `Wrapping` (`Bam16`, `Bam32`), `Saturating` (`Q15`, `Q31`, `UQ16_16`), `Unbounded`
   checked; same bytes, `Fixed::of` / `with_overflow`. Bounds prove conversions infallible: `into_rounded`, `From` of a
   `Range`-bounded value for a whole factor, a compile error where the proof fails. Run-time `requantize` /
-  `Requantizer` for dynamic clients. [Rounding and overflow](docs/std_library/rounding.md),
+  `Requantizer` for dynamic clients. [Rounding and overflow](docs/maths/rounding.md),
   `exact_units/tests/rounding.rs`, conformance `requantize.*` (derive, dynamic, Python `ww.requantize`, C `sw_requantize()`).
   `Seq` wrapping comes with NUM-5.
 - ✅ **NUM-5 `Index`, `IndexFrom1` and `Seq`** (was STD-58) · `v0.5` — `exact_units` (feature `counting`, re-exported by
@@ -86,7 +86,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   `Seq<Of, T>`, a wrapping sequence number (`next`, `wrapping_add`, `distance` as a `Wrapping` amount, RFC 1982
   `is_before` / `serial_cmp` within half the range, no `Ord`, no `Seq + Seq`). All `transparent`, the bytes of `T`; in
   the model instances of `Index` / `IndexFrom1` `[Of, T, B]` and `Seq` `[Of, T]`, shown and checked by clients
-  (CLT-54). [Indices and sequence numbers](docs/std_library/indices.md), conformance `stdlib.si.index.*`,
+  (CLT-54). [Indices and sequence numbers](docs/points/indices.md), conformance `stdlib.si.index.*`,
   `stdlib.si.index_from_1.*`, `stdlib.si.seq.*` (derive, dynamic, Python; C waits on API-26).
 - ✅ **NUM-6 Typed products and quotients of quantities** (was STD-83) · `v0.5` — in `exact_units` (locked at 93a1607): `a * b`
   is a `Fixed<Times<U1, U2>, Product<P1, P2>, T>`, `a / b` a `Fixed<Per<U1, U2>, Quotient<P1, P2>, T>`, one multiply
@@ -184,7 +184,7 @@ counted units, and the kinds that keep look-alike quantities apart.
   `Provenance::Conventional`, in the API model a `MarkerDef::ConventionalUnit` (defined units keep their bytes). `Fixed::convert` between units of one dimension, exact or `None`, factor at compile
   time; `DynQuantity::convert` and Python `Quantity.convert` the same at run time. The Mars Climate Orbiter case
   (lbf·s read as N·s) in `tests/customary` (typed, dynamic) and Python: converts exactly or is refused; the `Fixed`
-  field too, with its unit in the dynamic client (CLT-54). [Imperial and US customary](docs/std_library/customary.md),
+  field too, with its unit in the dynamic client (CLT-54). [Imperial and US customary](docs/customary.md),
   conformance `stdlib.si.fixed.customary`, `stdlib.si.si_expr.pound_force` (derive, dynamic, Python; C waits on
   API-26).
 - 🚧 **UNIT-2 Kinds that share a dimension** (was STD-68) · `v0.5` — first piece done (gain kinds): `exact_units::Kind` as
@@ -203,7 +203,7 @@ counted units, and the kinds that keep look-alike quantities apart.
 - ✅ **UNIT-3 `Minute`, `Hour`, `Day` and `Week` units** (was STD-84) — `exact_units` 8584aad: `Secs<T>`, `Minutes<T>`,
   `Hours<T>`, `Days<T>` (`Fixed<Second|Minute|Hour|Day, One, T>`). `ww_si` re-exports `Secs`, `Minutes`, `Hours`,
   `Days` next to `Micros`, `Millis`, `Nanos`; `units::{Minute, Hour, Day, Week}` reach `ww_si::..` through its
-  existing `units` re-export (feature `time`). Docs: [`exact_units`](std_library/exact_units.md#aliases).
+  existing `units` re-export (feature `time`). Docs: [`exact_units`](docs/start/first_steps.md#aliases-for-the-common-ones).
 - ✅ **UNIT-4 `Count`, `Percent`/`Permille`, binary byte sizes, `Hz`, and counted `Line`/`Row`/`Record`/`Entry`** (was STD-85) —
   `exact_units` d28ec86: `Count<Of, T>` (`Fixed<Of, One, T>`, a count of `Of`s, unconditional), `Percent<T>` and
   `Permille<T>` (`Fixed<Ratio, Centi|Milli, T>`, feature `dimensionless`), `Kibibytes<T>` / `Mebibytes<T>` /
@@ -211,8 +211,9 @@ counted units, and the kinds that keep look-alike quantities apart.
   aliases cat_stack's APIs had declared for themselves, now one set for every crate. `units::{Line, Row, Record,
   Entry}` (feature `counting`), counted bases beside `Item`/`Sample`/`Frame`/`Packet`. `ww_si` re-exports all of
   them; they reach `ww_si::..` through its existing `units` re-export. Docs:
-  [`exact_units`](std_library/exact_units.md#aliases), [`ww_si`](std_library/ww_si.md#dimensions),
-  [indices](std_library/indices.md).
+  [`exact_units`](docs/start/first_steps.md#aliases-for-the-common-ones),
+  [`ww_si`](https://ww.vhrd.tech/std_library/ww_si/#dimensions),
+  [indices](docs/points/indices.md).
 - ✅ **UNIT-5 48 SI derived-unit markers, `Nit`, fields and radiometric groups** (was STD-96) — named markers for the
   everyday coherent derived units of the SI Brochure (9th ed., tables 5 and 6, cited in each marker's docs), 48 in
   all: `mechanical` gains `Area`, `Volume`, `Wavenumber`, `Density`, `GramPerCubicCentimeter`, `SurfaceDensity`,
@@ -261,12 +262,12 @@ and clocks with a named epoch.
   `Angle<Turn | Degree | Radian>` (wrap every turn, the difference signed and shortest). Register formulas are origins
   `above` another (LSM6DS `raw/256 + 25 °C`, J1939 −40 °C). `to::<O2, P2, T2>()` between origins of the same unit and
   reference, its factor and offset at compile time, exact or `None`. On the wire a point is its number; `OriginDef`
-  holds an origin as data for INT-13. [Points and origins](docs/std_library/points.md), conformance
+  holds an origin as data for INT-13. [Points and origins](docs/points/points.md), conformance
   `stdlib.si.point.*`, `stdlib.si.offset.*` (derive, dynamic, Python; C waits on API-26).
 - ✅ **PT-2 The Unix epoch** (was STD-84) — `exact_units` 8584aad: `origins::UnixEpoch` with `UnixSecs<T>` /
   `UnixMillis<T>` / `UnixMicros<T>` / `UnixNanos<T>` (`T` defaults to `u64`), a `Point<UnixEpoch, Secs<T>|..>` for
   POSIX time (`time_t`, journald's `__REALTIME_TIMESTAMP`). `origins::{UnixEpoch, UnixSecs, ..}` reach `ww_si::..`
-  through its existing `origins` re-export (feature `time`). Docs: [points](std_library/points.md#origins).
+  through its existing `origins` re-export (feature `time`). Docs: [points](docs/points/points.md#origins-the-crate-ships).
 - 📋 **PT-3 Instants and clocks with named epochs** (was STD-65) · `v0.5` — `Instant<Clock, ..>`: device-monotonic, Unix, TAI, GPS
   (TAI − 19 s), UTC through a versioned leap-second table on hosts; GPS week rollover as a `Seq` modulo 1024.
 - 📋 **PT-4 Time scales as references** · `foundations` — `ReferenceDef` (exact, run time, time scale); `TaiScale`,
@@ -392,7 +393,7 @@ the command line, databases, Arrow.
   steps with the nearest two, past the storage, out of bounds). Breaking: `serde` no longer turns on `std` and
   `shrink_wrap`; `Magnitude` / `Offset` need `std` too, the owned mirrors `std` and `shrink_wrap` as before. Tests
   `exact_units/tests/serde.rs`, properties `tests/props/serde_values.rs` (two Kani proofs); docs
-  [`exact_units`](std_library/exact_units.md#serde).
+  [`exact_units`](docs/wire/shrink_wrap.md#serde-configs-and-other-formats).
 - 📋 **IO-2 Text unit codes in and out** (was STD-70) — UCUM, UNECE Rec 20, QUDT, SenML / RFC 8798, OpenMetrics: exact
   imports, exports that say where they lose something. Later, in a separate optional crate `exact_units_interop`
   (Roman, 27 Oct): this release builds the capability to represent them (STD-77, TEST-28), not the tables.

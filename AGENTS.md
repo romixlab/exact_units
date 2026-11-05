@@ -24,8 +24,11 @@ The optional `serde` feature (`src/serde.rs`) is serde alone, `no_std` without a
 (errors are `Display` types, text goes through `collect_str` and a stack buffer), `Magnitude`/`Offset` serde need
 `std`, the owned mirrors `std` and `shrink_wrap`. The module shares the crate's name, so paths in it start `::serde`.
 
-Docs: `docs/customary.md` (its tables are generated, `just customary-docs`); the rest lives on the WireWeaver docs
-site (`std_library/exact_units`, `magnitude`, `points`, `rounding`, `indices`), with the wire and client parts.
+Docs: this crate's own book, `docs/` (built with zensical, `zensical.toml`; served at
+[exact.vhrd.tech](https://exact.vhrd.tech/)), covers the library end to end; `docs/customary.md`'s tables are
+generated, `just customary-docs`. WireWeaver's docs site keeps only the API-model, `ww`, Python, dynamic-client and
+wire-bytes side of `exact_units` (`std_library/exact_units`, `magnitude`, `points`, `rounding`, `indices`,
+`customary`, `units_in_the_model`), each page there linking back here for the library part.
 Features and their status are tracked in this crate's own `FEATURES.md`, six areas: `NUM` (number core), `UNIT`
 (units and markers), `PT` (points and origins), `LVL` (levels), `CPX` (complex quantities), `IO` (numbers and units
 at the edges). An item about the wire, `ww_si`, codegen or WireWeaver integration stays in wire_weaver's own
