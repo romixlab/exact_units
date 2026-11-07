@@ -28,6 +28,8 @@ mod numeric;
 mod panics;
 mod point;
 mod prefix;
+#[cfg(all(feature = "q", not(kani)))]
+mod q_float;
 #[cfg(feature = "q")]
 mod q_literal;
 #[cfg(all(feature = "q", not(kani)))]

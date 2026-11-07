@@ -21,6 +21,7 @@ fn compile_fail_q() {
     let t = trybuild::TestCases::new();
     t.pass("tests/compile_fail/pass_marker.rs");
     t.compile_fail("tests/compile_fail/q_dim_mismatch.rs");
+    t.compile_fail("tests/compile_fail/q_float.rs");
     t.compile_fail("tests/compile_fail/q_symbols.rs");
     t.compile_fail("tests/compile_fail/q_grammar.rs");
     t.compile_fail("tests/compile_fail/q_point.rs");

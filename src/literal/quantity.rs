@@ -8,7 +8,9 @@
 //!   `16 > x`, and no stored value equals it.
 //! - A literal past `T`'s range compares as it is: every `i8` is below `q!(1000 m)`.
 //! - Units that don't convert are a compile error, as for `fixed!(x in S)`.
-//! - Integer storages.
+//! - Float storages too: the literal folds to the largest float at or below it and whether it is that float, so
+//!   `t < q!(0.1 V)` on an `f32` is one float compare, `0.1_f32` (just above 0.1) is above it, and nothing in an
+//!   `f32` equals it. NaN compares false with every literal, and `partial_cmp` is `None`; ±∞ are past every literal.
 //!
 //! ```
 //! # #[cfg(feature = "mechanical")] {
@@ -18,6 +20,18 @@
 //! assert!(speed > q!(359.9 km/h)); // 99.97.. m/s
 //! assert!(speed == q!(99.99 Speed));
 //! assert!(q!(0.155 m/s) < Fixed::<Speed, Centi, i16>::new(16)); // 15.5 steps
+//! # }
+//! ```
+//!
+//! ```
+//! # #[cfg(feature = "electrical")] {
+//! use exact_units::{Fixed, q, prefix::One, units::Volt};
+//! let v = |x: f32| Fixed::<Volt, One, f32>::new(x);
+//! assert!(v(0.1) > q!(0.1 V)); // 0.100000001490116.. as an f32
+//! assert!(v(0.1).ne(&q!(0.1 V)));
+//! assert!(v(0.1f32.next_down()) < q!(0.1 V));
+//! assert!(v(0.75) == q!(0.75 V)); // a float itself
+//! assert!(v(f32::NAN).partial_cmp(&q!(0.1 V)).is_none());
 //! # }
 //! ```
 //!
@@ -82,13 +96,14 @@ struct Cut {
     reason = "q >= 1 (Decimal::over), fl <= i128::MAX - 1 checked, so -fl - 1 fits"
 )]
 const fn cut<S: Unit, U: Unit, P: FixedScale>(x: Decimal) -> Cut {
+    // the units are checked for every literal, 0 too
+    let scale = scale_in::<S, U, P>();
     if x.num() == 0 {
         return Cut {
             floor: 0,
             exact: true,
         };
     }
-    let scale = scale_in::<S, U, P>();
     let (fl, exact) = if scale.is_rational() {
         let (p, q) = x.over(scale);
         (p / q, p % q == 0)
@@ -283,6 +298,177 @@ macro_rules! literal_cmp {
 }
 
 literal_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
+
+/// A literal against a float storage: `down` is the largest float at or below it (−∞ below the float's range, the
+/// largest finite float above it), `exact` whether it is that float.
+#[derive(Copy, Clone)]
+struct Below<F> {
+    down: F,
+    exact: bool,
+}
+
+macro_rules! literal_cmp_float {
+    ($($ty:ident $raw:ident $bits:literal $max_exp:literal;)*) => {$(
+        impl Below<$ty> {
+            /// `x` of `S` in steps of `P · U`, exact: the floor of its magnitude as a float for `x >= 0`, minus the
+            /// ceiling's for `x < 0` (the next float up where the magnitude isn't a float).
+            #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "bits is at most the largest finite float's, so bits + 1 fits (it is +∞'s)"
+            )]
+            const fn of<S: Unit, U: Unit, P: FixedScale>(x: Decimal) -> Self {
+                let Some(abs) = x.to_interval_any(scale_in::<S, U, P>()) else {
+                    return Below { down: 0.0, exact: true };
+                };
+                let (bits, exact) = abs.float_below($bits, $max_exp);
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "float_below gives the bits of a float of this width"
+                )]
+                let bits = bits as $raw;
+                if x.num() >= 0 {
+                    Below { down: $ty::from_bits(bits), exact }
+                } else {
+                    let up = if exact { bits } else { bits + 1 };
+                    Below { down: -$ty::from_bits(up), exact }
+                }
+            }
+
+            /// `t < x`: below `down`, or at it where `x` is above it.
+            #[inline(always)]
+            fn lt(self, t: $ty) -> bool {
+                if self.exact { t < self.down } else { t <= self.down }
+            }
+
+            /// `t <= x`.
+            #[inline(always)]
+            fn le(self, t: $ty) -> bool {
+                t <= self.down
+            }
+
+            /// `t == x`: only where `x` is a float.
+            #[inline(always)]
+            fn eq(self, t: $ty) -> bool {
+                self.exact && t == self.down
+            }
+
+            /// `t > x`, false for NaN as `!le` is not.
+            #[inline(always)]
+            fn gt(self, t: $ty) -> bool {
+                t > self.down
+            }
+
+            /// `t >= x`.
+            #[inline(always)]
+            fn ge(self, t: $ty) -> bool {
+                if self.exact { t >= self.down } else { t > self.down }
+            }
+        }
+
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
+            /// `[self < x, self <= x, self == x, self > x, self >= x]` for decimal `x` in units of `S`, at run time:
+            /// the fold the compares with a `q!` literal make in a `const` block, for the properties of
+            /// `tests/props`. Panics for units that don't convert.
+            #[doc(hidden)]
+            #[must_use]
+            pub fn literal_order<S: Unit>(&self, x: Decimal) -> [bool; 5] {
+                let c = Below::<$ty>::of::<S, U, P>(x);
+                let t = self.get();
+                [c.lt(t), c.le(t), c.eq(t), c.gt(t), c.ge(t)]
+            }
+        }
+
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+            PartialEq<LiteralIn<N, E, S>> for Fixed<U, P, $ty, B>
+        {
+            #[inline]
+            fn eq(&self, _: &LiteralIn<N, E, S>) -> bool {
+                const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)) }.eq(self.get())
+            }
+        }
+
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+            PartialOrd<LiteralIn<N, E, S>> for Fixed<U, P, $ty, B>
+        {
+            #[inline]
+            fn partial_cmp(&self, x: &LiteralIn<N, E, S>) -> Option<Ordering> {
+                if self.lt(x) {
+                    Some(Ordering::Less)
+                } else if self.eq(x) {
+                    Some(Ordering::Equal)
+                } else if self.gt(x) {
+                    Some(Ordering::Greater)
+                } else {
+                    None
+                }
+            }
+
+            #[inline]
+            fn lt(&self, _: &LiteralIn<N, E, S>) -> bool {
+                const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)) }.lt(self.get())
+            }
+
+            #[inline]
+            fn le(&self, _: &LiteralIn<N, E, S>) -> bool {
+                const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)) }.le(self.get())
+            }
+
+            #[inline]
+            fn gt(&self, _: &LiteralIn<N, E, S>) -> bool {
+                const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)) }.gt(self.get())
+            }
+
+            #[inline]
+            fn ge(&self, _: &LiteralIn<N, E, S>) -> bool {
+                const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)) }.ge(self.get())
+            }
+        }
+
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+            PartialEq<Fixed<U, P, $ty, B>> for LiteralIn<N, E, S>
+        {
+            #[inline]
+            fn eq(&self, t: &Fixed<U, P, $ty, B>) -> bool {
+                t == self
+            }
+        }
+
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+            PartialOrd<Fixed<U, P, $ty, B>> for LiteralIn<N, E, S>
+        {
+            #[inline]
+            fn partial_cmp(&self, t: &Fixed<U, P, $ty, B>) -> Option<Ordering> {
+                t.partial_cmp(self).map(Ordering::reverse)
+            }
+
+            #[inline]
+            fn lt(&self, t: &Fixed<U, P, $ty, B>) -> bool {
+                t > self
+            }
+
+            #[inline]
+            fn le(&self, t: &Fixed<U, P, $ty, B>) -> bool {
+                t >= self
+            }
+
+            #[inline]
+            fn gt(&self, t: &Fixed<U, P, $ty, B>) -> bool {
+                t < self
+            }
+
+            #[inline]
+            fn ge(&self, t: &Fixed<U, P, $ty, B>) -> bool {
+                t <= self
+            }
+        }
+    )*};
+}
+
+literal_cmp_float! {
+    f32 u32 24 127;
+    f64 u64 53 1023;
+}
 
 /// A decimal literal that names its unit, `q!(100 m/s)`, `q!(3.3 mV)`, `q!(90 deg)`, compared exactly with a
 /// [Fixed] of any unit it converts to: see the [module](crate::literal::quantity).

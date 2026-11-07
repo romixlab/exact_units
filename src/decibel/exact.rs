@@ -226,6 +226,61 @@ impl Num {
         }
         Some((mant, exp))
     }
+
+    /// The largest binary float at or below `self`, with `bits` of mantissa (the hidden one included), exponents of
+    /// its leading bit from `1 - max_exp` to `max_exp` and subnormals below: its IEEE 754 bits (the largest finite
+    /// float's above that range), and whether it is `self`.
+    #[cfg(feature = "q")]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "bits is 24 or 53 and max_exp 127 or 1023 (Interval::float_below's callers), so frac, 2 · max_exp and lead + max_exp are small and positive; exponents stay below 2^62 in size, so s fits"
+    )]
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "max_exp is 127 or 1023, so 2 · max_exp is positive"
+    )]
+    const fn float_floor(self, bits: u32, max_exp: i64) -> (u128, bool) {
+        let frac = bits - 1;
+        let lead = self.e + 127;
+        if lead > max_exp {
+            // the largest finite float: exponent field 2 · max_exp, fraction all ones
+            return ((((2 * max_exp) as u128) << frac) | ((1 << frac) - 1), false);
+        }
+        // the bits of m below the float's last place: those below the top `bits` for a normal float, below
+        // 2^(1 - max_exp - frac) for a subnormal
+        let s = if lead >= 1 - max_exp {
+            (128 - bits) as i64
+        } else {
+            1 - max_exp - frac as i64 - self.e
+        };
+        if s >= 128 {
+            // below the smallest subnormal: +0, never self (m != 0)
+            return (0, false);
+        }
+        #[expect(
+            clippy::cast_sign_loss,
+            clippy::cast_possible_truncation,
+            reason = "s is 128 - bits or more, and below 128, here"
+        )]
+        let s = s as u32;
+        let mant = self.m >> s;
+        let exact = self.m & ((1 << s) - 1) == 0;
+        if lead >= 1 - max_exp {
+            #[expect(
+                clippy::cast_sign_loss,
+                reason = "lead + max_exp is 1..=2 · max_exp here"
+            )]
+            let field = (lead + max_exp) as u128;
+            ((field << frac) | (mant & ((1 << frac) - 1)), exact)
+        } else {
+            // a subnormal: exponent field 0, mant below 2^frac
+            (mant, exact)
+        }
+    }
 }
 
 /// `a · b` as `(high, low)` 128-bit halves.
@@ -480,6 +535,34 @@ impl Interval {
                 "this literal is too close to a stored value to compare at compile time: write one more decimal"
             ),
             _ => panic!("this literal is too large to compare"),
+        }
+    }
+
+    /// The largest float at or below the exact value, as [Num::float_floor] has it for both ends (its IEEE 754 bits
+    /// and whether it is the value), or a compile error where a float lies between the ends: what `q!` compares a
+    /// float storage against. The value is inside the ends, never at one, where they differ: a ratio rounded both
+    /// ways has a remainder, and a value with π or a root in it isn't a binary fraction.
+    #[cfg(feature = "q")]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time): a value too close to a float to decide"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "lo is at most the largest finite float's bits, so lo + 1 fits"
+    )]
+    pub(crate) const fn float_below(self, bits: u32, max_exp: i64) -> (u128, bool) {
+        let (lo, exact) = self.lo.float_floor(bits, max_exp);
+        if self.lo.m == self.hi.m && self.lo.e == self.hi.e {
+            return (lo, exact);
+        }
+        // no float in (lo, hi): the upper end has the same floor, or is the next float itself
+        match self.hi.float_floor(bits, max_exp) {
+            (hi, _) if hi == lo => (lo, false),
+            (hi, true) if hi == lo + 1 => (lo, false),
+            _ => panic!(
+                "this literal is too close to a float to compare at compile time: write one more decimal"
+            ),
         }
     }
 
@@ -791,5 +874,157 @@ mod tests {
         );
         assert_eq!(Interval::ratio(1_999_999_999, 1_000_000_000).to_f32(), 2.0);
         assert_eq!(Interval::ratio(1, 1).to_f64(), 1.0);
+    }
+
+    /// The float floor `q!` compares a float storage against.
+    #[cfg(feature = "q")]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "test arithmetic on the floats and exponents the tests chose, far from any type's ends"
+    )]
+    mod float_floor {
+        use super::*;
+        use crate::Magnitude;
+        use core::f32::consts::PI as PI32;
+
+        /// `mant · 2^exp` as a [Num], `mant > 0`.
+        fn num_at(mant: u128, exp: i64) -> Num {
+            let n = Num::of(mant);
+            Num {
+                m: n.m,
+                e: n.e + exp,
+            }
+        }
+
+        /// The next [Num] below `n`, one unit of its last place.
+        fn below(n: Num) -> Num {
+            if n.m == TOP {
+                Num {
+                    m: u128::MAX,
+                    e: n.e - 1,
+                }
+            } else {
+                Num { m: n.m - 1, e: n.e }
+            }
+        }
+
+        /// The next [Num] above `n`, `n.m` not all ones.
+        fn above(n: Num) -> Num {
+            Num { m: n.m + 1, e: n.e }
+        }
+
+        /// A positive float's bits as `(mant, exp)`, its value `mant · 2^exp`, for `frac` bits of fraction and an exponent
+        /// field of `field_bits`.
+        fn parts(bits: u64, frac: u32, max_exp: i64) -> (u128, i64) {
+            let field = (bits >> frac).cast_signed();
+            let f = u128::from(bits & ((1 << frac) - 1));
+            if field == 0 {
+                (f, 1 - max_exp - i64::from(frac))
+            } else {
+                (f | (1 << frac), field - max_exp - i64::from(frac))
+            }
+        }
+
+        /// At float `bits`, just above it and just below it, for every positive finite float of one format whose bits
+        /// `step` divides, and their neighbours: the float itself exactly, it inexactly, the one before inexactly.
+        fn floor_walk(bits: u32, max_exp: i64, top: u64, step: u64) {
+            let frac = bits - 1;
+            let mut b = 1u64;
+            while b <= top {
+                for b in [b - 1, b, b + 1] {
+                    if b == 0 || b > top {
+                        continue;
+                    }
+                    let (mant, exp) = parts(b, frac, max_exp);
+                    let n = num_at(mant, exp);
+                    let ours = u128::from(b);
+                    assert_eq!(n.float_floor(bits, max_exp), (ours, true), "{b:#x}");
+                    assert_eq!(above(n).float_floor(bits, max_exp), (ours, false), "{b:#x}");
+                    assert_eq!(
+                        below(n).float_floor(bits, max_exp),
+                        (ours - 1, false),
+                        "{b:#x}"
+                    );
+                }
+                b += step;
+            }
+        }
+
+        #[test]
+        fn float_floor_of_every_f32_with_low_bits_zero_and_its_neighbours() {
+            floor_walk(24, 127, u64::from(f32::MAX.to_bits()), 1 << 10);
+        }
+
+        #[test]
+        fn float_floor_of_f64s_across_every_exponent() {
+            // 2^41 steps through the 2^63 patterns: every exponent field, 2^11 mantissas in each
+            floor_walk(53, 1023, f64::MAX.to_bits(), (1 << 41) + 1);
+        }
+
+        #[test]
+        fn float_floor_past_the_ends() {
+            let max32 = u128::from(f32::MAX.to_bits());
+            let max64 = u128::from(f64::MAX.to_bits());
+            // 2^128 and 2^1024 and above: the largest finite float, never exact
+            assert_eq!(num_at(1, 128).float_floor(24, 127), (max32, false));
+            assert_eq!(num_at(1, 1024).float_floor(53, 1023), (max64, false));
+            assert_eq!(num_at(1, 5000).float_floor(53, 1023), (max64, false));
+            // just below 2^128: still the largest finite f32, not exact
+            assert_eq!(below(num_at(1, 128)).float_floor(24, 127), (max32, false));
+            // below the smallest subnormal: +0, not exact
+            assert_eq!(num_at(1, -150).float_floor(24, 127), (0, false));
+            assert_eq!(num_at(1, -1075).float_floor(53, 1023), (0, false));
+            assert_eq!(num_at(1, -5000).float_floor(53, 1023), (0, false));
+            assert_eq!(num_at(1, -149).float_floor(24, 127), (1, true));
+            assert_eq!(num_at(1, -1074).float_floor(53, 1023), (1, true));
+        }
+
+        #[test]
+        fn float_below_of_intervals() {
+            // a ratio that is a float: exact; one that isn't: the float below, not exact (0.1 as a float is above 0.1)
+            assert_eq!(
+                Interval::ratio(3, 4).float_below(24, 127),
+                (u128::from(0.75f32.to_bits()), true)
+            );
+            assert_eq!(
+                Interval::ratio(1, 10).float_below(24, 127),
+                (u128::from(0.1f32.to_bits() - 1), false)
+            );
+            assert_eq!(
+                Interval::ratio(1, 10).float_below(53, 1023),
+                (u128::from(0.1f64.to_bits() - 1), false)
+            );
+            // just below a float, closer than a Num tells apart: the upper end is that float, exactly
+            let n = num_at(1, 0);
+            let i = Interval {
+                lo: below(n),
+                hi: n,
+            };
+            assert_eq!(
+                i.float_below(24, 127),
+                (u128::from(1f32.to_bits() - 1), false)
+            );
+            // π: the floor of both ends (π as an f32 is above π, as an f64 below)
+            let pi = Interval::magnitude(Magnitude::PI);
+            assert_eq!(
+                pi.float_below(24, 127),
+                (u128::from(PI32.to_bits() - 1), false)
+            );
+            assert_eq!(
+                pi.float_below(53, 1023),
+                (u128::from(consts::PI.to_bits()), false)
+            );
+        }
+
+        #[test]
+        #[should_panic(expected = "too close to a float")]
+        fn float_below_refuses_a_float_between_the_ends() {
+            let n = num_at(1, 0);
+            let _ = Interval {
+                lo: below(n),
+                hi: above(n),
+            }
+            .float_below(24, 127);
+        }
     }
 }

@@ -1,0 +1,105 @@
+error[E0080]: evaluation panicked: a literal's unit converts only between units of the same dimension: Meter (m) is m, not Speed (m/s) which is m·s⁻¹; they differ by s
+ --> src/literal/quantity.rs
+  |
+  |                   const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)) }.lt(self.get())
+  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::quantity::<impl std::cmp::PartialOrd<exact_units::literal::LiteralIn<1, 2, exact_units::units::Meter>> for exact_units::Fixed<exact_units::units::Speed, exact_units::prefix::Centi, f32>>::lt::{constant#0}` failed inside this call
+...
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+  |
+note: inside `quantity::Below::<f32>::of::<Meter, Speed, exact_units::prefix::Centi>`
+ --> src/literal/quantity.rs
+  |
+  |                   let Some(abs) = x.to_interval_any(scale_in::<S, U, P>()) else {
+  |                                                     ^^^^^^^^^^^^^^^^^^^^^
+...
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+note: inside `literal::scale_in::<Meter, Speed, exact_units::prefix::Centi>`
+ --> src/literal.rs
+  |
+  |         crate::conv_error::dim_mismatch::<S, U>("a literal's unit");
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `exact_units::conv_error::dim_mismatch::<Meter, Speed>`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/conv_error.rs
+  |
+  |     panic!("{}", msg.as_str())
+  |     -------------------------- in this macro invocation
+
+note: erroneous constant encountered
+ --> src/literal/quantity.rs
+  |
+  |                   const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)) }.lt(self.get())
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+  |
+  = note: this note originates in the macro `literal_cmp_float` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn quantity::<impl PartialOrd<LiteralIn<1, 2, Meter>> for Fixed<Speed, exact_units::prefix::Centi, f32>>::lt`
+ --> tests/compile_fail/q_float.rs:7:13
+  |
+7 |     let _ = speed < q!(100 m);
+  |             ^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: a literal's unit converts only between units of the same dimension: Meter (m) is m, not Speed (m/s) which is m·s⁻¹; they differ by s
+ --> src/literal/quantity.rs
+  |
+  |                 const { AtMost::<$ty>::lt(cut::<S, U, P>(Decimal::new(N, E))) }.test(self.get())
+  |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::quantity::<impl std::cmp::PartialOrd<exact_units::literal::LiteralIn<0, 0, exact_units::units::Meter>> for exact_units::Fixed<exact_units::units::Speed, exact_units::prefix::Centi, i16>>::lt::{constant#0}` failed inside this call
+...
+  | literal_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------- in this macro invocation
+  |
+note: inside `quantity::cut::<Meter, Speed, exact_units::prefix::Centi>`
+ --> src/literal/quantity.rs
+  |
+  |     let scale = scale_in::<S, U, P>();
+  |                 ^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::scale_in::<Meter, Speed, exact_units::prefix::Centi>`
+ --> src/literal.rs
+  |
+  |         crate::conv_error::dim_mismatch::<S, U>("a literal's unit");
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `exact_units::conv_error::dim_mismatch::<Meter, Speed>`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/conv_error.rs
+  |
+  |     panic!("{}", msg.as_str())
+  |     -------------------------- in this macro invocation
+
+note: erroneous constant encountered
+ --> src/literal/quantity.rs
+  |
+  |                 const { AtMost::<$ty>::lt(cut::<S, U, P>(Decimal::new(N, E))) }.test(self.get())
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | literal_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------- in this macro invocation
+  |
+  = note: this note originates in the macro `literal_cmp` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn quantity::<impl PartialOrd<LiteralIn<0, 0, Meter>> for Fixed<Speed, exact_units::prefix::Centi, i16>>::lt`
+ --> tests/compile_fail/q_float.rs:9:13
+  |
+9 |     let _ = speed < q!(0 m);
+  |             ^^^^^^^^^^^^^^^

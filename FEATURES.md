@@ -207,8 +207,13 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   `ppb`, `percent`, `of` (±0.25 %), `EXACT`, both ends in. Feature `dimensionless`. Doctests on the methods, book
   page [Exact fractions](docs/maths/fractions.md#relative-error-and-tolerance). For the clock planner (RCC-6) and a
   UART BRR.
-- 📋 **NUM-16 `q!` against float storages** — `Fixed<U, P, f32 | f64>` against a `q!` literal, exactly: the largest
-  float at or below the literal, worked out in a `const` block, and whether it equals it; NaN compares false.
+- ✅ **NUM-16 `q!` against float storages** — `Fixed<U, P, f32 | f64>` against a `q!` literal, exactly, both ways
+  round: a `const` block folds the literal to the largest float at or below it and whether it is that float
+  (`Interval::float_below`, subnormals included, the largest finite float past the range, −∞ below it), then one
+  float compare. NaN compares false (`partial_cmp` `None`), ±∞ past every literal, a scale with π decided from the
+  interval or a compile error. Tests: `tests/props/q_float.rs` (the fold against `num-rational`, random and
+  next-to-the-literal floats; `q!` walked over every `f32` whose low 16 bits are 0 and their neighbours) and the unit
+  tests of `Num::float_floor` over every `f32` exponent.
 - 📋 **NUM-17 `fixed!(100 m/s)`** — the typed constant names its unit through `q!`'s reader, checked against the
   constant's type; `fixed!(v in S)` stays.
 - 📋 **NUM-18 `q!` against `Exact` and the level types** — the same exact order against an `Exact<U>` at run time and
