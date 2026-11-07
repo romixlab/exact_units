@@ -178,6 +178,22 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   text, never a panic), `tests/compile_fail/q_*.rs` snapshots for each refusal. The generated symbol table (UNIT-11),
   float storages (NUM-16), points (PT-5), `fixed!(100 m/s)` (NUM-17), `Exact` and levels (NUM-18) and the thumbv6m
   check that `q!` compiles to the typed-const compare follow.
+- ✅ **NUM-15 `q!`, a literal that names its unit** — `speed < q!(100 m/s)`: a decimal and its unit (symbols joined
+  by `*` and `/` left to right, powers `^2` and `^-1`, groups `( .. )`, a leading `/`; a type, `q!(100 Speed)`; or a
+  string for what Rust's lexer refuses, `q!(90 "°")`, `q!("9.81 m/s²")`), a zero-sized `LiteralIn<N, E, S>` whose
+  `PartialOrd`/`PartialEq` with a `Fixed` of integer storage, both ways round, fold the literal in a `const` block to
+  its integer part in steps of `P` of `U` and whether it is that integer: one `t <= c`, or a constant past `T`'s
+  range. Never rounded (0.155 m/s against cm/s steps equals no stored value), a scale with π through `Interval`, a
+  wrong dimension or kind a compile error. The macro is a proc-macro of this repository without dependencies,
+  `macros/` (`exact_units_macros`), which `q!` reaches with `$crate` in front; its reader is plain Rust
+  (`macros/src/pure`): SI and binary prefixes folded into the literal (`km²` is 10⁶, `KiB` 1024), a symbol table of
+  unit markers, refused symbols that read two ways (`min`, `gal`), each error at its token, a marker of a feature
+  group that is off named with the feature. Tests: `tests/props/q_literal.rs` (the fold against the `i128` reference
+  for i8 to i64 and u8 to u32, whole walks of `q!` over every i16, u16, i8 and u8 for prefixes, powers, strings,
+  degrees against mrad, bytes; a Kani proof over i16), `tests/props/q_text.rs` and the `q_text` fuzz target (any
+  text, never a panic), `tests/compile_fail/q_*.rs` snapshots for each refusal. The generated symbol table (UNIT-11),
+  float storages (NUM-16), points (PT-5), `fixed!(100 m/s)` (NUM-17), `Exact` and levels (NUM-18) and the thumbv6m
+  check that `q!` compiles to the typed-const compare follow.
 - 📋 **NUM-10 Measured constants as exact symbols** · `foundations` — μ₀ and G in `Magnitude` beside π, ln 2 and ln 10
   (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
   old 4π·10⁻⁷ only as the opt-in `Ampere1948`; a conversion that needs a symbol doesn't compile without a set, floats
