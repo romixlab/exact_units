@@ -278,111 +278,234 @@ macro_rules! literal_cmp {
 
 literal_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
 
-/// PROTOTYPE: a decimal literal with its unit, `q!(100 m/s)`, `q!(3.3 mV)`, `q!(90 deg)`, compared exactly with a
+/// A decimal literal that names its unit, `q!(100 m/s)`, `q!(3.3 mV)`, `q!(90 deg)`, compared exactly with a
 /// [Fixed] of any unit it converts to: see the [module](crate::literal::quantity).
 ///
-/// The unit is symbols joined by `*` and `/` (left to right: `m/s/s` is (m/s)/s), each symbol from a table with
-/// its SI prefix folded into the literal's exponent, or a type: `q!(100 Speed)`, `q!(1 units::Volt)`,
-/// `q!(2 Per<Volt, Second>)`.
+/// The unit is symbols joined by `*` and `/`, left to right (`m/s/s` is (m/s)/s), with powers `^2`, `^-1` and
+/// groups `( .. )`; each symbol from the table, its SI prefix folded into the literal's exponent. Or a type:
+/// `q!(100 Speed)`, `q!(1 units::Volt)`, `q!(2 Per<Volt, Second>)`. A string takes the symbols Rust's lexer can't:
+/// `q!(90 "°")`, `q!("9.81 m/s²")`.
 #[macro_export]
 macro_rules! q {
-    // a type path: `units::Speed`, `::exact_units::units::Speed`, `Per<Volt, Second>`
-    ($v:literal $head:ident :: $($rest:tt)+) => { $crate::__q_done!([$v] [] [$head :: $($rest)+]) };
-    ($v:literal :: $($rest:tt)+) => { $crate::__q_done!([$v] [] [:: $($rest)+]) };
-    ($v:literal $head:ident < $($rest:tt)+) => { $crate::__q_done!([$v] [] [$head < $($rest)+]) };
-    // symbols
-    ($v:literal $s:ident $($rest:tt)*) => { $crate::__q_sym!($s first [$v] [] [] $($rest)*) };
+    ($($t:tt)*) => { $crate::__macros::q!($crate; $($t)*) };
 }
 
-/// The literal value of `q!`, once its unit is read.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __q_done {
-    ([$v:literal] [$($sh:tt)*] [$($ty:tt)*]) => {
-        $crate::literal::LiteralIn::<
-            { $crate::literal::Decimal::parse(stringify!($v)).shifted(0 $($sh)*).num() },
-            { $crate::literal::Decimal::parse(stringify!($v)).shifted(0 $($sh)*).exp() },
-            $($ty)*,
-        >::NEW
-    };
+// A unit without a dimension, for a literal whose unit starts with a negative power: `q!(5 s^-1)` is
+// `Per<Unitless, Second>`. Not a unit for an API: it is in no feature group, as every literal may need it.
+crate::unit! {
+    #[doc(hidden)]
+    pub struct Unitless = "", [];
 }
 
-/// After a symbol: the next `*` or `/` and symbol, or the end.
+// The symbols of q! name their markers through one macro per feature group: the marker's path where the group is
+// on, an error naming the feature where it is off (`s` needs `time`).
+
+#[cfg(feature = "time")]
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __q_more {
-    ([$v:literal] [$($sh:tt)*] [$($ty:tt)*]) => { $crate::__q_done!([$v] [$($sh)*] [$($ty)*]) };
-    ([$v:literal] [$($sh:tt)*] [$($ty:tt)*] / $s:ident $($rest:tt)*) => {
-        $crate::__q_sym!($s div [$v] [$($sh)*] [$($ty)*] $($rest)*)
-    };
-    ([$v:literal] [$($sh:tt)*] [$($ty:tt)*] * $s:ident $($rest:tt)*) => {
-        $crate::__q_sym!($s mul [$v] [$($sh)*] [$($ty)*] $($rest)*)
-    };
-    ([$v:literal] [$($sh:tt)*] [$($ty:tt)*] $($rest:tt)*) => {
-        compile_error!(concat!(
-            "q!: a unit is symbols joined by * and /, or a type; not `",
-            stringify!($($rest)*),
-            "`"
-        ))
-    };
+macro_rules! __q_time {
+    ($($p:tt)*) => { $crate::$($p)* };
 }
 
-/// One symbol of exponent `pfx` and unit `u` joined to what came before by `op`.
+#[cfg(not(feature = "time"))]
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __q_step {
-    ($pfx:literal [$($u:tt)*] first [$v:literal] [] [] $($rest:tt)*) => {
-        $crate::__q_more!([$v] [+ ($pfx)] [$($u)*] $($rest)*)
-    };
-    ($pfx:literal [$($u:tt)*] mul [$v:literal] [$($sh:tt)*] [$($ty:tt)*] $($rest:tt)*) => {
-        $crate::__q_more!([$v] [$($sh)* + ($pfx)] [$crate::units::Times<$($ty)*, $($u)*>] $($rest)*)
-    };
-    ($pfx:literal [$($u:tt)*] div [$v:literal] [$($sh:tt)*] [$($ty:tt)*] $($rest:tt)*) => {
-        $crate::__q_more!([$v] [$($sh)* - ($pfx)] [$crate::units::Per<$($ty)*, $($u)*>] $($rest)*)
-    };
+macro_rules! __q_time {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `time`")) };
 }
 
-/// The symbol table. macro_rules can't take an identifier apart, so every prefixed symbol is an arm of its own.
+#[cfg(feature = "electrical")]
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __q_sym {
-    // symbols that read two ways
-    (min $($k:tt)*) => {
-        compile_error!("q!: `min` reads two ways (minute of time, minute of arc): write the type, q!(5 Minute) or q!(5 Arcminute)")
-    };
-    (gal $($k:tt)*) => {
-        compile_error!("q!: `gal` reads two ways (US or imperial gallon): write the type, q!(5 GallonUs) or q!(5 GallonImperial)")
-    };
-    // time
-    (s $($k:tt)*) => { $crate::__q_step!(0 [$crate::units::Second] $($k)*) };
-    (ms $($k:tt)*) => { $crate::__q_step!(-3 [$crate::units::Second] $($k)*) };
-    (us $($k:tt)*) => { $crate::__q_step!(-6 [$crate::units::Second] $($k)*) };
-    (μs $($k:tt)*) => { $crate::__q_step!(-6 [$crate::units::Second] $($k)*) };
-    (ns $($k:tt)*) => { $crate::__q_step!(-9 [$crate::units::Second] $($k)*) };
-    (h $($k:tt)*) => { $crate::__q_step!(0 [$crate::units::Hour] $($k)*) };
-    (Hz $($k:tt)*) => { $crate::__q_step!(0 [$crate::units::Hertz] $($k)*) };
-    (kHz $($k:tt)*) => { $crate::__q_step!(3 [$crate::units::Hertz] $($k)*) };
-    (MHz $($k:tt)*) => { $crate::__q_step!(6 [$crate::units::Hertz] $($k)*) };
-    // length
-    (m $($k:tt)*) => { $crate::__q_step!(0 [$crate::units::Meter] $($k)*) };
-    (mm $($k:tt)*) => { $crate::__q_step!(-3 [$crate::units::Meter] $($k)*) };
-    (cm $($k:tt)*) => { $crate::__q_step!(-2 [$crate::units::Meter] $($k)*) };
-    (km $($k:tt)*) => { $crate::__q_step!(3 [$crate::units::Meter] $($k)*) };
-    // electrical
-    (V $($k:tt)*) => { $crate::__q_step!(0 [$crate::units::Volt] $($k)*) };
-    (mV $($k:tt)*) => { $crate::__q_step!(-3 [$crate::units::Volt] $($k)*) };
-    (uV $($k:tt)*) => { $crate::__q_step!(-6 [$crate::units::Volt] $($k)*) };
-    (μV $($k:tt)*) => { $crate::__q_step!(-6 [$crate::units::Volt] $($k)*) };
-    (A $($k:tt)*) => { $crate::__q_step!(0 [$crate::units::Ampere] $($k)*) };
-    (mA $($k:tt)*) => { $crate::__q_step!(-3 [$crate::units::Ampere] $($k)*) };
-    (W $($k:tt)*) => { $crate::__q_step!(0 [$crate::units::Watt] $($k)*) };
-    (mW $($k:tt)*) => { $crate::__q_step!(-3 [$crate::units::Watt] $($k)*) };
-    (Ω $($k:tt)*) => { $crate::__q_step!(0 [$crate::units::Ohm] $($k)*) };
-    (kΩ $($k:tt)*) => { $crate::__q_step!(3 [$crate::units::Ohm] $($k)*) };
-    // angle
-    (rad $($k:tt)*) => { $crate::__q_step!(0 [$crate::units::Radian] $($k)*) };
-    (mrad $($k:tt)*) => { $crate::__q_step!(-3 [$crate::units::Radian] $($k)*) };
-    (deg $($k:tt)*) => { $crate::__q_step!(0 [$crate::units::Degree] $($k)*) };
-    // anything else is a type in scope: `Speed`, `Volt`
-    ($other:ident $($k:tt)*) => { $crate::__q_step!(0 [$other] $($k)*) };
+macro_rules! __q_electrical {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "electrical"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_electrical {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `electrical`")) };
+}
+
+#[cfg(feature = "fields")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_fields {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "fields"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_fields {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `fields`")) };
+}
+
+#[cfg(feature = "mechanical")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_mechanical {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "mechanical"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_mechanical {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `mechanical`")) };
+}
+
+#[cfg(feature = "angle")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_angle {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "angle"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_angle {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `angle`")) };
+}
+
+#[cfg(feature = "thermal")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_thermal {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "thermal"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_thermal {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `thermal`")) };
+}
+
+#[cfg(feature = "chemical")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_chemical {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "chemical"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_chemical {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `chemical`")) };
+}
+
+#[cfg(feature = "photometric")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_photometric {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "photometric"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_photometric {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `photometric`")) };
+}
+
+#[cfg(feature = "radiometric")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_radiometric {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "radiometric"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_radiometric {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `radiometric`")) };
+}
+
+#[cfg(feature = "radiation")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_radiation {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "radiation"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_radiation {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `radiation`")) };
+}
+
+#[cfg(feature = "dimensionless")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_dimensionless {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "dimensionless"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_dimensionless {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `dimensionless`")) };
+}
+
+#[cfg(feature = "information")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_information {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "information"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_information {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `information`")) };
+}
+
+#[cfg(feature = "counting")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_counting {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "counting"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_counting {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `counting`")) };
+}
+
+#[cfg(feature = "levels")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_levels {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "levels"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_levels {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `levels`")) };
+}
+
+#[cfg(feature = "customary")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_customary {
+    ($($p:tt)*) => { $crate::$($p)* };
+}
+
+#[cfg(not(feature = "customary"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __q_customary {
+    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `customary`")) };
 }

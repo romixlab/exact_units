@@ -68,6 +68,8 @@ pub mod kind;
 #[cfg(feature = "levels")]
 pub mod level;
 pub mod literal;
+#[doc(hidden)]
+pub use exact_units_macros as __macros;
 mod magnitude;
 pub mod niche;
 pub mod num;

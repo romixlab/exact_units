@@ -109,6 +109,7 @@ name = "exact_units"
 version = "0.1.0"
 dependencies = [
  "defmt",
+ "exact_units_macros",
  "libm",
  "num-bigint",
  "num-rational",
@@ -119,6 +120,10 @@ dependencies = [
  "shrink_wrap",
  "trybuild",
 ]
+
+[[package]]
+name = "exact_units_macros"
+version = "0.1.0"
 
 [[package]]
 name = "getrandom"

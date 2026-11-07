@@ -1,0 +1,17 @@
+[package]
+name = "exact_units_macros"
+version = "0.1.0"
+authors = ["Roman Isaikin <romix.lab@gmail.com>"]
+description = "The q! unit literal of exact_units: a proc-macro without dependencies, use it through exact_units"
+edition = "2024"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/romixlab/exact_units"
+keywords = ["units", "literal", "proc-macro"]
+categories = ["no-std", "embedded", "science"]
+
+[lib]
+proc-macro = true
+
+[lints]
+workspace = true

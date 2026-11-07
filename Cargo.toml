@@ -15,6 +15,7 @@ exclude = [
     "assets/",
     "docs_ext/",
     "fuzz/",
+    "macros/",
     "overrides/",
     "tools/",
     "pyproject.toml",
@@ -23,6 +24,7 @@ exclude = [
 ]
 
 [workspace]
+members = ["macros"]
 
 [features]
 default = ["std"]
@@ -96,6 +98,8 @@ counting = []
 levels = []
 
 [dependencies]
+# q!, the unit literal: a proc-macro of this repository without dependencies of its own
+exact_units_macros = { version = "=0.1.0", path = "macros" }
 defmt = { version = "1.1", optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
 serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
@@ -221,7 +225,7 @@ split-debuginfo = "unpacked"
 inherits = "release"
 incremental = true
 
-[lints.rust]
+[workspace.lints.rust]
 unsafe_code = "deny"
 missing_docs = "warn"
 missing_debug_implementations = "warn"
@@ -232,7 +236,7 @@ rust_2018_idioms = { level = "warn", priority = -1 }
 # `cargo kani` sets cfg(kani): the proofs in tests/props; `cargo fuzz` sets cfg(fuzzing): fuzz/ runs the properties
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)", "cfg(fuzzing)"] }
 
-[lints.clippy]
+[workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 cargo = { level = "warn", priority = -1 }
 # pedantic, but for these: the house style writes names and formulas in prose (Q15, SIExpr, dB)
@@ -282,3 +286,6 @@ print_stdout = "warn"
 print_stderr = "warn"
 float_cmp = "warn"
 lossy_float_literal = "warn"
+
+[lints]
+workspace = true
