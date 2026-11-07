@@ -5,7 +5,9 @@
 //! - Any scale that is a fraction of integers: `Pow2`, `Pow10`, `Rational`, the SI prefixes and their products. A
 //!   scale with π or a root in it is a compile error: its stored values aren't decimals.
 //! - Integer storages take the nearest integer, ties to even, from the exact fraction: nothing is rounded on the way.
-//!   Float storages take the nearest float, ties to even.
+//!   Float storages take the nearest float, ties to even, which must be a normal number: a literal past the
+//!   float's range or below its normal numbers is a compile error.
+//! - `-0` is a compile error: a decimal has no negative zero, and a float storage would take it as +0.0.
 //! - A value that doesn't fit the storage or is outside the bounds `B` is a compile error, as is a negative value of
 //!   an unsigned storage.
 //! - The literal is in units of `U`: `fixed!(0.25)` of a `Fixed<Volt, Milli, u16>` is 0.25 V, stored as 250.

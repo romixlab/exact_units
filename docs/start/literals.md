@@ -40,8 +40,11 @@ $$
 n = \operatorname{round}_{\text{even}}\!\left(\frac{x}{\text{scale}}\right)
 $$
 
-- A float storage takes the nearest float.
+- A float storage takes the nearest float, which must be a normal number of that float.
 - An exponent works: `fixed!(2.5e-3)`.
+
+Both round without naming the mode: `fixed!(0.1)` in an `f32` stores 0.100000001490116.., with nothing in the
+source saying so. That is a known gap, listed under [where the crate falls short](exact.md#where-the-crate-falls-short-today).
 
 ### What doesn't compile
 
@@ -60,6 +63,29 @@ const NEGATIVE: Fixed<Volt, Milli, u16> = fixed!(-0.5);
 ```
 
 A scale with π or a root in it has no decimal stored values, so `fixed!` refuses it too.
+
+A float storage refuses a literal past its range or below its normal numbers, rather than storing ±∞, a
+subnormal or 0:
+
+```rust,compile_fail
+use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
+
+const HUGE: Fixed<Ratio, One, f32> = fixed!(3.4028236e38); // rounds past f32::MAX
+```
+
+```rust,compile_fail
+use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
+
+const TINY: Fixed<Ratio, One, f32> = fixed!(1e-38); // a subnormal f32
+```
+
+And no literal is `-0`: a decimal has no negative zero, and a float storage would store +0.0. Write `0`.
+
+```rust,compile_fail
+use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
+
+const ZERO: Fixed<Ratio, One, f64> = fixed!(-0.0);
+```
 
 ### A literal in another unit
 
@@ -148,9 +174,10 @@ let _ = speed != q!(1000 m/s); // past i16's range in steps of 1 cm/s
 
 ### Floats
 
-The same rules on an `f32` or `f64` storage: the literal folds to the largest float at or below it and whether it
-is that float exactly, so the compare is one float compare. `0.1` has no exact `f32`, so the stored `0.1_f32` (a
-hair above the real 0.1) is never equal to the literal, and 0.1's own nearest-below neighbour is below it:
+On an `f32` or `f64` storage the floats are the steps. The literal folds to the largest float at or below it, and
+whether it is that float exactly, so each compare is one float compare against a constant. `0.1` has no exact
+`f32`: the stored `0.1_f32` (a hair above the real 0.1) is above the literal, and 0.1's own nearest-below
+neighbour is below it:
 
 ```rust
 # #[cfg(feature = "electrical")] {
@@ -158,14 +185,47 @@ use exact_units::{Fixed, q, prefix::One, units::Volt};
 
 let v = |x: f32| Fixed::<Volt, One, f32>::new(x);
 assert!(v(0.1) > q!(0.1 V));              // 0.100000001490116.. as an f32
-assert!(v(0.1).ne(&q!(0.1 V)));
 assert!(v(0.1f32.next_down()) < q!(0.1 V));
 assert!(v(0.75) == q!(0.75 V));           // a float itself, exactly
+assert!(v(-0.0) == q!(0 V));              // −0.0 is 0
 assert!(v(f32::NAN).partial_cmp(&q!(0.1 V)).is_none());
 # }
 ```
 
-NaN compares false with every literal and orders with none; ±∞ are past every literal.
+`==` and `!=` follow the integer rule above with floats for steps: they compile only against a literal that is a
+float of the storage. Most decimals aren't, so `v == q!(0.1 V)` would be `false` for every `f32`; it is a compile
+error. So is a literal past the float's range, and any literal against a scale with π in it, whose stored values
+are never decimals. `<` and `<=` compile with all of them:
+
+```rust,compile_fail
+# #[cfg(feature = "electrical")] {
+use exact_units::{Fixed, q, prefix::One, units::Volt};
+let v = Fixed::<Volt, One, f32>::new(0.1);
+let _ = v == q!(0.1 V); // no f32 is 0.1
+# }
+# #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+```
+
+```rust,compile_fail
+# #[cfg(feature = "electrical")] {
+use exact_units::{Fixed, q, prefix::One, units::Volt};
+let v = Fixed::<Volt, One, f32>::new(0.1);
+let _ = v != q!(3.4028235e38 V); // above f32::MAX
+# }
+# #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+```
+
+```rust,compile_fail
+# #[cfg(feature = "angle")] {
+use exact_units::{Fixed, q, prefix::One, units::Radian};
+let a = Fixed::<Radian, One, f64>::new(1.5707963267948966);
+let _ = a == q!(90 deg); // π/2 is no f64
+# }
+# #[cfg(not(feature = "angle"))] compile_error!("the case needs angle");
+```
+
+What no compile error can catch are the run-time values: NaN compares false with every literal and orders with
+none, and ±∞ are past every literal.
 
 ### Points
 
