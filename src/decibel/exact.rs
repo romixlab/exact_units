@@ -137,6 +137,32 @@ impl Num {
     }
 
     /// The nearest integer, ties to even; `None` above `u128`.
+    /// The integer part, `None` from 2¹²⁷ on.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "-128 < e < 0 here, so -e fits"
+    )]
+    const fn floor_int(self) -> Option<u128> {
+        if self.e >= 0 {
+            return None;
+        }
+        if self.e <= -128 {
+            // m · 2^e < 2^128 · 2^-128 = 1
+            return Some(0);
+        }
+        #[expect(
+            clippy::cast_sign_loss,
+            clippy::cast_possible_truncation,
+            reason = "-e is 1..=127 here"
+        )]
+        let s = (-self.e) as u32;
+        Some(self.m >> s)
+    }
+
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
@@ -438,6 +464,21 @@ impl Interval {
             }
         };
         x.mul(Interval::exact(den)).div(Interval::exact(num))
+    }
+
+    /// The integer part, the same for both ends, or a compile error: what `q!` compares against.
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time): a value past u128 or too close to an integer to decide"
+    )]
+    pub(crate) const fn floor_int(self) -> u128 {
+        match (self.lo.floor_int(), self.hi.floor_int()) {
+            (Some(a), Some(b)) if a == b => a,
+            (Some(_), Some(_)) => panic!(
+                "this literal is too close to a stored value to compare at compile time: write one more decimal"
+            ),
+            _ => panic!("this literal is too large to compare"),
+        }
     }
 
     /// The nearest integer, the same for both ends, or a compile error.

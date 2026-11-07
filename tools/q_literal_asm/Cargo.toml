@@ -1,0 +1,18 @@
+# PROTOTYPE q!: the code of `speed < q!(100 m/s)` against a typed const, built for a Cortex-M0. Not part of the
+# crate: a workspace of its own, never published.
+[package]
+name = "q_literal_asm"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+exact_units = { path = "../..", default-features = false, features = ["mechanical", "time", "angle"] }
+
+[profile.release]
+opt-level = "s"

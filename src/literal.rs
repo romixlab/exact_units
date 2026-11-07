@@ -551,5 +551,7 @@ macro_rules! complex_literal {
 
 complex_literal!(i8 i16 i32 i64 f32 f64);
 
+pub mod quantity;
+
 #[cfg(test)]
 mod tests;

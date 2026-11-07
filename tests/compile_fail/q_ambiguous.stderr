@@ -1,0 +1,15 @@
+error: q!: `min` reads two ways (minute of time, minute of arc): write the type, q!(5 Minute) or q!(5 Arcminute)
+ --> tests/compile_fail/q_ambiguous.rs:6:17
+  |
+6 |     let _ = t < q!(5 min);
+  |                 ^^^^^^^^^
+  |
+  = note: this error originates in the macro `$crate::__q_sym` which comes from the expansion of the macro `q` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: q!: `gal` reads two ways (US or imperial gallon): write the type, q!(5 GallonUs) or q!(5 GallonImperial)
+ --> tests/compile_fail/q_ambiguous.rs:7:17
+  |
+7 |     let _ = t < q!(5 gal);
+  |                 ^^^^^^^^^
+  |
+  = note: this error originates in the macro `$crate::__q_sym` which comes from the expansion of the macro `q` (in Nightly builds, run with -Z macro-backtrace for more info)

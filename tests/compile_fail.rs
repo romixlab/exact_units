@@ -11,4 +11,6 @@ fn compile_fail() {
     t.compile_fail("tests/compile_fail/dim_mismatch_angle_hint.rs");
     t.compile_fail("tests/compile_fail/kind_mismatch.rs");
     t.compile_fail("tests/compile_fail/literal_mismatch.rs");
+    t.compile_fail("tests/compile_fail/q_dim_mismatch.rs");
+    t.compile_fail("tests/compile_fail/q_ambiguous.rs");
 }
