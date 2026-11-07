@@ -75,6 +75,21 @@ fn macro_in_const() {
 }
 
 #[test]
+#[cfg(all(feature = "q", feature = "mechanical"))]
+fn macro_with_a_symbol_unit() {
+    use crate::prefix::Centi;
+    use crate::units::Speed;
+
+    const LIMIT: Fixed<Speed, Centi, i16> = fixed!(100 m/s);
+    assert_eq!(LIMIT.get(), 10_000);
+    // 359.9 km/h = 99.9722.. m/s, rounded to even against cm/s steps
+    const OTHER: Fixed<Speed, Centi, i16> = fixed!(359.9 km/h);
+    assert_eq!(OTHER.get(), 9_997);
+    const BY_TYPE: Fixed<Speed, Centi, i16> = fixed!(100 Speed);
+    assert_eq!(BY_TYPE.get(), 10_000);
+}
+
+#[test]
 fn ties_to_even() {
     // 0.5 · 2 · ... in whole units: 2.5 → 2, 3.5 → 4, −2.5 → −2, −3.5 → −4
     assert_eq!(

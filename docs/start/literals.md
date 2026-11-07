@@ -49,6 +49,23 @@ const NEGATIVE: Fixed<Volt, Milli, u16> = fixed!(-0.5);
 
 A scale with π or a root in it has no decimal stored values, so `fixed!` refuses it too.
 
+## A literal in another unit
+
+`fixed!(value in S)` takes the literal in another unit `S` of the same dimension and kind, through `Fixed::from_decimal_in`: a datasheet's dB into a storage of µNp, degrees into radians.
+
+`S` can also be named the way [`q!`](symbols.md) reads one, symbols and all, instead of a type path:
+
+```rust
+# #[cfg(feature = "mechanical")] {
+use exact_units::{Fixed, fixed, prefix::Centi, units::Speed};
+
+const LIMIT: Fixed<Speed, Centi, i16> = fixed!(100 m/s);
+assert_eq!(LIMIT.get(), 10_000);
+# }
+```
+
+A symbol whose unit doesn't convert to the context's doesn't compile, as for `fixed!(value in S)`.
+
 ## Not a literal
 
 For a decimal that isn't a literal (a `Decimal` built in a `const`), `Fixed::from_decimal` is the same as a `const fn`. Levels in dB have their own literal, [`db!`](../levels/decibels.md).

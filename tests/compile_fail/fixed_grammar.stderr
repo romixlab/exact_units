@@ -1,0 +1,47 @@
+error: fixed!: `kmh` is no unit symbol q! knows: write a symbol (m/s, km/h, mV), its type (Speed, units::Volt), or a string for one Rust's lexer can't take ("°")
+ --> tests/compile_fail/fixed_grammar.rs:6:47
+  |
+6 |     let _: Fixed<Second, One, i16> = fixed!(5 kmh);
+  |                                               ^^^
+
+error: fixed!: `min` reads more than one way (Minute, MinimUs, MinimImperial): write the one you mean as a type, as in q!(5 Minute)
+ --> tests/compile_fail/fixed_grammar.rs:7:47
+  |
+7 |     let _: Fixed<Second, One, i16> = fixed!(5 min);
+  |                                               ^^^
+
+error[E0277]: the trait bound `Fixed<Second, One, i16>: AtLiteral<()>` is not satisfied
+ --> tests/compile_fail/fixed_grammar.rs:6:38
+  |
+6 |     let _: Fixed<Second, One, i16> = fixed!(5 kmh);
+  |                                      ^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Second, One, i16>`
+  |
+  = help: the following other types implement trait `AtLiteral<L>`:
+            `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+          and $N others
+  = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Fixed<Second, One, i16>: AtLiteral<()>` is not satisfied
+ --> tests/compile_fail/fixed_grammar.rs:7:38
+  |
+7 |     let _: Fixed<Second, One, i16> = fixed!(5 min);
+  |                                      ^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Second, One, i16>`
+  |
+  = help: the following other types implement trait `AtLiteral<L>`:
+            `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+          and $N others
+  = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)

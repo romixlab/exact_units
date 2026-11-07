@@ -15,6 +15,9 @@
 //!   ([Fixed::from_decimal_in]): a level in dB into a storage of µNp, degrees into radians. A factor with π, ln 10 or
 //!   a root in it is rounded from an interval around the exact value, and a literal too close to halfway between two
 //!   stored values to decide is a compile error.
+//! - `fixed!(100 m/s)` names that other unit `S` the way [q!](crate::q) reads one, through its symbol table or a
+//!   type (`fixed!(100 Speed)`), rather than writing a type path by hand: the same rules as `fixed!(17.7 in
+//!   Decibel)` once the symbol resolves to a unit.
 //!
 //! It is an associated const ([AtLiteral]), so nothing of it runs at run time; [Fixed::from_decimal] is the same as
 //! a `const fn`, for a value that isn't a literal.
@@ -362,6 +365,27 @@ pub trait AtLiteral<L>: Sized {
 /// # }
 /// ```
 ///
+/// That other unit can be named the way [q!](crate::q) reads one, symbols and all, rather than a type path:
+///
+/// ```
+/// # #[cfg(feature = "mechanical")] {
+/// use exact_units::{Fixed, fixed, prefix::Centi, units::Speed};
+/// const LIMIT: Fixed<Speed, Centi, i16> = fixed!(100 m/s);
+/// assert_eq!(LIMIT.get(), 10_000);
+/// const OTHER: Fixed<Speed, Centi, i16> = fixed!(359.9 km/h); // 99.9722.. m/s, rounded to even
+/// assert_eq!(OTHER.get(), 9_997);
+/// # }
+/// ```
+///
+/// A symbol whose unit doesn't convert to the context's (a length is not a speed) doesn't compile either:
+///
+/// ```compile_fail
+/// # #[cfg(feature = "mechanical")] {
+/// use exact_units::{Fixed, fixed, prefix::Centi, units::Speed};
+/// const X: Fixed<Speed, Centi, i16> = fixed!(100 m);
+/// # }
+/// ```
+///
 /// A value that doesn't fit its storage doesn't compile, nor does a negative one of an unsigned storage, one outside
 /// the bounds or one of a scale that isn't a fraction of integers:
 ///
@@ -412,6 +436,9 @@ macro_rules! fixed {
                 $unit,
             >,
         >>::AT
+    };
+    ($value:literal $($unit:tt)+) => {
+        <_ as $crate::literal::AtLiteral<$crate::__macros::fixed!($crate; $value $($unit)+)>>::AT
     };
     ($value:literal) => {
         <_ as $crate::literal::AtLiteral<

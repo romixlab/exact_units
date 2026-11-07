@@ -32,7 +32,33 @@ pub fn q(input: TokenStream) -> TokenStream {
             out.literal(&lit, &side);
             out.ts
         }
-        Err(e) => error(&e, &side),
+        Err(e) => error(&e, &side, "q!"),
+    }
+}
+
+/// `fixed!($crate; 100 m/s)`: the type `exact_units::literal::LiteralIn<N, E, Unit>`, so `fixed!(100 m/s)` reads
+/// against `AtLiteral` as `fixed!(0.1 in Volt)` already does, through the unit written as `q!` reads it rather than
+/// a bare type path. Called by exact_units' `fixed!`, which writes the `$crate;` in front. A mode of its own, not a
+/// flag on [q], so the two emission paths don't have to stay in step.
+#[proc_macro]
+pub fn fixed(input: TokenStream) -> TokenStream {
+    let mut trees = input.into_iter();
+    let mut krate = Vec::new();
+    for t in trees.by_ref() {
+        if matches!(&t, TokenTree::Punct(p) if p.as_char() == ';') {
+            break;
+        }
+        krate.push(t);
+    }
+    let mut side = Side { trees: vec![None] };
+    let toks = side.convert(trees.collect());
+    match grammar::literal(&toks, 0) {
+        Ok(lit) => {
+            let mut out = Out::new(&krate);
+            out.literal_type(&lit, &side);
+            out.ts
+        }
+        Err(e) => error(&e, &side, "fixed!"),
     }
 }
 
@@ -97,10 +123,10 @@ impl Side {
     }
 }
 
-/// `::core::compile_error!("q!: ..")` at the token the error is about.
-fn error(e: &Error, side: &Side) -> TokenStream {
+/// `::core::compile_error!("q!: ..")` (or `fixed!: ..`) at the token the error is about.
+fn error(e: &Error, side: &Side, name: &str) -> TokenStream {
     let span = side.span(e.id);
-    let mut msg = Literal::string(&format!("q!: {}", e.msg));
+    let mut msg = Literal::string(&format!("{name}: {}", e.msg));
     msg.set_span(span);
     let mut args = Group::new(
         Delimiter::Parenthesis,
@@ -173,6 +199,24 @@ impl<'a> Out<'a> {
         self.text(",");
         self.unit(&lit.unit, side);
         self.text(">::NEW");
+    }
+
+    /// As [literal](Self::literal), but the type `LiteralIn<N, E, Unit>` alone, no turbofish and no `::NEW`: what
+    /// `fixed!(100 m/s)` names against `AtLiteral`, the same shape `fixed!(x in S)` already writes by hand.
+    fn literal_type(&mut self, lit: &grammar::Literal, side: &Side) {
+        self.krate("::literal::LiteralIn<");
+        let mut n = TokenStream::new();
+        n.extend([TokenTree::Literal(Literal::i64_suffixed(lit.num))]);
+        self.ts
+            .extend([TokenTree::Group(Group::new(Delimiter::Brace, n))]);
+        self.text(",");
+        let mut e = TokenStream::new();
+        e.extend([TokenTree::Literal(Literal::i16_suffixed(lit.exp))]);
+        self.ts
+            .extend([TokenTree::Group(Group::new(Delimiter::Brace, e))]);
+        self.text(",");
+        self.unit(&lit.unit, side);
+        self.text(">");
     }
 
     fn unit(&mut self, u: &Unit, side: &Side) {

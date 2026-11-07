@@ -214,8 +214,16 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   interval or a compile error. Tests: `tests/props/q_float.rs` (the fold against `num-rational`, random and
   next-to-the-literal floats; `q!` walked over every `f32` whose low 16 bits are 0 and their neighbours) and the unit
   tests of `Num::float_floor` over every `f32` exponent.
-- 📋 **NUM-17 `fixed!(100 m/s)`** — the typed constant names its unit through `q!`'s reader, checked against the
-  constant's type; `fixed!(v in S)` stays.
+- ✅ **NUM-17 `fixed!(100 m/s)`** — the typed constant names its unit the way `q!` reads one, symbols and all, rather
+  than the type path `fixed!(v in S)` already takes: `fixed!(100 m/s)` into a `Fixed<Speed, Centi, i16>` is the same
+  `AtLiteral<LiteralIn<N, E, Unit>>` the `in` form reads, so a unit of another dimension or kind doesn't compile, a
+  factor with π or ln 10 is rounded from an interval, and a value too close to halfway between two stored values to
+  decide doesn't compile either, as for `fixed!(v in S)`. `exact_units_macros` gains a second proc-macro entry
+  (`fixed`, beside `q`) that emits the type `LiteralIn<N, E, Unit>` alone rather than the value `q!` gives, kept its
+  own function and `Out::literal_type` method so the two emission paths don't have to move together; its errors
+  read `fixed!: ..`, not `q!: ..`. Doctests in `src/literal.rs` and `docs/start/literals.md`, compile-fail snapshots
+  `tests/compile_fail/fixed_dim_mismatch.{rs,stderr}` (a unit that doesn't convert) and `fixed_grammar.{rs,stderr}`
+  (a grammar refusal shared with `q!`, named `fixed!:`).
 - 📋 **NUM-18 `q!` against `Exact` and the level types** — the same exact order against an `Exact<U>` at run time and
   against the level types where a compare means something.
 
