@@ -344,6 +344,27 @@ pub trait AtLiteral<L>: Sized {
     const AT: Self;
 }
 
+// `fixed!(100 m/s)` reads its unit through q!'s reader: the type of the literal where the feature `q` is on, an error
+// naming the feature where it is off.
+
+#[cfg(feature = "q")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __fixed_unit {
+    ($($t:tt)*) => { $crate::__macros::fixed!($crate; $($t)*) };
+}
+
+#[cfg(not(feature = "q"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __fixed_unit {
+    ($($t:tt)*) => {
+        ::core::compile_error!(
+            "fixed!(v unit) reads its unit symbols with exact_units' feature `q`; without it write fixed!(v in Unit)"
+        )
+    };
+}
+
 /// A constant of the [Fixed] (or, of two literals, the [Complex]) the context names, from a decimal literal in units
 /// of its unit, rounded to the nearest stored value at compile time: see the [module](crate::literal).
 ///
@@ -438,7 +459,7 @@ macro_rules! fixed {
         >>::AT
     };
     ($value:literal $($unit:tt)+) => {
-        <_ as $crate::literal::AtLiteral<$crate::__macros::fixed!($crate; $value $($unit)+)>>::AT
+        <_ as $crate::literal::AtLiteral<$crate::__fixed_unit!($value $($unit)+)>>::AT
     };
     ($value:literal) => {
         <_ as $crate::literal::AtLiteral<
