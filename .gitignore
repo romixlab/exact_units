@@ -8,6 +8,7 @@ target/
 /docs/plots/
 /docs/vendor/
 /docs/assets/logo/
+/overrides/partials/stamp.html
 __pycache__/
 /.pytest_cache/
 # cargo-mutants output (`just mutants`)

@@ -89,9 +89,15 @@ docs: docs-prep
 docs-build: docs-prep
     uv run zensical build --clean --strict
 
-# What the book needs beside its pages, none of it in git: KaTeX (pinned, hash-checked), the logo, the plots the
-# crate computes (tools/book_plots)
+# Build the book, then query its search index with the site's own search worker (docs_ext/tests/test_search.py): a
+# query for a macro (`db!`, `q!`, `macro`) finds its own page first
+docs-search: docs-build
+    EU_SITE=site uv run --group dev pytest -q docs_ext/tests/test_search.py
+
+# What the book needs beside its pages, none of it in git: the footer's build stamp (version, commit, build time),
+# KaTeX (pinned, hash-checked), the logo, the plots the crate computes (tools/book_plots)
 docs-prep:
+    uv run python -m eu_docs_ext.stamp
     uv run python -m eu_docs_ext.vendor docs
     mkdir -p docs/assets/logo
     cp assets/logo/*.svg docs/assets/logo/

@@ -14,4 +14,8 @@ build-backend = "hatchling.build"
 packages = ["docs_ext/eu_docs_ext"]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["mini-racer>=0.12", "pytest>=8"]
+
+[tool.pytest.ini_options]
+# mini-racer's ctypes structures (eu_docs_ext.search), on Python 3.14
+filterwarnings = ["ignore:Due to '_pack_':DeprecationWarning"]

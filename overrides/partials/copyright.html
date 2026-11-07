@@ -1,0 +1,16 @@
+{#- Zensical's own footer line (zensical_ui's partials/copyright.html), and below it the build stamp: the crate's
+    version, the commit and the build time, written by docs_ext/eu_docs_ext/stamp.py (`just docs-prep`) -#}
+<div class="md-copyright">
+  {% if config.copyright %}
+    <div class="md-copyright__highlight">
+      {{ config.copyright }}
+    </div>
+  {% endif %}
+  {% if not config.extra.generator == false %}
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  {% endif %}
+  {% include "partials/stamp.html" ignore missing %}
+</div>

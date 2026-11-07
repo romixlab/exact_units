@@ -2,7 +2,8 @@ name: Book
 
 # The book (docs/, zensical.toml): built strict on every change, so a broken page, link or figure fails CI. The
 # deploy job publishes the built site to GitHub Pages with actions/deploy-pages (Pages source "GitHub Actions"; the
-# domain exact.vhrd.tech is a repository setting, no CNAME file). It runs only when started by hand (see the job).
+# domain exact.vhrd.tech is a repository setting, no CNAME file). It runs on every push to main, and by hand on main
+# with "deploy" ticked (see the job).
 
 on:
   merge_group:
@@ -38,18 +39,22 @@ jobs:
       - run: uv run --group dev pytest -q docs_ext
       # KaTeX, the logo and the plots, then the site: a warning fails
       - run: just docs-build
+      # the built site's search, queried with the site's own search worker: a macro's query finds its page first
+      - run: EU_SITE=site uv run --group dev pytest -q docs_ext/tests/test_search.py
       # the artifact deploy-pages publishes; also downloadable from the run to look at a pull request's book
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site/
           retention-days: 7
 
-  # Runs only when started by hand on main with "deploy" ticked. To publish on every push to main, extend the `if`
-  # with `|| (github.event_name == 'push' && github.ref == 'refs/heads/main')`.
+  # Runs on every push to main, and when started by hand on main with "deploy" ticked (to publish again without a
+  # push). Not for pull requests or the merge queue: those only build.
   deploy:
     name: publish to GitHub Pages
     needs: build
-    if: github.event_name == 'workflow_dispatch' && inputs.deploy && github.ref == 'refs/heads/main'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.deploy && github.ref == 'refs/heads/main')
+      || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       pages: write

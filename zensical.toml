@@ -24,6 +24,7 @@ nav = [
             "start/display.md",
             "start/literals.md",
             "start/symbols.md",
+            "start/macros.md",
             "start/firmware.md",
         ]
     },
@@ -117,6 +118,12 @@ extra_javascript = [
     "vendor/katex/contrib/auto-render.min.js",
     "javascripts/katex.js",
 ]
+
+# Search splits words as Zensical's default separator does, except at `!`: `db!`, `np!`, `q!` and `fixed!` stay one
+# term each (a `db!` query no longer drowns among every dB), and a prefix query (`db`, `fix`) still finds them.
+# `!=` still splits. Ranks are checked against the built site by `just docs-search` (docs_ext/tests/test_search.py).
+[project.plugins.search]
+separator = '[\s\-_,:=\[\]()\\"`/]+|!(?==)|\.(?!\d)'
 
 [project.theme]
 custom_dir = "overrides"

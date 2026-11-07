@@ -86,7 +86,7 @@ let level: Level = gain.to_rounded(Rounding::NearestEven).unwrap();
 assert_eq!(level.get(), 251);
 ```
 
-## Neper
+## Neper: `np!` { #neper }
 
 The neper is the natural-log twin of the bel. Like the dB, it gives one level for an amplitude and for the power that goes with it, so the power form carries a ½ (IEC 60027-3, ISO 80000-3):
 
