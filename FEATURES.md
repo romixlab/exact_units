@@ -178,7 +178,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   text, never a panic), `tests/compile_fail/q_*.rs` snapshots for each refusal. The generated symbol table (UNIT-11),
   float storages (NUM-16), points (PT-5), `fixed!(100 m/s)` (NUM-17), `Exact` and levels (NUM-18) and the thumbv6m
   check that `q!` compiles to the typed-const compare follow.
-- ✅ **NUM-15 `q!`, a literal that names its unit** — `speed < q!(100 m/s)`: a decimal and its unit (symbols joined
+- ✅ **NUM-15 `q!`, a literal that names its unit** — the cargo feature `q`, on by default; `speed < q!(100 m/s)`: a decimal and its unit (symbols joined
   by `*` and `/` left to right, powers `^2` and `^-1`, groups `( .. )`, a leading `/`; a type, `q!(100 Speed)`; or a
   string for what Rust's lexer refuses, `q!(90 "°")`, `q!("9.81 m/s²")`), a zero-sized `LiteralIn<N, E, S>` whose
   `PartialOrd`/`PartialEq` with a `Fixed` of integer storage, both ways round, fold the literal in a `const` block to
