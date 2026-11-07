@@ -2,6 +2,16 @@
 
 ### 🚀 Features
 
+- Book: [Literals](docs/start/literals.md) now covers `q!` too, not `fixed!` alone, and says plainly where each
+  of `fixed!`, `q!` and `Exact` belongs (P2401#7nov-1452f). `fixed!` and `q!` are for a device, down to the one
+  register compare a hand-written `const` would cost — shown with the actual thumbv6m-none-eabi instructions
+  `tests/q_asm.rs` checks on every `just test`; `Exact` is for a host or a planner, a run-time fraction no fixed
+  scale holds. New sections: inexact literals compared exactly (a timeout in ms against `q!(1500 us)`), why `==`
+  and `!=` need a literal on an exact step and a compile error otherwise, float storages, a point against an
+  origin (`degC` against `Point`, linking [Points and amounts](docs/points/points.md#comparing-with-a-literal)),
+  the string form for symbols Rust's lexer refuses (`°`, `²`), and refused symbols as [rule
+  5](docs/start/exact.md#5-conventions-are-opt-ins)'s opt-in conventions, linking the full table on [The symbols
+  of `q!`](docs/start/symbols.md#refused-symbols). Every claim a doctest or a `compile_fail` block.
 - Faster `Exact` against `Fixed` compares on every target, and `Exact` against `Exact` on Thumb-1 cores, with the same results (NUM-11). A product of `x` and `y` has `bits(x) + bits(y) − 1` or `bits(x) + bits(y)` bits, so where one side's most bits are fewer than the other side's least, the order is proven without multiplying; every other pair goes through the 256-bit and 384-bit products as before. `Exact` against `Fixed` checks the bit lengths first everywhere. `Exact` against `Exact` (`Fraction::compare`) does so only on a Thumb-1 core (Cortex-M0, M0+, M23: `cfg(thumb1)`, set by a new `build.rs` from the target's name), where the products are library calls; elsewhere it is the code it was, since the products cost there about what the bit lengths would. On Thumb-1 a bit length also halves down to the 32-bit word that holds the highest bit and counts once, as there is no CLZ. Instructions per compare, before and after, for values far apart and close together: on a Cortex-M0 (thumbv6m), `Exact` against `Exact` 1,700 → 385 far, 1,700–1,706 → 2,019–2,060 close; `Fixed` against `Exact` 2,298–2,356 → 383–437 far, 2,409–2,685 → 2,670–2,955 close. On a Cortex-M3 (thumbv7m), `Exact` against `Exact` unchanged (216–220); `Fixed` against `Exact` 486–517 → 173–206 far, 571–743 → 660–830 close. On x86-64, `Exact` against `Exact` unchanged (107–112); `Fixed` against `Exact` 321–332 → 164–179 far, 377–421 → 490–534 close. Tests: a differential property in `tests/props/exact.rs` (the fast path with its fallback, built on every target, and `compare` itself against the wide products alone; the fast path answering exactly where the bound proves the order), drawn within 4 bits of the edge on `u128` and walked whole on `u8`; Kani proofs on `u8` limbs of the bound and of both fast paths' answers; the halved bit length against `bit_width` for every bit length.
 - Book: the library pages wire_weaver's docs site carried under `std_library` (`exact_units`, `magnitude`,
   `points`, `rounding`, `indices`, `customary`, `units_in_the_model`) moved here, where they belong (P2401#5nov-1344).
