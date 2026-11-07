@@ -187,7 +187,11 @@ pub(crate) fn level_at_most_0_db(num: i64, decimals: u8) {
     use exact_units::decibel::Decibels;
     use exact_units::prefix::One;
     use exact_units::units::{Per, Watt};
-    let g = Fixed::<Per<Watt, Watt>, One, u64>::from_db_const(Decibels::new(num, decimals)).get();
+    let g = Fixed::<Per<Watt, Watt>, One, u64>::from_db_const_rounded(
+        Decibels::new(num, decimals),
+        Rounding::NearestEven,
+    )
+    .get();
     // −10·log10(2) dB = −3.01029995663981… dB, in units of 10⁻⁹ dB
     let nano = i128::from(num) * 10i128.pow(9 - u32::from(decimals));
     assert_eq!(g, u64::from(nano > -3_010_299_957), "{num}e-{decimals} dB");
@@ -199,7 +203,11 @@ pub(crate) fn neper_at_most_0(num: i64, decimals: u8) {
     use exact_units::decibel::Nepers;
     use exact_units::prefix::One;
     use exact_units::units::{Per, Watt};
-    let g = Fixed::<Per<Watt, Watt>, One, u64>::from_np_const(Nepers::new(num, decimals)).get();
+    let g = Fixed::<Per<Watt, Watt>, One, u64>::from_np_const_rounded(
+        Nepers::new(num, decimals),
+        Rounding::NearestEven,
+    )
+    .get();
     // −ln(2)/2 Np = −0.346573590279972…, in units of 10⁻⁹ Np
     let nano = i128::from(num) * 10i128.pow(9 - u32::from(decimals));
     assert_eq!(g, u64::from(nano >= -346_573_590), "{num}e-{decimals} Np");

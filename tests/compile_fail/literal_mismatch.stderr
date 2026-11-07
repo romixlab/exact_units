@@ -1,20 +1,12 @@
 error[E0080]: evaluation panicked: a literal's unit converts only between units of the same dimension: Torque (N·m) is kg·m²·s⁻²·rad⁻¹, not Joule (J) which is kg·m²·s⁻²; they differ by rad⁻¹ — cross it with a named step: Torque × Radian is Joule
  --> src/literal.rs
   |
-  |             const AT: Self = Self::from_decimal_in::<S>(Decimal::new(N, E));
-  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::Fixed<exact_units::units::Joule, exact_units::prefix::One, i32> as exact_units::literal::AtLiteral<exact_units::literal::LiteralIn<5, 0, exact_units::units::Torque>>>::AT` failed inside this call
+  |                 let value = Value::of_literal_any(&BigDecimal::parse(L::VALUE), scale_in::<S, U, P>());
+  |                                                                                 ^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::Fixed<exact_units::units::Joule, exact_units::prefix::One, i32> as exact_units::literal::AtLiteral<exact_units::literal::LitIn<main::__Literal, exact_units::units::Torque, exact_units::literal::mode::Unrounded>>>::AT` failed inside this call
 ...
   | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
   | ------------------------------------------------ in this macro invocation
   |
-note: inside `literal::<impl Fixed<Joule, One, i32>>::from_decimal_in::<Torque>`
- --> src/literal.rs
-  |
-  |                 Self::of_literal(x.to_int_any(scale_in::<S, U, P>()))
-  |                                               ^^^^^^^^^^^^^^^^^^^^^
-...
-  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
-  | ------------------------------------------------ in this macro invocation
 note: inside `literal::scale_in::<Torque, Joule, One>`
  --> src/literal.rs
   |
@@ -37,4 +29,4 @@ note: erroneous constant encountered
 6 |     let _: Fixed<Joule, One, i32> = fixed!(5 in Torque);
   |                                     ^^^^^^^^^^^^^^^^^^^
   |
-  = note: this note originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+  = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)

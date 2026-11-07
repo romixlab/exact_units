@@ -10,7 +10,7 @@
 use super::Decimal;
 use crate::prefix::{Kilo, Micro, Milli, One, Pow2, Rational};
 use crate::units::Ratio;
-use crate::{Complex, Fixed, Range, Saturating};
+use crate::{Complex, Fixed, Range, Rounding, Saturating};
 use std::format;
 use std::string::String;
 
@@ -62,7 +62,7 @@ fn refuses_a_negative_zero() {
 
 #[test]
 fn macro_in_const() {
-    const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1);
+    const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1, NearestEven);
     assert_eq!(BUSY.get(), 107_374_182);
     const NEG: Fixed<Ratio, Pow2<-15>, i16> = fixed!(-1.0);
     assert_eq!(NEG.get(), i16::MIN);
@@ -76,7 +76,7 @@ fn macro_in_const() {
     assert_eq!(B.get(), -5);
     const Z: Complex<Ratio, Pow2<-15>, i16, Saturating> = fixed!(0.5, -0.25);
     assert_eq!(Z.get(), (16384, -8192));
-    const ZF: Complex<Ratio, One, f32> = fixed!(1.5, 2e-1);
+    const ZF: Complex<Ratio, One, f32> = fixed!(1.5, 2e-1, NearestEven);
     assert_eq!(ZF.get(), (1.5, 0.2));
 }
 
@@ -89,7 +89,7 @@ fn macro_with_a_symbol_unit() {
     const LIMIT: Fixed<Speed, Centi, i16> = fixed!(100 m/s);
     assert_eq!(LIMIT.get(), 10_000);
     // 359.9 km/h = 99.9722.. m/s, rounded to even against cm/s steps
-    const OTHER: Fixed<Speed, Centi, i16> = fixed!(359.9 km/h);
+    const OTHER: Fixed<Speed, Centi, i16> = fixed!(359.9 km/h, NearestEven);
     assert_eq!(OTHER.get(), 9_997);
     const BY_TYPE: Fixed<Speed, Centi, i16> = fixed!(100 Speed);
     assert_eq!(BY_TYPE.get(), 10_000);
@@ -99,33 +99,49 @@ fn macro_with_a_symbol_unit() {
 fn ties_to_even() {
     // 0.5 · 2 · ... in whole units: 2.5 → 2, 3.5 → 4, −2.5 → −2, −3.5 → −4
     assert_eq!(
-        Fixed::<Ratio, One, i8>::from_decimal(Decimal::new(25, -1)).get(),
+        Fixed::<Ratio, One, i8>::from_decimal_rounded(Decimal::new(25, -1), Rounding::NearestEven)
+            .get(),
         2
     );
     assert_eq!(
-        Fixed::<Ratio, One, i8>::from_decimal(Decimal::new(35, -1)).get(),
+        Fixed::<Ratio, One, i8>::from_decimal_rounded(Decimal::new(35, -1), Rounding::NearestEven)
+            .get(),
         4
     );
     assert_eq!(
-        Fixed::<Ratio, One, i8>::from_decimal(Decimal::new(-25, -1)).get(),
+        Fixed::<Ratio, One, i8>::from_decimal_rounded(Decimal::new(-25, -1), Rounding::NearestEven)
+            .get(),
         -2
     );
     assert_eq!(
-        Fixed::<Ratio, One, i8>::from_decimal(Decimal::new(-35, -1)).get(),
+        Fixed::<Ratio, One, i8>::from_decimal_rounded(Decimal::new(-35, -1), Rounding::NearestEven)
+            .get(),
         -4
     );
     // just past halfway goes up
     assert_eq!(
-        Fixed::<Ratio, One, u8>::from_decimal(Decimal::new(2_500_001, -6)).get(),
+        Fixed::<Ratio, One, u8>::from_decimal_rounded(
+            Decimal::new(2_500_001, -6),
+            Rounding::NearestEven
+        )
+        .get(),
         3
     );
     // 2.5 in thirds is 7.5
     assert_eq!(
-        Fixed::<Ratio, Rational<1, 3>, u8>::from_decimal(Decimal::new(25, -1)).get(),
+        Fixed::<Ratio, Rational<1, 3>, u8>::from_decimal_rounded(
+            Decimal::new(25, -1),
+            Rounding::NearestEven
+        )
+        .get(),
         8
     );
     assert_eq!(
-        Fixed::<Ratio, Rational<1, 3>, u8>::from_decimal(Decimal::new(35, -1)).get(),
+        Fixed::<Ratio, Rational<1, 3>, u8>::from_decimal_rounded(
+            Decimal::new(35, -1),
+            Rounding::NearestEven
+        )
+        .get(),
         10
     ); // 10.5
 }
@@ -164,9 +180,17 @@ fn integers_against_a_reference() {
         seed ^= seed << 17;
         let num = (seed % 2_000_000) as i64 - 1_000_000;
         let exp = -(((seed >> 32) % 7) as i16);
-        let got = Fixed::<Ratio, Pow2<-30>, i64>::from_decimal(Decimal::new(num, exp)).get();
+        let got = Fixed::<Ratio, Pow2<-30>, i64>::from_decimal_rounded(
+            Decimal::new(num, exp),
+            Rounding::NearestEven,
+        )
+        .get();
         assert_eq!(i128::from(got), reference_pow2(num, exp, 30), "{num}e{exp}");
-        let got = Fixed::<Ratio, Pow2<-15>, i64>::from_decimal(Decimal::new(num, exp)).get();
+        let got = Fixed::<Ratio, Pow2<-15>, i64>::from_decimal_rounded(
+            Decimal::new(num, exp),
+            Rounding::NearestEven,
+        )
+        .get();
         assert_eq!(i128::from(got), reference_pow2(num, exp, 15), "{num}e{exp}");
     }
 }
@@ -188,19 +212,19 @@ fn floats_against_the_parser() {
         let d = Decimal::new(num, exp);
         let s: String = format!("{num}e{}", exp + 3);
         assert_eq!(
-            Fixed::<Ratio, Milli, f64>::from_decimal(d).get(),
+            Fixed::<Ratio, Milli, f64>::from_decimal_rounded(d, Rounding::NearestEven).get(),
             s.parse::<f64>().unwrap(),
             "{s}"
         );
         assert_eq!(
-            Fixed::<Ratio, Milli, f32>::from_decimal(d).get(),
+            Fixed::<Ratio, Milli, f32>::from_decimal_rounded(d, Rounding::NearestEven).get(),
             s.parse::<f32>().unwrap(),
             "{s}"
         );
         // and in One, the literal itself
         let s: String = format!("{num}e{exp}");
         assert_eq!(
-            Fixed::<Ratio, One, f64>::from_decimal(d).get(),
+            Fixed::<Ratio, One, f64>::from_decimal_rounded(d, Rounding::NearestEven).get(),
             s.parse::<f64>().unwrap(),
             "{s}"
         );
@@ -231,17 +255,24 @@ fn outside_bounds_panics_at_run_time() {
 fn a_float_outside_its_normal_range_panics_at_run_time() {
     let f32_of = |num, exp| {
         std::panic::catch_unwind(|| {
-            Fixed::<Ratio, One, f32>::from_decimal(Decimal::new(num, exp)).get()
+            Fixed::<Ratio, One, f32>::from_decimal_rounded(
+                Decimal::new(num, exp),
+                Rounding::NearestEven,
+            )
+            .get()
         })
         .map_err(|e| e.downcast_ref::<&str>().map(|m| String::from(*m)))
     };
-    let outside = Err(Some(String::from(
-        "this value is outside the normal range of its float storage",
+    let past = Err(Some(String::from(
+        "this value is past the range of its float storage",
     )));
-    assert_eq!(f32_of(34_028_236, 31), outside);
-    assert_eq!(f32_of(-34_028_236, 31), outside);
-    assert_eq!(f32_of(1, -38), outside);
-    assert_eq!(f32_of(-1, -38), outside);
+    let below = Err(Some(String::from(
+        "this value is below the normal range of its float storage: write 0 or a normal number",
+    )));
+    assert_eq!(f32_of(34_028_236, 31), past);
+    assert_eq!(f32_of(-34_028_236, 31), past);
+    assert_eq!(f32_of(1, -38), below);
+    assert_eq!(f32_of(-1, -38), below);
     assert_eq!(f32_of(34_028_234, 31), Ok(f32::MAX));
     assert_eq!(f32_of(2, -38), Ok(2e-38));
 }

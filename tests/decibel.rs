@@ -13,7 +13,7 @@
 use exact_units::decibel::Decibels;
 use exact_units::prefix::{Micro, Milli, Nano, One, Rational};
 use exact_units::units::{Ampere, Per, Volt, Watt};
-use exact_units::{Fixed, db};
+use exact_units::{Fixed, Rounding, db};
 
 type VoltGain<P, T> = Fixed<Per<Volt, Volt>, P, T>;
 type PowerGain<P, T> = Fixed<Per<Watt, Watt>, P, T>;
@@ -841,22 +841,22 @@ fn floats_correctly_rounded() {
         let db = Decibels::new(n, d);
         // Rust's float parsing rounds correctly, so these are the nearest f64 and f32
         assert_eq!(
-            VoltGain::<One, f64>::from_db_const(db).get(),
+            VoltGain::<One, f64>::from_db_const_rounded(db, Rounding::NearestEven).get(),
             v.parse::<f64>().unwrap(),
             "{db:?}"
         );
         assert_eq!(
-            PowerGain::<One, f64>::from_db_const(db).get(),
+            PowerGain::<One, f64>::from_db_const_rounded(db, Rounding::NearestEven).get(),
             p.parse::<f64>().unwrap(),
             "{db:?}"
         );
         assert_eq!(
-            VoltGain::<One, f32>::from_db_const(db).get(),
+            VoltGain::<One, f32>::from_db_const_rounded(db, Rounding::NearestEven).get(),
             v.parse::<f32>().unwrap(),
             "{db:?}"
         );
         assert_eq!(
-            PowerGain::<One, f32>::from_db_const(db).get(),
+            PowerGain::<One, f32>::from_db_const_rounded(db, Rounding::NearestEven).get(),
             p.parse::<f32>().unwrap(),
             "{db:?}"
         );
@@ -867,15 +867,15 @@ fn floats_correctly_rounded() {
 fn floats_near_libm() {
     // libm's exp10 is within a few ulps (3 at -96.875 dB), so the exact gain is too
     for (db, y) in dyadic_levels() {
-        let v = VoltGain::<One, f64>::from_db_const(db).get();
-        let p = PowerGain::<One, f64>::from_db_const(db).get();
+        let v = VoltGain::<One, f64>::from_db_const_rounded(db, Rounding::NearestEven).get();
+        let p = PowerGain::<One, f64>::from_db_const_rounded(db, Rounding::NearestEven).get();
         assert!(ulps(v, libm::exp10(y)) <= 4, "{db:?}: {v}");
         assert!(ulps(p, libm::exp10(2.0 * y)) <= 4, "{db:?}: {p}");
     }
     for db in levels() {
         let y = db.to_f64() / 20.0;
-        let v = VoltGain::<One, f64>::from_db_const(db).get();
-        let p = PowerGain::<One, f64>::from_db_const(db).get();
+        let v = VoltGain::<One, f64>::from_db_const_rounded(db, Rounding::NearestEven).get();
+        let p = PowerGain::<One, f64>::from_db_const_rounded(db, Rounding::NearestEven).get();
         assert!(
             (v / libm::exp10(y) - 1.0).abs() <= tolerance(y),
             "{db:?}: {v}"
@@ -901,7 +901,7 @@ fn integers_nearest() {
         let v = libm::exp10(y);
         // micro-units: 0.000001 to 1000 V/V
         if let Some(r) = nearest(v * 1e6, y) {
-            let g = VoltGain::<Micro, u32>::from_db_const(db).get();
+            let g = VoltGain::<Micro, u32>::from_db_const_rounded(db, Rounding::NearestEven).get();
             assert_eq!(f64::from(g), r, "{db:?}");
             checked += 1;
         }
@@ -914,14 +914,19 @@ fn integers_nearest() {
                 clippy::cast_precision_loss,
                 reason = "the gain is below 1e17 nano-units; the reference is rounded to f64 the same way"
             )]
-            let g = PowerGain::<Nano, i64>::from_db_const(db).get() as f64;
+            let g = PowerGain::<Nano, i64>::from_db_const_rounded(db, Rounding::NearestEven).get()
+                as f64;
             assert_eq!(g, r, "{db:?}");
             checked += 1;
         }
         if p * 65535.0 < 60_000.0
             && let Some(r) = nearest(p * 65535.0, 2.0 * y)
         {
-            let g = PowerGain::<Rational<1, 65535>, u16>::from_db_const(db).get();
+            let g = PowerGain::<Rational<1, 65535>, u16>::from_db_const_rounded(
+                db,
+                Rounding::NearestEven,
+            )
+            .get();
             assert_eq!(f64::from(g), r, "{db:?}");
             checked += 1;
         }
@@ -937,12 +942,12 @@ fn round_levels_are_exact() {
     assert_eq!(G.get(), 10_000);
     assert_eq!(P.get(), 1_000);
     assert_eq!(Z.get(), 1.0);
-    let big: PowerGain<One, f64> = db!(300);
+    let big: PowerGain<One, f64> = db!(300, NearestEven);
     assert_eq!(big.get(), 1e30);
-    let small: VoltGain<One, f64> = db!(-200.0);
+    let small: VoltGain<One, f64> = db!(-200.0, NearestEven);
     assert_eq!(small.get(), 1e-10);
     // more decimals, and digits the literal can't hold as a float
-    let fine: VoltGain<Nano, u64> = db!(6.020_599_913);
+    let fine: VoltGain<Nano, u64> = db!(6.020_599_913, NearestEven);
     assert_eq!(fine.get(), 2_000_000_000);
     assert_eq!(Decibels::parse("-3.01"), Decibels::new(-301, 2));
     assert_eq!(Decibels::parse("+ 6"), Decibels::new(6, 0));
@@ -959,7 +964,7 @@ fn parse_refuses_past_255_decimals() {
 #[test]
 fn in_comparisons() {
     // a threshold in firmware: integers only at run time
-    const MINUS_3: VoltGain<Milli, u16> = db!(-3);
+    const MINUS_3: VoltGain<Milli, u16> = db!(-3, NearestEven);
     assert_eq!(MINUS_3.get(), 708);
     assert!(VoltGain::<Milli, u16>::new(690) < MINUS_3);
 }
@@ -1003,7 +1008,7 @@ mod run_time {
         // not a whole number of the storage
         assert_eq!(VoltGain::<One, u16>::from_db_f32(3.0), None);
         // the compile-time and the run-time gain agree
-        let c: VoltGain<Micro, u32> = db!(-6);
+        let c: VoltGain<Micro, u32> = db!(-6, NearestEven);
         let r = VoltGain::<Micro, f32>::from_db_f32(-6.0).unwrap();
         #[expect(
             clippy::cast_precision_loss,
@@ -1026,7 +1031,11 @@ fn tiny_gains_round_to_zero() {
         i64::MIN / 2,
     ] {
         assert_eq!(
-            PowerGain::<One, u64>::from_db_const(Decibels::new(n, 0)).get(),
+            PowerGain::<One, u64>::from_db_const_rounded(
+                Decibels::new(n, 0),
+                Rounding::NearestEven
+            )
+            .get(),
             0,
             "{n} dB"
         );

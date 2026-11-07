@@ -3,9 +3,11 @@
 //!
 //! - [to_db](Complex::to_db) / [to_db_f32](Complex::to_db_f32) take the exact [norm_sqr](Complex::norm_sqr) and one
 //!   `log10` (feature `std` or `libm`).
-//! - [norm_sqr_at](Complex::norm_sqr_at) and `db!(norm_sqr -15)` work a level out at compile time as a threshold
-//!   on |z|²: a firmware tests |Γ| ≤ −15 dB as one integer compare of `norm_sqr` with a constant, no root and no
-//!   log at run time.
+//! - [norm_sqr_at_rounded](Complex::norm_sqr_at_rounded) and `db!(norm_sqr -15, Floor)` work a level out at compile
+//!   time as a threshold on |z|²: a firmware tests |Γ| ≤ −15 dB as one integer compare of `norm_sqr` with a
+//!   constant, no root and no log at run time. The |z|² of most levels is irrational, so the call names how the
+//!   threshold rounds; [norm_sqr_at](Complex::norm_sqr_at) and `db!(norm_sqr x)` without one take only a level
+//!   whose |z|² is a stored value.
 //!
 //! ```
 //! # #[cfg(feature = "electrical")] {
@@ -15,9 +17,10 @@
 //! type Gamma = Complex<Per<Volt, Volt>, Pow2<-15>, i16, Saturating>;
 //! type GammaSqr = Fixed<Times<Per<Volt, Volt>, Per<Volt, Volt>>, Product<Pow2<-15>, Pow2<-15>>, u32>;
 //! // −15 dB of a voltage ratio: |Γ|² ≤ 10^(−1.5) = 0.0316.. in steps of 2⁻³⁰
-//! const MATCHED: GammaSqr = db!(norm_sqr -15);
+//! const MATCHED: GammaSqr = db!(norm_sqr -15, NearestEven);
 //! assert_eq!(MATCHED.get(), 33_954_698);
-//! assert_eq!(MATCHED, Gamma::norm_sqr_at(exact_units::decibel::Decibels::new(-15, 0)));
+//! let at = Gamma::norm_sqr_at_rounded(exact_units::decibel::Decibels::new(-15, 0), exact_units::Rounding::NearestEven);
+//! assert_eq!(MATCHED, at);
 //!
 //! let g = Gamma::of(4000, -3000); // |Γ| = 0.1526, −16.3 dB
 //! assert!(g.norm_sqr() <= MATCHED);
@@ -30,10 +33,13 @@
 //! macro says which is meant.
 
 use super::Complex;
-use crate::decibel::{Decibels, exact, gain};
+use crate::decibel::{Decibels, gain};
+use crate::literal::Source;
+use crate::literal::mode::Mode;
+use crate::literal::steps::{Src, Value};
 use crate::prefix::Product;
 use crate::units::Times;
-use crate::{Fixed, FixedScale, LevelForm, Unit, Unlimited};
+use crate::{Fixed, FixedScale, LevelForm, Rounding, Unit, Unlimited};
 #[cfg(any(feature = "std", feature = "libm"))]
 use {super::NormStorage, crate::Storage, crate::num::math};
 
@@ -43,7 +49,7 @@ use {super::NormStorage, crate::Storage, crate::num::math};
     clippy::panic,
     reason = "a compile error in const code (a panic at run time), as documented: a level form this kind lacks"
 )]
-const fn norm_sqr_gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) -> exact::Interval {
+const fn norm_sqr_gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) -> Value {
     let db = match form {
         LevelForm::RootPower => db,
         // 10^(dB/5) is 10^((2·dB)/10)
@@ -55,51 +61,58 @@ const fn norm_sqr_gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) ->
     gain::<Times<U, U>, Product<P, P>>(db, LevelForm::Power)
 }
 
-/// `norm_sqr_at` for each storage: the integers' |z|² rounded to nearest, the floats' to the nearest float.
+/// `norm_sqr_at` for each storage, `$norm` the storage of |z|².
 macro_rules! norm_sqr_at {
-    ($($ty:ident $norm:ident $round:ident;)*) => {$(
-        #[expect(
-            clippy::allow_attributes,
-            reason = "only the integer storages cast: an #[expect] is unfulfilled for the floats"
-        )]
+    ($($ty:ident $norm:ident;)*) => {$(
         impl<U: Unit, P: FixedScale, B: Unlimited<$ty>> Complex<U, P, $ty, B> {
             /// The |z|² of a value at level `db`, worked out at compile time as [Fixed::from_db_const] does, for one
-            /// compare with [norm_sqr](Self::norm_sqr). `db!(norm_sqr -15)` is the same as a constant. A compile
-            /// error in `const` code (a panic at run time) for a kind without a level form or a level whose |z|²
-            /// doesn't fit; see the [module](crate::complex::level).
-            #[allow(clippy::as_conversions, reason = "const fn: From is not const on stable")]
+            /// compare with [norm_sqr](Self::norm_sqr), where it is a stored value of |z|². A compile error in `const`
+            /// code (a panic at run time) for one that isn't (most levels: their |z|² is irrational), a kind without a
+            /// level form or a level whose |z|² doesn't fit; [norm_sqr_at_rounded](Self::norm_sqr_at_rounded) names a
+            /// rounding. See the [module](crate::complex::level).
             pub const fn norm_sqr_at(db: Decibels) -> Fixed<Times<U, U>, Product<P, P>, $norm> {
                 let form = Fixed::<U, P, $ty>::LEVEL_FORM;
-                norm_sqr_at!(@$round norm_sqr_gain::<U, P>(db, form), $norm)
+                Fixed::<Times<U, U>, Product<P, P>, $norm>::of_value(
+                    &norm_sqr_gain::<U, P>(db, form),
+                    None,
+                    &Src::Fn { name: "Complex::norm_sqr_at" },
+                )
+            }
+
+            /// The |z|² of a value at level `db`, rounded by `r` to a stored value of |z|² at compile time:
+            /// `Floor` keeps every |z|² at or below the level's below the threshold, `Ceil` every one above it above.
+            /// `db!(norm_sqr -15, Floor)` is the same as a constant. A compile error in `const` code (a panic at run
+            /// time) for a kind without a level form or a level whose |z|² doesn't fit.
+            pub const fn norm_sqr_at_rounded(
+                db: Decibels,
+                r: Rounding,
+            ) -> Fixed<Times<U, U>, Product<P, P>, $norm> {
+                let form = Fixed::<U, P, $ty>::LEVEL_FORM;
+                Fixed::<Times<U, U>, Product<P, P>, $norm>::of_value(
+                    &norm_sqr_gain::<U, P>(db, form),
+                    Some(r),
+                    &Src::Fn { name: "Complex::norm_sqr_at" },
+                )
             }
         }
 
-        impl<U: Unit, P: FixedScale, const N: i64, const D: u8>
-            crate::decibel::AtLevel<crate::decibel::NormSqrLevel<N, D>>
+        impl<U: Unit, P: FixedScale, L: Source, M: Mode> crate::decibel::AtLevel<crate::decibel::NormSqrLevel<L, M>>
             for Fixed<Times<U, U>, Product<P, P>, $norm>
         {
-            const AT: Self = Complex::<U, P, $ty>::norm_sqr_at(Decibels::new(N, D));
+            const AT: Self = {
+                let value = norm_sqr_gain::<U, P>(Decibels::parse(L::VALUE), Fixed::<U, P, $ty>::LEVEL_FORM);
+                Self::of_value(&value, M::ROUNDING, &Src::Macro { name: "db!", args: L::ARGS, direct: false })
+            };
         }
     )*};
-    (@int $gain:expr, $norm:ident) => {{
-        let x = $gain.to_int();
-        if x > $norm::MAX as u128 {
-            panic!("this level is too large for its storage");
-        }
-        #[expect(clippy::cast_possible_truncation, reason = "checked against the storage's MAX above")]
-        let x = x as $norm;
-        Fixed::new(x)
-    }};
-    (@to_f32 $gain:expr, $norm:ident) => { Fixed::<_, _, f32>::bounded($gain.to_f32()) };
-    (@to_f64 $gain:expr, $norm:ident) => { Fixed::<_, _, f64>::bounded($gain.to_f64()) };
 }
 
 norm_sqr_at! {
-    i8 u16 int;
-    i16 u32 int;
-    i32 u64 int;
-    f32 f32 to_f32;
-    f64 f64 to_f64;
+    i8 u16;
+    i16 u32;
+    i32 u64;
+    f32 f32;
+    f64 f64;
 }
 
 #[cfg(any(feature = "std", feature = "libm"))]

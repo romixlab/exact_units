@@ -28,7 +28,7 @@
 //!
 //! // a cable's 17.7 dB/100 m, positive as the datasheet writes it, in nepers per meter exactly rounded
 //! type Alpha = Fixed<Per<Loss<Neper>, Meter>, Micro, u32>;
-//! const ALPHA: Alpha = fixed!(0.177 in Per<Loss<Decibel>, Meter>);
+//! const ALPHA: Alpha = fixed!(0.177 in Per<Loss<Decibel>, Meter>, NearestEven);
 //! assert_eq!(ALPHA.get(), 20_378); // 0.177 dB/m = 0.0203779.. Np/m
 //!
 //! // a gain of 0.5 V/V is −6.02 dB, a loss of 6.02 dB

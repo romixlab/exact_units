@@ -59,7 +59,7 @@ mod dsp {
 
     /// −10 dBFS, a power of 0.1 of full scale: busy when the mean power of a block is at or above it. Worked out at
     /// compile time, compared as integers: no square root and no logarithm at run time.
-    pub(crate) const BUSY: PowerLevel = db!(norm_sqr - 10);
+    pub(crate) const BUSY: PowerLevel = db!(norm_sqr - 10, NearestEven);
 
     /// Mixes an interleaved Q15 IQ buffer down by the NCO's frequency, in place, and sums the power of what comes
     /// out.
@@ -110,7 +110,7 @@ fn main() {
     }
 
     // the detector: the mean power is 0.25 (−6 dBFS), above the −10 dBFS threshold, 0.1 · 2³⁰ rounded
-    let point_one: dsp::PowerLevel = exact_units::fixed!(0.1);
+    let point_one: dsp::PowerLevel = exact_units::fixed!(0.1, NearestEven);
     assert_eq!(dsp::BUSY.get(), point_one.get());
     assert_eq!(dsp::BUSY.get(), 107_374_182);
     #[expect(

@@ -16,56 +16,44 @@ error: fixed!: `"°C"` names an origin, and fixed! is an amount, a Fixed: write 
 8 |     let _: Fixed<Kelvin, One, i16> = fixed!(25 "°C");
   |                                                ^^^^
 
-error[E0277]: the trait bound `Fixed<Kelvin, One, i16>: AtLiteral<()>` is not satisfied
+error[E0277]: the trait bound `(): InUnit` is not satisfied
  --> tests/compile_fail/fixed_point.rs:6:38
   |
 6 |     let _: Fixed<Kelvin, One, i16> = fixed!(25 degC);
-  |                                      ^^^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Kelvin, One, i16>`
+  |                                      ^^^^^^^^^^^^^^^ the trait `InUnit` is not implemented for `()`
   |
-  = help: the following other types implement trait `AtLiteral<L>`:
-            `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-          and $N others
-  = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: the trait `InUnit` is implemented for `LiteralIn<N, E, S>`
+ --> src/literal.rs
+  |
+  | impl<const N: i64, const E: i16, S> InUnit for LiteralIn<N, E, S> {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: required for `Fixed<Kelvin, One, i16>` to implement `AtLiteral<LitSymbols<main::__Literal, (), Unrounded>>`
+  = note: this error originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0277]: the trait bound `Fixed<Kelvin, One, i16>: AtLiteral<()>` is not satisfied
+error[E0277]: the trait bound `(): InUnit` is not satisfied
  --> tests/compile_fail/fixed_point.rs:7:38
   |
 7 |     let _: Fixed<Kelvin, One, i16> = fixed!(300 K @ AbsoluteZero);
-  |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Kelvin, One, i16>`
+  |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `InUnit` is not implemented for `()`
   |
-  = help: the following other types implement trait `AtLiteral<L>`:
-            `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-          and $N others
-  = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: the trait `InUnit` is implemented for `LiteralIn<N, E, S>`
+ --> src/literal.rs
+  |
+  | impl<const N: i64, const E: i16, S> InUnit for LiteralIn<N, E, S> {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: required for `Fixed<Kelvin, One, i16>` to implement `AtLiteral<LitSymbols<main::__Literal, (), Unrounded>>`
+  = note: this error originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0277]: the trait bound `Fixed<Kelvin, One, i16>: AtLiteral<()>` is not satisfied
+error[E0277]: the trait bound `(): InUnit` is not satisfied
  --> tests/compile_fail/fixed_point.rs:8:38
   |
 8 |     let _: Fixed<Kelvin, One, i16> = fixed!(25 "°C");
-  |                                      ^^^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Kelvin, One, i16>`
+  |                                      ^^^^^^^^^^^^^^^ the trait `InUnit` is not implemented for `()`
   |
-  = help: the following other types implement trait `AtLiteral<L>`:
-            `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-          and $N others
-  = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: the trait `InUnit` is implemented for `LiteralIn<N, E, S>`
+ --> src/literal.rs
+  |
+  | impl<const N: i64, const E: i16, S> InUnit for LiteralIn<N, E, S> {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: required for `Fixed<Kelvin, One, i16>` to implement `AtLiteral<LitSymbols<main::__Literal, (), Unrounded>>`
+  = note: this error originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)

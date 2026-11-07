@@ -48,8 +48,9 @@ pub(crate) fn literal_in_db(num: i32) {
         LN10_DEN,
         Rounding::NearestEven,
     );
-    let got = Fixed::<Neper, Micro, i64>::from_decimal_in::<Decibel>(
+    let got = Fixed::<Neper, Micro, i64>::from_decimal_in_rounded::<Decibel>(
         exact_units::literal::Decimal::new(i64::from(num), -2),
+        Rounding::NearestEven,
     );
     assert_eq!(i128::from(got.get()), want, "{num} cdB");
 }

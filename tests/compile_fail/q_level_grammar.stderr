@@ -16,23 +16,19 @@ error: fixed!: `dB` is a level, and fixed! a number of its context's unit: write
 13 |     let _: Fixed<Per<Volt, Volt>, Milli, u16> = fixed!(-3 dB);
    |                                                           ^^
 
-error[E0277]: the trait bound `Fixed<Per<Volt, Volt>, exact_units::prefix::Milli, u16>: AtLiteral<()>` is not satisfied
+error[E0277]: the trait bound `(): InUnit` is not satisfied
   --> tests/compile_fail/q_level_grammar.rs:13:49
    |
 13 |     let _: Fixed<Per<Volt, Volt>, Milli, u16> = fixed!(-3 dB);
-   |                                                 ^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Per<Volt, Volt>, exact_units::prefix::Milli, u16>`
+   |                                                 ^^^^^^^^^^^^^ the trait `InUnit` is not implemented for `()`
    |
-   = help: the following other types implement trait `AtLiteral<L>`:
-             `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
-             `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-             `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
-             `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-             `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
-             `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-             `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
-             `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-           and $N others
-   = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: the trait `InUnit` is implemented for `LiteralIn<N, E, S>`
+  --> src/literal.rs
+   |
+   | impl<const N: i64, const E: i16, S> InUnit for LiteralIn<N, E, S> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required for `Fixed<Per<Volt, Volt>, exact_units::prefix::Milli, u16>` to implement `AtLiteral<LitSymbols<__Literal, (), Unrounded>>`
+   = note: this error originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: can't compare `exact_units::Exact<Per<Volt, Volt>>` with `LevelLiteral<-3, 0, Db>`
   --> tests/compile_fail/q_level_grammar.rs:14:49

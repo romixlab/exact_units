@@ -97,11 +97,14 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   a client computes the scale as rustc does; the evolution check compares them by meaning (test in
   `tests/quantities`).
 - ✅ **NUM-7 Decimal literals as exact constants** (was STD-93) — `exact_units` d4b5b1a, fce4739, 790d6f0: `fixed!(0.1)` is the
-  `Fixed` (or, of two literals, the `Complex`) its context names, holding the stored value nearest to the literal,
-  worked out at compile time (`fixed!(0.1)` in Q30 is `107_374_182`); a scale with π, a value past the storage or
-  its bounds, a value outside a float's normal range, and `-0` (a float storage would take it as +0.0, so both
-  literal readers refuse it) don't compile; `Fixed::from_decimal` as a `const fn`. `Mac::mean_at_least(threshold, n)`: a mean
-  power against a typed threshold (`db!(norm_sqr -10)`) in one exact integer compare.
+  `Fixed` (or, of two literals, the `Complex`) its context names, holding the stored value the literal is, worked out
+  at compile time; a literal that is no stored value is a compile error naming the two around it with their exact
+  decimals (`fixed!(0.1)` in Q30: `107374182 = 0.09999999962747097015380859375` and `107374183 = ..`), unless the
+  call names a rounding (`fixed!(0.1, NearestEven)` is `107_374_182`; P2401#3nov-0058b, also `db!` and `np!`); a
+  scale with π, a value past the storage or its bounds (checked before any rounding), a value outside a float's
+  normal range, and `-0` (a float storage would take it as +0.0, so both literal readers refuse it) don't compile;
+  `Fixed::from_decimal` and `from_decimal_rounded` as `const fn`s. `Mac::mean_at_least(threshold, n)`: a mean
+  power against a typed threshold (`db!(norm_sqr -10, NearestEven)`) in one exact integer compare.
 - ✅ **NUM-8 Niche codes next to `Bounds`** (was STD-66) — `exact_units` d7266c7, module `niche`: `Niched<V, N>` is a value
   `V` (`Fixed` or `Point`) or one of the codes of `N`, stored as the raw number alone, so `size_of` and the wire
   bytes are the storage's. `get()` answers `Reading::Value(v)` or `Reading::Niche(meaning)`, never a code as a
@@ -392,7 +395,7 @@ non-linear named scales.
 - 🚧 **LVL-1 Levels: dB, dBm, dBV, dBFS, dBc, Np, LUFS, RSSI** (was STD-67) · `v0.5` — first piece done: a gain's dB by its kind
   (UNIT-2), `Fixed::to_db` / `from_db` with 20·lg for ratios of root-power quantities (V/V, A/A, Pa/Pa) and 10·lg for
   powers (W/W, J/J), a plain `Ratio` refused at compile time; `to_db` / `from_db` in `f64` and `f32`, without `std`
-  through the `libm` feature; `db!()` works the stored value out exactly at compile time. Missing: the rest below.
+  through the `libm` feature; `db!()` works the stored value out exactly at compile time, a rounding named where the gain is no stored value (`db!(-3, NearestEven)`). Missing: the rest below.
   `Level<Kind, Ref>` on the point
   algebra: level − level = gain, level + gain = level, references named (1 mW, 1 V, 20 µPa, full scale with its sine
   or square convention). The log base comes from the level's unit (Np coherent on a log-ratio base, B, dB, octave,
@@ -401,8 +404,8 @@ non-linear named scales.
 - ✅ **LVL-2 Levels in nepers** (was STD-95) — the twin of the dB API in `decibel`: `Fixed::to_np` / `from_np` (`f64`) and
   `to_np_f32` / `from_np_f32`, with the form from the unit's `Kind` like `to_db` (a root-power ratio such as V/V is
   `ln(x)` Np, a power ratio such as W/W is `½·ln(x)` Np; feature `std` or `libm`). At compile time the
-  `decibel::Nepers` decimal, `Fixed::from_np_const` and the `np!` macro (`np!(-1)`, `np!(-0.5)`) give the stored
-  value nearest to `e^Np` (`e^(2·Np)` for powers), worked out in integers with an error bound by the same machinery
+  `decibel::Nepers` decimal, `Fixed::from_np_const_rounded` and the `np!` macro (`np!(-1, NearestEven)`) give the
+  stored value a named rounding picks for `e^Np` (`e^(2·Np)` for powers), worked out in integers with an error bound by the same machinery
   as `from_db_const`, no float at run time. `LevelForm::np_per_ln()` is the form's factor; 1 Np is 20/ln 10 dB for
   both forms (aaf886f). Book: the Neper section of the Decibels page.
 - 🚧 **LVL-3 Level rates** (was STD-97) — levels and their rates as quantities: the neper is a counted base of this crate
@@ -484,7 +487,7 @@ angles, complex power.
   `Fixed` and a phase angle, with `Complex::to_polar` / `from_polar` and `Polar::to_complex`. Floats through `hypot`,
   `atan2` and `sin`/`cos` (feature `std` or `libm`); integers without a float: `abs` the correctly rounded root of
   the exact `norm_sqr` in the unsigned twin, `arg` by CORDIC into a `PhaseBam16` / `PhaseBam32` within 0.51 of a
-  step, `from_polar` by Q31 sin/cos. `to_db` from |z|², `norm_sqr_at(Decibels)` and `db!(norm_sqr -15)` as a typed
+  step, `from_polar` by Q31 sin/cos. `to_db` from |z|², `norm_sqr_at_rounded(Decibels, Rounding)` and `db!(norm_sqr -15, Floor)` as a typed
   threshold; RF helpers on an impedance (Γ, VSWR, return loss), example `13_impedance_match`.
 
 ## Numbers and units at the edges (`IO`)

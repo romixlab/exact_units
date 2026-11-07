@@ -41,6 +41,7 @@ fn compile_fail() {
     t.compile_fail("tests/compile_fail/dim_mismatch_angle_hint.rs");
     t.compile_fail("tests/compile_fail/kind_mismatch.rs");
     t.compile_fail("tests/compile_fail/literal_mismatch.rs");
+    t.compile_fail("tests/compile_fail/fixed_inexact.rs");
 }
 
 /// The refusals of `q!`, with the pass fixture so the batch is built, not checked (a wrong dimension panics only
@@ -62,6 +63,7 @@ fn compile_fail_q() {
     t.compile_fail("tests/compile_fail/fixed_dim_mismatch.rs");
     t.compile_fail("tests/compile_fail/fixed_grammar.rs");
     t.compile_fail("tests/compile_fail/fixed_point.rs");
+    t.compile_fail("tests/compile_fail/level_inexact.rs");
 }
 
 /// A symbol of a unit group that is off: only where `customary` is (`just test`'s `std` run).

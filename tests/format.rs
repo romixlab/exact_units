@@ -15,7 +15,7 @@ type Millivolts = Fixed<Volt, Milli, i32>;
 
 #[test]
 fn binary_scales_exactly() {
-    let x: Q15 = fixed!(0.8);
+    let x: Q15 = fixed!(0.8, NearestEven);
     assert_eq!(x.get(), 26214);
     assert_eq!(format!("{x:#}"), "0.79998779296875");
     assert_eq!(format!("{:#}", Q15::<Ratio>::of(i16::MIN)), "-1");
@@ -39,7 +39,7 @@ fn binary_scales_exactly() {
 
 #[test]
 fn precision_rounds_to_nearest_even() {
-    let x: Q15 = fixed!(0.8);
+    let x: Q15 = fixed!(0.8, NearestEven);
     assert_eq!(format!("{x:#.3}"), "0.800");
     assert_eq!(format!("{x:#.0}"), "1");
     assert_eq!(format!("{x:#.20}"), "0.79998779296875000000");
@@ -103,7 +103,7 @@ fn width_fill_align_sign() {
     assert_eq!(format!("{x:+#010.2}"), "+0001.50 V");
     assert_eq!(format!("{:#8.1}", Millivolts::new(-1500)), "  -1.5 V");
     // a dimensionless value is the number alone
-    let r: Q15 = fixed!(0.8);
+    let r: Q15 = fixed!(0.8, NearestEven);
     assert_eq!(format!("{r:#8.3}"), "   0.800");
     assert_eq!(format!("{r:<#8.3}|"), "0.800   |");
     assert_eq!(format!("{r:#08.3}"), "0000.800");

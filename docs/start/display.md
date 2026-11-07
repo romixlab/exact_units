@@ -34,7 +34,7 @@ use exact_units::{Fixed, Kibibytes, Micros, Q15, fixed, prefix::Milli, units::{R
 let t: Micros<u32> = Fixed::new(1500);
 let v: Fixed<Volt, Milli, i16> = Fixed::new(1250);
 let k: Kibibytes<u16> = Fixed::new(4);
-let q: Q15<Ratio> = fixed!(0.8);
+let q: Q15<Ratio> = fixed!(0.8, NearestEven);
 
 assert_eq!(format!("{t:#}"), "0.0015 s");
 assert_eq!(format!("{v:#}"), "1.25 V");
@@ -128,7 +128,7 @@ This is the text alone. The type, equality, conversion, the wire and serde's num
 use exact_units::{Fixed, Q15, fixed, prefix::Milli, units::{Ratio, Volt}};
 
 let v: Fixed<Volt, Milli, i16> = Fixed::new(1250);
-let q: Q15<Ratio> = fixed!(0.8);
+let q: Q15<Ratio> = fixed!(0.8, NearestEven);
 
 assert_eq!(format!("{v:#.1}"), "1.2 V");
 assert_eq!(format!("{v:+#.2}"), "+1.25 V");

@@ -46,27 +46,28 @@ use exact_units::{Fixed, Range, db, prefix::Milli, units::{Per, Volt}};
 type Level = Fixed<Per<Volt, Volt>, Milli, u16>;
 type Peak = Fixed<Per<Volt, Volt>, Milli, u16, Range<0, 1000>>;
 
-const LIMIT: Level = db!(-6); // 501 mV/V
-const WARN: Level = db!(-1);  // 891 mV/V
+const LIMIT: Level = db!(-6, NearestEven); // 501 mV/V
+const WARN: Level = db!(-1, NearestEven);  // 891 mV/V
 
 let peak = Peak::try_new(640).unwrap();
 assert!(peak >= LIMIT && peak < WARN); // one integer compare each
 assert_eq!((LIMIT.get(), WARN.get()), (501, 891));
 ```
 
-- No float and no logarithm at run time: `db!(-6)` is the same flash as the literal 501.
+- No float and no logarithm at run time: `db!(-6, NearestEven)` is the same flash as the literal 501.
+- The gain of −6 dB is irrational, so no stored value is it: the call names how it rounds, and without a rounding the compile error names 501 = 0.501 and 502 = 0.502.
 - The same level for a power gain is a different number, chosen by the kind:
 
 ```rust
 use exact_units::{Fixed, db, prefix::Milli, units::{Per, Watt}};
 
-let p: Fixed<Per<Watt, Watt>, Milli, u16> = db!(-6);
+let p: Fixed<Per<Watt, Watt>, Milli, u16> = db!(-6, NearestEven);
 assert_eq!(p.get(), 251); // 10^(−6/10)
 ```
 
 ## `q!`: a level compared without a constant { #q }
 
-`db!` rounds the gain to the nearest stored value: a constant has to be one. A compare doesn't. `q!(-3 dB)` keeps the level exact and folds it in the compare itself: `gain < q!(-3 dB)` is `gain <= 707` for a V/V in steps of 1 mV/V, since 10^(−3/20) is 707.94.. mV/V, and no stored value is equal to it.
+`db!(-3, NearestEven)` rounds the gain to the nearest stored value: a constant has to be one. A compare doesn't. `q!(-3 dB)` keeps the level exact and folds it in the compare itself: `gain < q!(-3 dB)` is `gain <= 707` for a V/V in steps of 1 mV/V, since 10^(−3/20) is 707.94.. mV/V, and no stored value is equal to it.
 
 ```rust
 use exact_units::{Fixed, db, q, prefix::Milli, units::{Per, Volt, Watt}};
@@ -75,8 +76,8 @@ type Gain = Fixed<Per<Volt, Volt>, Milli, u16>;
 
 let g = Gain::new(708);
 assert!(g > q!(-3 dB));   // 708 is above 707.94..
-const HALF_POWER: Gain = db!(-3);
-assert!(g == HALF_POWER); // db!(-3) rounded to 708: the constant is the nearest step, not the level
+const HALF_POWER: Gain = db!(-3, NearestEven);
+assert!(g == HALF_POWER); // rounded to 708: the constant is the nearest step, not the level
 assert!(Gain::new(1000) == q!(0 dB)); // a whole number of decades is a step: == compiles
 assert!(Gain::new(449) < q!(-0.8 Np)); // e^(−0.8) = 0.4493..: the neper too
 
@@ -155,14 +156,14 @@ $$
 <figcaption>Line theory works in nepers because they fall out of the wave equation: V(x) = V<sub>0</sub>·e<sup>−γx</sup> with γ = α + jβ, so the amplitude is V<sub>0</sub>·e<sup>−αx</sup>. With α in Np/m, αx is the level in Np, no conversion factor needed. A datasheet's dB per 100 ft is typed as written, <code>Per&lt;Loss&lt;Decibel&gt;, Feet100&gt;</code>, and <code>convert</code>s to α in Np/m exactly. The cable is a Belden 8259 RG-58: nominally 5.4 dB/100 ft at 100 MHz, velocity 66 %. Computed by <code>tools/book_plots</code> with the crate's <code>convert</code>, <code>over</code>, <code>to_db</code> and <code>from_db_const</code>.</figcaption>
 </figure>
 
-`exact_units` takes a neper level the way it takes a dB level, and the kind picks the form: `ln(x)` Np for a ratio of root-power quantities (V/V), `½·ln(x)` Np for a ratio of powers (W/W). At compile time `np!` gives the stored value nearest to $e^{L}$ (or $e^{2L}$ for powers), worked out in integers like `db!`, with no float at run time:
+`exact_units` takes a neper level the way it takes a dB level, and the kind picks the form: `ln(x)` Np for a ratio of root-power quantities (V/V), `½·ln(x)` Np for a ratio of powers (W/W). At compile time `np!` gives the stored value a named rounding picks for $e^{L}$ (or $e^{2L}$ for powers), worked out in integers like `db!`, with no float at run time. Only 0 Np has a gain that is a stored value, 1: every other is irrational, so `np!` names its rounding:
 
 ```rust
 use exact_units::{Fixed, np, prefix::Micro, units::{Per, Volt, Watt}};
 
 // 1 Np down: a voltage at 1/e and a power at 1/e² are one level
-let volts: Fixed<Per<Volt, Volt>, Micro, u32> = np!(-1);
-let watts: Fixed<Per<Watt, Watt>, Micro, u32> = np!(-1);
+let volts: Fixed<Per<Volt, Volt>, Micro, u32> = np!(-1, NearestEven);
+let watts: Fixed<Per<Watt, Watt>, Micro, u32> = np!(-1, NearestEven);
 assert_eq!(volts.get(), 367_879); // 1/e = 0.367879..
 assert_eq!(watts.get(), 135_335); // 1/e² = 0.135335..
 ```
@@ -200,7 +201,7 @@ use exact_units::units::{Decibel, Loss, Meter, Neper, Per, Volt};
 
 // a cable's loss as the datasheet writes it, positive, in an integer of µNp/m
 type Alpha = Fixed<Per<Loss<Neper>, Meter>, Micro, u32>;
-const ALPHA: Alpha = fixed!(0.177 in Per<Loss<Decibel>, Meter>); // 17.7 dB/100 m
+const ALPHA: Alpha = fixed!(0.177 in Per<Loss<Decibel>, Meter>, NearestEven); // 17.7 dB/100 m
 assert_eq!(ALPHA.get(), 20_378);
 
 // dB to Np in integers, rounded by name: ln 10 is not a fraction of integers

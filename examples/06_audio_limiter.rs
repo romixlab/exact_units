@@ -29,8 +29,8 @@ type Peak = Fixed<Per<Volt, Volt>, Milli, u16, Range<0, 1000>>;
 /// A level to compare against: same unit, scale and storage, no bounds.
 type Level = Fixed<Per<Volt, Volt>, Milli, u16>;
 
-const LIMIT: Level = db!(-6); // 501 mV/V, no float at run time
-const WARN: Level = db!(-1); // 891 mV/V
+const LIMIT: Level = db!(-6, NearestEven); // 501 mV/V, no float at run time
+const WARN: Level = db!(-1, NearestEven); // 891 mV/V
 
 fn main() {
     println!("limit at -6 dBFS = {LIMIT}, warn at -1 dBFS = {WARN}");

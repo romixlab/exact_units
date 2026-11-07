@@ -15,7 +15,7 @@ use core::f64::consts::{E, LN_10};
 use exact_units::decibel::{Decibels, Nepers};
 use exact_units::prefix::{Micro, Milli, Nano, One};
 use exact_units::units::{Ampere, Per, Volt, Watt};
-use exact_units::{Fixed, np};
+use exact_units::{Fixed, Rounding, np};
 
 type VoltGain<P, T> = Fixed<Per<Volt, Volt>, P, T>;
 type PowerGain<P, T> = Fixed<Per<Watt, Watt>, P, T>;
@@ -70,22 +70,22 @@ fn golden_values_are_exact() {
     for &(n, d, v, p) in GOLDEN {
         let np = Nepers::new(n, d);
         assert_eq!(
-            VoltGain::<One, f64>::from_np_const(np).get(),
+            VoltGain::<One, f64>::from_np_const_rounded(np, Rounding::NearestEven).get(),
             v.parse::<f64>().unwrap(),
             "{np:?}"
         );
         assert_eq!(
-            PowerGain::<One, f64>::from_np_const(np).get(),
+            PowerGain::<One, f64>::from_np_const_rounded(np, Rounding::NearestEven).get(),
             p.parse::<f64>().unwrap(),
             "{np:?}"
         );
         assert_eq!(
-            VoltGain::<One, f32>::from_np_const(np).get(),
+            VoltGain::<One, f32>::from_np_const_rounded(np, Rounding::NearestEven).get(),
             v.parse::<f32>().unwrap(),
             "{np:?}"
         );
         assert_eq!(
-            PowerGain::<One, f32>::from_np_const(np).get(),
+            PowerGain::<One, f32>::from_np_const_rounded(np, Rounding::NearestEven).get(),
             p.parse::<f32>().unwrap(),
             "{np:?}"
         );
@@ -94,10 +94,10 @@ fn golden_values_are_exact() {
 
 #[test]
 fn macro_and_const_fn() {
-    const A: VoltGain<Micro, u32> = np!(-1);
-    const B: PowerGain<Micro, u32> = np!(-0.5);
-    const C: VoltGain<One, f64> = np!(1);
-    const D: PowerGain<Nano, u64> = np!(0.25);
+    const A: VoltGain<Micro, u32> = np!(-1, NearestEven);
+    const B: PowerGain<Micro, u32> = np!(-0.5, NearestEven);
+    const C: VoltGain<One, f64> = np!(1, NearestEven);
+    const D: PowerGain<Nano, u64> = np!(0.25, NearestEven);
     assert_eq!(A.get(), 367_879);
     assert_eq!(B.get(), 367_879);
     assert_eq!(C.get(), E);
@@ -115,8 +115,8 @@ fn matches_libm() {
     // the compile-time gain is correctly rounded, libm's exp is within an ulp or so
     for np in levels() {
         let x = np.to_f64();
-        let v = VoltGain::<One, f64>::from_np_const(np).get();
-        let p = PowerGain::<One, f64>::from_np_const(np).get();
+        let v = VoltGain::<One, f64>::from_np_const_rounded(np, Rounding::NearestEven).get();
+        let p = PowerGain::<One, f64>::from_np_const_rounded(np, Rounding::NearestEven).get();
         assert!(
             (v / libm::exp(x) - 1.0).abs() <= tolerance(x),
             "{np:?}: {v}"
@@ -136,7 +136,7 @@ fn integers_are_nearest() {
         let want = libm::exp(x) * 1e6;
         // micro-units up to 10^9 µV/V, where the reference is good to a millionth of a step
         if (want.fract() - 0.5).abs() > 1e-4 && want < 1e9 {
-            let g = VoltGain::<Micro, u64>::from_np_const(np).get();
+            let g = VoltGain::<Micro, u64>::from_np_const_rounded(np, Rounding::NearestEven).get();
             assert_eq!(g as f64, want.round(), "{np:?}");
             checked += 1;
         }
@@ -147,39 +147,43 @@ fn integers_are_nearest() {
 #[test]
 fn edges() {
     // the largest and smallest u8: e^5.54 = 254.7 -> 255, e^5.55 = 257 is past
-    let g: VoltGain<One, u8> = np!(5.54);
+    let g: VoltGain<One, u8> = np!(5.54, NearestEven);
     assert_eq!(g.get(), 255);
     // far below one step rounds to 0, however far
     for n in [-100i64, -10_000_000_000, i64::MIN / 2, i64::MIN] {
         assert_eq!(
-            PowerGain::<One, u64>::from_np_const(Nepers::new(n, 0)).get(),
+            PowerGain::<One, u64>::from_np_const_rounded(Nepers::new(n, 0), Rounding::NearestEven)
+                .get(),
             0,
             "{n} Np"
         );
     }
     // near the ends of f64's range (e^709.78 is f64::MAX)
-    let top: VoltGain<One, f64> = np!(709);
+    let top: VoltGain<One, f64> = np!(709, NearestEven);
     assert!(ulps(top.get(), libm::exp(709.0)) <= 800);
-    let low: VoltGain<One, f64> = np!(-708);
+    let low: VoltGain<One, f64> = np!(-708, NearestEven);
     assert!(ulps(low.get(), libm::exp(-708.0)) <= 800);
 }
 
 #[test]
-#[should_panic(expected = "this level is too large for its storage")]
+#[should_panic(expected = "this value is too large for its storage")]
 fn too_large_for_the_storage() {
-    let _ = VoltGain::<One, u8>::from_np_const(Nepers::new(556, 2));
+    let _ = VoltGain::<One, u8>::from_np_const_rounded(Nepers::new(556, 2), Rounding::NearestEven);
 }
 
 #[test]
-#[should_panic(expected = "this level is too large for its storage")]
+#[should_panic(expected = "this value is too large for its storage")]
 fn far_too_large_for_the_storage() {
-    let _ = PowerGain::<One, u64>::from_np_const(Nepers::new(i64::MAX, 0));
+    let _ = PowerGain::<One, u64>::from_np_const_rounded(
+        Nepers::new(i64::MAX, 0),
+        Rounding::NearestEven,
+    );
 }
 
 #[test]
-#[should_panic(expected = "this value is outside the normal range of its float storage")]
+#[should_panic(expected = "this value is past the range of its float storage")]
 fn past_the_float_range() {
-    let _ = VoltGain::<One, f64>::from_np_const(Nepers::new(710, 0));
+    let _ = VoltGain::<One, f64>::from_np_const_rounded(Nepers::new(710, 0), Rounding::NearestEven);
 }
 
 #[test]
@@ -195,16 +199,24 @@ fn np_and_db_are_one_level() {
     const DB_PER_NP: f64 = 20.0 / LN_10;
     for np in levels() {
         let x = np.to_f64();
-        let n = VoltGain::<One, f64>::from_np_const(np).get();
+        let n = VoltGain::<One, f64>::from_np_const_rounded(np, Rounding::NearestEven).get();
         // the same level in dB as a decimal with 9 decimals, 5·10^-10 dB off at most
         let db_nano = (x * DB_PER_NP * 1e9).round() as i64;
-        let d = VoltGain::<One, f64>::from_db_const(Decibels::new(db_nano, 9)).get();
+        let d = VoltGain::<One, f64>::from_db_const_rounded(
+            Decibels::new(db_nano, 9),
+            Rounding::NearestEven,
+        )
+        .get();
         assert!(
             (n / d - 1.0).abs() < 1e-9 * (1.0 + x.abs()),
             "{x} Np: {n} {d}"
         );
-        let p = PowerGain::<One, f64>::from_np_const(np).get();
-        let d = PowerGain::<One, f64>::from_db_const(Decibels::new(db_nano, 9)).get();
+        let p = PowerGain::<One, f64>::from_np_const_rounded(np, Rounding::NearestEven).get();
+        let d = PowerGain::<One, f64>::from_db_const_rounded(
+            Decibels::new(db_nano, 9),
+            Rounding::NearestEven,
+        )
+        .get();
         assert!(
             (p / d - 1.0).abs() < 1e-9 * (1.0 + x.abs()),
             "{x} Np: {p} {d}"
@@ -267,7 +279,7 @@ mod run_time {
                 g32.to_np_f32()
             );
         }
-        let c: VoltGain<Micro, u32> = np!(-1);
+        let c: VoltGain<Micro, u32> = np!(-1, NearestEven);
         let r = VoltGain::<Micro, f32>::from_np_f32(-1.0).unwrap();
         assert!((c.get() as f32 - r.get()).abs() <= 1.0);
         assert_eq!(

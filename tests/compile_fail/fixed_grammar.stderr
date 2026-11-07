@@ -16,56 +16,44 @@ error: fixed!: `-0.0` reads two ways for a float storage, -0.0 or +0.0: write 0
 9 |     let _: Fixed<Second, One, f32> = fixed!(-0.0 s);
   |                                              ^^^
 
-error[E0277]: the trait bound `Fixed<Second, One, i16>: AtLiteral<()>` is not satisfied
+error[E0277]: the trait bound `(): InUnit` is not satisfied
  --> tests/compile_fail/fixed_grammar.rs:7:38
   |
 7 |     let _: Fixed<Second, One, i16> = fixed!(5 kmh);
-  |                                      ^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Second, One, i16>`
+  |                                      ^^^^^^^^^^^^^ the trait `InUnit` is not implemented for `()`
   |
-  = help: the following other types implement trait `AtLiteral<L>`:
-            `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-          and $N others
-  = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: the trait `InUnit` is implemented for `LiteralIn<N, E, S>`
+ --> src/literal.rs
+  |
+  | impl<const N: i64, const E: i16, S> InUnit for LiteralIn<N, E, S> {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: required for `Fixed<Second, One, i16>` to implement `AtLiteral<LitSymbols<main::__Literal, (), Unrounded>>`
+  = note: this error originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0277]: the trait bound `Fixed<Second, One, i16>: AtLiteral<()>` is not satisfied
+error[E0277]: the trait bound `(): InUnit` is not satisfied
  --> tests/compile_fail/fixed_grammar.rs:8:38
   |
 8 |     let _: Fixed<Second, One, i16> = fixed!(5 min);
-  |                                      ^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Second, One, i16>`
+  |                                      ^^^^^^^^^^^^^ the trait `InUnit` is not implemented for `()`
   |
-  = help: the following other types implement trait `AtLiteral<L>`:
-            `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-          and $N others
-  = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: the trait `InUnit` is implemented for `LiteralIn<N, E, S>`
+ --> src/literal.rs
+  |
+  | impl<const N: i64, const E: i16, S> InUnit for LiteralIn<N, E, S> {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: required for `Fixed<Second, One, i16>` to implement `AtLiteral<LitSymbols<main::__Literal, (), Unrounded>>`
+  = note: this error originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0277]: the trait bound `Fixed<Second, One, f32>: AtLiteral<()>` is not satisfied
+error[E0277]: the trait bound `(): InUnit` is not satisfied
  --> tests/compile_fail/fixed_grammar.rs:9:38
   |
 9 |     let _: Fixed<Second, One, f32> = fixed!(-0.0 s);
-  |                                      ^^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Second, One, f32>`
+  |                                      ^^^^^^^^^^^^^^ the trait `InUnit` is not implemented for `()`
   |
-  = help: the following other types implement trait `AtLiteral<L>`:
-            `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-            `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
-            `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
-          and $N others
-  = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: the trait `InUnit` is implemented for `LiteralIn<N, E, S>`
+ --> src/literal.rs
+  |
+  | impl<const N: i64, const E: i16, S> InUnit for LiteralIn<N, E, S> {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: required for `Fixed<Second, One, f32>` to implement `AtLiteral<LitSymbols<main::__Literal, (), Unrounded>>`
+  = note: this error originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)

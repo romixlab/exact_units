@@ -806,7 +806,7 @@ where
 /// use exact_units::{Fixed, Range, db, prefix::Micro, units::{Per, Volt}};
 ///
 /// type Gain = Fixed<Per<Volt, Volt>, Micro, u32>;
-/// const THRESHOLD: Gain = db!(-3);
+/// const THRESHOLD: Gain = db!(-3, NearestEven);
 /// let measured = Fixed::<Per<Volt, Volt>, Micro, u32, Range<0, 1_000_000>>::bounded(800_000);
 /// assert!(measured >= THRESHOLD);
 /// assert!(Gain::new(707_946) == THRESHOLD);

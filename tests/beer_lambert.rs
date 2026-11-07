@@ -102,7 +102,7 @@ fn coefficient_over_a_path() {
 /// A literal in AU lands in a depth's storage, correctly rounded at compile time.
 #[test]
 fn literal_in_absorbance() {
-    const TAU: Fixed<OpticalDepth, Milli, u16> = fixed!(0.3 in Absorbance);
+    const TAU: Fixed<OpticalDepth, Milli, u16> = fixed!(0.3 in Absorbance, NearestEven);
     assert_eq!(TAU.get(), 691);
     let r = Fixed::<Absorbance, Milli, u16>::new(300)
         .convert_rounded::<OpticalDepth, Milli, u16>(Rounding::NearestEven);

@@ -309,17 +309,21 @@ mod float {
         for tenth in -600..=0 {
             let db = Decibels::new(tenth, 1);
             let exact = libm::pow(10.0, tenth as f64 / 100.0) * libm::ldexp(1.0, 30);
-            let got = f64::from(Gamma::norm_sqr_at(db).get());
+            let got = f64::from(Gamma::norm_sqr_at_rounded(db, Rounding::NearestEven).get());
             assert!((got - exact).abs() <= 0.5 + 1e-6, "{tenth}: {got} {exact}");
         }
         // 10·lg|z| of a power kind: |z|² is 10^(dB/5)
         for tenth in -200..=200 {
             let db = Decibels::new(tenth, 1);
             let exact = libm::pow(10.0, tenth as f64 / 50.0) * 1e6;
-            let got = P::norm_sqr_at(db).get() as f64;
+            let got = P::norm_sqr_at_rounded(db, Rounding::NearestEven).get() as f64;
             assert!((got - exact).abs() <= 0.5 + 1e-5, "{tenth}: {got} {exact}");
         }
-        let f = Complex::<Per<Volt, Volt>, One, f64>::norm_sqr_at(Decibels::new(-15, 0)).get();
+        let f = Complex::<Per<Volt, Volt>, One, f64>::norm_sqr_at_rounded(
+            Decibels::new(-15, 0),
+            Rounding::NearestEven,
+        )
+        .get();
         assert!(near(f, libm::pow(10.0, -1.5), 1.0));
     }
 

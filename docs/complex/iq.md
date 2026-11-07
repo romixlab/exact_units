@@ -69,7 +69,7 @@ use exact_units::{CQ15, Fixed, Mac, db, fixed, prefix::{Pow2, Product}, units::{
 
 type FullScale = Per<Volt, Volt>;
 type PowerLevel = Fixed<Times<FullScale, FullScale>, Product<Pow2<-15>, Pow2<-15>>, u32>;
-const BUSY: PowerLevel = db!(norm_sqr -10); // −10 dBFS
+const BUSY: PowerLevel = db!(norm_sqr -10, NearestEven); // −10 dBFS
 
 let y: CQ15<FullScale> = fixed!(0.5, 0.0); // −6 dBFS
 let mut power = Mac::new();

@@ -30,10 +30,10 @@ type GammaQ15 = Complex<Per<Volt, Volt>, Pow2<-15>, i16, Saturating>;
 type GammaSqr = Fixed<Times<Per<Volt, Volt>, Per<Volt, Volt>>, Product<Pow2<-15>, Pow2<-15>>, u32>;
 
 /// |Γ| ≤ −15 dB as a threshold on |Γ|²: 10^(−1.5) · 2³⁰, nearest.
-const MATCHED: GammaSqr = db!(norm_sqr - 15);
+const MATCHED: GammaSqr = db!(norm_sqr - 15, NearestEven);
 
 /// The slip: −15 dB read as a voltage-ratio level of |Γ|² itself, 10^(−0.75) · 2³⁰.
-const SLIP: GammaSqr = db!(-15);
+const SLIP: GammaSqr = db!(-15, NearestEven);
 
 fn main() {
     // the bench tool, in f64 on a host

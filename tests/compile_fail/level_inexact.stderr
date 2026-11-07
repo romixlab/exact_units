@@ -1,0 +1,163 @@
+error[E0080]: evaluation panicked: fixed!(90 in Degree) is not a step of its storage: the steps around it are 1570796 = 1.570796 and 1570797 = 1.570797; write one of them as fixed!(..), or name a rounding: fixed!(90 in Degree, NearestEven)
+ --> src/literal.rs
+  |
+  |                 Self::of_value(&value, M::ROUNDING, &src::<L>(false))
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::Fixed<exact_units::units::Radian, exact_units::prefix::Micro, i32> as exact_units::literal::AtLiteral<exact_units::literal::LitIn<main::__Literal, exact_units::units::Degree, exact_units::literal::mode::Unrounded>>>::AT` failed inside this call
+...
+  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------------ in this macro invocation
+  |
+note: inside `literal::<impl Fixed<Radian, exact_units::prefix::Micro, i32>>::of_value`
+ --> src/literal.rs
+  |
+  |                 let v = steps::to_int(v, range, mode, src, P::SCALE);
+  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------------ in this macro invocation
+note: inside `literal::steps::to_int`
+ --> src/literal/steps.rs
+  |
+  |         refuse(src, Pair::Int { lo, hi, step })
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::steps::refuse`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/level_inexact.rs:12:40
+   |
+12 |     let _: Fixed<Radian, Micro, i32> = fixed!(90 in Degree);
+   |                                        ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: fixed!(359.9 km/h) is not a step of its storage: the steps around it are 9997 = 99.97 and 9998 = 99.98; write one of them as fixed!(..), or name a rounding: fixed!(359.9 km/h, NearestEven)
+ --> src/literal.rs
+  |
+  |                 Self::of_value(&value, M::ROUNDING, &src::<L>(false))
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::Fixed<exact_units::units::Speed, exact_units::prefix::Centi, i16> as exact_units::literal::AtLiteral<exact_units::literal::LitSymbols<main::__Literal, exact_units::literal::LiteralIn<3599, 2, exact_units::units::Per<exact_units::units::Meter, exact_units::units::Hour>>, exact_units::literal::mode::Unrounded>>>::AT` failed inside this call
+...
+  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------------ in this macro invocation
+  |
+note: inside `literal::<impl Fixed<Speed, exact_units::prefix::Centi, i16>>::of_value`
+ --> src/literal.rs
+  |
+  |                 let v = steps::to_int(v, range, mode, src, P::SCALE);
+  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------------ in this macro invocation
+note: inside `literal::steps::to_int`
+ --> src/literal/steps.rs
+  |
+  |         refuse(src, Pair::Int { lo, hi, step })
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::steps::refuse`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/level_inexact.rs:13:39
+   |
+13 |     let _: Fixed<Speed, Centi, i16> = fixed!(359.9 km/h);
+   |                                       ^^^^^^^^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: db!(6) is not a step of its storage: the steps around it are 1995262 = 1.995262 and 1995263 = 1.995263; write one of them as fixed!(..), or name a rounding: db!(6, NearestEven)
+ --> src/decibel.rs
+  |
+  |                 Self::of_value(&value, M::ROUNDING, &Src::Macro { name: "db!", args: L::ARGS, direct: false })
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::Fixed<exact_units::units::Per<exact_units::units::Volt, exact_units::units::Volt>, exact_units::prefix::Micro, u32> as exact_units::decibel::AtLevel<exact_units::decibel::Level<main::__Level, exact_units::literal::mode::Unrounded>>>::AT` failed inside this call
+...
+  | from_db_const!(u8 u16 u32 u64 i8 i16 i32 i64 f32 f64);
+  | ----------------------------------------------------- in this macro invocation
+  |
+note: inside `literal::<impl Fixed<Per<Volt, Volt>, exact_units::prefix::Micro, u32>>::of_value`
+ --> src/literal.rs
+  |
+  |                 let v = steps::to_int(v, range, mode, src, P::SCALE);
+  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------------ in this macro invocation
+note: inside `literal::steps::to_int`
+ --> src/literal/steps.rs
+  |
+  |         refuse(src, Pair::Int { lo, hi, step })
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::steps::refuse`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/level_inexact.rs:14:49
+   |
+14 |     let _: Fixed<Per<Volt, Volt>, Micro, u32> = db!(6);
+   |                                                 ^^^^^^
+   |
+   = note: this note originates in the macro `$crate::__level_at` which comes from the expansion of the macro `db` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: np!(-1) is not a step of its storage: the steps around it are 367879 = 0.367879 and 367880 = 0.36788; write one of them as fixed!(..), or name a rounding: np!(-1, NearestEven)
+ --> src/decibel.rs
+  |
+  |                 Self::of_value(&value, M::ROUNDING, &Src::Macro { name: "np!", args: L::ARGS, direct: false })
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::Fixed<exact_units::units::Per<exact_units::units::Volt, exact_units::units::Volt>, exact_units::prefix::Micro, u32> as exact_units::decibel::AtLevel<exact_units::decibel::NeperLevel<main::__Level, exact_units::literal::mode::Unrounded>>>::AT` failed inside this call
+...
+  | from_db_const!(u8 u16 u32 u64 i8 i16 i32 i64 f32 f64);
+  | ----------------------------------------------------- in this macro invocation
+  |
+note: inside `literal::<impl Fixed<Per<Volt, Volt>, exact_units::prefix::Micro, u32>>::of_value`
+ --> src/literal.rs
+  |
+  |                 let v = steps::to_int(v, range, mode, src, P::SCALE);
+  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------------ in this macro invocation
+note: inside `literal::steps::to_int`
+ --> src/literal/steps.rs
+  |
+  |         refuse(src, Pair::Int { lo, hi, step })
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::steps::refuse`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/level_inexact.rs:15:49
+   |
+15 |     let _: Fixed<Per<Volt, Volt>, Micro, u32> = np!(-1);
+   |                                                 ^^^^^^^
+   |
+   = note: this note originates in the macro `$crate::__level_at` which comes from the expansion of the macro `np` (in Nightly builds, run with -Z macro-backtrace for more info)

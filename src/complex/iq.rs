@@ -348,7 +348,7 @@ impl<U: Unit, P: FixedScale, T: IqStorage> Mac<U, P, T> {
     /// # #[cfg(feature = "dimensionless")] {
     /// use exact_units::{CQ15, Fixed, Mac, fixed, prefix::{Pow2, Product}, units::{Ratio, Times}};
     /// type PowerQ30 = Fixed<Times<Ratio, Ratio>, Product<Pow2<-15>, Pow2<-15>>, u32>;
-    /// const BUSY: PowerQ30 = fixed!(0.1);
+    /// const BUSY: PowerQ30 = fixed!(0.1, NearestEven);
     /// let y: CQ15 = fixed!(0.5, 0); // a power of 0.25
     /// let mut power = Mac::new();
     /// power.mac_conj(y, y);

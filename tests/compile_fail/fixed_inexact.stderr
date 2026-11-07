@@ -1,0 +1,169 @@
+error[E0080]: evaluation panicked: fixed!(0.1) is not a step of its storage: the steps around it are 107374182 = 0.09999999962747097015380859375 and 107374183 = 0.100000000558793544769287109375; write one of them, or name a rounding: fixed!(0.1, NearestEven)
+ --> src/literal.rs
+  |
+  |                 Self::of_value(&value, M::ROUNDING, &src::<L>(true))
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::Fixed<exact_units::units::Ratio, exact_units::prefix::Pow2<-30>, i64> as exact_units::literal::AtLiteral<exact_units::literal::Lit<main::__Literal, exact_units::literal::mode::Unrounded>>>::AT` failed inside this call
+...
+  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------------ in this macro invocation
+  |
+note: inside `literal::<impl Fixed<Ratio, exact_units::prefix::Pow2<-30>, i64>>::of_value`
+ --> src/literal.rs
+  |
+  |                 let v = steps::to_int(v, range, mode, src, P::SCALE);
+  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------------ in this macro invocation
+note: inside `literal::steps::to_int`
+ --> src/literal/steps.rs
+  |
+  |         refuse(src, Pair::Int { lo, hi, step })
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::steps::refuse`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/fixed_inexact.rs:11:43
+   |
+11 |     let _: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1);
+   |                                           ^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: fixed!(-0.7071) is not a step of its storage: the steps around it are -23171 = -0.707122802734375 and -23170 = -0.70709228515625; write one of them, or name a rounding: fixed!(-0.7071, NearestEven)
+ --> src/literal.rs
+  |
+  |                 Self::of_value(&value, M::ROUNDING, &src::<L>(true))
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::Fixed<exact_units::units::Ratio, exact_units::prefix::Pow2<-15>, i16> as exact_units::literal::AtLiteral<exact_units::literal::Lit<main::__Literal, exact_units::literal::mode::Unrounded>>>::AT` failed inside this call
+...
+  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------------ in this macro invocation
+  |
+note: inside `literal::<impl Fixed<Ratio, exact_units::prefix::Pow2<-15>, i16>>::of_value`
+ --> src/literal.rs
+  |
+  |                 let v = steps::to_int(v, range, mode, src, P::SCALE);
+  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------------ in this macro invocation
+note: inside `literal::steps::to_int`
+ --> src/literal/steps.rs
+  |
+  |         refuse(src, Pair::Int { lo, hi, step })
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::steps::refuse`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/fixed_inexact.rs:12:43
+   |
+12 |     let _: Fixed<Ratio, Pow2<-15>, i16> = fixed!(-0.7071);
+   |                                           ^^^^^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: fixed!(0.1) is not a value of its float storage: the values around it are 0.0999999940395355224609375 and 0.100000001490116119384765625; write one of them, or name a rounding: fixed!(0.1, NearestEven)
+ --> src/literal.rs
+  |
+  |                 Self::of_value(&value, M::ROUNDING, &src::<L>(true))
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::Fixed<exact_units::units::Ratio, exact_units::prefix::One, f32> as exact_units::literal::AtLiteral<exact_units::literal::Lit<main::__Literal, exact_units::literal::mode::Unrounded>>>::AT` failed inside this call
+...
+  | from_decimal!(float f32 u32 F32 f64 u64 F64);
+  | -------------------------------------------- in this macro invocation
+  |
+note: inside `literal::<impl Fixed<Ratio, One, f32>>::of_value`
+ --> src/literal.rs
+  |
+  |                 let x = $ty::from_bits(parts.pick(mode, src, P::SCALE, FloatFormat::$format) as $bits);
+  |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | from_decimal!(float f32 u32 F32 f64 u64 F64);
+  | -------------------------------------------- in this macro invocation
+note: inside `literal::steps::FloatParts::pick`
+ --> src/literal/steps.rs
+  |
+  | /             refuse(
+  | |                 src,
+  | |                 Pair::Float {
+  | |                     neg: self.neg,
+... |
+  | |                 },
+  | |             )
+  | |_____________^
+note: inside `literal::steps::refuse`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/fixed_inexact.rs:13:37
+   |
+13 |     let _: Fixed<Ratio, One, f32> = fixed!(0.1);
+   |                                     ^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: fixed!(2.5) is not a step of its storage: the steps around it are 7 and 8, and their values aren't finite decimals; name a rounding: fixed!(2.5, NearestEven)
+ --> src/literal.rs
+  |
+  |                 Self::of_value(&value, M::ROUNDING, &src::<L>(true))
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::Fixed<exact_units::units::Ratio, exact_units::prefix::Rational<1, 3>, u8> as exact_units::literal::AtLiteral<exact_units::literal::Lit<main::__Literal, exact_units::literal::mode::Unrounded>>>::AT` failed inside this call
+...
+  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------------ in this macro invocation
+  |
+note: inside `literal::<impl Fixed<Ratio, Rational<1, 3>, u8>>::of_value`
+ --> src/literal.rs
+  |
+  |                 let v = steps::to_int(v, range, mode, src, P::SCALE);
+  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------------ in this macro invocation
+note: inside `literal::steps::to_int`
+ --> src/literal/steps.rs
+  |
+  |         refuse(src, Pair::Int { lo, hi, step })
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::steps::refuse`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/fixed_inexact.rs:14:47
+   |
+14 |     let _: Fixed<Ratio, Rational<1, 3>, u8> = fixed!(2.5);
+   |                                               ^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)

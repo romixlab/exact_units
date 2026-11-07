@@ -244,8 +244,8 @@ pub(crate) fn mean_at_least(products: &[(i16, i16, i16, i16)], t: i64, n: u32) {
     }
 }
 
-/// `norm_sqr_at(level)` of Q15 values is the nearest |z|² in Q30 to 10^(dB/10) (a root-power kind), so
-/// `norm_sqr() >= norm_sqr_at(level)` is |z|² ≥ the level less half a step: the compare is exact up to that one
+/// `norm_sqr_at_rounded(level, NearestEven)` of Q15 values is the nearest |z|² in Q30 to 10^(dB/10) (a root-power kind), so
+/// `norm_sqr() >= norm_sqr_at_rounded(level, NearestEven)` is |z|² ≥ the level less half a step: the compare is exact up to that one
 /// rounding.
 #[cfg(not(kani))]
 pub(crate) fn norm_sqr_at(num: i64, decimals: u8, x: i16, y: i16) {
@@ -253,7 +253,7 @@ pub(crate) fn norm_sqr_at(num: i64, decimals: u8, x: i16, y: i16) {
     use exact_units::units::{Per, Volt};
     type Gamma = Complex<Per<Volt, Volt>, Pow2<-15>, i16>;
     let db = Decibels::new(num, decimals);
-    let level = Gamma::norm_sqr_at(db).get();
+    let level = Gamma::norm_sqr_at_rounded(db, Rounding::NearestEven).get();
     let exact = 10f64.powf(db.to_f64() / 10.0) * f64::from(1u32 << 30);
     assert!(
         (f64::from(level) - exact).abs() <= 0.5 + exact * 1e-12,

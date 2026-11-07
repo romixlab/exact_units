@@ -299,9 +299,9 @@ fn headers(s: &mut Svg) {
 
 pub fn db_scale() -> String {
     // the page's own numbers: the figure can't drift from them
-    const MINUS_6: Level = db!(-6);
+    const MINUS_6: Level = db!(-6, NearestEven);
     assert!(MINUS_6.get() == 501);
-    let power: Fixed<Per<Watt, Watt>, Milli, u16> = db!(-6);
+    let power: Fixed<Per<Watt, Watt>, Milli, u16> = db!(-6, NearestEven);
     assert!(power.get() == 251);
 
     let mut s = Svg::new(

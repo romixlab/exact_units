@@ -54,7 +54,7 @@ fn main() {
     assert_eq!(phase.get(), 829); // 65000 + 1365 − 65536
 
     // the mix: two voices near their peaks
-    let a: Q15 = fixed!(0.8);
+    let a: Q15 = fixed!(0.8, NearestEven);
     let b: Q15 = fixed!(0.5);
     let mixed = a + b; // saturates at the top of Q15
     println!("{a:#.3} + {b:#.3} = {mixed:#.3} (Q15 saturates)");

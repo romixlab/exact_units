@@ -6,10 +6,11 @@ level: advanced
 
 ## Exact at compile time
 
-`db!(x)` is the stored value nearest to the exact gain $10^{x/20}$ (or $10^{x/10}$). It is worked out in integers, with an error bound, at compile time:
+`db!(x)` is the exact gain $10^{x/20}$ (or $10^{x/10}$) where that is a stored value, and `db!(x, NearestEven)` (or `Floor`, `Ceil`, ...) is the stored value the named rounding picks where it isn't. It is worked out in integers, with an error bound, at compile time:
 
-- The result is the correctly rounded stored value.
-- A level too close to halfway between two stored values to decide doesn't compile, rather than being rounded the wrong way.
+- Most gains are irrational, so only a whole number of decades is a stored value: `db!(-6)` doesn't compile, and its error names the two stored values around the gain, to write as `fixed!(..)` instead or to pick with a rounding.
+- The result is the correctly rounded stored value for the rounding named.
+- A level too close to a stored value, or to halfway between two, to decide doesn't compile, rather than being rounded the wrong way.
 - A level whose gain doesn't fit the storage doesn't compile.
 
 ```rust,compile_fail
@@ -55,13 +56,13 @@ use exact_units::{Q15, db, units::{Per, Volt}};
 
 type Sample = Q15<Per<Volt, Volt>>; // a fraction of full scale
 
-const MINUS_6_DBFS: Sample = db!(-6);
+const MINUS_6_DBFS: Sample = db!(-6, NearestEven);
 assert_eq!(MINUS_6_DBFS.get(), 16423); // 0.501 · 2¹⁵
 ```
 
 ## Power of a complex value
 
-For an IQ sample or a reflection coefficient the level is of $|z|^2$, and the square root is never needed: `db!(norm_sqr x)` is the threshold on $|z|^2$.
+For an IQ sample or a reflection coefficient the level is of $|z|^2$, and the square root is never needed: `db!(norm_sqr x, Floor)` (or another rounding) is the threshold on $|z|^2$.
 
 $$
 |z| \le 10^{-15/20} \iff |z|^2 \le 10^{-15/10}
@@ -73,7 +74,7 @@ use exact_units::{CQ15, Complex, Fixed, db, prefix::{Pow2, Product}, units::{Per
 type FullScale = Per<Volt, Volt>;
 type PowerLevel = Fixed<Times<FullScale, FullScale>, Product<Pow2<-15>, Pow2<-15>>, u32>;
 
-const BUSY: PowerLevel = db!(norm_sqr -10); // −10 dBFS as |z|² in Q30
+const BUSY: PowerLevel = db!(norm_sqr -10, NearestEven); // −10 dBFS as |z|² in Q30
 
 let x: CQ15<FullScale> = Complex::of(16384, 0); // 0.5: −6 dBFS
 assert!(x.norm_sqr() >= BUSY);

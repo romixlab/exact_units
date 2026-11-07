@@ -1,6 +1,7 @@
-//! Property 7: a decimal as a stored value. [Fixed::from_decimal] is the nearest stored value, ties to even, against
-//! the exact quotient in `i128`, and panics where that doesn't fit the storage; `fixed!(literal)` is the same value,
-//! worked out at compile time.
+//! Property 7: a decimal as a stored value, against the exact quotient in `i128`. [Fixed::from_decimal] is the stored
+//! value the decimal is, and panics where it is none; [Fixed::from_decimal_rounded] is the one each [Rounding] picks;
+//! both panic where the decimal itself is past the storage, before any rounding. `fixed!(literal)` and
+//! `fixed!(literal, NearestEven)` are the same values, worked out at compile time.
 #![expect(
     clippy::as_conversions,
     reason = "a test casts the values it chose and the references it computes; the cast lints say why each fits"
@@ -30,8 +31,11 @@ pub(crate) trait Lit {
     /// The storage's greatest value.
     const MAX: i128;
 
-    /// The stored value of `from_decimal(d)`.
+    /// The stored value of `from_decimal(d)`: panics where `d` is no stored value.
     fn from_decimal(d: Decimal) -> i128;
+
+    /// The stored value of `from_decimal_rounded(d, r)`.
+    fn from_decimal_rounded(d: Decimal, r: Rounding) -> i128;
 }
 
 macro_rules! decimal_types {
@@ -49,6 +53,10 @@ macro_rules! decimal_types {
             fn from_decimal(d: Decimal) -> i128 {
                 Self::from_decimal(d).get().into()
             }
+
+            fn from_decimal_rounded(d: Decimal, r: Rounding) -> i128 {
+                Self::from_decimal_rounded(d, r).get().into()
+            }
         }
     )*};
 }
@@ -63,46 +71,118 @@ decimal_types! {
     KiloI64 = Kilo, i64, 1000, 1;
 }
 
-/// `num · 10^exp` in steps of `snum / sden`, to the nearest, ties to even; `None` where the exact quotient needs more
-/// than `i128`.
-pub(crate) fn nearest(num: i64, exp: i16, snum: i128, sden: i128) -> Option<i128> {
+/// Every rounding.
+pub(crate) const MODES: [Rounding; 5] = [
+    Rounding::Truncate,
+    Rounding::Floor,
+    Rounding::Ceil,
+    Rounding::NearestEven,
+    Rounding::NearestAway,
+];
+
+/// `num · 10^exp` in steps of `snum / sden`, rounded by `r`; `None` where the exact quotient needs more than `i128`.
+pub(crate) fn rounded(num: i64, exp: i16, snum: i128, sden: i128, r: Rounding) -> Option<i128> {
     let ten = 10i128.checked_pow(u32::from(exp.unsigned_abs()))?;
     let (p, d) = if exp >= 0 {
         (i128::from(num).checked_mul(ten)?.checked_mul(sden)?, snum)
     } else {
         (i128::from(num).checked_mul(sden)?, ten.checked_mul(snum)?)
     };
-    Some(round_div(p, d, Rounding::NearestEven))
+    Some(round_div(p, d, r))
 }
 
-/// Where the nearest stored value fits `L`'s storage, `from_decimal` is it.
+/// `num · 10^exp` in steps of `snum / sden`, to the nearest, ties to even.
+pub(crate) fn nearest(num: i64, exp: i16, snum: i128, sden: i128) -> Option<i128> {
+    rounded(num, exp, snum, sden, Rounding::NearestEven)
+}
+
+/// The decimal `num · 10^exp` lies within `L`'s storage: its floor and ceiling in steps are both stored values.
+fn within<L: Lit>(num: i64, exp: i16) -> Option<bool> {
+    let lo = rounded(num, exp, L::STEP_NUM, L::STEP_DEN, Rounding::Floor)?;
+    let hi = rounded(num, exp, L::STEP_NUM, L::STEP_DEN, Rounding::Ceil)?;
+    Some(L::MIN <= lo && hi <= L::MAX)
+}
+
+/// Where the decimal lies within `L`'s storage, `from_decimal_rounded` is the reference's rounding, for every mode,
+/// and `from_decimal` is the decimal itself where it is a stored value.
 pub(crate) fn from_decimal_fits<L: Lit>(num: i64, exp: i16) {
-    if let Some(q) = nearest(num, exp, L::STEP_NUM, L::STEP_DEN)
-        && (L::MIN..=L::MAX).contains(&q)
-    {
-        assert_eq!(L::from_decimal(Decimal::new(num, exp)), q, "{num}e{exp}");
+    if within::<L>(num, exp) != Some(true) {
+        return;
+    }
+    let d = Decimal::new(num, exp);
+    for r in MODES {
+        let q = rounded(num, exp, L::STEP_NUM, L::STEP_DEN, r);
+        assert_eq!(Some(L::from_decimal_rounded(d, r)), q, "{num}e{exp} {r:?}");
+    }
+    let lo = rounded(num, exp, L::STEP_NUM, L::STEP_DEN, Rounding::Floor);
+    if lo == rounded(num, exp, L::STEP_NUM, L::STEP_DEN, Rounding::Ceil) {
+        assert_eq!(Some(L::from_decimal(d)), lo, "{num}e{exp}");
     }
 }
 
-/// [from_decimal_fits], and a panic, never a wrong value, where the nearest stored value doesn't fit: past the
-/// storage, or past what the exact quotient can hold.
+/// [from_decimal_fits], and a panic, never a wrong value, everywhere else: `from_decimal` of a decimal that is no
+/// stored value, either of a decimal past the storage, or past what the exact quotient can hold.
 #[cfg(not(kani))]
 pub(crate) fn from_decimal_rounds<L: Lit>(num: i64, exp: i16) {
     from_decimal_fits::<L>(num, exp);
-    let got = std::panic::catch_unwind(|| L::from_decimal(Decimal::new(num, exp)));
-    match (nearest(num, exp, L::STEP_NUM, L::STEP_DEN), got) {
-        (Some(q), Ok(v)) => assert_eq!(v, q, "{num}e{exp}"),
-        (Some(q), Err(_)) => assert!(!(L::MIN..=L::MAX).contains(&q), "{num}e{exp}: {q} fits"),
-        // the reference can't hold it: whatever the crate gives fits its storage, being one
-        (None, _) => {}
+    let d = Decimal::new(num, exp);
+    let fits = within::<L>(num, exp);
+    for r in MODES {
+        let got = std::panic::catch_unwind(|| L::from_decimal_rounded(d, r));
+        match (fits, got) {
+            (Some(true), got) => assert!(got.is_ok(), "{num}e{exp} {r:?} refused"),
+            (Some(false), got) => {
+                assert!(got.is_err(), "{num}e{exp} {r:?}: past the storage, taken");
+            }
+            (None, _) => {}
+        }
+    }
+    let exact = rounded(num, exp, L::STEP_NUM, L::STEP_DEN, Rounding::Floor)
+        .zip(rounded(num, exp, L::STEP_NUM, L::STEP_DEN, Rounding::Ceil))
+        .map(|(lo, hi)| lo == hi);
+    let got = std::panic::catch_unwind(|| L::from_decimal(d));
+    match (fits, exact, got) {
+        (Some(true), Some(true), got) => assert!(got.is_ok(), "{num}e{exp} refused"),
+        (Some(_), Some(_), got) => assert!(got.is_err(), "{num}e{exp}: no stored value, taken"),
+        _ => {}
     }
 }
 
-/// A float storage's `from_decimal` is the nearest float, ties to even, as Rust's own correctly rounded parser has it:
-/// wherever that is a normal number. The ends (the largest and smallest normal numbers) are in, subnormals and
-/// overflow are a compile error, left out here.
+/// Whether the float `f` is the decimal `num · 10^exp` exactly, by integers: `None` where they need more than
+/// `i128`.
+fn float_is(num: i64, exp: i16, f: f64) -> Option<bool> {
+    let bits = f.abs().to_bits();
+    let field = i32::try_from(bits >> 52).ok()?;
+    let m = i128::from(bits & ((1 << 52) - 1) | (1 << 52));
+    let e = field - 1075;
+    if (num < 0) != (f < 0.0) {
+        return Some(false);
+    }
+    let ten = 10i128.checked_pow(u32::from(exp.unsigned_abs()))?;
+    let two = 1i128
+        .checked_shl(e.unsigned_abs())
+        .filter(|_| e.unsigned_abs() < 127)?;
+    // |num| · 10^exp == m · 2^e, each side with the negative powers moved across
+    let mut left = i128::from(num.unsigned_abs());
+    let mut right = m;
+    if exp >= 0 {
+        left = left.checked_mul(ten)?;
+    } else {
+        right = right.checked_mul(ten)?;
+    }
+    if e >= 0 {
+        right = right.checked_mul(two)?;
+    } else {
+        left = left.checked_mul(two)?;
+    }
+    Some(left == right)
+}
+
+/// A float storage's `from_decimal_rounded(.., NearestEven)` is the nearest float, ties to even, as Rust's own
+/// correctly rounded parser has it: wherever that is a normal number and the decimal is within the normal range.
+/// `Floor` and `Ceil` are the floats around it, the same float or neighbours, `Truncate` and `NearestAway` one of
+/// them; `from_decimal` is the decimal where it is a float, as integers tell, and refuses it elsewhere.
 #[cfg(not(kani))]
-#[expect(clippy::expect_used, reason = "the text is digits and an exponent")]
 pub(crate) fn float_from_decimal_is_nearest(num: i64, exp: i16) {
     // a literal whose whole value needs more than 128 bits is refused, as documented
     if exp > 0
@@ -114,18 +194,33 @@ pub(crate) fn float_from_decimal_is_nearest(num: i64, exp: i16) {
         return;
     }
     let text = format!("{num}e{exp}");
-    let want: f64 = text.parse().expect("digits and an exponent");
-    if num != 0 && want.is_normal() {
-        let got =
-            Fixed::<Ratio, exact_units::prefix::One, f64>::from_decimal(Decimal::new(num, exp));
-        assert_eq!(got.get().to_bits(), want.to_bits(), "{text} as f64");
+    let d = Decimal::new(num, exp);
+    macro_rules! check {
+        ($t:ty) => {{
+            type F = Fixed<Ratio, exact_units::prefix::One, $t>;
+            let want: $t = text.parse().expect("digits and an exponent");
+            // a decimal next to the ends of the normal range may lie past them although its nearest float doesn't
+            if num != 0 && want.is_normal() && want.abs() < <$t>::MAX && want.abs() > <$t>::MIN_POSITIVE {
+                let got = |r| F::from_decimal_rounded(d, r).get();
+                assert_eq!(got(Rounding::NearestEven).to_bits(), want.to_bits(), "{text} as {}", stringify!($t));
+                let (lo, hi) = (got(Rounding::Floor), got(Rounding::Ceil));
+                let same = lo.to_bits() == hi.to_bits();
+                assert!(same || lo.next_up().to_bits() == hi.to_bits(), "{text}: {lo} and {hi}");
+                assert!(lo <= want && want <= hi, "{text}");
+                let toward_zero = if num < 0 { hi } else { lo };
+                assert_eq!(got(Rounding::Truncate).to_bits(), toward_zero.to_bits(), "{text}");
+                let away = got(Rounding::NearestAway);
+                assert!(away.to_bits() == lo.to_bits() || away.to_bits() == hi.to_bits(), "{text}");
+                let exact = std::panic::catch_unwind(|| F::from_decimal(d).get());
+                assert_eq!(exact.is_ok(), same, "{text}: exact one way, not the other");
+                if let Some(is) = float_is(num, exp, f64::from(want)) {
+                    assert_eq!(is, same, "{text}: the integers disagree");
+                }
+            }
+        }};
     }
-    let want: f32 = text.parse().expect("digits and an exponent");
-    if num != 0 && want.is_normal() {
-        let got =
-            Fixed::<Ratio, exact_units::prefix::One, f32>::from_decimal(Decimal::new(num, exp));
-        assert_eq!(got.get().to_bits(), want.to_bits(), "{text} as f32");
-    }
+    check!(f64);
+    check!(f32);
 }
 
 /// A decimal written out parses back: `{num}e{exp}`, and with the point moved into the digits (`123.45e{exp + 2}`).
@@ -150,15 +245,16 @@ pub(crate) fn parses(num: i64, exp: i16) {
     }
 }
 
-/// `fixed!(literal)` of each type is `from_decimal` of the literal parsed at run time, and the nearest stored value.
+/// `fixed!(literal, NearestEven)` of each type is `from_decimal_rounded` of the literal parsed at run time, and the
+/// nearest stored value.
 macro_rules! literals {
     ($($ty:ident: $($lit:literal)*;)*) => {
         /// Every literal of the list.
         pub(crate) fn literals() {
             $($(
-                let at: $ty = exact_units::fixed!($lit);
+                let at: $ty = exact_units::fixed!($lit, NearestEven);
                 let d = Decimal::parse(stringify!($lit));
-                assert_eq!(at, $ty::from_decimal(d), "{}", stringify!($lit));
+                assert_eq!(at, $ty::from_decimal_rounded(d, Rounding::NearestEven), "{}", stringify!($lit));
                 assert_eq!(
                     Some(at.get().into()),
                     nearest(d.num(), d.exp(), <$ty as Lit>::STEP_NUM, <$ty as Lit>::STEP_DEN),
@@ -171,7 +267,7 @@ macro_rules! literals {
 }
 
 literals! {
-    Q15: 0 0.1 -0.1 0.5 -0.5 -1 0.7071 0.99996948 0.999984741 1.52587890625e-5 -1.52587890625e-5 4.57763671875e-5
+    Q15: 0 0.1 -0.1 0.5 -0.5 -1 0.7071 0.99996948 1.52587890625e-5 -1.52587890625e-5 4.57763671875e-5
         0.999969482421875 -0.999969482421875 1e-10 -1e-10 0.333333333333333333;
     Q31: 0.1 -1 0.999999999 2.3283064365386962e-10 6.984919309616088e-10 -0.75 1e-18;
     Q63: 0.1 -1 0.5 -0.999999999999999999 1.0842021724855044e-19 0.333333333333333333;
@@ -179,6 +275,32 @@ literals! {
     ThirdI16: 2.5 3.5 -2.5 -3.5 0.5 -0.5 1e-1 10922.3333 -10922.6666 0.16666666666666667;
     ThirdU16: 2.5 3.5 0.5 0.1666 21845 0;
     KiloI64: 500 1500 2500 -500 -2500 1e18 -9.2233720368547758e21 0.4999e3 5e2;
+}
+
+/// `fixed!(literal)` without a rounding of a literal that is a stored value: its whole decimal, however long, reads
+/// back as that value. The long ones are what the compile error of an inexact literal prints.
+macro_rules! exact_literals {
+    ($($ty:ident: $($lit:literal => $stored:expr),*;)*) => {
+        /// Every literal of the list.
+        pub(crate) fn exact_literals() {
+            $($(
+                let at: $ty = exact_units::fixed!($lit);
+                assert_eq!(i128::from(at.get()), $stored, "{}", stringify!($lit));
+            )*)*
+        }
+    };
+}
+
+exact_literals! {
+    Q15: 0.5 => 16_384, -1 => -32_768, 3.0517578125e-5 => 1, 0.999969482421875 => 32_767,
+        0.70709228515625 => 23_170, 0.707122802734375 => 23_171;
+    Q31: 0.1000000000931322574615478515625 => 214_748_365, -0.75 => -1_610_612_736;
+    Q63: 1.084202172485504434007452800869941711425781250e-19 => 1,
+        0.100000000000000000021684043449710088680149056017398834228515625 => 922_337_203_685_477_581,
+        -1 => i128::from(i64::MIN);
+    MilliI32: 2147483.647 => 2_147_483_647, 2e-3 => 2;
+    ThirdI16: 1e1 => 30;
+    KiloI64: 1e18 => 1_000_000_000_000_000, -2e3 => -2;
 }
 
 #[cfg(not(kani))]
@@ -228,6 +350,7 @@ mod tests {
     #[test]
     fn every_literal() {
         literals();
+        exact_literals();
     }
 }
 

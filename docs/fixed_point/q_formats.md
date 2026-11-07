@@ -56,7 +56,7 @@ Q15 is `Saturating`: `+` and `-` stop at the ends instead of wrapping. Two voice
 ```rust
 use exact_units::{Q15, fixed, units::Ratio};
 
-let a: Q15<Ratio> = fixed!(0.8);
+let a: Q15<Ratio> = fixed!(0.8, NearestEven);
 let b: Q15<Ratio> = fixed!(0.5);
 assert_eq!((a + b).get(), i16::MAX);            // 1 − 2⁻¹⁵: a clipped peak
 assert_eq!(26214i16.wrapping_add(16384), -22938); // a plain i16 flips to −0.7: a click

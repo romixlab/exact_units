@@ -17,7 +17,7 @@
 //! # #[cfg(feature = "electrical")] {
 //! use exact_units::{Fixed, db, prefix::Milli, units::{Per, Volt}};
 //! type Gain = Fixed<Per<Volt, Volt>, Milli, u16>;
-//! const HALF_POWER: Gain = db!(-3.0103);
+//! const HALF_POWER: Gain = db!(-3.0103, NearestEven);
 //! assert_eq!(HALF_POWER.get(), 707); // 0.707 V/V
 //! const PLUS_20: Gain = Gain::from_db_const(exact_units::decibel::Decibels::new(20, 0));
 //! assert_eq!(PLUS_20.get(), 10_000);
@@ -26,7 +26,12 @@
 
 pub(crate) mod exact;
 
-use crate::{Bounds, Fixed, FixedScale, LevelForm, Unit};
+use crate::literal::Source;
+use crate::literal::big::Big;
+use crate::literal::mode::Mode;
+use crate::literal::steps::{Abs, Src, Value};
+use crate::{Bounds, Fixed, FixedScale, LevelForm, Rounding, Unit};
+use core::marker::PhantomData;
 
 /// A level in dB as a decimal, `num · 10^-decimals`: what [db!](crate::db) parses its literal into.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -246,28 +251,40 @@ impl Nepers {
     }
 }
 
-/// A gain at a level in dB, worked out at compile time: `db!(-3.01)` is the [Fixed] its context names, holding the
-/// stored value nearest to the exact gain. It is an associated const ([AtLevel]), so nothing of it runs at run time;
-/// [Fixed::from_db_const] is the same as a `const fn`, for a level that isn't a literal.
+/// A gain at a level in dB, worked out at compile time: `db!(20)` is the [Fixed] its context names, holding the
+/// exact gain where it is a stored value. A gain that isn't, every level that isn't a whole number of decades (its
+/// gain is irrational), names a rounding: `db!(6, NearestEven)`; without one the compile error names the two stored
+/// values around the gain, to write as `fixed!(..)` instead. It is an associated const ([AtLevel]), so nothing of it
+/// runs at run time; [Fixed::from_db_const] and [Fixed::from_db_const_rounded] are the same as `const fn`s, for a
+/// level that isn't a literal.
 ///
-/// `db!(norm_sqr -15)` is the |z|² of a complex value at that level, a threshold for
+/// `db!(norm_sqr -15, Floor)` is the |z|² of a complex value at that level, a threshold for
 /// [Complex::norm_sqr](crate::Complex::norm_sqr) ([the level module](crate::complex::level)).
 ///
 /// ```
 /// # #[cfg(feature = "electrical")] {
-/// use exact_units::{Fixed, db, prefix::{Micro, One}, units::{Per, Volt, Watt}};
-/// let g: Fixed<Per<Volt, Volt>, Micro, u32> = db!(6);
+/// use exact_units::{Fixed, db, prefix::{Micro, Milli, One}, units::{Per, Volt, Watt}};
+/// let ten: Fixed<Per<Volt, Volt>, Milli, u32> = db!(20);
+/// assert_eq!(ten.get(), 10_000); // exactly 10 V/V
+/// let g: Fixed<Per<Volt, Volt>, Micro, u32> = db!(6, NearestEven);
 /// assert_eq!(g.get(), 1_995_262); // 10^(6/20) = 1.9952623..
-/// let p: Fixed<Per<Watt, Watt>, One, f32> = db!(-3);
+/// let p: Fixed<Per<Watt, Watt>, One, f32> = db!(-3, NearestEven);
 /// assert_eq!(p.get(), 0.5011872);
 /// # }
 /// ```
 ///
-/// A kind without a level form doesn't compile, nor does a level whose gain doesn't fit the storage:
+/// A gain that isn't a stored value doesn't compile without a rounding, nor does a kind without a level form or a
+/// level whose gain doesn't fit the storage:
+///
+/// ```compile_fail
+/// # #[cfg(not(feature = "electrical"))] compile_error!("needs electrical");
+/// use exact_units::{Fixed, db, prefix::Micro, units::{Per, Volt}};
+/// let _: Fixed<Per<Volt, Volt>, Micro, u32> = db!(6); // 1995262 = 1.995262 and 1995263 = 1.995263
+/// ```
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, db, prefix::One, units::Ratio};
-/// let _: Fixed<Ratio, One, u16> = db!(-3);
+/// let _: Fixed<Ratio, One, u16> = db!(-3, NearestEven);
 /// ```
 ///
 /// ```compile_fail
@@ -277,33 +294,46 @@ impl Nepers {
 /// ```
 #[macro_export]
 macro_rules! db {
+    (norm_sqr $level:literal, $mode:ident $(,)?) => {
+        $crate::__level_at!(::core::concat!("norm_sqr ", ::core::stringify!($level)); $level; NormSqrLevel; $mode)
+    };
     (norm_sqr $level:literal) => {
-        <_ as $crate::decibel::AtLevel<
-            $crate::decibel::NormSqrLevel<
-                { $crate::decibel::Decibels::parse(stringify!($level)).num() },
-                { $crate::decibel::Decibels::parse(stringify!($level)).decimals() },
-            >,
-        >>::AT
+        $crate::__level_at!(::core::concat!("norm_sqr ", ::core::stringify!($level)); $level; NormSqrLevel; Unrounded)
+    };
+    ($level:literal, $mode:ident $(,)?) => {
+        $crate::__level_at!(::core::stringify!($level); $level; Level; $mode)
     };
     ($level:literal) => {
-        <_ as $crate::decibel::AtLevel<
-            $crate::decibel::Level<
-                { $crate::decibel::Decibels::parse(stringify!($level)).num() },
-                { $crate::decibel::Decibels::parse(stringify!($level)).decimals() },
-            >,
-        >>::AT
+        $crate::__level_at!(::core::stringify!($level); $level; Level; Unrounded)
     };
 }
 
-/// The |z|² of a complex value at a level in dB as a type: what `db!(norm_sqr -15)` names, a threshold for
-/// [Complex::norm_sqr](crate::Complex::norm_sqr) ([Complex::norm_sqr_at](crate::Complex::norm_sqr_at)).
-#[derive(Debug)]
-pub struct NormSqrLevel<const NUM: i64, const DECIMALS: u8>;
+/// `db!`'s and `np!`'s expansion: a source type for the level and the gain the carrier `$carrier` names.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __level_at {
+    ($args:expr; $value:literal; $carrier:ident; $mode:ident) => {{
+        struct __Level;
+        impl $crate::literal::Source for __Level {
+            const VALUE: &'static str = ::core::stringify!($value);
+            const ARGS: &'static str = $args;
+        }
+        <_ as $crate::decibel::AtLevel<
+            $crate::decibel::$carrier<__Level, $crate::literal::mode::$mode>,
+        >>::AT
+    }};
+}
 
-/// A level in dB as a type, `NUM · 10^-DECIMALS` dB: what [db!](crate::db) names, so the storage of the [Fixed] can
-/// come from the context.
+/// The |z|² of a complex value at a level in dB as a type, `L` its source and `M` its rounding: what
+/// `db!(norm_sqr -15, Floor)` names, a threshold for [Complex::norm_sqr](crate::Complex::norm_sqr)
+/// ([Complex::norm_sqr_at](crate::Complex::norm_sqr_at)).
 #[derive(Debug)]
-pub struct Level<const NUM: i64, const DECIMALS: u8>;
+pub struct NormSqrLevel<L, M>(PhantomData<(L, M)>);
+
+/// A level in dB as a type, `L` its source and `M` its rounding: what [db!](crate::db) names, so the storage of the
+/// [Fixed] can come from the context.
+#[derive(Debug)]
+pub struct Level<L, M>(PhantomData<(L, M)>);
 
 /// The gain at level `L` as an associated const, worked out at compile time ([Fixed::from_db_const]): what
 /// [db!](crate::db) reads, for every [Fixed] with an integer or float storage.
@@ -312,189 +342,195 @@ pub trait AtLevel<L>: Sized {
     const AT: Self;
 }
 
-/// A gain at a level in nepers, worked out at compile time: `np!(-0.5)` is the [Fixed] its context names, holding the
-/// stored value nearest to `e^(Np)` for a root-power ratio (V/V) and to `e^(2·Np)` for a power ratio (W/W). Like
-/// [db!](crate::db) it is an associated const, nothing of it runs at run time; [Fixed::from_np_const] is the same as
-/// a `const fn`.
+/// A gain at a level in nepers, worked out at compile time: `np!(0)` is the [Fixed] its context names, holding 1;
+/// every other level's gain, `e^(Np)` for a root-power ratio (V/V) and `e^(2·Np)` for a power ratio (W/W), is
+/// irrational and names a rounding: `np!(-1, NearestEven)`. Like [db!](crate::db) it is an associated const, nothing
+/// of it runs at run time; [Fixed::from_np_const] and [Fixed::from_np_const_rounded] are the same as `const fn`s.
 ///
 /// ```
 /// # #[cfg(feature = "electrical")] {
 /// use exact_units::{Fixed, np, prefix::{Micro, One}, units::{Per, Volt, Watt}};
-/// let g: Fixed<Per<Volt, Volt>, Micro, u32> = np!(-1);
+/// let g: Fixed<Per<Volt, Volt>, Micro, u32> = np!(-1, NearestEven);
 /// assert_eq!(g.get(), 367_879); // 1/e = 0.3678794..
-/// let p: Fixed<Per<Watt, Watt>, One, f32> = np!(-1);
+/// let p: Fixed<Per<Watt, Watt>, One, f32> = np!(-1, NearestEven);
 /// assert_eq!(p.get(), 0.13533528); // 1/e²
 /// # }
 /// ```
 ///
-/// A kind without a level form doesn't compile, nor does a level whose gain doesn't fit the storage:
+/// A gain that isn't a stored value doesn't compile without a rounding, nor does a kind without a level form or a
+/// level whose gain doesn't fit the storage:
+///
+/// ```compile_fail
+/// # #[cfg(not(feature = "electrical"))] compile_error!("needs electrical");
+/// use exact_units::{Fixed, np, prefix::Micro, units::{Per, Volt}};
+/// let _: Fixed<Per<Volt, Volt>, Micro, u32> = np!(-1);
+/// ```
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, np, prefix::One, units::Ratio};
-/// let _: Fixed<Ratio, One, u16> = np!(-1);
+/// let _: Fixed<Ratio, One, u16> = np!(-1, NearestEven);
 /// ```
 ///
 /// ```compile_fail
 /// # #[cfg(not(feature = "electrical"))] compile_error!("needs electrical");
 /// use exact_units::{Fixed, np, prefix::Milli, units::{Per, Volt}};
-/// let _: Fixed<Per<Volt, Volt>, Milli, u16> = np!(5); // e^5 = 148.4 V/V is 148_413 mV/V
+/// let _: Fixed<Per<Volt, Volt>, Milli, u16> = np!(5, NearestEven); // e^5 = 148.4 V/V is 148_413 mV/V
 /// ```
 #[macro_export]
 macro_rules! np {
+    ($level:literal, $mode:ident $(,)?) => {
+        $crate::__level_at!(::core::stringify!($level); $level; NeperLevel; $mode)
+    };
     ($level:literal) => {
-        <_ as $crate::decibel::AtLevel<
-            $crate::decibel::NeperLevel<
-                { $crate::decibel::Nepers::parse(stringify!($level)).num() },
-                { $crate::decibel::Nepers::parse(stringify!($level)).decimals() },
-            >,
-        >>::AT
+        $crate::__level_at!(::core::stringify!($level); $level; NeperLevel; Unrounded)
     };
 }
 
-/// A level in Np as a type, `NUM · 10^-DECIMALS` Np: what [np!](crate::np) names.
+/// A level in Np as a type, `L` its source and `M` its rounding: what [np!](crate::np) names.
 #[derive(Debug)]
-pub struct NeperLevel<const NUM: i64, const DECIMALS: u8>;
+pub struct NeperLevel<L, M>(PhantomData<(L, M)>);
 
-/// The exact gain of `db` in units of `P · U` as an interval, or a compile error for a scale that isn't a fraction of
-/// integers.
+/// The scale of `P · U` as `(num, den)`, or a compile error for one that isn't a fraction of integers.
 #[expect(
     clippy::panic,
-    reason = "a compile error in const code (a panic at run time), as documented: a kind without a level form"
+    reason = "a compile error in const code (a panic at run time), as documented: a scale with π or a root in it"
 )]
-pub(crate) const fn gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) -> exact::Interval {
+const fn level_scale<U: Unit, P: FixedScale>() -> (u128, u128) {
     let Some(unit) = U::EXPR.magnitude() else {
         panic!("a level needs an exact scale")
     };
-    let Some((num, den)) = P::SCALE.mul(unit).to_ratio() else {
+    let Some(ratio) = P::SCALE.mul(unit).to_ratio() else {
         panic!("a level at compile time needs a scale that is a fraction of integers")
     };
+    ratio
+}
+
+/// `10^k · den / num` exactly, for a level a whole number of decades from 0 dB, `|k| <= 1000`.
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented: a value past what an exact value holds"
+)]
+#[expect(
+    clippy::as_conversions,
+    clippy::cast_possible_truncation,
+    reason = "const fn: From is not const on stable; |k| <= 1000, the callers' bound"
+)]
+const fn decades(k: i64, num: u128, den: u128) -> Value {
+    let Some(ten) = Big::pow10(k.unsigned_abs() as u32) else {
+        panic!("this value is too large for its storage")
+    };
+    let (p, q) = if k >= 0 {
+        (ten.mul(&Big::of(den)), Some(Big::of(num)))
+    } else {
+        (Some(Big::of(den)), ten.mul(&Big::of(num)))
+    };
+    let (Some(p), Some(q)) = (p, q) else {
+        panic!("this value is too large for its storage")
+    };
+    Value::ratio(false, &p, &q)
+}
+
+/// The exact gain of `db` in stored values of `P · U`: a fraction of integers for a whole number of decades, an
+/// interval around an irrational gain otherwise.
+pub(crate) const fn gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) -> Value {
+    let (num, den) = level_scale::<U, P>();
     let (n, d) = db.exponent(form);
-    // the value in units of the scale: 10^(n/d) / (num / den)
-    exact::Interval::level(n, d, num, den)
+    // past 10^±1000 the interval says as much (too large, or below every stored value but 0)
+    if d == 1 && n.unsigned_abs() <= 1000 {
+        return decades(n, num, den);
+    }
+    Value {
+        neg: false,
+        abs: Abs::Irrational(exact::Interval::level(n, d, num, den)),
+    }
 }
 
-/// The exact gain of `np` in units of `P · U` as an interval, like [gain].
-#[expect(
-    clippy::panic,
-    reason = "a compile error in const code (a panic at run time), as documented: a kind without a level form"
-)]
-pub(crate) const fn gain_np<U: Unit, P: FixedScale>(
-    np: Nepers,
-    form: LevelForm,
-) -> exact::Interval {
-    let Some(unit) = U::EXPR.magnitude() else {
-        panic!("a level needs an exact scale")
-    };
-    let Some((num, den)) = P::SCALE.mul(unit).to_ratio() else {
-        panic!("a level at compile time needs a scale that is a fraction of integers")
-    };
+/// The exact gain of `np` in stored values of `P · U`, like [gain]: 1 for 0 Np, an interval around an irrational
+/// gain otherwise.
+pub(crate) const fn gain_np<U: Unit, P: FixedScale>(np: Nepers, form: LevelForm) -> Value {
+    let (num, den) = level_scale::<U, P>();
     let (k, r, d) = np.exponent(form);
-    exact::Interval::neper(k, r, d, num, den)
+    if k == 0 && r == 0 {
+        return decades(0, num, den);
+    }
+    Value {
+        neg: false,
+        abs: Abs::Irrational(exact::Interval::neper(k, r, d, num, den)),
+    }
 }
 
-/// `from_db_const` per storage: the integers through `bounded`, the floats checked against `B` here.
+/// `from_db_const` per storage.
 macro_rules! from_db_const {
-    (int $($ty:ident)*) => {$(
+    ($($ty:ident)*) => {$(
         impl<U: Unit, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
-            /// The gain at `db`, rounded to the nearest stored value (ties to even) at compile time: see the
-            /// [module](crate::decibel). A compile error in `const` code (a panic at run time) for a kind without a
-            /// level form, a gain that doesn't fit `T` or `B`, or one too close to halfway between two stored values
-            /// to decide.
-            #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
+            /// The gain at `db` at compile time, where it is a stored value: see the [module](crate::decibel). A
+            /// compile error in `const` code (a panic at run time) for a gain that isn't one (every level that isn't
+            /// a whole number of decades), a kind without a level form, or a gain that doesn't fit `T` or `B`;
+            /// [from_db_const_rounded](Self::from_db_const_rounded) names a rounding.
             pub const fn from_db_const(db: Decibels) -> Self {
-                let x = gain::<U, P>(db, Self::LEVEL_FORM).to_int();
-                if x > $ty::MAX as u128 {
-                    panic!("this level is too large for its storage");
-                }
-                #[expect(clippy::cast_possible_truncation, reason = "checked against the storage's MAX above")]
-                let x = x as $ty;
-                Self::bounded(x)
+                Self::of_value(
+                    &gain::<U, P>(db, Self::LEVEL_FORM),
+                    None,
+                    &Src::Fn { name: "Fixed::from_db_const" },
+                )
             }
 
-            /// The gain at `np` nepers, rounded to the nearest stored value (ties to even) at compile time: the
-            /// stored value nearest to `e^np` for a root-power ratio, `e^(2·np)` for a power ratio. A compile error
-            /// in `const` code (a panic at run time) for a kind without a level form, a gain that doesn't fit `T`
-            /// or `B`, or one too close to halfway between two stored values to decide.
-            #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
+            /// The gain at `db`, rounded by `r` to a stored value at compile time. A compile error in `const` code
+            /// (a panic at run time) for a kind without a level form, a gain that doesn't fit `T` or `B`, or one too
+            /// close to a stored value (or halfway between two) to decide.
+            pub const fn from_db_const_rounded(db: Decibels, r: Rounding) -> Self {
+                Self::of_value(
+                    &gain::<U, P>(db, Self::LEVEL_FORM),
+                    Some(r),
+                    &Src::Fn { name: "Fixed::from_db_const" },
+                )
+            }
+
+            /// The gain at `np` nepers at compile time, where it is a stored value: only 0 Np's, 1. A compile error
+            /// in `const` code (a panic at run time) for any other, a kind without a level form, or a gain that
+            /// doesn't fit `T` or `B`; [from_np_const_rounded](Self::from_np_const_rounded) names a rounding.
             pub const fn from_np_const(np: Nepers) -> Self {
-                let x = gain_np::<U, P>(np, Self::LEVEL_FORM).to_int();
-                if x > $ty::MAX as u128 {
-                    panic!("this level is too large for its storage");
-                }
-                #[expect(clippy::cast_possible_truncation, reason = "checked against the storage's MAX above")]
-                let x = x as $ty;
-                Self::bounded(x)
+                Self::of_value(
+                    &gain_np::<U, P>(np, Self::LEVEL_FORM),
+                    None,
+                    &Src::Fn { name: "Fixed::from_np_const" },
+                )
+            }
+
+            /// The gain at `np` nepers, rounded by `r` to a stored value at compile time: `e^np` for a root-power
+            /// ratio, `e^(2·np)` for a power ratio. A compile error in `const` code (a panic at run time) for a kind
+            /// without a level form, a gain that doesn't fit `T` or `B`, or one too close to a stored value (or
+            /// halfway between two) to decide.
+            pub const fn from_np_const_rounded(np: Nepers, r: Rounding) -> Self {
+                Self::of_value(
+                    &gain_np::<U, P>(np, Self::LEVEL_FORM),
+                    Some(r),
+                    &Src::Fn { name: "Fixed::from_np_const" },
+                )
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, const N: i64, const D: u8> AtLevel<NeperLevel<N, D>>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, L: Source, M: Mode> AtLevel<NeperLevel<L, M>>
             for Fixed<U, P, $ty, B>
         {
-            const AT: Self = Self::from_np_const(Nepers::new(N, D));
+            const AT: Self = {
+                let value = gain_np::<U, P>(Nepers::parse(L::VALUE), Self::LEVEL_FORM);
+                Self::of_value(&value, M::ROUNDING, &Src::Macro { name: "np!", args: L::ARGS, direct: false })
+            };
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, const N: i64, const D: u8> AtLevel<Level<N, D>>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, L: Source, M: Mode> AtLevel<Level<L, M>>
             for Fixed<U, P, $ty, B>
         {
-            const AT: Self = Self::from_db_const(Decibels::new(N, D));
-        }
-    )*};
-    (float $($ty:ident $to:ident)*) => {$(
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
-            /// The gain at `db`, the nearest float (ties to even) at compile time: see the
-            /// [module](crate::decibel). A compile error in `const` code (a panic at run time) for a kind without a
-            /// level form or a gain outside `B` or the float's normal range.
-            pub const fn from_db_const(db: Decibels) -> Self {
-                let x = gain::<U, P>(db, Self::LEVEL_FORM).$to();
-                if let Some(min) = B::MIN
-                    && x < min
-                {
-                    panic!("value below its bound");
-                }
-                if let Some(max) = B::MAX
-                    && x > max
-                {
-                    panic!("value above its bound");
-                }
-                Self::new_unchecked(x)
-            }
-
-            /// The gain at `np` nepers, the nearest float (ties to even) at compile time: `e^np` for a
-            /// root-power ratio, `e^(2·np)` for a power ratio. A compile error in `const` code (a panic at run
-            /// time) for a kind without a level form or a gain outside `B` or the float's normal range.
-            pub const fn from_np_const(np: Nepers) -> Self {
-                let x = gain_np::<U, P>(np, Self::LEVEL_FORM).$to();
-                if let Some(min) = B::MIN
-                    && x < min
-                {
-                    panic!("value below its bound");
-                }
-                if let Some(max) = B::MAX
-                    && x > max
-                {
-                    panic!("value above its bound");
-                }
-                Self::new_unchecked(x)
-            }
-        }
-
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, const N: i64, const D: u8> AtLevel<NeperLevel<N, D>>
-            for Fixed<U, P, $ty, B>
-        {
-            const AT: Self = Self::from_np_const(Nepers::new(N, D));
-        }
-
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, const N: i64, const D: u8> AtLevel<Level<N, D>>
-            for Fixed<U, P, $ty, B>
-        {
-            const AT: Self = Self::from_db_const(Decibels::new(N, D));
+            const AT: Self = {
+                let value = gain::<U, P>(Decibels::parse(L::VALUE), Self::LEVEL_FORM);
+                Self::of_value(&value, M::ROUNDING, &Src::Macro { name: "db!", args: L::ARGS, direct: false })
+            };
         }
     )*};
 }
 
-from_db_const!(int u8 u16 u32 u64 i8 i16 i32 i64);
-
-from_db_const!(float f32 to_f32 f64 to_f64);
+from_db_const!(u8 u16 u32 u64 i8 i16 i32 i64 f32 f64);
 
 #[cfg(any(feature = "std", feature = "libm"))]
 use crate::num::math;

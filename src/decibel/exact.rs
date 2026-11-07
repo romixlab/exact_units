@@ -30,6 +30,21 @@ impl Num {
         }
     }
 
+    /// `x · 2^e`, for `x != 0`.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "callers pass shifts of a few thousand at most (a Big's bits, a float's exponent), far from i64's ends"
+    )]
+    const fn scaled(x: u128, e: i64) -> Num {
+        let n = Num::of(x);
+        Num { m: n.m, e: n.e + e }
+    }
+
+    /// `self < rhs`.
+    const fn lt(self, rhs: Num) -> bool {
+        !rhs.le(self)
+    }
+
     /// `self ≤ rhs`.
     const fn le(self, rhs: Num) -> bool {
         self.e < rhs.e || (self.e == rhs.e && self.m <= rhs.m)
@@ -137,7 +152,6 @@ impl Num {
     }
 
     /// The integer part, `None` from 2¹²⁷ on.
-    #[cfg(feature = "q")]
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
@@ -164,6 +178,7 @@ impl Num {
     }
 
     /// The nearest integer, ties to even; `None` above `u128`.
+    #[cfg(test)]
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
@@ -203,6 +218,7 @@ impl Num {
     /// The nearest binary float with `bits` of mantissa (the hidden one included) and exponents down to `min_exp`
     /// for its leading bit and up to `max_exp`, ties to even: `(mantissa, exponent of its leading bit)`. `None`
     /// outside the normal range.
+    #[cfg(test)]
     #[expect(
         clippy::arithmetic_side_effects,
         reason = "bits is 24 or 53 (to_f32, to_f64), so s is 75..=104; mant = m >> s is below 2^bits; exponents stay below 2^62 in size: the largest power is 10^(i64::MAX / 10) in Interval::level, about 2^(3.1 * 10^18)"
@@ -230,7 +246,6 @@ impl Num {
     /// The largest binary float at or below `self`, with `bits` of mantissa (the hidden one included), exponents of
     /// its leading bit from `1 - max_exp` to `max_exp` and subnormals below: its IEEE 754 bits (the largest finite
     /// float's above that range), and whether it is `self`.
-    #[cfg(feature = "q")]
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
@@ -305,6 +320,22 @@ const fn mul_wide(a: u128, b: u128) -> (u128, u128) {
     let lo = (mid << 64) | (p00 & LOW);
     let hi = p11 + (p01 >> 64) + (p10 >> 64) + (mid >> 64);
     (hi, lo)
+}
+
+/// Where an exact value lies against the stored values: its floor (an integer, or a float's IEEE 754 bits), whether it
+/// is that value, and against the point halfway to the next one: -1 below it, 0 at it, 1 above it, 2 where the
+/// interval doesn't tell.
+#[derive(Copy, Clone)]
+pub(crate) enum Around {
+    At {
+        floor: u128,
+        exact: bool,
+        half: i8,
+    },
+    /// A stored value lies between the ends of the interval: too close to decide.
+    Undecided,
+    /// Past `u128`.
+    TooLarge,
 }
 
 /// A closed interval `[lo, hi]` that holds the exact value.
@@ -522,6 +553,106 @@ impl Interval {
         x.mul(Interval::exact(den)).div(Interval::exact(num))
     }
 
+    /// `p / q` from the top bits of two big integers ([Big::top128](crate::literal::big::Big::top128)): `(m, s,
+    /// below)` is `m · 2^s`, plus less than `2^s` more where `below`. Both nonzero.
+    pub(crate) const fn of_top_bits(p: (u128, i64, bool), q: (u128, i64, bool)) -> Interval {
+        let p_lo = Num::scaled(p.0, p.1);
+        let q_lo = Num::scaled(q.0, q.1);
+        let p_hi = Num::bump(p_lo.m, p_lo.e, p.2);
+        let q_hi = Num::bump(q_lo.m, q_lo.e, q.2);
+        Interval {
+            lo: p_lo.div(q_hi, false),
+            hi: p_hi.div(q_lo, true),
+        }
+    }
+
+    /// Where `mid` lies against the interval: -1 for the whole interval below it, 1 above it, 0 where both ends
+    /// are it, 2 where it lies inside (the interval doesn't tell).
+    const fn half_against(self, mid: Num) -> i8 {
+        if self.hi.lt(mid) {
+            -1
+        } else if mid.lt(self.lo) {
+            1
+        } else if self.lo.le(mid) && mid.le(self.lo) && self.hi.le(mid) {
+            0
+        } else {
+            2
+        }
+    }
+
+    /// The integer part of an irrational value (π, a root, a power of 10 or e that isn't whole) and where the value
+    /// lies against it plus ½, without a panic: what a literal's or a level's stored value is rounded from
+    /// ([Around]).
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a < 2^127 is checked first, so 2 · a + 1 fits u128"
+    )]
+    pub(crate) const fn int_around(self) -> Around {
+        let (Some(a), Some(b)) = (self.lo.floor_int(), self.hi.floor_int()) else {
+            return Around::TooLarge;
+        };
+        if a != b {
+            return Around::Undecided;
+        }
+        if a >= 1 << 127 {
+            return Around::TooLarge;
+        }
+        Around::At {
+            floor: a,
+            // only an irrational value comes here: a rational one is worked out exactly (literal::big)
+            exact: false,
+            half: self.half_against(Num::scaled(2 * a + 1, -1)),
+        }
+    }
+
+    /// The largest float at or below the exact value ([Num::float_floor]: its IEEE 754 bits, the largest finite
+    /// float's past the range) and where the value lies against the point halfway to the next float, without a
+    /// panic.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "lo is at most the largest finite float's bits, so lo + 1 fits; bits is 24 or 53 and max_exp 127 or 1023, so the exponents and 2 · m + 1 are small"
+    )]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the exponent field is below 2^11"
+    )]
+    pub(crate) const fn float_around(self, bits: u32, max_exp: i64) -> Around {
+        let (lo, exact) = self.lo.float_floor(bits, max_exp);
+        let same = self.lo.le(self.hi) && self.hi.le(self.lo);
+        if !same {
+            match self.hi.float_floor(bits, max_exp) {
+                (hi, _) if hi == lo => {}
+                (hi, true) if hi == lo + 1 => {}
+                _ => return Around::Undecided,
+            }
+        }
+        let frac = bits - 1;
+        let field = (lo >> frac) as i64;
+        let (m, e) = if field == 0 {
+            (lo & ((1 << frac) - 1), 1 - max_exp - frac as i64)
+        } else {
+            (
+                (lo & ((1 << frac) - 1)) | (1 << frac),
+                field - max_exp - frac as i64,
+            )
+        };
+        let half = if m == 0 {
+            // below the least subnormal: the caller refuses it as below the normal range
+            2
+        } else {
+            self.half_against(Num::scaled(2 * m + 1, e - 1))
+        };
+        Around::At {
+            floor: lo,
+            exact: same && exact,
+            half,
+        }
+    }
+
     /// The integer part, the same for both ends, or a compile error: what `q!` compares against.
     #[cfg(feature = "q")]
     #[expect(
@@ -566,23 +697,8 @@ impl Interval {
         }
     }
 
-    /// The nearest integer, the same for both ends, or a compile error.
-    #[expect(
-        clippy::panic,
-        reason = "a compile error in const code (a panic at run time), as documented: a gain past u128 or too close to a tie to decide"
-    )]
-    pub(crate) const fn to_int(self) -> u128 {
-        match (self.lo.round_int(), self.hi.round_int()) {
-            (Some(a), Some(b)) if a == b => a,
-            (Some(_), Some(_)) => panic!(
-                "this level is too close to halfway between two stored values to round at compile time: write \
-                 one more decimal"
-            ),
-            _ => panic!("this level is too large for its storage"),
-        }
-    }
-
     /// The nearest `f64`, ties to even.
+    #[cfg(test)]
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
@@ -606,6 +722,7 @@ impl Interval {
     }
 
     /// The nearest `f32`, ties to even.
+    #[cfg(test)]
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
@@ -628,10 +745,7 @@ impl Interval {
         f32::from_bits(bits)
     }
 
-    #[expect(
-        clippy::panic,
-        reason = "a compile error in const code (a panic at run time), as documented: a float too close to a tie to decide or outside the normal range"
-    )]
+    #[cfg(test)]
     const fn same_float(lo: Option<(u128, i64)>, hi: Option<(u128, i64)>) -> (u128, i64) {
         match (lo, hi) {
             (Some(a), Some(b)) if a.0 == b.0 && a.1 == b.1 => a,

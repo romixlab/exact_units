@@ -1,20 +1,12 @@
 error[E0080]: evaluation panicked: a literal's unit converts only between units of the same dimension: Meter (m) is m, not Speed (m/s) which is m·s⁻¹; they differ by s
  --> src/literal.rs
   |
-  |             const AT: Self = Self::from_decimal_in::<S>(Decimal::new(N, E));
-  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::Fixed<exact_units::units::Speed, exact_units::prefix::Centi, i16> as exact_units::literal::AtLiteral<exact_units::literal::LiteralIn<1, 2, exact_units::units::Meter>>>::AT` failed inside this call
+  |                 let value = Value::of_literal_any(&BigDecimal::of(Q::VALUE), scale_in::<Q::Unit, U, P>());
+  |                                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::Fixed<exact_units::units::Speed, exact_units::prefix::Centi, i16> as exact_units::literal::AtLiteral<exact_units::literal::LitSymbols<main::__Literal, exact_units::literal::LiteralIn<1, 2, exact_units::units::Meter>, exact_units::literal::mode::Unrounded>>>::AT` failed inside this call
 ...
   | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
   | ------------------------------------------------ in this macro invocation
   |
-note: inside `literal::<impl Fixed<Speed, exact_units::prefix::Centi, i16>>::from_decimal_in::<Meter>`
- --> src/literal.rs
-  |
-  |                 Self::of_literal(x.to_int_any(scale_in::<S, U, P>()))
-  |                                               ^^^^^^^^^^^^^^^^^^^^^
-...
-  | from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
-  | ------------------------------------------------ in this macro invocation
 note: inside `literal::scale_in::<Meter, Speed, exact_units::prefix::Centi>`
  --> src/literal.rs
   |
@@ -37,4 +29,4 @@ note: erroneous constant encountered
 5 |     let _: Fixed<Speed, Centi, i16> = fixed!(100 m);
   |                                       ^^^^^^^^^^^^^
   |
-  = note: this note originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+  = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)

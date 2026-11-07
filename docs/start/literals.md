@@ -22,29 +22,49 @@ A constant in Q15 or in steps of 3.3 V / 4096 is a number nobody wants to work o
 use exact_units::{Fixed, Q15, fixed, prefix::{Milli, Pow2}, units::{Ratio, Volt}};
 
 const HALF: Q15<Ratio> = fixed!(0.5);
-const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1);
 const LIMIT: Fixed<Volt, Milli, u16> = fixed!(3.3);
+const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1, NearestEven);
 
 assert_eq!(HALF.get(), 16384);        // 0.5 · 2¹⁵
-assert_eq!(BUSY.get(), 107_374_182);  // 0.1 · 2³⁰ = 107374182.4, rounded
 assert_eq!(LIMIT.get(), 3300);        // 3.3 V in mV
+assert_eq!(BUSY.get(), 107_374_182);  // 0.1 · 2³⁰ = 107374182.4, to the nearest
 ```
 
 ### What it does
 
 - The literal is in the unit `U` of the type it goes into: `fixed!(3.3)` of a `Fixed<Volt, Milli, u16>` is 3.3 V.
 - The stored value is worked out at compile time from the exact fraction. Nothing runs at run time.
-- An integer storage takes the nearest integer, ties to even:
-
-$$
-n = \operatorname{round}_{\text{even}}\!\left(\frac{x}{\text{scale}}\right)
-$$
-
-- A float storage takes the nearest float, which must be a normal number of that float.
+- A literal that is a stored value is that value: 0.5 in Q15, 3.3 V in mV.
+- A literal that isn't one doesn't compile, unless the call names a rounding: `fixed!(0.1, NearestEven)`, or `Floor`, `Ceil`, `Truncate`, `NearestAway`. Nothing is rounded without its name in the source.
 - An exponent works: `fixed!(2.5e-3)`.
 
-Both round without naming the mode: `fixed!(0.1)` in an `f32` stores 0.100000001490116.., with nothing in the
-source saying so. That is a known gap, listed under [where the crate falls short](exact.md#where-the-crate-falls-short-today).
+### A literal between two steps
+
+0.1 is no step of $2^{-30}$. Without a rounding, `fixed!(0.1)` doesn't compile, and the error names the two stored values around it with their exact decimals:
+
+```rust,compile_fail
+use exact_units::{Fixed, fixed, prefix::Pow2, units::Ratio};
+
+const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1);
+```
+
+```text
+fixed!(0.1) is not a step of its storage: the steps around it are 107374182 = 0.09999999962747097015380859375 and 107374183 = 0.100000000558793544769287109375; write one of them, or name a rounding: fixed!(0.1, NearestEven)
+```
+
+- Each decimal is the step's whole value, every digit: a step of $2^{-k}$ or $10^{-k}$ always has a finite decimal. Pasted back, it is exactly that step, however many digits it takes:
+
+```rust
+use exact_units::{Fixed, fixed, prefix::Pow2, units::Ratio};
+
+const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.100000000558793544769287109375);
+assert_eq!(BUSY.get(), 107_374_183);
+```
+
+- A float storage works the same way, with the two floats around the literal: `fixed!(0.1)` is no `f32`, and the error names 0.0999999940395355224609375 and 0.100000001490116119384765625.
+- A step whose value isn't a finite decimal (a scale of 1/3) is named by its stored value only: the call needs a rounding.
+- A tie is a choice too: 2.5 steps needs `NearestEven` (2) or `NearestAway` (3), named by the caller.
+- The literal is checked against the storage and its bounds before any rounding: `fixed!(10.4, NearestEven)` into a `Range<0, 10>` doesn't compile, although it would round to 10.
 
 ### What doesn't compile
 
@@ -64,19 +84,18 @@ const NEGATIVE: Fixed<Volt, Milli, u16> = fixed!(-0.5);
 
 A scale with π or a root in it has no decimal stored values, so `fixed!` refuses it too.
 
-A float storage refuses a literal past its range or below its normal numbers, rather than storing ±∞, a
-subnormal or 0:
+A float storage refuses a literal past its range or below its normal numbers, with or without a rounding, rather than storing ±∞, a subnormal or 0:
 
 ```rust,compile_fail
 use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
 
-const HUGE: Fixed<Ratio, One, f32> = fixed!(3.4028236e38); // rounds past f32::MAX
+const HUGE: Fixed<Ratio, One, f32> = fixed!(3.4028236e38, NearestEven); // past f32::MAX
 ```
 
 ```rust,compile_fail
 use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
 
-const TINY: Fixed<Ratio, One, f32> = fixed!(1e-38); // a subnormal f32
+const TINY: Fixed<Ratio, One, f32> = fixed!(1e-38, NearestEven); // a subnormal f32
 ```
 
 And no literal is `-0`: a decimal has no negative zero, and a float storage would store +0.0. Write `0`.
@@ -89,7 +108,7 @@ const ZERO: Fixed<Ratio, One, f64> = fixed!(-0.0);
 
 ### A literal in another unit
 
-`fixed!(value in S)` takes the literal in another unit `S` of the same dimension and kind, through `Fixed::from_decimal_in`: a datasheet's dB into a storage of µNp, degrees into radians.
+`fixed!(value in S)` takes the literal in another unit `S` of the same dimension and kind, through `Fixed::from_decimal_in`: a datasheet's dB into a storage of µNp, degrees into radians. A factor with π or ln 10 in it makes the value irrational, never a stored value, so such a call always names a rounding: `fixed!(90 in Degree, NearestEven)`. The error of one that doesn't names the stored values around it in the storage's own unit, to write as a plain `fixed!(1.570796)`.
 
 `S` can also be named the way [`q!`](#q) reads one, symbols and all, instead of a type path:
 
@@ -106,7 +125,7 @@ A symbol whose unit doesn't convert to the context's doesn't compile, as for `fi
 
 ### Not a literal
 
-For a decimal that isn't a literal (a `Decimal` built in a `const`), `Fixed::from_decimal` is the same as a `const fn`. Levels in dB have their own literal, [`db!`](../levels/decibels.md).
+For a decimal that isn't a literal (a `Decimal` built in a `const`), `Fixed::from_decimal` is the same as a `const fn`, and `Fixed::from_decimal_rounded` names the rounding. Levels in dB and Np have their own literals, [`db!` and `np!`](../levels/decibels.md): a gain of most levels is irrational, so they name a rounding the same way, `db!(-6, NearestEven)`.
 
 ## `q!`
 

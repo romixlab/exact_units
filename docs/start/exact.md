@@ -66,6 +66,14 @@ use exact_units::{Q15, fixed, units::Ratio};
 const ONE: Q15<Ratio> = fixed!(1.0); // Q15 ends at 1 − 2⁻¹⁵
 ```
 
+Nor does a literal that is no stored value: 0.1 lies between two steps of $2^{-30}$, and the compile error names both, `107374182 = 0.09999999962747097015380859375` and `107374183 = 0.100000000558793544769287109375`, to paste or to pick from with a rounding:
+
+```rust,compile_fail
+use exact_units::{Fixed, fixed, prefix::Pow2, units::Ratio};
+
+const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1);
+```
+
 ## 3. Every lossy step is named
 
 Losing part of a value is often what you want. Then the code says how. `Rounding` has no default, so a rounding call always names its mode:
@@ -76,6 +84,15 @@ use exact_units::{Fixed, Rounding, prefix::Deci, prefix::Milli, units::Volt};
 let v: Fixed<Volt, Milli, i16> = Fixed::new(1250);
 assert_eq!(v.to_rounded::<Deci, i16>(Rounding::NearestEven).map(|x| x.get()), Some(12));
 assert_eq!(v.to_rounded::<Deci, i16>(Rounding::NearestAway).map(|x| x.get()), Some(13));
+```
+
+A literal names its rounding the same way, in the macro:
+
+```rust
+use exact_units::{Fixed, fixed, prefix::Pow2, units::Ratio};
+
+const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1, NearestEven); // 107374182.4 steps
+assert_eq!(BUSY.get(), 107_374_182);
 ```
 
 What overflow does is named too: in the type, so plain `+` follows it.
@@ -209,7 +226,6 @@ These places break a rule above. Each is known and tracked, and until it is fixe
 
 - **`Scale::Affine` holds floats.** `units::DegreeCelsius` uses it. Use `origins::Celsius`, whose offset is exact.
 - **A float storage rounds.** `to` into an `f32` or `f64` storage rounds to the nearest float, and an `f32` that overflows becomes infinity.
-- **`fixed!`, `db!` and `np!` round** a literal that isn't a whole number of steps to the nearest one, ties to even, without naming the mode. `fixed!(0.1)` in $2^{-30}$ steps stores 107374182, not $107374182.4$.
 - **Integer `/` truncates**, as the storage's own `/` does: 3 V / 2 A is 1 V/A. `per_into` and `times_into` name a rounding.
 - **`+` without bounds is the storage's own `+`**: a panic on overflow in a debug build, a wrap in a release build. Bounds `Saturating`, `Wrapping` or `checked_add` say what you mean.
 - **`to_rounded` across $\pi$, $\ln 2$ or $\ln 10$** works with a 64-bit approximation of the factor, so within $|x| \cdot 2^{-64}$ of a rounding step it can be one step off.

@@ -15,7 +15,7 @@ use exact_units::decibel::Decibels;
 use exact_units::literal::Decimal;
 use exact_units::prefix::One;
 use exact_units::units::{self, Per, Volt, Watt};
-use exact_units::{Fixed, Prefix, UnitExpr};
+use exact_units::{Fixed, Prefix, Rounding, UnitExpr};
 
 /// Every message `Decimal::parse` refuses a literal with.
 const DECIMAL_REFUSALS: [&str; 4] = [
@@ -32,13 +32,15 @@ const DECIBELS_REFUSALS: [&str; 3] = [
     "a level in dB takes up to 9 decimals",
 ];
 
-/// Every message `from_db_const` refuses a level with, for the storages below: a gain past the storage, or one too
-/// close to halfway between two stored values to round at compile time.
-const LEVEL_REFUSALS: [&str; 4] = [
-    "this level is too large for its storage",
-    "this level is too close to halfway between two stored values to round at compile time: write one more decimal",
-    "this value is outside the normal range of its float storage",
-    "this value is too close to halfway between two floats to round at compile time",
+/// Every message `from_db_const_rounded` refuses a level with, for the storages below: a gain past the storage or
+/// below a float's normal range, or one too close to a stored value or halfway between two to decide at compile time.
+const LEVEL_REFUSALS: [&str; 6] = [
+    "this value is too large for its storage",
+    "this value is too close to halfway between two stored values to round at compile time: write one more decimal",
+    "this value is too close to a stored value to decide at compile time: write one more decimal",
+    "this value is past the range of its float storage",
+    "this value is below the normal range of its float storage: write 0 or a normal number",
+    "this value is too close to a float to decide at compile time: write one more decimal",
 ];
 
 /// `Decimal::parse(s)` is the reference's value, or a documented refusal where the reference has none.
@@ -82,7 +84,9 @@ pub(crate) fn decibels(s: &str) {
 pub(crate) fn level(num: i64, decimals: u8) {
     let db = Decibels::new(num, decimals);
     let x = db.to_f64();
-    match outcome(|| Fixed::<Per<Watt, Watt>, One, u64>::from_db_const(db).get()) {
+    match outcome(|| {
+        Fixed::<Per<Watt, Watt>, One, u64>::from_db_const_rounded(db, Rounding::NearestEven).get()
+    }) {
         Ok(g) => {
             #[expect(
                 clippy::as_conversions,
@@ -106,7 +110,9 @@ pub(crate) fn level(num: i64, decimals: u8) {
             );
         }
     }
-    match outcome(|| Fixed::<Per<Volt, Volt>, One, f32>::from_db_const(db).get()) {
+    match outcome(|| {
+        Fixed::<Per<Volt, Volt>, One, f32>::from_db_const_rounded(db, Rounding::NearestEven).get()
+    }) {
         Ok(g) => {
             let want = 10f64.powf(x / 20.0);
             let g = f64::from(g);
@@ -135,7 +141,9 @@ pub(crate) fn neper_level(num: i64, decimals: u8) {
     use exact_units::decibel::Nepers;
     let np = Nepers::new(num, decimals);
     let x = np.to_f64();
-    match outcome(|| Fixed::<Per<Watt, Watt>, One, u64>::from_np_const(np).get()) {
+    match outcome(|| {
+        Fixed::<Per<Watt, Watt>, One, u64>::from_np_const_rounded(np, Rounding::NearestEven).get()
+    }) {
         Ok(g) => {
             #[expect(
                 clippy::as_conversions,
@@ -159,7 +167,9 @@ pub(crate) fn neper_level(num: i64, decimals: u8) {
             );
         }
     }
-    match outcome(|| Fixed::<Per<Volt, Volt>, One, f32>::from_np_const(np).get()) {
+    match outcome(|| {
+        Fixed::<Per<Volt, Volt>, One, f32>::from_np_const_rounded(np, Rounding::NearestEven).get()
+    }) {
         Ok(g) => {
             let want = x.exp();
             let g = f64::from(g);

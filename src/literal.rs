@@ -1,44 +1,61 @@
-//! Decimal literals as stored values, worked out at compile time: `fixed!(0.1)` is the [Fixed] its context names,
-//! holding the stored value nearest to 0.1 of its unit, so a constant in Q30, in steps of 2⁻¹⁵ or in mV is written as
-//! the number it means, never as `107_374_182 // 0.1 · 2³⁰`.
+//! Decimal literals as stored values, worked out at compile time: `fixed!(0.5)` is the [Fixed] its context names,
+//! holding the stored value 0.5 of its unit is, so a constant in Q30, in steps of 2⁻¹⁵ or in mV is written as the
+//! number it means, never as `536_870_912 // 0.5 · 2³⁰`.
 //!
+//! - Exact, or refused: a literal that is a stored value is that value. One that isn't (0.1 in steps of 2⁻³⁰) is a
+//!   compile error that names the two stored values around it, each with its exact decimal ready to paste:
+//!   `107374182 = 0.09999999962747097015380859375 and 107374183 = 0.100000000558793544769287109375`.
+//! - A rounding is named in the call: `fixed!(0.1, NearestEven)`, or `Floor`, `Ceil`, `Truncate`, `NearestAway`
+//!   ([Rounding]). A tie is a choice the caller names too.
 //! - Any scale that is a fraction of integers: `Pow2`, `Pow10`, `Rational`, the SI prefixes and their products. A
 //!   scale with π or a root in it is a compile error: its stored values aren't decimals.
-//! - Integer storages take the nearest integer, ties to even, from the exact fraction: nothing is rounded on the way.
-//!   Float storages take the nearest float, ties to even, which must be a normal number: a literal past the
-//!   float's range or below its normal numbers is a compile error.
+//! - Float storages the same way, with the two floats around the literal; a literal past the float's range or
+//!   below its normal numbers is a compile error, with or without a rounding.
 //! - `-0` is a compile error: a decimal has no negative zero, and a float storage would take it as +0.0.
-//! - A value that doesn't fit the storage or is outside the bounds `B` is a compile error, as is a negative value of
-//!   an unsigned storage.
+//! - The literal itself is checked against the storage and the bounds `B`, before any rounding: a value past the
+//!   storage, a negative value of an unsigned storage or one outside `B` is a compile error, even where a rounding
+//!   would land on the last stored value (`fixed!(10.4, NearestEven)` into `Range<0, 10>`).
 //! - The literal is in units of `U`: `fixed!(0.25)` of a `Fixed<Volt, Milli, u16>` is 0.25 V, stored as 250.
-//!   A decimal exponent works too: `fixed!(2.5e-3)`.
-//! - `fixed!(0.5, -0.25)` is a [Complex] of two such parts.
-//! - `fixed!(17.7 in Decibel)` is a literal in another unit `S` of the same dimension and kind
+//!   A decimal exponent works too: `fixed!(2.5e-3)`. A literal of any length reads back whole: the decimals a
+//!   compile error prints are exact stored values.
+//! - `fixed!(0.5, -0.25)` is a [Complex] of two such parts, `fixed!(0.1, 0.2, NearestEven)` with a rounding.
+//! - `fixed!(17.7 in Decibel, NearestEven)` is a literal in another unit `S` of the same dimension and kind
 //!   ([Fixed::from_decimal_in]): a level in dB into a storage of µNp, degrees into radians. A factor with π, ln 10 or
-//!   a root in it is rounded from an interval around the exact value, and a literal too close to halfway between two
-//!   stored values to decide is a compile error.
+//!   a root in it makes the value irrational, never a stored value, so the call names a rounding; it is rounded from
+//!   an interval around the exact value, and a literal too close to a stored value (or halfway between two) to
+//!   decide is a compile error.
 //! - `fixed!(100 m/s)` names that other unit `S` the way [q!](crate::q) reads one, through its symbol table or a
 //!   type (`fixed!(100 Speed)`), rather than writing a type path by hand: the same rules as `fixed!(17.7 in
 //!   Decibel)` once the symbol resolves to a unit.
 //!
-//! It is an associated const ([AtLiteral]), so nothing of it runs at run time; [Fixed::from_decimal] is the same as
-//! a `const fn`, for a value that isn't a literal.
+//! It is an associated const ([AtLiteral]), so nothing of it runs at run time; [Fixed::from_decimal] and
+//! [Fixed::from_decimal_rounded] are the same as `const fn`s, for a value that isn't a literal.
 //!
 //! ```
 //! use exact_units::{Fixed, fixed, prefix::{Milli, Pow2, Rational}, units::Ratio};
-//! const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1);
-//! assert_eq!(BUSY.get(), 107_374_182); // 0.1 · 2³⁰ = 107374182.4
 //! const HALF: Fixed<Ratio, Pow2<-15>, i16> = fixed!(-0.5);
 //! assert_eq!(HALF.get(), -16384);
-//! let third: Fixed<Ratio, Rational<1, 3>, u8> = fixed!(2.5); // 7.5 thirds, ties to even
+//! const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1, NearestEven);
+//! assert_eq!(BUSY.get(), 107_374_182); // 0.1 · 2³⁰ = 107374182.4
+//! const STEP: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.100000000558793544769287109375);
+//! assert_eq!(STEP.get(), 107_374_183); // the decimal of a step, pasted from the error
+//! let third: Fixed<Ratio, Rational<1, 3>, u8> = fixed!(2.5, NearestEven); // 7.5 thirds, a tie: to even
 //! assert_eq!(third.get(), 8);
 //! let x: Fixed<Ratio, Milli, f32> = fixed!(1.5e-3);
 //! assert_eq!(x.get(), 1.5);
 //! ```
 
 use crate::complex::Complex;
+#[cfg(feature = "q")]
 use crate::decibel::exact::Interval;
-use crate::{Bounds, Fixed, FixedScale, Magnitude, Unit, Unlimited};
+use crate::{Bounds, Fixed, FixedScale, Magnitude, Rounding, Unit, Unlimited};
+use big::BigDecimal;
+use core::marker::PhantomData;
+use mode::Mode;
+use steps::{FloatFormat, IntRange, Src, Value};
+
+pub(crate) mod big;
+pub(crate) mod steps;
 
 /// A decimal number, `num · 10^exp`: what [fixed!](crate::fixed) parses its literal into.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -172,6 +189,7 @@ impl Decimal {
 
     /// `|self| / scale` as a reduced fraction `(p, q)`, or a compile error for a scale that isn't a fraction of
     /// integers or a fraction too large for `u128`.
+    #[cfg(feature = "q")]
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
@@ -210,37 +228,8 @@ impl Decimal {
         (mul(p, sden), mul(q, snum))
     }
 
-    /// The stored value nearest to `self` in units of `P`, ties to even, as an `i128`.
-    #[expect(
-        clippy::as_conversions,
-        reason = "const fn: From is not const on stable"
-    )]
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "q >= 1: a product of factors at least 1 (to_ratio's num is a product of prime powers); rem < q, so q - rem fits; up only when rem > 0, so q >= 2 and int + 1 fits; 0 <= x <= i128::MAX, so -x fits"
-    )]
-    const fn to_int(self, scale: Magnitude) -> i128 {
-        if self.num == 0 {
-            return 0;
-        }
-        let (p, q) = self.over(scale);
-        let (int, rem) = (p / q, p % q);
-        // rem > q/2, or rem == q/2 and int is odd; q - rem can't overflow where 2 · rem could
-        let up = rem > q - rem || (rem == q - rem && int & 1 == 1);
-        let x = int + up as u128;
-        assert!(
-            x <= i128::MAX as u128,
-            "this literal is too large for its storage"
-        );
-        #[expect(
-            clippy::cast_possible_wrap,
-            reason = "x is checked to be at most i128::MAX just above"
-        )]
-        let x = x as i128;
-        if self.num < 0 { -x } else { x }
-    }
-
     /// The exact `|self|` in units of `P` as an interval, for the nearest float; `None` for zero.
+    #[cfg(feature = "q")]
     const fn to_interval(self, scale: Magnitude) -> Option<Interval> {
         if self.num == 0 {
             return None;
@@ -251,6 +240,7 @@ impl Decimal {
 
     /// As [to_interval](Self::to_interval), also for a scale that isn't a fraction of integers (π, ln 10, a root):
     /// `|self| / scale` with the scale's interval ([Interval::magnitude]).
+    #[cfg(feature = "q")]
     const fn to_interval_any(self, scale: Magnitude) -> Option<Interval> {
         if scale.is_rational() {
             return self.to_interval(scale);
@@ -259,37 +249,6 @@ impl Decimal {
             Some(x) => Some(x.mul(Interval::magnitude(scale.recip()))),
             None => None,
         }
-    }
-
-    /// As [to_int](Self::to_int), also for a scale that isn't a fraction of integers: then the interval of the exact
-    /// value must round to one integer at both ends, else a compile error (a literal too close to halfway between
-    /// two stored values to decide).
-    #[expect(
-        clippy::as_conversions,
-        reason = "const fn: From is not const on stable"
-    )]
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "0 <= x <= i128::MAX, checked, so -x fits"
-    )]
-    const fn to_int_any(self, scale: Magnitude) -> i128 {
-        if scale.is_rational() {
-            return self.to_int(scale);
-        }
-        let Some(x) = self.to_interval_any(scale) else {
-            return 0;
-        };
-        let x = x.to_int();
-        assert!(
-            x <= i128::MAX as u128,
-            "this literal is too large for its storage"
-        );
-        #[expect(
-            clippy::cast_possible_wrap,
-            reason = "x is checked to be at most i128::MAX just above"
-        )]
-        let x = x as i128;
-        if self.num < 0 { -x } else { x }
     }
 }
 
@@ -312,6 +271,7 @@ const fn scale_in<S: Unit, U: Unit, P: FixedScale>() -> Magnitude {
 }
 
 /// `a · b`, or a compile error: the scale and the literal together need more than 128 bits.
+#[cfg(feature = "q")]
 #[expect(
     clippy::panic,
     reason = "a compile error in const code (a panic at run time), as documented: a fraction past u128"
@@ -325,6 +285,7 @@ const fn mul(a: u128, b: u128) -> u128 {
     }
 }
 
+#[cfg(feature = "q")]
 #[expect(clippy::arithmetic_side_effects, reason = "b != 0, the loop condition")]
 const fn gcd(mut a: u128, mut b: u128) -> u128 {
     while b != 0 {
@@ -335,19 +296,89 @@ const fn gcd(mut a: u128, mut b: u128) -> u128 {
     a
 }
 
-/// A decimal literal as a type, `NUM · 10^EXP`: what [fixed!](crate::fixed) names, so the scale and storage of the
-/// [Fixed] can come from the context. A pair of them is a [Complex]'s.
-#[derive(Debug)]
-pub struct Literal<const NUM: i64, const EXP: i16>;
+/// A literal as a macro call wrote it, carried by a type the call declares: what [fixed!](crate::fixed),
+/// [db!](crate::db) and [np!](crate::np) name, so the storage comes from the context and a literal of any length (the
+/// exact decimal of a stored value, pasted from a compile error) reads back whole.
+pub trait Source {
+    /// The literal: `0.1`.
+    const VALUE: &'static str;
 
-/// A decimal literal in the unit `S` as a type, `NUM · 10^EXP` of `S`: what `fixed!(17.7 in Decibel)` names.
+    /// The call's arguments as written, without the rounding: `0.1`, `90 in Degree`, `0.5, -0.25`. Only the message
+    /// that refuses an inexact literal reads it.
+    const ARGS: &'static str;
+}
+
+/// The rounding a call names, as a type: `fixed!(0.1, NearestEven)` names [mode::NearestEven]; a call without one
+/// names [mode::Unrounded] and refuses a literal that isn't a stored value.
+pub mod mode {
+    use crate::Rounding;
+
+    /// A rounding as a type.
+    pub trait Mode {
+        /// The rounding, `None` for none: an inexact literal is a compile error.
+        const ROUNDING: Option<Rounding>;
+    }
+
+    /// No rounding: the literal is a stored value, or a compile error names the two around it.
+    #[derive(Debug)]
+    pub struct Unrounded;
+
+    impl Mode for Unrounded {
+        const ROUNDING: Option<Rounding> = None;
+    }
+
+    macro_rules! modes {
+        ($($name:ident)*) => {$(
+            #[doc = concat!("[Rounding::", stringify!($name), "] as a type.")]
+            #[derive(Debug)]
+            pub struct $name;
+
+            impl Mode for $name {
+                const ROUNDING: Option<Rounding> = Some(Rounding::$name);
+            }
+        )*};
+    }
+
+    modes!(Truncate Floor Ceil NearestEven NearestAway);
+}
+
+/// A decimal literal in the unit of its context, `L` its source and `M` its rounding: what `fixed!(0.1)` and
+/// `fixed!(0.1, NearestEven)` name. A pair of them is a [Complex]'s.
 #[derive(Debug)]
-pub struct LiteralIn<const NUM: i64, const EXP: i16, S>(core::marker::PhantomData<S>);
+pub struct Lit<L, M>(PhantomData<(L, M)>);
+
+/// A decimal literal in the unit `S`: what `fixed!(17.7 in Decibel)` and `fixed!(100 m/s)` name.
+#[derive(Debug)]
+pub struct LitIn<L, S, M>(PhantomData<(L, S, M)>);
+
+/// A decimal literal in units `q!`'s reader resolved, `Q` a [LiteralIn]: what `fixed!(100 m/s)` names. The reader
+/// folds a prefix into the number (`359.9 km/h` is 3599 · 10² of m/h), so the number comes from `Q`, not the text.
+#[derive(Debug)]
+pub struct LitSymbols<L, Q, M>(PhantomData<(L, Q, M)>);
+
+/// The number and unit of a [LiteralIn].
+pub trait InUnit {
+    /// The unit.
+    type Unit;
+
+    /// The number, in units of [Unit](Self::Unit).
+    const VALUE: Decimal;
+}
+
+impl<const N: i64, const E: i16, S> InUnit for LiteralIn<N, E, S> {
+    type Unit = S;
+
+    const VALUE: Decimal = Decimal::new(N, E);
+}
+
+/// A decimal literal in the unit `S` as a type, `NUM · 10^EXP` of `S`: what [q!](crate::q) names.
+#[derive(Debug)]
+pub struct LiteralIn<const NUM: i64, const EXP: i16, S>(PhantomData<S>);
 
 /// The stored value of literal `L` as an associated const, worked out at compile time ([Fixed::from_decimal]): what
 /// [fixed!](crate::fixed) reads, for every [Fixed] with an integer or float storage and every [Complex].
 pub trait AtLiteral<L>: Sized {
-    /// The stored value nearest to literal `L`.
+    /// The stored value of literal `L`.
     const AT: Self;
 }
 
@@ -372,15 +403,63 @@ macro_rules! __fixed_unit {
     };
 }
 
+/// `fixed!`'s expansion: a source type for the literal and the stored value of the carrier `$lit` names.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __fixed_at {
+    ($args:expr; $($name:ident = $value:literal),+; $lit:ty) => {{
+        $(
+            struct $name;
+            impl $crate::literal::Source for $name {
+                const VALUE: &'static str = ::core::stringify!($value);
+                const ARGS: &'static str = $args;
+            }
+        )+
+        <_ as $crate::literal::AtLiteral<$lit>>::AT
+    }};
+}
+
+/// `fixed!(100 m/s, NearestEven)`: the unit's tokens taken one by one up to the comma before a rounding.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __fixed_symbols {
+    ([$value:literal] [$($unit:tt)+] , $mode:ident $(,)?) => {
+        $crate::__fixed_at!(
+            ::core::stringify!($value $($unit)+); __Literal = $value;
+            $crate::literal::LitSymbols<__Literal, $crate::__fixed_unit!($value $($unit)+), $crate::literal::mode::$mode>
+        )
+    };
+    ([$value:literal] [$($unit:tt)+]) => {
+        $crate::__fixed_at!(
+            ::core::stringify!($value $($unit)+); __Literal = $value;
+            $crate::literal::LitSymbols<__Literal, $crate::__fixed_unit!($value $($unit)+), $crate::literal::mode::Unrounded>
+        )
+    };
+    ([$value:literal] [$($unit:tt)*] $t:tt $($rest:tt)*) => {
+        $crate::__fixed_symbols!([$value] [$($unit)* $t] $($rest)*)
+    };
+}
+
 /// A constant of the [Fixed] (or, of two literals, the [Complex]) the context names, from a decimal literal in units
-/// of its unit, rounded to the nearest stored value at compile time: see the [module](crate::literal).
+/// of its unit, worked out at compile time: the stored value the literal is, or the one a named rounding picks, or a
+/// compile error that names the two around it. See the [module](crate::literal).
 ///
 /// ```
 /// use exact_units::{CQ15, Fixed, fixed, prefix::Pow2, units::Ratio};
-/// const GAIN: Fixed<Ratio, Pow2<-15>, i16> = fixed!(0.7071); // 23170.25..
+/// const HALF: Fixed<Ratio, Pow2<-15>, i16> = fixed!(0.5);
+/// assert_eq!(HALF.get(), 16384);
+/// const GAIN: Fixed<Ratio, Pow2<-15>, i16> = fixed!(0.7071, NearestEven); // 23170.25..
 /// assert_eq!(GAIN.get(), 23170);
 /// const Z: CQ15 = fixed!(0.5, -0.25);
 /// assert_eq!(Z.get(), (16384, -8192));
+/// ```
+///
+/// A literal that isn't a stored value doesn't compile without a rounding; the error names the two around it,
+/// `23170 = 0.70709228515625 and 23171 = 0.707122802734375`:
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, fixed, prefix::Pow2, units::Ratio};
+/// const GAIN: Fixed<Ratio, Pow2<-15>, i16> = fixed!(0.7071);
 /// ```
 ///
 /// A literal in another unit of the same dimension and kind is written `in` it:
@@ -388,7 +467,7 @@ macro_rules! __fixed_unit {
 /// ```
 /// # #[cfg(feature = "angle")] {
 /// use exact_units::{Fixed, fixed, prefix::Micro, units::{Degree, Radian}};
-/// const RIGHT: Fixed<Radian, Micro, i32> = fixed!(90 in Degree);
+/// const RIGHT: Fixed<Radian, Micro, i32> = fixed!(90 in Degree, NearestEven);
 /// assert_eq!(RIGHT.get(), 1_570_796); // π/2 = 1.5707963..
 /// # }
 /// ```
@@ -400,7 +479,7 @@ macro_rules! __fixed_unit {
 /// use exact_units::{Fixed, fixed, prefix::Centi, units::Speed};
 /// const LIMIT: Fixed<Speed, Centi, i16> = fixed!(100 m/s);
 /// assert_eq!(LIMIT.get(), 10_000);
-/// const OTHER: Fixed<Speed, Centi, i16> = fixed!(359.9 km/h); // 99.9722.. m/s, rounded to even
+/// const OTHER: Fixed<Speed, Centi, i16> = fixed!(359.9 km/h, NearestEven); // 99.9722.. m/s
 /// assert_eq!(OTHER.get(), 9_997);
 /// # }
 /// ```
@@ -415,7 +494,7 @@ macro_rules! __fixed_unit {
 /// ```
 ///
 /// A value that doesn't fit its storage doesn't compile, nor does a negative one of an unsigned storage, one outside
-/// the bounds or one of a scale that isn't a fraction of integers:
+/// the bounds (checked on the literal, before any rounding) or one of a scale that isn't a fraction of integers:
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, fixed, prefix::Pow2, units::Ratio};
@@ -429,7 +508,7 @@ macro_rules! __fixed_unit {
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, Range, fixed, prefix::One, units::Ratio};
-/// const X: Fixed<Ratio, One, i8, Range<0, 10>> = fixed!(11);
+/// const X: Fixed<Ratio, One, i8, Range<0, 10>> = fixed!(10.4, NearestEven); // 10.4 is past 10
 /// ```
 ///
 /// ```compile_fail
@@ -437,17 +516,22 @@ macro_rules! __fixed_unit {
 /// const X: Fixed<Ratio, One, f32> = fixed!(0.5f32); // the storage comes from the context
 /// ```
 ///
-/// A float storage refuses a literal past its range or below its normal numbers, and `-0`, which it would take as
-/// +0.0:
+/// A float storage takes a literal that is one of its floats, or names a rounding: `fixed!(0.1)` is no `f32`. It
+/// refuses a literal past its range or below its normal numbers, and `-0`, which it would take as +0.0:
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
-/// const X: Fixed<Ratio, One, f32> = fixed!(3.4028236e38); // rounds past f32::MAX
+/// const X: Fixed<Ratio, One, f32> = fixed!(0.1);
 /// ```
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
-/// const X: Fixed<Ratio, One, f32> = fixed!(1e-38); // a subnormal f32
+/// const X: Fixed<Ratio, One, f32> = fixed!(3.4028236e38, NearestEven); // past f32::MAX
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
+/// const X: Fixed<Ratio, One, f32> = fixed!(1e-38, NearestEven); // a subnormal f32
 /// ```
 ///
 /// ```compile_fail
@@ -462,65 +546,111 @@ macro_rules! __fixed_unit {
 /// ```
 #[macro_export]
 macro_rules! fixed {
+    ($re:literal, $im:literal, $mode:ident $(,)?) => {
+        $crate::__fixed_at!(
+            ::core::stringify!($re, $im); __Re = $re, __Im = $im;
+            (
+                $crate::literal::Lit<__Re, $crate::literal::mode::$mode>,
+                $crate::literal::Lit<__Im, $crate::literal::mode::$mode>,
+            )
+        )
+    };
     ($re:literal, $im:literal $(,)?) => {
-        <_ as $crate::literal::AtLiteral<(
-            $crate::literal::Literal<
-                { $crate::literal::Decimal::parse(stringify!($re)).num() },
-                { $crate::literal::Decimal::parse(stringify!($re)).exp() },
-            >,
-            $crate::literal::Literal<
-                { $crate::literal::Decimal::parse(stringify!($im)).num() },
-                { $crate::literal::Decimal::parse(stringify!($im)).exp() },
-            >,
-        )>>::AT
+        $crate::__fixed_at!(
+            ::core::stringify!($re, $im); __Re = $re, __Im = $im;
+            (
+                $crate::literal::Lit<__Re, $crate::literal::mode::Unrounded>,
+                $crate::literal::Lit<__Im, $crate::literal::mode::Unrounded>,
+            )
+        )
+    };
+    ($value:literal in $unit:ty, $mode:ident $(,)?) => {
+        $crate::__fixed_at!(
+            ::core::stringify!($value in $unit); __Literal = $value;
+            $crate::literal::LitIn<__Literal, $unit, $crate::literal::mode::$mode>
+        )
     };
     ($value:literal in $unit:ty) => {
-        <_ as $crate::literal::AtLiteral<
-            $crate::literal::LiteralIn<
-                { $crate::literal::Decimal::parse(stringify!($value)).num() },
-                { $crate::literal::Decimal::parse(stringify!($value)).exp() },
-                $unit,
-            >,
-        >>::AT
+        $crate::__fixed_at!(
+            ::core::stringify!($value in $unit); __Literal = $value;
+            $crate::literal::LitIn<__Literal, $unit, $crate::literal::mode::Unrounded>
+        )
     };
-    ($value:literal $($unit:tt)+) => {
-        <_ as $crate::literal::AtLiteral<$crate::__fixed_unit!($value $($unit)+)>>::AT
+    ($value:literal, $mode:ident $(,)?) => {
+        $crate::__fixed_at!(
+            ::core::stringify!($value); __Literal = $value;
+            $crate::literal::Lit<__Literal, $crate::literal::mode::$mode>
+        )
     };
     ($value:literal) => {
-        <_ as $crate::literal::AtLiteral<
-            $crate::literal::Literal<
-                { $crate::literal::Decimal::parse(stringify!($value)).num() },
-                { $crate::literal::Decimal::parse(stringify!($value)).exp() },
-            >,
-        >>::AT
+        $crate::__fixed_at!(
+            ::core::stringify!($value); __Literal = $value;
+            $crate::literal::Lit<__Literal, $crate::literal::mode::Unrounded>
+        )
+    };
+    ($value:literal $($unit:tt)+) => {
+        $crate::__fixed_symbols!([$value] [] $($unit)+)
     };
 }
 
-/// `from_decimal` per storage: the integers through `bounded`, the floats checked against `B` here.
+/// The message source of `fixed!`'s literal `L`, `direct` where its stored values' decimals can take its place.
+const fn src<L: Source>(direct: bool) -> Src {
+    Src::Macro {
+        name: "fixed!",
+        args: L::ARGS,
+        direct,
+    }
+}
+
+/// `from_decimal` per storage: the integers and the floats, each checked against the storage's range and `B` on
+/// the literal itself, before any rounding.
 macro_rules! from_decimal {
     (int $($ty:ident)*) => {$(
         impl<U, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
-            /// The stored value nearest to `x` in units of `U`, ties to even, at compile time: see the
-            /// [module](crate::literal). A compile error in `const` code (a panic at run time) for a value that
-            /// doesn't fit `T` or `B`, or a scale that isn't a fraction of integers.
+            /// `x` in units of `U`, at compile time: see the [module](crate::literal). A compile error in `const`
+            /// code (a panic at run time) for a value that isn't a stored value, one that doesn't fit `T` or `B`,
+            /// or a scale that isn't a fraction of integers; [from_decimal_rounded](Self::from_decimal_rounded)
+            /// names a rounding.
             pub const fn from_decimal(x: Decimal) -> Self {
-                Self::of_literal(x.to_int(P::SCALE))
+                Self::of_value(
+                    &Value::of_literal(&BigDecimal::of(x), P::SCALE),
+                    None,
+                    &Src::Fn { name: "Fixed::from_decimal" },
+                )
             }
 
-            /// `v` in `T` and `B`, or a compile error.
+            /// `x` in units of `U`, rounded by `r` where it isn't a stored value, at compile time. A compile error
+            /// in `const` code (a panic at run time) for a value that doesn't fit `T` or `B`, or a scale that
+            /// isn't a fraction of integers.
+            pub const fn from_decimal_rounded(x: Decimal, r: Rounding) -> Self {
+                Self::of_value(
+                    &Value::of_literal(&BigDecimal::of(x), P::SCALE),
+                    Some(r),
+                    &Src::Fn { name: "Fixed::from_decimal" },
+                )
+            }
+
+            /// The stored value `v`, or the one `mode` picks, or a compile error naming the two around it.
             #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
             #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
-            const fn of_literal(v: i128) -> Self {
-                if v < $ty::MIN as i128 {
-                    panic!("this literal is below the range of its storage");
-                }
-                if v > $ty::MAX as i128 {
-                    panic!("this literal is too large for its storage");
-                }
+            pub(crate) const fn of_value(v: &Value, mode: Option<Rounding>, src: &Src) -> Self {
+                let range = IntRange {
+                    min: $ty::MIN as i128,
+                    max: $ty::MAX as i128,
+                    bound_min: match B::MIN {
+                        Some(m) => Some(m as i128),
+                        None => None,
+                    },
+                    bound_max: match B::MAX {
+                        Some(m) => Some(m as i128),
+                        None => None,
+                    },
+                };
+                let v = steps::to_int(v, range, mode, src, P::SCALE);
                 #[allow(
                     clippy::cast_possible_truncation,
                     clippy::cast_sign_loss,
-                    reason = "v is checked to be in the storage's range just above"
+                    reason = "to_int checks v against the storage's range"
                 )]
                 let v = v as $ty;
                 Self::bounded(v)
@@ -528,95 +658,174 @@ macro_rules! from_decimal {
         }
 
         impl<U: Unit, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
-            /// The stored value nearest to `x` in units of `S`, ties to even, at compile time: what
-            /// `fixed!(17.7 in Decibel)` reads, a literal in another unit of the same dimension and kind. A factor
-            /// that isn't a fraction of integers (dB in Np, ° in rad) is rounded from an interval around the exact
-            /// value. A compile error in `const` code (a panic at run time) for units that don't convert, a value
-            /// that doesn't fit `T` or `B`, or one too close to halfway between two stored values to decide.
+            /// `x` in units of `S`, a unit of the same dimension and kind, at compile time: what `fixed!(17.7 in
+            /// Decibel)` reads. A factor that isn't a fraction of integers (dB in Np, ° in rad) makes the value
+            /// irrational, never a stored value, so it needs [from_decimal_in_rounded](Self::from_decimal_in_rounded).
+            /// A compile error in `const` code (a panic at run time) for units that don't convert, a value that isn't
+            /// a stored value or doesn't fit `T` or `B`.
             pub const fn from_decimal_in<S: Unit>(x: Decimal) -> Self {
-                Self::of_literal(x.to_int_any(scale_in::<S, U, P>()))
+                Self::of_value(
+                    &Value::of_literal_any(&BigDecimal::of(x), scale_in::<S, U, P>()),
+                    None,
+                    &Src::Fn { name: "Fixed::from_decimal_in" },
+                )
+            }
+
+            /// `x` in units of `S`, rounded by `r` where it isn't a stored value, at compile time. A compile error in
+            /// `const` code (a panic at run time) for units that don't convert, a value that doesn't fit `T` or `B`,
+            /// or one too close to a stored value (or halfway between two) to decide.
+            pub const fn from_decimal_in_rounded<S: Unit>(x: Decimal, r: Rounding) -> Self {
+                Self::of_value(
+                    &Value::of_literal_any(&BigDecimal::of(x), scale_in::<S, U, P>()),
+                    Some(r),
+                    &Src::Fn { name: "Fixed::from_decimal_in" },
+                )
             }
         }
 
-        impl<U, P: FixedScale, B: Bounds<$ty>, const N: i64, const E: i16> AtLiteral<Literal<N, E>>
+        impl<U, P: FixedScale, B: Bounds<$ty>, L: Source, M: Mode> AtLiteral<Lit<L, M>> for Fixed<U, P, $ty, B> {
+            const AT: Self = {
+                let value = Value::of_literal(&BigDecimal::parse(L::VALUE), P::SCALE);
+                Self::of_value(&value, M::ROUNDING, &src::<L>(true))
+            };
+        }
+
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, L: Source, S: Unit, M: Mode> AtLiteral<LitIn<L, S, M>>
             for Fixed<U, P, $ty, B>
         {
-            const AT: Self = Self::from_decimal(Decimal::new(N, E));
+            const AT: Self = {
+                let value = Value::of_literal_any(&BigDecimal::parse(L::VALUE), scale_in::<S, U, P>());
+                Self::of_value(&value, M::ROUNDING, &src::<L>(false))
+            };
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
-            AtLiteral<LiteralIn<N, E, S>> for Fixed<U, P, $ty, B>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, L: Source, Q: InUnit<Unit: Unit>, M: Mode>
+            AtLiteral<LitSymbols<L, Q, M>> for Fixed<U, P, $ty, B>
         {
-            const AT: Self = Self::from_decimal_in::<S>(Decimal::new(N, E));
+            const AT: Self = {
+                let value = Value::of_literal_any(&BigDecimal::of(Q::VALUE), scale_in::<Q::Unit, U, P>());
+                Self::of_value(&value, M::ROUNDING, &src::<L>(false))
+            };
         }
     )*};
-    (float $($ty:ident $to:ident)*) => {$(
+    (float $($ty:ident $bits:ident $format:ident)*) => {$(
         impl<U, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
-            /// The float nearest to `x` in units of `U`, ties to even, at compile time: see the
-            /// [module](crate::literal). A compile error in `const` code (a panic at run time) for a value outside
-            /// `B` or the float's normal range, or a scale that isn't a fraction of integers.
+            /// `x` in units of `U`, at compile time: see the [module](crate::literal). A compile error in `const`
+            /// code (a panic at run time) for a value that isn't a float of the storage, one outside `B` or the
+            /// float's normal range, or a scale that isn't a fraction of integers;
+            /// [from_decimal_rounded](Self::from_decimal_rounded) names a rounding.
             pub const fn from_decimal(x: Decimal) -> Self {
-                Self::of_literal(x, x.to_interval(P::SCALE))
+                Self::of_value(
+                    &Value::of_literal(&BigDecimal::of(x), P::SCALE),
+                    None,
+                    &Src::Fn { name: "Fixed::from_decimal" },
+                )
             }
 
-            /// `±|x|` from its interval, checked against `B`.
-            const fn of_literal(x: Decimal, abs: Option<Interval>) -> Self {
-                let v = match abs {
-                    Some(i) => i.$to(),
-                    None => 0.0,
-                };
-                let v = if x.num() < 0 { -v } else { v };
+            /// `x` in units of `U`, rounded by `r` to a float where it isn't one, at compile time. A compile error
+            /// in `const` code (a panic at run time) for a value outside `B` or the float's normal range, or a
+            /// scale that isn't a fraction of integers.
+            pub const fn from_decimal_rounded(x: Decimal, r: Rounding) -> Self {
+                Self::of_value(
+                    &Value::of_literal(&BigDecimal::of(x), P::SCALE),
+                    Some(r),
+                    &Src::Fn { name: "Fixed::from_decimal" },
+                )
+            }
+
+            /// The float `v` is, or the one `mode` picks, or a compile error naming the two around it; `v` checked
+            /// against `B` first.
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_possible_truncation,
+                reason = "const fn: From is not const on stable; float_parts gives the bits of a float of this width"
+            )]
+            pub(crate) const fn of_value(v: &Value, mode: Option<Rounding>, src: &Src) -> Self {
+                let parts = steps::float_parts(v, FloatFormat::$format);
+                let (lo, hi) = ($ty::from_bits(parts.lo as $bits), $ty::from_bits(parts.hi() as $bits));
+                // the value lies in [lo, hi]; for a negative one, in [-hi, -lo]
+                let (lo, hi) = if parts.neg { (-hi, -lo) } else { (lo, hi) };
                 if let Some(min) = B::MIN
-                    && v < min
+                    && lo < min
                 {
                     panic!("value below its bound");
                 }
                 if let Some(max) = B::MAX
-                    && v > max
+                    && hi > max
                 {
                     panic!("value above its bound");
                 }
-                Self::new_unchecked(v)
+                let x = $ty::from_bits(parts.pick(mode, src, P::SCALE, FloatFormat::$format) as $bits);
+                Self::new_unchecked(if parts.neg { -x } else { x })
             }
         }
 
         impl<U: Unit, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
-            /// The float nearest to `x` in units of `S`, ties to even, at compile time: what
-            /// `fixed!(17.7 in Decibel)` reads. A compile error in `const` code (a panic at run time) for units that
-            /// don't convert, a value outside `B` or the float's normal range, or one too close to halfway between
-            /// two floats to decide.
+            /// `x` in units of `S`, a unit of the same dimension and kind, at compile time: what `fixed!(17.7 in
+            /// Decibel)` reads. A factor that isn't a fraction of integers makes the value irrational, never a float,
+            /// so it needs [from_decimal_in_rounded](Self::from_decimal_in_rounded). A compile error in `const` code
+            /// (a panic at run time) for units that don't convert, a value that isn't a float of the storage, or one
+            /// outside `B` or the float's normal range.
             pub const fn from_decimal_in<S: Unit>(x: Decimal) -> Self {
-                Self::of_literal(x, x.to_interval_any(scale_in::<S, U, P>()))
+                Self::of_value(
+                    &Value::of_literal_any(&BigDecimal::of(x), scale_in::<S, U, P>()),
+                    None,
+                    &Src::Fn { name: "Fixed::from_decimal_in" },
+                )
+            }
+
+            /// `x` in units of `S`, rounded by `r` to a float where it isn't one, at compile time. A compile error in
+            /// `const` code (a panic at run time) for units that don't convert, a value outside `B` or the float's
+            /// normal range, or one too close to a float (or halfway between two) to decide.
+            pub const fn from_decimal_in_rounded<S: Unit>(x: Decimal, r: Rounding) -> Self {
+                Self::of_value(
+                    &Value::of_literal_any(&BigDecimal::of(x), scale_in::<S, U, P>()),
+                    Some(r),
+                    &Src::Fn { name: "Fixed::from_decimal_in" },
+                )
             }
         }
 
-        impl<U, P: FixedScale, B: Bounds<$ty>, const N: i64, const E: i16> AtLiteral<Literal<N, E>>
-            for Fixed<U, P, $ty, B>
-        {
-            const AT: Self = Self::from_decimal(Decimal::new(N, E));
+        impl<U, P: FixedScale, B: Bounds<$ty>, L: Source, M: Mode> AtLiteral<Lit<L, M>> for Fixed<U, P, $ty, B> {
+            const AT: Self = {
+                let value = Value::of_literal(&BigDecimal::parse(L::VALUE), P::SCALE);
+                Self::of_value(&value, M::ROUNDING, &src::<L>(true))
+            };
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
-            AtLiteral<LiteralIn<N, E, S>> for Fixed<U, P, $ty, B>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, L: Source, S: Unit, M: Mode> AtLiteral<LitIn<L, S, M>>
+            for Fixed<U, P, $ty, B>
         {
-            const AT: Self = Self::from_decimal_in::<S>(Decimal::new(N, E));
+            const AT: Self = {
+                let value = Value::of_literal_any(&BigDecimal::parse(L::VALUE), scale_in::<S, U, P>());
+                Self::of_value(&value, M::ROUNDING, &src::<L>(false))
+            };
+        }
+
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, L: Source, Q: InUnit<Unit: Unit>, M: Mode>
+            AtLiteral<LitSymbols<L, Q, M>> for Fixed<U, P, $ty, B>
+        {
+            const AT: Self = {
+                let value = Value::of_literal_any(&BigDecimal::of(Q::VALUE), scale_in::<Q::Unit, U, P>());
+                Self::of_value(&value, M::ROUNDING, &src::<L>(false))
+            };
         }
     )*};
 }
 
 from_decimal!(int u8 u16 u32 u64 i8 i16 i32 i64);
 
-from_decimal!(float f32 to_f32 f64 to_f64);
+from_decimal!(float f32 u32 F32 f64 u64 F64);
 
 /// A [Complex] of two literals, each part as [Fixed::from_decimal] has it.
 macro_rules! complex_literal {
     ($($ty:ident)*) => {$(
-        impl<U, P: FixedScale, B: Unlimited<$ty>, const N1: i64, const E1: i16, const N2: i64, const E2: i16>
-            AtLiteral<(Literal<N1, E1>, Literal<N2, E2>)> for Complex<U, P, $ty, B>
+        impl<U, P: FixedScale, B: Unlimited<$ty>, L1: Source, L2: Source, M: Mode>
+            AtLiteral<(Lit<L1, M>, Lit<L2, M>)> for Complex<U, P, $ty, B>
         {
             const AT: Self = Complex::of_unchecked(
-                Fixed::<U, P, $ty>::from_decimal(Decimal::new(N1, E1)).get(),
-                Fixed::<U, P, $ty>::from_decimal(Decimal::new(N2, E2)).get(),
+                <Fixed<U, P, $ty> as AtLiteral<Lit<L1, M>>>::AT.get(),
+                <Fixed<U, P, $ty> as AtLiteral<Lit<L2, M>>>::AT.get(),
             );
         }
     )*};
