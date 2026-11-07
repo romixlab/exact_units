@@ -1,10 +1,10 @@
-error: q!: `min` reads more than one way (Minute, customary::MinimUs, customary::MinimImperial, milli Inch): write the one you mean as a type, as in q!(5 Minute)
+error: q!: `min` reads more than one way (Minute, MinimUs, MinimImperial, milli Inch): write the one you mean as a type, as in q!(5 Minute)
  --> tests/compile_fail/q_symbols.rs:7:22
   |
 7 |     let _ = t < q!(5 min);
   |                      ^^^
 
-error: q!: `gal` reads more than one way (customary::GallonUs, customary::GallonImperial): write the one you mean as a type, as in q!(5 customary::GallonUs)
+error: q!: `gal` reads more than one way (GallonUs, GallonImperial): write the one you mean as a type, as in q!(5 GallonUs)
  --> tests/compile_fail/q_symbols.rs:8:22
   |
 8 |     let _ = t < q!(5 gal);
