@@ -4,6 +4,7 @@
     reason = "a test computes indices of the words it splits, which fit"
 )]
 
+use super::entry::Prefixes;
 use super::grammar::{Literal, Unit, literal};
 use super::model::Tok;
 use super::number::{Decimal, parse};
@@ -104,10 +105,13 @@ fn table_is_sorted_and_unique() {
     for w in UNITS.windows(2) {
         assert!(w[0].symbol < w[1].symbol, "{} {}", w[0].symbol, w[1].symbol);
     }
+    // a refused symbol keeps its line only for its prefixed forms (`cd` is refused, `mcd` a millicandela)
     for r in REFUSED {
         assert!(
-            !UNITS.iter().any(|u| u.symbol == r.symbol),
-            "{} is refused and a unit",
+            !UNITS
+                .iter()
+                .any(|u| u.symbol == r.symbol && u.prefixes == Prefixes::None),
+            "{} is refused and a unit without prefixes",
             r.symbol
         );
     }
