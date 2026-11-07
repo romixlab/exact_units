@@ -270,7 +270,7 @@ mod proofs {
     use super::*;
 
     /// Every i16 stored in steps of 1 cm and of 1/3 m against every i8 of digits with a power of ten from 10⁻² to
-    /// 10¹. The fold's gcd loops in `u128` bound the size, as for property 7.
+    /// 10¹: 12 minutes. The fold's gcd loops in `u128` bound the size, as for property 7.
     #[kani::proof]
     #[kani::unwind(40)]
     fn centi_and_third_i16() {
