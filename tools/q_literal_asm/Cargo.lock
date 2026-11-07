@@ -5,6 +5,13 @@ version = 4
 [[package]]
 name = "exact_units"
 version = "0.1.0"
+dependencies = [
+ "exact_units_macros",
+]
+
+[[package]]
+name = "exact_units_macros"
+version = "0.1.0"
 
 [[package]]
 name = "q_literal_asm"
