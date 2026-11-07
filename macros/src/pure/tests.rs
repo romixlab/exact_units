@@ -5,7 +5,7 @@
 )]
 
 use super::entry::Prefixes;
-use super::grammar::{Literal, Unit, literal};
+use super::grammar::{At, Literal, Unit, literal};
 use super::model::Tok;
 use super::number::{Decimal, parse};
 use super::resolve::{Symbol, resolve};
@@ -217,11 +217,56 @@ fn refusals() {
     assert!(refused("1 m ^ 10").contains("power"));
     assert!(refused("1 m / KiB").contains("binary prefix"));
     assert!(refused("1 m s").contains("joined by"));
-    assert!(refused("25 °C").contains("point"));
-    assert!(refused("25 K @ AbsoluteZero").contains("origin"));
+    assert!(refused("25 degC / s").contains("stands alone"));
+    assert!(refused("25 °C * m").contains("stands alone"));
     assert!(refused("m / s").contains("number"));
     assert!(refused("\"9.81 m2\"").contains("power"));
     assert!(refused("\"9.81 Speed\"").contains("no unit symbol"));
     assert!(refused("1 m *").contains("missing"));
     assert!(refused("1e40000 m").contains("out of range"));
+}
+
+fn origin(l: &Literal) -> &'static str {
+    match &l.at {
+        Some(At::Symbol { path, .. }) => path,
+        at => panic!("{at:?} is no origin symbol"),
+    }
+}
+
+#[test]
+fn points() {
+    let l = lit("25 degC");
+    assert_eq!((l.num, l.exp, &l.unit), (25, 0, &Unit::Steps));
+    assert_eq!(origin(&l), "origins::Celsius");
+    let l = lit("- 40 degF");
+    assert_eq!((l.num, l.exp, origin(&l)), (-4, 1, "origins::Fahrenheit"));
+    let l = lit("25 \"°C\"");
+    assert_eq!(origin(&l), "origins::Celsius");
+    let l = lit("\"25 ℃\"");
+    assert_eq!(origin(&l), "origins::Celsius");
+    let l = lit("\"491.67 °R\"");
+    assert_eq!((l.num, l.exp, origin(&l)), (49167, -2, "origins::Rankine"));
+    // a unit and an origin's type: the prefix folds into the number as for an amount
+    let l = lit("300 mK @ AbsoluteZero");
+    assert_eq!((l.num, l.exp, marker(&l.unit)), (3, -1, "units::Kelvin"));
+    assert_eq!(l.at, Some(At::Type(vec![4])));
+    let l = lit("2 kPa @ origins : : Gauge");
+    assert_eq!(l.at, Some(At::Type(vec![4, 5, 6, 7])));
+    let l = lit("77 @ Fahrenheit");
+    assert_eq!((l.unit, l.at), (Unit::Steps, Some(At::Type(vec![3]))));
+    let l = lit("90 deg @ Angle < Degree >");
+    assert_eq!(l.at, Some(At::Type(vec![4, 5, 6, 7])));
+    // amounts stay amounts
+    assert_eq!(lit("25 K").at, None);
+}
+
+#[test]
+fn point_refusals() {
+    assert!(refused("25 K @").contains("origin's type follows"));
+    assert!(refused("25 K @ 3").contains("origin's type follows"));
+    assert!(refused("25 K @ AbsoluteZero m").contains("ends with its origin"));
+    assert!(refused("25 degC @ Celsius").contains("one origin"));
+    assert!(refused("\"300 K @ AbsoluteZero\"").contains("after the string"));
+    assert!(refused("25 kmh @ Celsius").contains("no unit symbol"));
+    assert!(refused("@ Celsius").contains("number"));
 }

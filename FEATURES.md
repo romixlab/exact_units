@@ -180,7 +180,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   `tools/q_literal_asm` for thumbv6m-none-eabi with `--emit asm` and checks `speed < q!(100 m/s)` is the exact
   instructions of the typed-const and hand-written compares, a literal past the storage's range a bare `true`;
   skipped where that target isn't installed). The generated symbol table (UNIT-11), float storages (NUM-16),
-  points (PT-5), `fixed!(100 m/s)` (NUM-17) and `Exact` and levels (NUM-18) follow.
+  `fixed!(100 m/s)` (NUM-17) and points (PT-5) are in; `Exact` and levels (NUM-18) follow.
 - ✅ **NUM-15 `q!`, a literal that names its unit** — the cargo feature `q`, on by default; `speed < q!(100 m/s)`: a decimal and its unit (symbols joined
   by `*` and `/` left to right, powers `^2` and `^-1`, groups `( .. )`, a leading `/`; a type, `q!(100 Speed)`; or a
   string for what Rust's lexer refuses, `q!(90 "°")`, `q!("9.81 m/s²")`), a zero-sized `LiteralIn<N, E, S>` whose
@@ -195,7 +195,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   for i8 to i64 and u8 to u32, whole walks of `q!` over every i16, u16, i8 and u8 for prefixes, powers, strings,
   degrees against mrad, bytes; a Kani proof over i16), `tests/props/q_text.rs` and the `q_text` fuzz target (any
   text, never a panic), `tests/compile_fail/q_*.rs` snapshots for each refusal. The generated symbol table (UNIT-11),
-  float storages (NUM-16), points (PT-5), `fixed!(100 m/s)` (NUM-17), `Exact` and levels (NUM-18) and the thumbv6m
+  float storages (NUM-16), `fixed!(100 m/s)` (NUM-17), points (PT-5), `Exact` and levels (NUM-18) and the thumbv6m
   check that `q!` compiles to the typed-const compare follow.
 - 📋 **NUM-10 Measured constants as exact symbols** · `foundations` — μ₀ and G in `Magnitude` beside π, ln 2 and ln 10
   (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
@@ -365,9 +365,17 @@ and clocks with a named epoch.
 - 📋 **PT-4 Time scales as references** · `foundations` — `ReferenceDef` (exact, run time, time scale); `TaiScale`,
   `PosixScale`, `DeviceMonotonic`; `UnixEpoch` moves off `UnitZero`; within a scale exact at compile time, across
   through a `LeapTable` at run time behind a cargo feature, `InLeap` inside a leap second. The foundation of PT-3.
-- 📋 **PT-5 Point literals** — `q!(25 °C)`, `q!(77 degF)`, `q!(300 K @ AbsoluteZero)`: a literal at an origin,
-  compared with a `Point` only, folded into its origin's frame in a `const` block; a plain literal against a `Point`
-  and a point literal against a `Fixed` don't compile.
+- ✅ **PT-5 Point literals** — `q!(25 degC)`, `q!(77 degF)`, `q!(491.67 degR)`, `q!(25 "°C")`: a number in an
+  origin's own step; `q!(298.15 K @ AbsoluteZero)`, `q!(220 kPa @ Gauge)`: a unit at any origin's type;
+  `q!(77 @ Fahrenheit)`: the origin's step again. A `literal::LiteralAt<N, E, S, O>` compared with a `Point<O2,
+  Fixed<..>>` of integer storage at any origin of the same unit, reference and modulus: folded into `O2`'s frame in a
+  `const` block (the offset `O − O2` and the step, exact in fractions of integers; at the same origin also a scale
+  with π), one integer compare against a constant. `==` for every origin, a modulo one taking the literal into its
+  period; `<` and the rest for `Linear` origins only. A point literal against a `Fixed`, a plain literal against a
+  `Point`, a gauge literal against an absolute pressure and an order of points that wrap don't compile. Tests:
+  `tests/props/q_point.rs` (the fold against an `i128` reference for u8 to i64, walks of `q!` over every i16, u16
+  and u8, angles in their period; Kani proofs over i16), `tests/compile_fail/q_point.rs`. Docs:
+  [Points and amounts](docs/points/points.md#comparing-with-a-literal).
 
 ## Levels (`LVL`)
 

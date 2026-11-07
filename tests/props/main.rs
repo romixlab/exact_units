@@ -32,6 +32,8 @@ mod prefix;
 mod q_float;
 #[cfg(feature = "q")]
 mod q_literal;
+#[cfg(all(feature = "q", feature = "thermal", feature = "angle"))]
+mod q_point;
 #[cfg(all(feature = "q", not(kani)))]
 mod q_text;
 mod reference;

@@ -107,6 +107,30 @@ assert_eq!(MilliK::from_raw(298_155).to::<Celsius, Centi, i16>(), None);
 
 The factor and the offset are worked out at compile time: at run time a multiply, an add and a divide by constants.
 
+## Comparing with a literal
+
+`q!` writes a point as people do, a number and its scale: `q!(25 degC)`, `q!(77 degF)`, `q!(491.67 degR)`. A string takes the degree sign, `q!(25 "°C")` or `q!("25 ℃")`, as Rust's lexer refuses `°` outside one. Any origin is named with `@`: after a unit (`q!(298.15 K @ AbsoluteZero)`, `q!(220 kPa @ Gauge)`) or after the number alone, which then counts the origin's own steps (`q!(77 @ Fahrenheit)`, `q!(4 @ Lsm6dsTemp)`).
+
+A point compares with such a literal at any origin of the same unit and reference. The literal is moved into the point's frame at compile time, exactly, so the compare is one integer compare against a constant:
+
+```rust
+use exact_units::{Fixed, Point, q, origins::{AbsoluteZero, Celsius}, prefix::Centi, units::Kelvin};
+
+let t = Point::<AbsoluteZero, Fixed<Kelvin, Centi, u16>>::from_raw(29_815); // 298.15 K
+assert!(t == q!(25 degC));
+assert!(t == q!(77 degF));
+assert!(t < q!(25.01 degC));
+
+let body = Point::<Celsius, Fixed<Kelvin, Centi, i16>>::from_raw(3_700);
+// 98.6 °F is exactly 37 °C; 98 °F is 36.66.. °C, between two stored values, and equals neither
+assert!(body == q!(98.6 degF));
+assert!(q!(98 degF) < body && body != q!(98 degF));
+```
+
+Nothing is rounded: a literal between two stored values is above the one and below the other. A literal past the storage's range is a constant answer.
+
+A reading is not an amount, so a point literal doesn't compare with a `Fixed`, and a plain `q!(300 K)` doesn't compare with a `Point`. Gauge and absolute pressure don't compare, as they don't convert. Points that wrap (an `Angle<..>`) take `==` only: the literal is taken into the period first, so `q!(370 deg @ Angle<Degree>)` is the point at 10°, and `<` doesn't compile, as a heading has no order.
+
 ## Origins the crate ships
 
 `exact_units::origins` has these:

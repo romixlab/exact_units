@@ -87,7 +87,7 @@ use core::cmp::Ordering;
 use core::marker::PhantomData;
 
 use super::{Decimal, LiteralIn, scale_in};
-use crate::{Bounds, Fixed, FixedScale, Unit};
+use crate::{Bounds, Fixed, FixedScale, Magnitude, Unit};
 
 impl<const N: i64, const E: i16, S> LiteralIn<N, E, S> {
     /// The literal as a value: what `q!` gives.
@@ -105,13 +105,19 @@ impl<const N: i64, const E: i16, S> Copy for LiteralIn<N, E, S> {}
 /// A literal in steps of a [Fixed]'s scale: `floor` is its integer part (toward −∞), `exact` whether it is that
 /// integer.
 #[derive(Copy, Clone)]
-struct Cut {
-    floor: i128,
-    exact: bool,
+pub(super) struct Cut {
+    pub(super) floor: i128,
+    pub(super) exact: bool,
 }
 
-/// `x` of `S` in steps of `P · U`, exact: an integer division for a rational scale, the interval's floor for one
-/// with π or a root (never an integer then, as `x ≠ 0`).
+/// `x` of `S` in steps of `P · U`, exact ([cut_scale]).
+const fn cut<S: Unit, U: Unit, P: FixedScale>(x: Decimal) -> Cut {
+    // the units are checked for every literal, 0 too
+    cut_scale(x, scale_in::<S, U, P>())
+}
+
+/// `x` in steps of `scale` (a step in units of `x`), exact: an integer division for a rational scale, the
+/// interval's floor for one with π or a root (never an integer then, as `x ≠ 0`).
 #[expect(
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
@@ -120,9 +126,7 @@ struct Cut {
     clippy::arithmetic_side_effects,
     reason = "q >= 1 (Decimal::over), fl <= i128::MAX - 1 checked, so -fl - 1 fits"
 )]
-const fn cut<S: Unit, U: Unit, P: FixedScale>(x: Decimal) -> Cut {
-    // the units are checked for every literal, 0 too
-    let scale = scale_in::<S, U, P>();
+pub(super) const fn cut_scale(x: Decimal, scale: Magnitude) -> Cut {
     if x.num() == 0 {
         return Cut {
             floor: 0,
@@ -162,7 +166,7 @@ const fn cut<S: Unit, U: Unit, P: FixedScale>(x: Decimal) -> Cut {
 
 /// `t <= c` for every stored `t` of a storage, folded: always, never, or against a `c` in range.
 #[derive(Copy, Clone)]
-enum AtMost<T> {
+pub(super) enum AtMost<T> {
     All,
     Never,
     Le(T),
@@ -173,7 +177,7 @@ macro_rules! literal_cmp {
         impl AtMost<$ty> {
             #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
             #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
-            const fn of(c: i128) -> Self {
+            pub(super) const fn of(c: i128) -> Self {
                 if c > $ty::MAX as i128 {
                     AtMost::All
                 } else if c < $ty::MIN as i128 {
@@ -191,17 +195,17 @@ macro_rules! literal_cmp {
 
             /// `t < x` as `t <= c`: `c` is `floor(x)`, one less where `x` is that integer.
             #[expect(clippy::arithmetic_side_effects, reason = "floor <= i128::MAX - 1 (cut), and above i128::MIN: |x| < 2^127")]
-            const fn lt(x: Cut) -> Self {
+            pub(super) const fn lt(x: Cut) -> Self {
                 Self::of(if x.exact { x.floor - 1 } else { x.floor })
             }
 
             /// `t <= x` as `t <= floor(x)`.
-            const fn le(x: Cut) -> Self {
+            pub(super) const fn le(x: Cut) -> Self {
                 Self::of(x.floor)
             }
 
             /// `t == x`: only where `x` is an integer in range.
-            const fn eq(x: Cut) -> Option<$ty> {
+            pub(super) const fn eq(x: Cut) -> Option<$ty> {
                 match Self::of(x.floor) {
                     AtMost::Le(c) if x.exact => Some(c),
                     _ => None,
@@ -221,7 +225,7 @@ macro_rules! literal_cmp {
             }
 
             #[inline(always)]
-            fn test(self, t: $ty) -> bool {
+            pub(super) fn test(self, t: $ty) -> bool {
                 match self {
                     AtMost::All => true,
                     AtMost::Never => false,
@@ -512,6 +516,9 @@ literal_cmp_float! {
 /// groups `( .. )`; each symbol from the table, its SI prefix folded into the literal's exponent. Or a type:
 /// `q!(100 Speed)`, `q!(1 units::Volt)`, `q!(2 Per<Volt, Second>)`. A string takes the symbols Rust's lexer can't:
 /// `q!(90 "°")`, `q!("9.81 m/s²")`.
+///
+/// A point literal names an origin, and compares with a [Point](crate::Point) instead: `q!(25 degC)`, `q!(77 degF)`,
+/// `q!(25 "°C")`, `q!(298.15 K @ AbsoluteZero)`, `q!(77 @ Fahrenheit)` (see [point](crate::literal::point)).
 #[macro_export]
 macro_rules! q {
     ($($t:tt)*) => { $crate::__macros::q!($crate; $($t)*) };

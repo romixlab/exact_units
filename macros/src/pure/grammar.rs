@@ -1,7 +1,7 @@
 //! The grammar of `q!`: a number and a unit.
 //!
 //! ```text
-//! literal := '-'? NUMBER unit | STRING            (the whole literal in a string)
+//! literal := '-'? NUMBER (unit | ORIGIN | unit? '@' TYPE) | STRING   (the whole literal in a string)
 //! unit    := (term | '/' term) (('*' | '/') term)*   (left to right: m/s/s is (m/s)/s; /ms is 1/ms)
 //! term    := atom ('^' '-'? INTEGER)?
 //! atom    := SYMBOL | TYPE | '(' unit ')' | '%' | STRING   (a unit in a string)
@@ -10,6 +10,10 @@
 //! A symbol is looked up in the table, with a prefix split off where the unit takes one; the prefix goes into the
 //! number's exponent, so `mV` is `Volt` and `10^-3` more. A type is a path with `::` or `<..>` (`units::Speed`,
 //! `Per<Volt, Second>`) or a capitalised identifier the table doesn't know (`Speed`).
+//!
+//! A point literal is a number at an origin: an origin symbol alone after the number (`25 degC`, `25 "°C"`, the
+//! number in the origin's own step), or `@` and the origin's type after a unit (`300 K @ AbsoluteZero`) or after the
+//! number alone (`77 @ Fahrenheit`, again in the origin's step).
 
 use super::model::{Delim, Error, Tok};
 use super::number::{self, Decimal};
@@ -43,6 +47,24 @@ pub(crate) enum Unit {
     Pow(Box<Unit>, i32),
     /// The unit 1, before a leading `/`: `q!(5 /ms)`.
     One,
+    /// The step of a point literal's origin, for a number without a unit: `q!(25 degC)`, `q!(77 @ Fahrenheit)`.
+    Steps,
+}
+
+/// The origin of a point literal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum At {
+    /// An origin symbol of the table, `degC`.
+    Symbol {
+        /// The origin's path under exact_units' root, `origins::Celsius`.
+        path: &'static str,
+        /// Its feature group, `thermal`.
+        group: &'static str,
+        /// The symbol's token.
+        id: usize,
+    },
+    /// The type after `@`, as the ids of its tokens.
+    Type(Vec<usize>),
 }
 
 /// A literal: `num · 10^exp` of `unit`, its prefixes folded into `num` and `exp`.
@@ -54,6 +76,8 @@ pub(crate) struct Literal {
     pub(crate) exp: i16,
     /// The unit.
     pub(crate) unit: Unit,
+    /// The origin of a point literal, `None` for an amount.
+    pub(crate) at: Option<At>,
 }
 
 /// The largest power `^n` takes.
@@ -119,11 +143,11 @@ fn number_and_unit(toks: &[Tok], whole: usize, in_string: bool) -> Result<Litera
             "a unit is missing after the number: q!(100 m/s), q!(5 %), q!(0.5 Ratio); fixed!(..) is a number in the unit of its context",
         ));
     }
-    if let Some(at) = rest.iter().find(|t| t.punct() == Some('@')) {
-        return Err(Error::at(
-            at.id(),
-            "a point at an origin (`@ Origin`) is not read yet: q! compares a Fixed here",
-        ));
+    if let Some(k) = rest.iter().position(|t| t.punct() == Some('@')) {
+        return point(rest, k, num, num_id, in_string);
+    }
+    if let Some(at) = origin_symbol(rest, in_string)? {
+        return fold(num, Unit::Steps, num_id, Some(at));
     }
     let mut p = Parser {
         toks: rest,
@@ -137,12 +161,117 @@ fn number_and_unit(toks: &[Tok], whole: usize, in_string: bool) -> Result<Litera
             "a unit is symbols joined by `*` and `/`, with powers `^2`, or a type",
         ));
     }
-    fold(num, unit, num_id)
+    fold(num, unit, num_id, None)
+}
+
+/// `rest` as one origin symbol, `degC` or `"°C"`, if it is one.
+fn origin_symbol(rest: &[Tok], in_string: bool) -> Result<Option<At>, Error> {
+    let (text, id) = match rest {
+        [Tok::Ident { text, id }] => (text.clone(), *id),
+        [Tok::Lit { text, id }] if !in_string => match strlex::content(text) {
+            Some(s) => match strlex::lex(s.map_err(|m| Error::at(*id, m))?, *id)?.as_slice() {
+                [Tok::Ident { text, .. }] => (text.clone(), *id),
+                _ => return Ok(None),
+            },
+            None => return Ok(None),
+        },
+        _ => return Ok(None),
+    };
+    match resolve(&text) {
+        Ok(Symbol::Origin(o)) => Ok(Some(At::Symbol {
+            path: o.path,
+            group: o.group,
+            id,
+        })),
+        _ => Ok(None),
+    }
+}
+
+/// A point literal with `@` at `rest[k]`: the unit before it (none: the origin's step), the origin's type after.
+fn point(
+    rest: &[Tok],
+    k: usize,
+    num: Decimal,
+    num_id: usize,
+    in_string: bool,
+) -> Result<Literal, Error> {
+    let (unit, after) = rest.split_at(k);
+    let (amp, after) = match after.split_first() {
+        Some((amp, after)) => (amp.id(), after),
+        None => (num_id, after),
+    };
+    if in_string {
+        return Err(Error::at(
+            amp,
+            "an origin is written after the string: q!(300 \"K\" @ AbsoluteZero)",
+        ));
+    }
+    let unit = if unit.is_empty() {
+        Unit::Steps
+    } else {
+        if let Some(At::Symbol { id, .. }) = origin_symbol(unit, in_string)? {
+            return Err(Error::at(
+                id,
+                "a point literal has one origin: an origin symbol (q!(25 degC)) or `@` and a type (q!(298.15 K @ AbsoluteZero))",
+            ));
+        }
+        let mut p = Parser {
+            toks: unit,
+            at: 0,
+            in_string,
+        };
+        let u = p.unit()?;
+        if let Some(t) = p.peek() {
+            return Err(Error::at(
+                t.id(),
+                "a unit is symbols joined by `*` and `/`, with powers `^2`, or a type",
+            ));
+        }
+        u
+    };
+    let origin_needed = || {
+        Error::at(
+            amp,
+            "an origin's type follows `@`: q!(300 K @ AbsoluteZero), q!(220 kPa @ Gauge)",
+        )
+    };
+    let mut p = Parser {
+        toks: after,
+        at: 0,
+        in_string,
+    };
+    let starts_type = match after.first() {
+        Some(Tok::Ident { .. }) => true,
+        Some(Tok::Punct {
+            ch: ':',
+            joint: true,
+            ..
+        }) => after.get(1).and_then(Tok::punct) == Some(':'),
+        _ => false,
+    };
+    if !starts_type {
+        return Err(after.first().map_or_else(origin_needed, |t| {
+            Error::at(
+                t.id(),
+                "an origin's type follows `@`: q!(300 K @ AbsoluteZero), q!(220 kPa @ Gauge)",
+            )
+        }));
+    }
+    let Unit::Type(ids) = p.type_path()? else {
+        return Err(origin_needed());
+    };
+    if let Some(t) = p.peek() {
+        return Err(Error::at(
+            t.id(),
+            "a point literal ends with its origin's type: q!(300 K @ AbsoluteZero)",
+        ));
+    }
+    fold(num, unit, num_id, Some(At::Type(ids)))
 }
 
 /// The prefixes of `unit` folded into the number: `num · 10^exp` with each decimal prefix and the symbol's own power
 /// of ten times its power in the unit, and `num` times 1024 per binary prefix.
-fn fold(num: Decimal, unit: Unit, num_id: usize) -> Result<Literal, Error> {
+fn fold(num: Decimal, unit: Unit, num_id: usize, at: Option<At>) -> Result<Literal, Error> {
     let mut pow10 = i64::from(num.exp);
     let mut pow1024 = 0_i64;
     let mut first = num_id;
@@ -167,7 +296,12 @@ fn fold(num: Decimal, unit: Unit, num_id: usize) -> Result<Literal, Error> {
             .checked_mul(1024)
             .ok_or_else(|| Error::at(first, "the literal times its binary prefix is past i64"))?;
     }
-    Ok(Literal { num: n, exp, unit })
+    Ok(Literal {
+        num: n,
+        exp,
+        unit,
+        at,
+    })
 }
 
 /// Calls `f(id, pow10, pow1024, times)` for every symbol of `unit` with its prefix, at power `times`.
@@ -176,7 +310,7 @@ fn walk(unit: &Unit, times: i64, f: &mut impl FnMut(usize, i64, i64, i64)) {
         Unit::Marker {
             id, pow10, pow1024, ..
         } => f(*id, *pow10, *pow1024, times),
-        Unit::Type(_) | Unit::One => {}
+        Unit::Type(_) | Unit::One | Unit::Steps => {}
         Unit::Mul(a, b) => {
             walk(a, times, f);
             walk(b, times, f);
@@ -392,7 +526,7 @@ impl<'a> Parser<'a> {
             Symbol::Origin(o) => Err(Error::at(
                 id,
                 format!(
-                    "`{text}` is a point at the origin {}: it compares with a Point, which q! doesn't read yet",
+                    "`{text}` is a point at the origin {}: it stands alone after the number, as in q!(25 {text}); a difference of temperatures is in K",
                     o.path
                 ),
             )),

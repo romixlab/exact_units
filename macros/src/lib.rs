@@ -9,7 +9,7 @@ use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenSt
 
 mod pure;
 
-use pure::grammar::{self, Unit};
+use pure::grammar::{self, At, Unit};
 use pure::model::{Delim, Error, Tok};
 
 /// `q!($crate; 100 m/s)`: the literal `exact_units::literal::LiteralIn<N, E, Unit>::NEW`. Called by exact_units'
@@ -29,7 +29,10 @@ pub fn q(input: TokenStream) -> TokenStream {
     match grammar::literal(&toks, 0) {
         Ok(lit) => {
             let mut out = Out::new(&krate);
-            out.literal(&lit, &side);
+            match &lit.at {
+                None => out.literal(&lit, &side),
+                Some(at) => out.point(&lit, at, &side),
+            }
             out.ts
         }
         Err(e) => error(&e, &side, "q!"),
@@ -187,6 +190,27 @@ impl<'a> Out<'a> {
 
     fn literal(&mut self, lit: &grammar::Literal, side: &Side) {
         self.krate("::literal::LiteralIn::<");
+        self.number(lit);
+        self.unit(&lit.unit, side);
+        self.text(">::NEW");
+    }
+
+    /// A point literal: `$crate::literal::LiteralAt::<N, E, Unit, Origin>::NEW`, the unit `literal::Steps` for a
+    /// number in the origin's own step.
+    fn point(&mut self, lit: &grammar::Literal, at: &At, side: &Side) {
+        self.krate("::literal::LiteralAt::<");
+        self.number(lit);
+        self.unit(&lit.unit, side);
+        self.text(",");
+        match at {
+            At::Symbol { path, group, id } => self.marker(path, group, *id, side),
+            At::Type(ids) => self.tokens(ids, side),
+        }
+        self.text(">::NEW");
+    }
+
+    /// `{N}, {E},`
+    fn number(&mut self, lit: &grammar::Literal) {
         let mut n = TokenStream::new();
         n.extend([TokenTree::Literal(Literal::i64_suffixed(lit.num))]);
         self.ts
@@ -197,8 +221,37 @@ impl<'a> Out<'a> {
         self.ts
             .extend([TokenTree::Group(Group::new(Delimiter::Brace, e))]);
         self.text(",");
-        self.unit(&lit.unit, side);
-        self.text(">::NEW");
+    }
+
+    /// `$crate::__q_{group}!("`symbol`"; path)`, spanned at the symbol's token.
+    fn marker(&mut self, path: &str, group: &str, id: usize, side: &Side) {
+        let span = side.span(id);
+        self.krate(&format!("::__q_{group}!"));
+        let mut inner = TokenStream::new();
+        let mut symbol = Literal::string(&format!("`{}`", side.text(id)));
+        symbol.set_span(span);
+        inner.extend([
+            TokenTree::Literal(symbol),
+            TokenTree::Punct(alone(';', span)),
+        ]);
+        if let Ok(ts) = path.parse::<TokenStream>() {
+            inner.extend(ts.into_iter().map(|mut t| {
+                t.set_span(span);
+                t
+            }));
+        }
+        let mut g = Group::new(Delimiter::Parenthesis, inner);
+        g.set_span(span);
+        self.ts.extend([TokenTree::Group(g)]);
+    }
+
+    /// The user's own tokens, a type.
+    fn tokens(&mut self, ids: &[usize], side: &Side) {
+        for id in ids {
+            if let Some(Some(t)) = side.trees.get(*id) {
+                self.ts.extend([t.clone()]);
+            }
+        }
     }
 
     /// As [literal](Self::literal), but the type `LiteralIn<N, E, Unit>` alone, no turbofish and no `::NEW`: what
@@ -223,34 +276,10 @@ impl<'a> Out<'a> {
         match u {
             Unit::Marker {
                 path, group, id, ..
-            } => {
-                let span = side.span(*id);
-                self.krate(&format!("::__q_{group}!"));
-                let mut inner = TokenStream::new();
-                let mut symbol = Literal::string(&format!("`{}`", side.text(*id)));
-                symbol.set_span(span);
-                inner.extend([
-                    TokenTree::Literal(symbol),
-                    TokenTree::Punct(alone(';', span)),
-                ]);
-                if let Ok(ts) = path.parse::<TokenStream>() {
-                    inner.extend(ts.into_iter().map(|mut t| {
-                        t.set_span(span);
-                        t
-                    }));
-                }
-                let mut g = Group::new(Delimiter::Parenthesis, inner);
-                g.set_span(span);
-                self.ts.extend([TokenTree::Group(g)]);
-            }
+            } => self.marker(path, group, *id, side),
             Unit::One => self.krate("::literal::Unitless"),
-            Unit::Type(ids) => {
-                for id in ids {
-                    if let Some(Some(t)) = side.trees.get(*id) {
-                        self.ts.extend([t.clone()]);
-                    }
-                }
-            }
+            Unit::Steps => self.krate("::literal::Steps"),
+            Unit::Type(ids) => self.tokens(ids, side),
             Unit::Mul(a, b) => match b.as_ref() {
                 Unit::Pow(x, n) if *n < 0 => {
                     self.pair("Per", a, &Unit::Pow(x.clone(), n.saturating_neg()), side);

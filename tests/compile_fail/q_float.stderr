@@ -69,8 +69,8 @@ error[E0080]: evaluation panicked: a literal's unit converts only between units 
 note: inside `quantity::cut::<Meter, Speed, exact_units::prefix::Centi>`
  --> src/literal/quantity.rs
   |
-  |     let scale = scale_in::<S, U, P>();
-  |                 ^^^^^^^^^^^^^^^^^^^^^
+  |     cut_scale(x, scale_in::<S, U, P>())
+  |                  ^^^^^^^^^^^^^^^^^^^^^
 note: inside `literal::scale_in::<Meter, Speed, exact_units::prefix::Centi>`
  --> src/literal.rs
   |
