@@ -581,6 +581,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
   `exact_units_macros` gains a second mode (`fixed`, beside `q`) that emits the type alone, not the
   `LiteralIn::<..>::NEW` value `q!` does, kept apart in the proc-macro crate so the two emission paths don't have
   to move together; its own errors read `fixed!: ..` rather than `q!: ..`.
+- `q!`, a literal that names its unit (NUM-15): `speed < q!(100 m/s)` compares a `Fixed` of integer storage with 100 m/s exactly, as one integer compare against a constant worked out at compile time, the same code as against a typed `const`. The unit is symbols joined by `*` and `/` (`km/h`, `m/s^2`, `kg/(m*s)`, `/ms`), SI and binary prefixes (`mV`, `kΩ`, `KiB`), a type (`q!(100 Speed)`, `q!(2 Per<Volt, Second>)`), or a string for symbols Rust's lexer refuses (`q!(90 "°")`, `q!("9.81 m/s²")`); ASCII spellings always work (`deg`, `u` for micro, `percent`). An inexact literal is never rounded (0.155 m/s against cm/s steps is between two stored values and equals neither), a literal past the storage's range is a constant answer, a unit of another dimension or kind doesn't compile, nor does a symbol that reads two ways (`min`, `gal`), each error at its token. `q!` comes from `exact_units_macros`, a proc-macro crate of this repository without dependencies; `exact_units` depends on it always.
 
 ### 🐛 Fixes
 
