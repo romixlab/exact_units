@@ -11,7 +11,9 @@ use crate::Repr;
 use core::cmp::Ordering;
 
 macro_rules! wide {
-    ($(#[$meta:meta])* $name:ident, $magnitude:ident, $l:ty, $d:ty) => {
+    (
+        $(#[$meta:meta])* $name:ident, $vis:vis $magnitude:ident, $by_bits:ident, $wide:ident, $l:ty, $d:ty
+    ) => {
         $(#[$meta])*
         #[derive(Copy, Clone, PartialEq, Eq)]
         struct $name([$l; 6]);
@@ -137,8 +139,43 @@ macro_rules! wide {
             }
         }
 
-        /// `m · 2^k · sn/sd` against `en/ed`, all of them above 0.
-        fn $magnitude(m: $d, k: i32, (sn, sd): ($d, $d), (en, ed): ($d, $d)) -> Ordering {
+        /// `m · 2^k · sn/sd` against `en/ed`, all of them above 0: by bit length where that proves the order, by
+        /// the wide products elsewhere.
+        $vis fn $magnitude(m: $d, k: i32, s: ($d, $d), e: ($d, $d)) -> Ordering {
+            match $by_bits(m, k, s, e) {
+                Some(o) => o,
+                None => $wide(m, k, s, e),
+            }
+        }
+
+        /// `m · 2^k · sn/sd` against `en/ed` where the bit lengths alone prove the order, `None` elsewhere and
+        /// where a part is 0. The order is that of `a = m · sn · ed · 2^k` and `b = en · sd`: a product of three
+        /// has between the sum of their bit lengths less 2 and that sum, one of two between the sum less 1 and the
+        /// sum, and of two numbers the one with more bits is the larger.
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "five bit lengths of at most 128 and an i32 k: each sum and difference is far inside i64"
+        )]
+        $vis fn $by_bits(m: $d, k: i32, (sn, sd): ($d, $d), (en, ed): ($d, $d)) -> Option<Ordering> {
+            if m == 0 || sn == 0 || sd == 0 || en == 0 || ed == 0 {
+                return None;
+            }
+            let len = |x: $d| i64::from(bit_length!(x, $d));
+            // a has la − 2 to la bits, b has lb − 1 to lb: la − 2 > lb proves a > b, la < lb − 1 proves a < b
+            let la = len(m) + len(sn) + len(ed) + i64::from(k);
+            let lb = len(en) + len(sd);
+            if la - 2 > lb {
+                Some(Ordering::Greater)
+            } else if la < lb - 1 {
+                Some(Ordering::Less)
+            } else {
+                None
+            }
+        }
+
+        /// `m · 2^k · sn/sd` against `en/ed`, all of them above 0, by the wide products always: what the order
+        /// falls back to where the bit lengths don't prove it.
+        $vis fn $wide(m: $d, k: i32, (sn, sd): ($d, $d), (en, ed): ($d, $d)) -> Ordering {
             let a = $name::of(m).mul(sn).mul(ed);
             let b = $name::of(en).mul(sd);
             if k >= 0 {
@@ -152,13 +189,13 @@ macro_rules! wide {
 
 wide! {
     /// A number of six `u64` limbs, the lowest first: 384 bits, the product of three `u128`s.
-    Wide, magnitude, u64, u128
+    Wide, pub magnitude, magnitude_by_bits, magnitude_wide, u64, u128
 }
 
 #[cfg(kani)]
 wide! {
     /// [Wide] on `u8` limbs, for Kani: 48 bits, the product of three `u16`s.
-    Wide8, magnitude8, u8, u16
+    Wide8, magnitude8, magnitude8_by_bits, magnitude8_wide, u8, u16
 }
 
 /// A [Repr] as a sign, a magnitude and a power of two; `Err` for NaN (`None`) and ±∞ (its sign).
@@ -213,7 +250,7 @@ pub(super) fn order(x: Repr, scale: Fraction, e: Fraction) -> Option<Ordering> {
 /// order by bit length, over every input of 16 bits and every shift up to 40.
 #[cfg(kani)]
 mod proofs {
-    use super::{Wide8, magnitude8};
+    use super::{Wide8, magnitude8, magnitude8_by_bits};
     use core::cmp::Ordering;
 
     fn value(w: Wide8) -> u64 {
@@ -237,6 +274,45 @@ mod proofs {
         let w = Wide8::of(a);
         assert_eq!(value(w.shl(n)), u64::from(a) << n);
         assert_eq!(w.bits(), 16 - a.leading_zeros());
+    }
+
+    /// The bound the fast path rests on: a product of three numbers has between the sum of their bit lengths less
+    /// 2 and that sum, of two between the sum less 1 and the sum.
+    #[kani::proof]
+    fn bits_of_products() {
+        let (a, b, c): (u16, u16, u16) = (kani::any(), kani::any(), kani::any());
+        kani::assume(a != 0 && b != 0 && c != 0);
+        let len = |x: u64| 64 - x.leading_zeros();
+        let (la, lb, lc) = (len(a.into()), len(b.into()), len(c.into()));
+        let two = len(u64::from(a) * u64::from(b));
+        let three = len(u64::from(a) * u64::from(b) * u64::from(c));
+        assert!(two + 1 >= la + lb && two <= la + lb);
+        assert!(three + 2 >= la + lb + lc && three <= la + lb + lc);
+    }
+
+    /// The fast path alone, where it answers, gives the order of `m · sn · ed · 2^k` and `en · sd`, for every input
+    /// of 16 bits and every shift up to 40 either way.
+    #[kani::proof]
+    fn magnitude_by_bits() {
+        let (m, sn, sd, en, ed): (u16, u16, u16, u16, u16) = (
+            kani::any(),
+            kani::any(),
+            kani::any(),
+            kani::any(),
+            kani::any(),
+        );
+        let k: i8 = kani::any();
+        kani::assume((-40..=40).contains(&k));
+        if let Some(o) = magnitude8_by_bits(m, i32::from(k), (sn, sd), (en, ed)) {
+            let a = u128::from(m) * u128::from(sn) * u128::from(ed);
+            let b = u128::from(en) * u128::from(sd);
+            let want = if k >= 0 {
+                (a << k).cmp(&b)
+            } else {
+                a.cmp(&(b << -k))
+            };
+            assert_eq!(o, want);
+        }
     }
 
     /// The whole order of magnitudes against `u128`: `m · sn · ed` has 48 bits, shifted by up to 40 it fits.

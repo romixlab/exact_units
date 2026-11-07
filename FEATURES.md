@@ -173,7 +173,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   in 256 bits), never rounding; by integers and
   `Fraction`s; `Exact<U1> * Exact<U2>` is `Exact<Times<U1, U2>>` and `/` `Exact<Per<..>>` as NUM-6, `convert::<U2>()`
   exact (Hz · s to `Ratio`), `as_ratio()` from a quotient `U/U` (Hz/Hz) and `as_gain::<U>()` back, `scaled(Exact<Ratio>)` keeping `U`, `recip::<Second>()` the period. Compare exact (256-bit cross products), also against any
-  `Fixed` across scales and every value of it (384-bit products: floats of any size, ±∞ past every `Exact`, NaN no
+  `Fixed` across scales and every value of it (384-bit products, skipped where bit lengths alone prove the order: floats of any size, ±∞ past every `Exact`, NaN no
   order); a scale that isn't a fraction of `u128`s doesn't compile there. `const fn` constructors (`new_in::<Mega>(1375, 10)`), `from_scaled` / `from_prefix`,
   `from_fixed`, `to` exact or `None`, `to_rounded(Rounding)`, `to_f64`. Display: the decimal when it ends, a
   repetend in parentheses up to 12 digits (`333.(3) kHz`), else the fraction, never cut, with an SI prefix picked or

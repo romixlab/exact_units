@@ -16,6 +16,34 @@ macro_rules! tri {
     };
 }
 
+/// The order of two fractions `$a` and `$b` by the signs, then the cross products in twice the width: the body of
+/// `compare_wide`, and of `compare` off Thumb-1, so there `compare` is the code it always was. Written out in place
+/// on the caller's own `self` and `rhs`: calling `compare_wide`, or copying the two first, measured 11 to 13% more
+/// instructions on a Cortex-M3.
+macro_rules! cross_order {
+    ($a:ident, $b:ident) => {{
+        match ($a.neg, $b.neg) {
+            (true, false) => return Ordering::Less,
+            (false, true) => return Ordering::Greater,
+            _ => {}
+        }
+        let (ah, al) = Self::wide_mul($a.num, $b.den);
+        let (bh, bl) = Self::wide_mul($b.num, $a.den);
+        let o = if ah < bh {
+            Ordering::Less
+        } else if ah > bh {
+            Ordering::Greater
+        } else if al < bl {
+            Ordering::Less
+        } else if al > bl {
+            Ordering::Greater
+        } else {
+            Ordering::Equal
+        };
+        if $a.neg { o.reverse() } else { o }
+    }};
+}
+
 macro_rules! fraction {
     ($(#[$meta:meta])* $name:ident, $u:ty) => {
         $(#[$meta])*
@@ -189,17 +217,105 @@ macro_rules! fraction {
             }
 
             /// The order of `self` and `rhs`, exactly and never overflowing: the cross products in twice the
-            /// width. What `Ord` gives, in `const` code.
+            /// width. What `Ord` gives, in `const` code. On a Thumb-1 core (`cfg(thumb1)`: Cortex-M0, M0+, M23),
+            /// where those products are library calls, the bit lengths of the cross products decide first where
+            /// they prove the order ([compare_fast](Self::compare_fast)); elsewhere the products cost about what
+            /// the bit lengths would, and this is [compare_wide](Self::compare_wide). The order is the same.
             #[must_use]
+            #[cfg(thumb1)]
             pub const fn compare(self, rhs: Self) -> Ordering {
+                self.compare_fast(rhs)
+            }
+
+            /// The order of `self` and `rhs`, exactly and never overflowing: the cross products in twice the
+            /// width. What `Ord` gives, in `const` code. On a Thumb-1 core (`cfg(thumb1)`: Cortex-M0, M0+, M23)
+            /// the bit lengths of the cross products decide first where they prove the order
+            /// ([compare_fast](Self::compare_fast)); here the products cost about what the bit lengths would.
+            #[must_use]
+            #[cfg(not(thumb1))]
+            pub const fn compare(self, rhs: Self) -> Ordering {
+                cross_order!(self, rhs)
+            }
+
+            /// The order of `self` and `rhs` by the signs, then by the bit lengths of the cross products where
+            /// they prove it, the cross products in twice the width elsewhere. Not API: [compare](Self::compare)
+            /// on a Thumb-1 core, built on every target for the property that checks it against
+            /// [compare_wide](Self::compare_wide).
+            #[doc(hidden)]
+            #[must_use]
+            pub const fn compare_fast(self, rhs: Self) -> Ordering {
                 match (self.neg, rhs.neg) {
                     (true, false) => return Ordering::Less,
                     (false, true) => return Ordering::Greater,
                     _ => {}
                 }
-                let (ah, al) = Self::wide_mul(self.num, rhs.den);
-                let (bh, bl) = Self::wide_mul(rhs.num, self.den);
-                let o = if ah < bh {
+                let (a, b) = ((self.num, rhs.den), (rhs.num, self.den));
+                let o = match Self::product_by_bits(a, b) {
+                    Some(o) => o,
+                    None => Self::product_wide(a, b),
+                };
+                if self.neg { o.reverse() } else { o }
+            }
+
+            /// The order of `self` and `rhs` where the signs or the bit lengths of the cross products alone prove
+            /// it, `None` elsewhere. Not API: [compare_fast](Self::compare_fast)'s fast path alone, for the
+            /// property that checks it against [compare_wide](Self::compare_wide).
+            #[doc(hidden)]
+            #[must_use]
+            pub const fn compare_by_bits(self, rhs: Self) -> Option<Ordering> {
+                match (self.neg, rhs.neg) {
+                    (true, false) => return Some(Ordering::Less),
+                    (false, true) => return Some(Ordering::Greater),
+                    _ => {}
+                }
+                let o = tri!(Self::product_by_bits((self.num, rhs.den), (rhs.num, self.den)));
+                Some(if self.neg { o.reverse() } else { o })
+            }
+
+            /// The order of `self` and `rhs` by the cross products in twice the width, always:
+            /// [compare](Self::compare) off Thumb-1, the code it has always been. Not API: named apart for the
+            /// property that checks the fast path against it.
+            #[doc(hidden)]
+            #[must_use]
+            pub const fn compare_wide(self, rhs: Self) -> Ordering {
+                cross_order!(self, rhs)
+            }
+
+            /// `a.0 · a.1` against `b.0 · b.1` where their bit lengths prove the order, `None` elsewhere and where
+            /// a factor is 0. A product of `x` and `y` has `bits(x) + bits(y) − 1` or `bits(x) + bits(y)` bits,
+            /// and of two numbers the one with more bits is the larger: where one side's most bits are fewer than
+            /// the other side's least, nothing need be multiplied.
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "bit lengths are at most BITS, so a sum of two and that sum plus 2 fit u32"
+            )]
+            const fn product_by_bits(a: ($u, $u), b: ($u, $u)) -> Option<Ordering> {
+                if a.0 == 0 || a.1 == 0 || b.0 == 0 || b.1 == 0 {
+                    return None;
+                }
+                let x = Self::bits(a.0) + Self::bits(a.1);
+                let y = Self::bits(b.0) + Self::bits(b.1);
+                // a has x − 1 bits or x, b has y − 1 or y: x − 1 > y proves a > b, y − 1 > x proves a < b
+                if x >= y + 2 {
+                    Some(Ordering::Greater)
+                } else if y >= x + 2 {
+                    Some(Ordering::Less)
+                } else {
+                    None
+                }
+            }
+
+            /// The number of bits up to the highest one set, 0 for 0.
+            const fn bits(x: $u) -> u32 {
+                bit_length!(x, $u)
+            }
+
+            /// `a.0 · a.1` against `b.0 · b.1`, the products in twice the width: [compare_wide](Self::compare_wide)'s
+            /// order of magnitudes, for [compare_fast](Self::compare_fast) to fall back to.
+            const fn product_wide(a: ($u, $u), b: ($u, $u)) -> Ordering {
+                let (ah, al) = Self::wide_mul(a.0, a.1);
+                let (bh, bl) = Self::wide_mul(b.0, b.1);
+                if ah < bh {
                     Ordering::Less
                 } else if ah > bh {
                     Ordering::Greater
@@ -209,8 +325,7 @@ macro_rules! fraction {
                     Ordering::Greater
                 } else {
                     Ordering::Equal
-                };
-                if self.neg { o.reverse() } else { o }
+                }
             }
 
             /// `a · b` in twice the width, as (high, low) halves: four products of half-width parts.
@@ -389,6 +504,21 @@ mod proofs {
         let (q, r) = F::wide_divrem(n, d);
         assert_eq!(wide(q), wide(n) / u16::from(d));
         assert_eq!(u16::from(r), wide(n) % u16::from(d));
+    }
+
+    /// The bound [compare](F::compare)'s fast path rests on, a product of two has `bits(x) + bits(y) − 1` or
+    /// `bits(x) + bits(y)` bits, and the fast path's answer, where it gives one, is the order of the products.
+    #[kani::proof]
+    fn product_by_bits() {
+        let (a, b, c, d): (u8, u8, u8, u8) = (kani::any(), kani::any(), kani::any(), kani::any());
+        let (x, y) = (u16::from(a) * u16::from(b), u16::from(c) * u16::from(d));
+        if a != 0 && b != 0 {
+            let (len, sum) = (16 - x.leading_zeros(), F::bits(a) + F::bits(b));
+            assert!(len == sum || len + 1 == sum);
+        }
+        if let Some(o) = F::product_by_bits((a, b), (c, d)) {
+            assert_eq!(o, x.cmp(&y));
+        }
     }
 
     /// The gcd divides both, and what is left of them has no common factor: Euclid on u8 takes at most 13 steps.

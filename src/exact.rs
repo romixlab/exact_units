@@ -10,10 +10,67 @@ use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 use core::ops::{Add, Div, Mul, Neg, Sub};
 
+/// The number of bits of `$x`, an unsigned `$u`, up to the highest one set, 0 for 0. A Thumb-1 core (`cfg(thumb1)`,
+/// set by `build.rs`: Cortex-M0, M0+, M23) has no CLZ, and a count of leading zeros over a whole `u128` is a
+/// software count for every 32-bit word; there [bit_length_halved] halves it down to the word that holds the
+/// highest bit and counts once. Elsewhere `bit_width` is an instruction or a few.
+macro_rules! bit_length {
+    ($x:expr, $u:ty) => {{
+        #[cfg(thumb1)]
+        let n = bit_length_halved!($x, $u);
+        #[cfg(not(thumb1))]
+        let n = <$u>::bit_width($x);
+        n
+    }};
+}
+
+/// [bit_length] by halving: down to the 32-bit word that holds the highest bit (two steps for a `u128`), then one
+/// count of leading zeros in it. Checked against `bit_width` for every bit length on every target (`tests`).
+#[cfg_attr(
+    not(any(test, thumb1)),
+    expect(
+        unused_macros,
+        reason = "used on Thumb-1 targets only, and by the test that checks it"
+    )
+)]
+macro_rules! bit_length_halved {
+    ($x:expr, $u:ty) => {{
+        let (mut x, mut width, mut base): ($u, u32, u32) = ($x, <$u>::BITS, 0);
+        while width > 32 {
+            width /= 2;
+            let hi = x >> width;
+            if hi != 0 {
+                x = hi;
+                base = base.saturating_add(width);
+            }
+        }
+        #[expect(
+            clippy::allow_attributes,
+            reason = "a macro over several widths: the cast narrows a u128 and widens a u8, so an #[expect] is \
+                      unfulfilled for one of them"
+        )]
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_lossless,
+            clippy::as_conversions,
+            reason = "x is below 2^32 here, halved down to it; a const fn, where From is not const"
+        )]
+        let w = x as u32;
+        base.saturating_add(w.bit_width())
+    }};
+}
+
 mod compare;
 mod decimal;
 mod fraction;
 mod text;
+
+/// Not API: the order of a [Fixed]'s and an [Exact]'s magnitudes in their parts, the fast path by bit length and the
+/// wide products apart, for the property that checks one against the other (`tests/props/exact.rs`).
+#[doc(hidden)]
+pub mod order_parts {
+    pub use super::compare::{magnitude, magnitude_by_bits, magnitude_wide};
+}
 #[cfg(feature = "dimensionless")]
 mod tolerance;
 
@@ -695,5 +752,31 @@ impl<U, U2> Div<Exact<U2>> for Exact<U> {
     /// [checked_per](Exact::checked_per).
     fn div(self, rhs: Exact<U2>) -> Self::Output {
         self.checked_per(rhs)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// [bit_length_halved] is `bit_width` for every bit length of a `u128`, a `u16` and a `u8`, at
+    /// both ends of each (`2^p` and `2^(p+1) − 1`): its branches look only at whether `x >> width` is 0, which
+    /// depends only on the highest bit set, so the two ends of each length take every path it can.
+    #[test]
+    fn bit_length_halved_is_bit_width() {
+        macro_rules! walk {
+            ($u:ty) => {
+                assert_eq!(bit_length_halved!(0, $u), 0);
+                for p in 0..<$u>::BITS {
+                    let lo: $u = 1 << p;
+                    let hi: $u = lo.wrapping_sub(1).wrapping_add(lo);
+                    for x in [lo, hi] {
+                        assert_eq!(bit_length_halved!(x, $u), x.bit_width(), "{x}");
+                        assert_eq!(bit_length!(x, $u), x.bit_width(), "{x}");
+                    }
+                }
+            };
+        }
+        walk!(u128);
+        walk!(u16);
+        walk!(u8);
     }
 }

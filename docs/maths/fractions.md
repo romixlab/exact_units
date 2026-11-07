@@ -85,7 +85,7 @@ use exact_units::{Exact, units::{Hertz, Second}};
 let _ = Exact::<Hertz>::int(1).convert::<Second>();
 ```
 
-Every operation refuses exactly the results that don't fit, in lowest terms. Multiply and divide cancel crosswise first. Add and subtract use Knuth's form with the cross terms in 256 bits, then reduce, so a sum that fits is never refused for a step that didn't. Comparing never overflows: its cross products are taken in 256 bits too.
+Every operation refuses exactly the results that don't fit, in lowest terms. Multiply and divide cancel crosswise first. Add and subtract use Knuth's form with the cross terms in 256 bits, then reduce, so a sum that fits is never refused for a step that didn't. Comparing never overflows: its cross products are taken in 256 bits too. On a Cortex-M0, where those products are library calls, the bit lengths of the cross products decide first where they prove the order (a product of `x` and `y` has `bits(x) + bits(y) − 1` or `bits(x) + bits(y)` bits), which gives the same answer without multiplying. A compare with a `Fixed` does that on every target.
 
 ## To and from `Fixed`
 

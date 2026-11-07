@@ -85,6 +85,86 @@ pub(crate) fn ops8(a: Parts8, b: Parts8) {
         "{a:?} against {b:?}"
     );
     assert_eq!(a.negate().checked_add(a), Some(Fraction8::ZERO));
+    compare_fast8(a, b);
+}
+
+/// The number of bits up to the highest one set, 0 for 0.
+fn len8(x: u8) -> i64 {
+    x.checked_ilog2().map_or(0, |l| i64::from(l) + 1)
+}
+
+/// See [len8].
+fn len(x: u128) -> i64 {
+    x.checked_ilog2().map_or(0, |l| i64::from(l) + 1)
+}
+
+/// Whether the order of `a · b` and `c · d` (`x` and `y`, the sums of their factors' bit lengths) is proven by bit
+/// length alone: a product of two has `x − 1` or `x` bits, so it is where `x` and `y` are 2 or more apart and no
+/// factor is 0.
+fn proven(x: i64, y: i64, any_zero: bool) -> bool {
+    !any_zero && (x - 2 >= y || y - 2 >= x)
+}
+
+/// The fast path of a compare against the wide cross products alone: `compare` (the fast path on Thumb-1, the wide
+/// products elsewhere) and `compare_fast` (fast path and fallback, on every target) are `compare_wide` for every
+/// pair; `compare_by_bits` answers exactly where the signs differ or the bit lengths prove the order ([proven]), and
+/// where it answers it is `compare_wide`'s answer.
+macro_rules! compare_fast {
+    ($(#[$meta:meta])* $name:ident, $f:ty, $len:ident) => {
+        $(#[$meta])*
+        pub(crate) fn $name(a: $f, b: $f) {
+            let wide = a.compare_wide(b);
+            assert_eq!(a.compare(b), wide, "{a:?} against {b:?}");
+            assert_eq!(a.compare_fast(b), wide, "{a:?} against {b:?}");
+            let fast = a.compare_by_bits(b);
+            let (x, y) = ($len(a.numer()) + $len(b.denom()), $len(b.numer()) + $len(a.denom()));
+            let decides = a.is_negative() != b.is_negative() || proven(x, y, a.is_zero() || b.is_zero());
+            assert_eq!(fast.is_some(), decides, "{a:?} against {b:?}: bit lengths {x}, {y}");
+            if let Some(o) = fast {
+                assert_eq!(o, wide, "{a:?} against {b:?}");
+            }
+        }
+    };
+}
+
+compare_fast! {
+    /// [compare_fast] on `u8`, walked whole with [ops8].
+    compare_fast8, Fraction8, len8
+}
+
+compare_fast! {
+    /// [compare_fast] on `u128`, drawn at the bit-length edge.
+    #[cfg(not(kani))]
+    compare_fast128, exact_units::Fraction, len
+}
+
+/// The order of a `Fixed`'s and an `Exact`'s magnitudes, `m · 2^k` steps of `sn/sd` against `en/ed` (all above 0),
+/// fast path and fallback against the wide products alone: `magnitude` is `magnitude_wide`; `magnitude_by_bits`
+/// answers exactly where the bit lengths prove the order, and then as `magnitude_wide` does. `a = m · sn · ed`
+/// has between `la − 2` and `la` bits (`la` the sum of its factors'), `b = en · sd` between `lb − 1` and `lb`.
+#[cfg(not(kani))]
+pub(crate) fn magnitude_fast(
+    m: u128,
+    k: i32,
+    s: (u128, u128),
+    e: (u128, u128),
+) -> core::cmp::Ordering {
+    use exact_units::__order_parts::{magnitude, magnitude_by_bits, magnitude_wide};
+    let wide = magnitude_wide(m, k, s, e);
+    let at = format!("{m}·2^{k}·{}/{} against {}/{}", s.0, s.1, e.0, e.1);
+    assert_eq!(magnitude(m, k, s, e), wide, "{at}");
+    let fast = magnitude_by_bits(m, k, s, e);
+    let (la, lb) = (
+        len(m) + len(s.0) + len(e.1) + i64::from(k),
+        len(e.0) + len(s.1),
+    );
+    let any_zero = [m, s.0, s.1, e.0, e.1].contains(&0);
+    let decides = !any_zero && (la - 2 > lb || la < lb - 1);
+    assert_eq!(fast.is_some(), decides, "{at}: bit lengths {la}, {lb}");
+    if let Some(o) = fast {
+        assert_eq!(o, wide, "{at}");
+    }
+    wide
 }
 
 #[cfg(not(kani))]
@@ -266,6 +346,16 @@ pub(crate) mod big {
         assert_eq!(e == f, want == Some(Ordering::Equal), "{e:?} == {f:?}");
     }
 
+    /// [magnitude_fast](super::magnitude_fast), and the order it gives is the exact one.
+    pub(crate) fn magnitude(m: u128, k: i32, s: (u128, u128), e: (u128, u128)) {
+        let got = super::magnitude_fast(m, k, s, e);
+        let pow = BigRational::from_integer(num_bigint::BigInt::from(2).pow(k.unsigned_abs()));
+        let pow = if k < 0 { pow.recip() } else { pow };
+        let r = |n: u128, d: u128| BigRational::new(n.into(), d.into());
+        let a = r(m, 1) * pow * r(s.0, s.1);
+        assert_eq!(got, a.cmp(&r(e.0, e.1)), "{m}·2^{k}·{s:?} against {e:?}");
+    }
+
     /// [order] at the scales that pass `u128` with a big storage (`10^±30`, `10^20`), at 1 and 1/3, on every storage
     /// kind: `x` as an `f64` and an `f32`, `i` as an `i64` and a `u64`.
     pub(crate) fn orders(x: f64, i: i64, e: Exact<Hertz>) {
@@ -360,6 +450,104 @@ mod tests {
             }),
             2 => (any::<i32>(), -160i32..=160).prop_map(|(m, k)| f64::from(m) * 2f64.powi(k)),
         ]
+    }
+
+    /// A number of exactly `l` bits (1 to 128): the least, the most, or between.
+    fn of_bits(l: u32) -> impl Strategy<Value = u128> {
+        let lo = 1u128 << (l - 1);
+        let hi = lo - 1 + lo;
+        prop_oneof![Just(lo), Just(hi), lo..=hi]
+    }
+
+    /// Bit lengths of 1 to 128 for `n` numbers, and `n` of those bits: the lengths are what decides.
+    fn lengths<const N: usize>() -> impl Strategy<Value = [u32; N]> {
+        proptest::array::uniform::<_, N>(prop_oneof![
+            2 => 1u32..=128,
+            1 => proptest::sample::select(&[1u32, 2, 31, 32, 33, 63, 64, 65, 95, 96, 97, 127, 128][..]),
+        ])
+    }
+
+    /// The four cross factors of two fractions of one sign with `len(an) + len(bd)` and `len(bn) + len(ad)` at most
+    /// 4 apart: both sides of the ±1-bit edge where the fast path just declines or just answers. The fractions
+    /// are reduced, which may move a length.
+    fn fractions_at_the_edge()
+    -> impl Strategy<Value = (exact_units::Fraction, exact_units::Fraction)> {
+        (lengths::<3>(), -4i64..=4, any::<bool>())
+            .prop_flat_map(|([la, lb, lc], delta, neg)| {
+                let ld = (i64::from(la) + i64::from(lb) - i64::from(lc) + delta).clamp(1, 128);
+                let ld = u32::try_from(ld).unwrap_or(1);
+                (
+                    of_bits(la),
+                    of_bits(ld),
+                    of_bits(lc),
+                    of_bits(lb),
+                    Just(neg),
+                )
+            })
+            .prop_map(|(an, ad, bn, bd, neg)| {
+                let f = |n, d| exact_units::Fraction::from_parts(neg, n, d).unwrap_or_default();
+                (f(an, ad), f(bn, bd))
+            })
+    }
+
+    /// `m, k, (sn, sd), (en, ed)` of the order of magnitudes, with `k` set so that `len(m) + len(sn) + len(ed) + k`
+    /// is within 4 of `len(en) + len(sd)`: both sides of the edges at −2 and +1 bits.
+    fn magnitudes_at_the_edge() -> impl Strategy<Value = (u128, i32, (u128, u128), (u128, u128))> {
+        (lengths::<5>(), -4i32..=4).prop_flat_map(|([lm, lsn, led, len, lsd], delta)| {
+            let k = i32::try_from(len + lsd).unwrap_or(0)
+                - i32::try_from(lm + lsn + led).unwrap_or(0)
+                + delta;
+            (
+                of_bits(lm),
+                Just(k),
+                (of_bits(lsn), of_bits(lsd)),
+                (of_bits(len), of_bits(led)),
+            )
+        })
+    }
+
+    proptest! {
+        #[test]
+        fn compares_by_bits_as_wide((a, b) in fractions_at_the_edge()) {
+            super::compare_fast128(a, b);
+            big::arith(a, b);
+        }
+
+        #[test]
+        fn compares_any_by_bits_as_wide(a in strategy::fraction(), b in strategy::fraction()) {
+            super::compare_fast128(a, b);
+        }
+
+        #[test]
+        fn orders_magnitudes_by_bits_as_wide((m, k, s, e) in magnitudes_at_the_edge()) {
+            big::magnitude(m, k, s, e);
+        }
+    }
+
+    /// Pinned edges of the order of magnitudes: equal values, one step either side, the fast path's bounds met
+    /// exactly (`len(a) = la − 2`, `len(b) = lb − 1`) and missed by one bit.
+    #[test]
+    fn magnitudes_at_known_edges() {
+        let max = u128::MAX;
+        for (m, k, s, e) in [
+            (1, 0, (1, 1), (1, 1)),
+            (1, 1, (1, 1), (1, 1)),
+            (1, -1, (1, 1), (1, 1)),
+            (1, 2, (1, 1), (3, 1)),
+            (1, 1, (1, 1), (3, 1)),
+            (2, 0, (2, 1), (7, 1)),
+            (2, 0, (2, 1), (8, 1)),
+            (3, 0, (3, 1), (8, 1)),
+            (max, 0, (max, 1), (max, 1)),
+            (max, 128, (max, max), (max, 1)),
+            (max, -256, (1, 1), (1, max)),
+            (1 << 127, -127, (1, 1), (1, 1)),
+            (1 << 127, -128, (1, 1), (1, 1)),
+            (1 << 127, -126, (1, 1), (1, 1)),
+            (1 << 52, -1126, (1, 1), (1, max)),
+        ] {
+            big::magnitude(m, k, s, e);
+        }
     }
 
     /// An `Exact` whose value is a float's: the orders that are `Equal`.
