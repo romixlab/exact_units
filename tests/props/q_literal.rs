@@ -84,8 +84,9 @@ mod tests {
         }
     }
 
-    /// Every operator of stored value `t` against a `q!` literal, both ways round, is order `ord`.
-    macro_rules! agrees {
+    /// Every order operator of stored value `t` against a `q!` literal, both ways round, is order `ord`. For a
+    /// literal no stored value equals (between two steps, past the range), where `==` doesn't compile.
+    macro_rules! orders_only {
         ($t:expr, $lit:expr, $ord:expr) => {{
             let (t, lit, ord): (_, _, Ordering) = ($t, $lit, $ord);
             assert_eq!(t.partial_cmp(&lit), Some(ord), "{t:?}");
@@ -93,14 +94,23 @@ mod tests {
             assert_eq!(t <= lit, ord.is_le());
             assert_eq!(t > lit, ord.is_gt());
             assert_eq!(t >= lit, ord.is_ge());
-            assert_eq!(t == lit, ord.is_eq());
-            assert_eq!(t != lit, ord.is_ne());
             assert_eq!(lit.partial_cmp(&t), Some(ord.reverse()));
             assert_eq!(lit < t, ord.is_gt());
             assert_eq!(lit <= t, ord.is_ge());
             assert_eq!(lit > t, ord.is_lt());
             assert_eq!(lit >= t, ord.is_le());
+        }};
+    }
+
+    /// Every operator of stored value `t` against a `q!` literal a stored value can equal, `==` and `!=` too.
+    macro_rules! agrees {
+        ($t:expr, $lit:expr, $ord:expr) => {{
+            let (t, lit, ord): (_, _, Ordering) = ($t, $lit, $ord);
+            orders_only!(t, lit, ord);
+            assert_eq!(t == lit, ord.is_eq());
+            assert_eq!(t != lit, ord.is_ne());
             assert_eq!(lit == t, ord.is_eq());
+            assert_eq!(lit != t, ord.is_ne());
         }};
     }
 
@@ -120,20 +130,20 @@ mod tests {
             let speed = Fixed::<Speed, Centi, i16>::new(t);
             agrees!(speed, q!(100 m/s), want(t, 1, 100, 100, 0));
             agrees!(speed, q!(99.99 m/s), want(t, 1, 100, 9999, -2));
-            agrees!(speed, q!(0.155 m/s), want(t, 1, 100, 155, -3));
-            agrees!(speed, q!(-0.155 m/s), want(t, 1, 100, -155, -3));
-            agrees!(speed, q!(99.995 m/s), want(t, 1, 100, 99995, -3));
+            orders_only!(speed, q!(0.155 m/s), want(t, 1, 100, 155, -3));
+            orders_only!(speed, q!(-0.155 m/s), want(t, 1, 100, -155, -3));
+            orders_only!(speed, q!(99.995 m/s), want(t, 1, 100, 99995, -3));
             // 360 km/h is 100 m/s, 359.9 km/h 99.97.. m/s: in m/s, times 1000/3600
             agrees!(speed, q!(360 km/h), want(t, 36, 1000, 360, 0));
-            agrees!(speed, q!(359.9 km/h), want(t, 36, 1000, 3599, -1));
+            orders_only!(speed, q!(359.9 km/h), want(t, 36, 1000, 3599, -1));
             agrees!(speed, q!(100 Speed), want(t, 1, 100, 100, 0));
             agrees!(speed, q!(100 Per<Meter, Second>), want(t, 1, 100, 100, 0));
             agrees!(speed, q!("100 m/s"), want(t, 1, 100, 100, 0));
             agrees!(speed, q!(100 "m/s"), want(t, 1, 100, 100, 0));
             agrees!(speed, q!(6 m/Minute), want(t, 60, 100, 6, 0));
             // past i16's range: a constant answer
-            agrees!(speed, q!(1000 m/s), Ordering::Less);
-            agrees!(speed, q!(-1000 m/s), Ordering::Greater);
+            orders_only!(speed, q!(1000 m/s), Ordering::Less);
+            orders_only!(speed, q!(-1000 m/s), Ordering::Greater);
         }
     }
 
@@ -143,10 +153,10 @@ mod tests {
             let v = Fixed::<Volt, Milli, i16>::new(t);
             agrees!(v, q!(3.3 V), want(t, 1, 1000, 33, -1));
             agrees!(v, q!(3300 mV), want(t, 1, 1000, 3300, -3));
-            agrees!(v, q!(1250.5 mV), want(t, 1, 1000, 12505, -4));
-            agrees!(v, q!(1500 μV), want(t, 1, 1000, 1500, -6));
-            agrees!(v, q!(1500 uV), want(t, 1, 1000, 1500, -6));
-            agrees!(v, q!("1500 µV"), want(t, 1, 1000, 1500, -6));
+            orders_only!(v, q!(1250.5 mV), want(t, 1, 1000, 12505, -4));
+            orders_only!(v, q!(1500 μV), want(t, 1, 1000, 1500, -6));
+            orders_only!(v, q!(1500 uV), want(t, 1, 1000, 1500, -6));
+            orders_only!(v, q!("1500 µV"), want(t, 1, 1000, 1500, -6));
             agrees!(v, q!(0.5 A*Ω), want(t, 1, 1000, 5, -1));
             agrees!(v, q!(-12 V), want(t, 1, 1000, -12, 0));
             let f = Fixed::<Hertz, One, i16>::new(t);
@@ -188,7 +198,7 @@ mod tests {
             let a = Fixed::<Degree, Rational<1, 10>, i16>::new(t);
             agrees!(a, q!(90 deg), want(t, 1, 10, 90, 0));
             agrees!(a, q!(90 "°"), want(t, 1, 10, 90, 0));
-            agrees!(a, q!(90.05 deg), want(t, 1, 10, 9005, -2));
+            orders_only!(a, q!(90.05 deg), want(t, 1, 10, 9005, -2));
             // 90° is 1570.796.. mrad: never equal, below from 1571 on
             let r = Fixed::<Radian, Milli, i16>::new(t);
             let ord = if t <= 1570 {
@@ -196,13 +206,13 @@ mod tests {
             } else {
                 Ordering::Greater
             };
-            agrees!(r, q!(90 deg), ord);
+            orders_only!(r, q!(90 deg), ord);
             let ord = if t <= -1571 {
                 Ordering::Less
             } else {
                 Ordering::Greater
             };
-            agrees!(r, q!(-90 deg), ord);
+            orders_only!(r, q!(-90 deg), ord);
         }
     }
 
@@ -211,19 +221,19 @@ mod tests {
     fn every_i8_and_u8_past_the_range() {
         for t in i8::MIN..=i8::MAX {
             let x = Fixed::<Meter, One, i8>::new(t);
-            agrees!(x, q!(1000 m), Ordering::Less);
-            agrees!(x, q!(-1000 m), Ordering::Greater);
-            agrees!(x, q!(127.5 m), Ordering::Less);
-            agrees!(x, q!(-128.5 m), Ordering::Greater);
+            orders_only!(x, q!(1000 m), Ordering::Less);
+            orders_only!(x, q!(-1000 m), Ordering::Greater);
+            orders_only!(x, q!(127.5 m), Ordering::Less);
+            orders_only!(x, q!(-128.5 m), Ordering::Greater);
             agrees!(x, q!(-128 m), t.cmp(&-128));
-            agrees!(x, q!(1 km), Ordering::Less);
+            orders_only!(x, q!(1 km), Ordering::Less);
         }
         for t in u8::MIN..=u8::MAX {
             let x = Fixed::<Meter, One, u8>::new(t);
-            agrees!(x, q!(-0.5 m), Ordering::Greater);
+            orders_only!(x, q!(-0.5 m), Ordering::Greater);
             agrees!(x, q!(0 m), t.cmp(&0));
             agrees!(x, q!(0.255 km), t.cmp(&255));
-            agrees!(x, q!(256 m), Ordering::Less);
+            orders_only!(x, q!(256 m), Ordering::Less);
         }
     }
 
@@ -236,7 +246,7 @@ mod tests {
             agrees!(b, q!(4 KiB), t.cmp(&4096));
             agrees!(b, q!(4 kB), t.cmp(&4000));
             agrees!(b, q!(1.5 KiB), t.cmp(&1536));
-            agrees!(b, q!(64 KiB), Ordering::Less);
+            orders_only!(b, q!(64 KiB), Ordering::Less);
         }
     }
 
@@ -245,19 +255,18 @@ mod tests {
     fn literal_order_is_what_q_compares() {
         for t in i16::MIN..=i16::MAX {
             let x = Fixed::<Meter, Centi, i16>::new(t);
+            // `==` with 0.155 m (between two steps) and 2 km (past the range) doesn't compile: no stored value
+            // equals them, and `literal_order` says so
             for (lit, d) in [
                 (
-                    [x < q!(0.155 m), x <= q!(0.155 m), x == q!(0.155 m)],
+                    [x < q!(0.155 m), x <= q!(0.155 m), false],
                     Decimal::new(155, -3),
                 ),
                 (
                     [x < q!(-327.68 m), x <= q!(-327.68 m), x == q!(-327.68 m)],
                     Decimal::new(-32768, -2),
                 ),
-                (
-                    [x < q!(2 km), x <= q!(2 km), x == q!(2 km)],
-                    Decimal::new(2000, 0),
-                ),
+                ([x < q!(2 km), x <= q!(2 km), false], Decimal::new(2000, 0)),
             ] {
                 assert_eq!(lit, x.literal_order::<Meter>(d), "{t}");
             }

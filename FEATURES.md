@@ -167,8 +167,9 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   string for what Rust's lexer refuses, `q!(90 "°")`, `q!("9.81 m/s²")`), a zero-sized `LiteralIn<N, E, S>` whose
   `PartialOrd`/`PartialEq` with a `Fixed` of integer storage, both ways round, fold the literal in a `const` block to
   its integer part in steps of `P` of `U` and whether it is that integer: one `t <= c`, or a constant past `T`'s
-  range. Never rounded (0.155 m/s against cm/s steps equals no stored value), a scale with π through `Interval`, a
-  wrong dimension or kind a compile error. The macro is a proc-macro of this repository without dependencies,
+  range. Never rounded (0.155 m/s against cm/s steps is between 15 and 16), a scale with π through `Interval`, a
+  wrong dimension or kind a compile error, and so is `==` or `!=` with a literal no stored value equals (between two
+  steps, past `T`'s range). The macro is a proc-macro of this repository without dependencies,
   `macros/` (`exact_units_macros`), which `q!` reaches with `$crate` in front; its reader is plain Rust
   (`macros/src/pure`): SI and binary prefixes folded into the literal (`km²` is 10⁶, `KiB` 1024), a symbol table of
   unit markers, refused symbols that read two ways (`min`, `gal`), each error at its token, a marker of a feature

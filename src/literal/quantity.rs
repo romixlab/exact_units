@@ -5,8 +5,11 @@
 //! `speed < q!(100 m/s)` is one integer compare against a constant: the same code as against a typed `const`.
 //!
 //! - The literal is never rounded: 0.155 m/s against steps of 1 cm/s is between 15 and 16, so `15 < x` and
-//!   `16 > x`, and no stored value equals it.
-//! - A literal past `T`'s range compares as it is: every `i8` is below `q!(1000 m)`.
+//!   `16 > x`.
+//! - A literal past `T`'s range orders as it is: every `i8` is below `q!(1000 m)`.
+//! - On an integer storage, `==` and `!=` compile only against a literal a stored value can equal: one on a step
+//!   of `P` and in `T`'s range. Between two steps or past the range the answer would be the same for every value,
+//!   so it is a compile error, never a silent `false`; `<` and `<=` say what was meant.
 //! - Units that don't convert are a compile error, as for `fixed!(x in S)`.
 //! - Float storages too: the literal folds to the largest float at or below it and whether it is that float, so
 //!   `t < q!(0.1 V)` on an `f32` is one float compare, `0.1_f32` (just above 0.1) is above it, and nothing in an
@@ -33,6 +36,28 @@
 //! assert!(v(0.75) == q!(0.75 V)); // a float itself
 //! assert!(v(f32::NAN).partial_cmp(&q!(0.1 V)).is_none());
 //! # }
+//! ```
+//!
+//! `==` against a literal between two steps doesn't compile, as no stored value equals it:
+//!
+//! ```compile_fail
+//! # #[cfg(feature = "mechanical")] {
+//! use exact_units::{Fixed, q, prefix::Centi, units::Speed};
+//! let speed = Fixed::<Speed, Centi, i16>::new(15);
+//! let _ = speed == q!(0.155 m/s); // 15.5 steps of 1 cm/s
+//! # }
+//! # #[cfg(not(feature = "mechanical"))] compile_error!("the case needs mechanical");
+//! ```
+//!
+//! Nor `!=` against one past the storage's range (in steps of 1 cm/s, an `i16` reaches 327.67 m/s):
+//!
+//! ```compile_fail
+//! # #[cfg(feature = "mechanical")] {
+//! use exact_units::{Fixed, q, prefix::Centi, units::Speed};
+//! let speed = Fixed::<Speed, Centi, i16>::new(15);
+//! let _ = speed != q!(1000 m/s);
+//! # }
+//! # #[cfg(not(feature = "mechanical"))] compile_error!("the case needs mechanical");
 //! ```
 //!
 //! A unit of another dimension doesn't compile:
@@ -183,6 +208,18 @@ macro_rules! literal_cmp {
                 }
             }
 
+            /// The stored value an `==` with a `q!` literal compares with: a compile error where none equals `x`.
+            const fn equal(x: Cut) -> $ty {
+                assert!(
+                    x.exact,
+                    "this literal is between two steps of the scale: no stored value equals it"
+                );
+                match Self::of(x.floor) {
+                    AtMost::Le(c) => c,
+                    _ => panic!("this literal is past the storage's range: no stored value equals it"),
+                }
+            }
+
             #[inline(always)]
             fn test(self, t: $ty) -> bool {
                 match self {
@@ -195,8 +232,9 @@ macro_rules! literal_cmp {
 
         impl<U: Unit, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
             /// `[self < x, self <= x, self == x]` for decimal `x` in units of `S`, at run time: the fold the compares
-            /// with a `q!` literal make in a `const` block, for the properties of `tests/props`. Panics for units
-            /// that don't convert.
+            /// with a `q!` literal make in a `const` block, for the properties of `tests/props`. `self == x` is
+            /// `false` where no stored value equals `x`, which is a compile error for `==` with `q!`. Panics for
+            /// units that don't convert.
             #[doc(hidden)]
             #[must_use]
             pub fn literal_order<S: Unit>(&self, x: Decimal) -> [bool; 3] {
@@ -215,10 +253,7 @@ macro_rules! literal_cmp {
         {
             #[inline]
             fn eq(&self, _: &LiteralIn<N, E, S>) -> bool {
-                match const { AtMost::<$ty>::eq(cut::<S, U, P>(Decimal::new(N, E))) } {
-                    Some(c) => self.get() == c,
-                    None => false,
-                }
+                self.get() == const { AtMost::<$ty>::equal(cut::<S, U, P>(Decimal::new(N, E))) }
             }
         }
 
@@ -229,7 +264,7 @@ macro_rules! literal_cmp {
             fn partial_cmp(&self, x: &LiteralIn<N, E, S>) -> Option<Ordering> {
                 Some(if self.lt(x) {
                     Ordering::Less
-                } else if self.eq(x) {
+                } else if self.le(x) {
                     Ordering::Equal
                 } else {
                     Ordering::Greater
