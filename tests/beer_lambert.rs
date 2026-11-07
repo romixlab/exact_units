@@ -117,11 +117,13 @@ fn transmittance() {
 
     let t = Fixed::<Per<Watt, Watt>, One, f64>::bounded(0.01);
     assert_eq!(
-        t.to_level::<Absorbance, One, f64>(),
+        t.to_level::<Absorbance, One, f64>(Rounding::NearestEven),
         Some(Fixed::<_, _, f64>::bounded(2.0)),
         "a whole number of decades stays exact"
     );
-    let tau = t.to_level::<OpticalDepth, One, f64>().unwrap();
+    let tau = t
+        .to_level::<OpticalDepth, One, f64>(Rounding::NearestEven)
+        .unwrap();
     assert!((tau.get() - 2.0 * LN_10).abs() < 1e-14);
     let back = tau.to_gain::<Per<Watt, Watt>, One, f64>().unwrap();
     assert!((back.get() - 0.01).abs() < 1e-15);
@@ -132,13 +134,13 @@ fn transmittance() {
 
     let i = Fixed::<Per<Irradiance, Irradiance>, One, f64>::bounded(0.01);
     assert_eq!(
-        i.to_level::<Absorbance, Milli, u16>(),
+        i.to_level::<Absorbance, Milli, u16>(Rounding::NearestEven),
         Some(Fixed::new(2000))
     );
     // a field ratio of 0.1 is a power ratio of 0.01
     let v = Fixed::<Per<Volt, Volt>, One, f64>::bounded(0.1);
     assert_eq!(
-        v.to_level::<Absorbance, One, f64>(),
+        v.to_level::<Absorbance, One, f64>(Rounding::NearestEven),
         Some(Fixed::<_, _, f64>::bounded(2.0))
     );
 }

@@ -17,7 +17,8 @@
 //! ωt: they are rates of [Loss](crate::units::Loss) levels. A rate signed as a gain (the real part σ of a pole, an AGC's
 //! ramp in dB/s) is `as_loss` away. The integer steps are exact, rounded once by the [Rounding] given, when the
 //! factor between the scales is a fraction of integers (Np/s against s, rad/s; a δ in dB/s has ln 10 in it, so it is
-//! worked in a float or `convert_rounded` to Np/s first); Λ ↔ ζ has a square root and π in it and is worked in `f64`.
+//! worked in a float or `convert_rounded` to Np/s first); Λ ↔ ζ has a square root and π in it and is worked in
+//! `f64`, then rounded once by the [Rounding] given too.
 //!
 //! ```
 //! # #[cfg(all(feature = "levels", feature = "time", feature = "angle", feature = "counting"))] {
@@ -41,7 +42,7 @@
 //! let lambda: Fixed<_, Micro, i64> = delta.per_into(f, NearestEven).unwrap();
 //! let lambda = lambda.convert::<LogarithmicDecrement, Micro, i64>().unwrap();
 //! assert_eq!(lambda.get(), 31_416);
-//! let back: Fixed<DampingRatio, Micro, i64> = Fixed::from_log_decrement(lambda).unwrap();
+//! let back: Fixed<DampingRatio, Micro, i64> = Fixed::from_log_decrement(lambda, NearestEven).unwrap();
 //! assert_eq!(back.get(), 5000);
 //! # }
 //! ```
@@ -105,9 +106,9 @@
 //!
 //! ```compile_fail
 //! # #[cfg(not(all(feature = "levels", feature = "time")))] compile_error!("needs levels, time");
-//! use exact_units::{Fixed, prefix::One, units::{DampingCoefficient, DampingRatio}};
+//! use exact_units::{Fixed, Rounding, prefix::One, units::{DampingCoefficient, DampingRatio}};
 //! let delta = Fixed::<DampingCoefficient, One, f64>::bounded(3.0);
-//! let _: Option<Fixed<DampingRatio, One, f64>> = Fixed::from_log_decrement(delta);
+//! let _: Option<Fixed<DampingRatio, One, f64>> = Fixed::from_log_decrement(delta, Rounding::NearestEven);
 //! ```
 
 use super::LOSS_DIM;
@@ -155,9 +156,9 @@ fn one<T: Storage>() -> Option<T> {
     T::from_int(1)
 }
 
-/// `x` (a value in the coherent unit) in stored steps of `step`, into `T`: the nearest stored value, ties to even, for
-/// an integer; `None` where it isn't finite or doesn't fit.
-fn settle<T: Storage>(x: f64, step: f64) -> Option<T> {
+/// `x` (a value in the coherent unit) in stored steps of `step`, into `T`: rounded by `r` for an integer, the nearest
+/// float for a float; `None` where it isn't finite or doesn't fit.
+fn settle<T: Storage>(x: f64, step: f64, r: Rounding) -> Option<T> {
     let y = x / step;
     if !y.is_finite() {
         return None;
@@ -165,7 +166,7 @@ fn settle<T: Storage>(x: f64, step: f64) -> Option<T> {
     let y = if T::IS_FLOAT {
         y
     } else {
-        crate::fixed::round_f64(y, Rounding::NearestEven)
+        crate::fixed::round_f64(y, r)
     };
     crate::fixed::settle_f64(y, Overflow::Checked)
 }
@@ -312,23 +313,28 @@ impl<P: FixedScale, T: Storage, B: Bounds<T>> Fixed<DampingRatio, P, T, B> {
         half_recip::<P, T, P2, T2>(self.get(), r).and_then(Fixed::from_number)
     }
 
-    /// The damping ratio of a logarithmic decrement Λ: ζ = Λ/√(4π² + Λ²) (Λ = 2πζ/√(1 − ζ²) solved for ζ), worked
-    /// in `f64` and rounded to the nearest stored value, ties to even. `None` where it doesn't fit `T`. Λ is a loss per
-    /// cycle ([LogarithmicDecrement], or in dB per cycle); anything else doesn't compile.
+    /// The damping ratio of a logarithmic decrement Λ: ζ = Λ/√(4π² + Λ²) (Λ = 2πζ/√(1 − ζ²) solved for ζ). π and a
+    /// root make it no exact number: it is worked in `f64` and rounded once by `r` to an integer `T` (a float `T`
+    /// takes the nearest float), so within an `f64` ulp of a rounding step it can be one step off. `None` where it
+    /// doesn't fit `T`. Λ is a loss per cycle ([LogarithmicDecrement], or in dB per cycle); anything else doesn't
+    /// compile.
     ///
     /// ```
     /// # #[cfg(all(feature = "levels", feature = "counting"))] {
-    /// use exact_units::{Fixed, prefix::{Micro, Milli}, units::{DampingRatio, LogarithmicDecrement}};
+    /// use exact_units::{Fixed, Rounding::{Floor, NearestEven}, prefix::{Micro, Milli}, units::{DampingRatio, LogarithmicDecrement}};
     /// // successive peaks 0.5 apart: Λ = ln 2
     /// let lambda = Fixed::<LogarithmicDecrement, Micro, i32>::new(693_147);
-    /// let zeta: Fixed<DampingRatio, Micro, i32> = Fixed::from_log_decrement(lambda).unwrap();
+    /// let zeta: Fixed<DampingRatio, Micro, i32> = Fixed::from_log_decrement(lambda, NearestEven).unwrap();
     /// assert_eq!(zeta.get(), 109_653);
+    /// let zeta: Fixed<DampingRatio, Milli, i32> = Fixed::from_log_decrement(lambda, Floor).unwrap();
+    /// assert_eq!(zeta.get(), 109);
     /// # }
     /// ```
     ///
     /// [LogarithmicDecrement]: crate::units::LogarithmicDecrement
     pub fn from_log_decrement<U: Unit, P2: FixedScale, T2: Storage, B2: Bounds<T2>>(
         lambda: Fixed<U, P2, T2, B2>,
+        r: Rounding,
     ) -> Option<Self> {
         let (s, z) = const {
             check(
@@ -341,23 +347,30 @@ impl<P: FixedScale, T: Storage, B: Bounds<T>> Fixed<DampingRatio, P, T, B> {
         };
         let l = to_f64(lambda.get()) * s;
         let zeta = l / sqrt_f64(4.0 * PI * PI + l * l);
-        Fixed::try_new(settle(zeta, z)?).ok()
+        Fixed::try_new(settle(zeta, z, r)?).ok()
     }
 
     /// The logarithmic decrement of an underdamped system of this damping ratio: Λ = 2πζ/√(1 − ζ²), in the loss per
-    /// cycle `U`, scale `P2` and storage `T2`, worked in `f64` and rounded to the nearest stored value, ties to even.
-    /// `None` for |ζ| ≥ 1 (no oscillation, no decrement) or where it doesn't fit `T2`.
+    /// cycle `U`, scale `P2` and storage `T2`. π and a root make it no exact number: it is worked in `f64` and rounded
+    /// once by `r` to an integer `T2` (a float `T2` takes the nearest float), so within an `f64` ulp of a rounding step
+    /// it can be one step off. `None` for |ζ| ≥ 1 (no oscillation, no decrement) or where it doesn't fit `T2`.
     ///
     /// ```
     /// # #[cfg(all(feature = "levels", feature = "counting"))] {
-    /// use exact_units::{Fixed, prefix::{Micro, Milli}, units::{DampingRatio, LogarithmicDecrement}};
+    /// use exact_units::{Fixed, Rounding::{Ceil, NearestEven}, prefix::{Micro, Milli}, units::{DampingRatio, LogarithmicDecrement}};
     /// let zeta = Fixed::<DampingRatio, Milli, u16>::new(100);
-    /// let lambda: Fixed<LogarithmicDecrement, Micro, u32> = zeta.log_decrement().unwrap();
-    /// assert_eq!(lambda.get(), 631_484); // 2π · 0.1 / √0.99
-    /// assert_eq!(Fixed::<DampingRatio, Milli, u16>::new(1000).log_decrement::<LogarithmicDecrement, Micro, u32>(), None);
+    /// let lambda: Fixed<LogarithmicDecrement, Micro, u32> = zeta.log_decrement(NearestEven).unwrap();
+    /// assert_eq!(lambda.get(), 631_484); // 2π · 0.1 / √0.99 = 0.6314838..
+    /// let lambda: Fixed<LogarithmicDecrement, Milli, u32> = zeta.log_decrement(Ceil).unwrap();
+    /// assert_eq!(lambda.get(), 632);
+    /// let undamped = Fixed::<DampingRatio, Milli, u16>::new(1000);
+    /// assert_eq!(undamped.log_decrement::<LogarithmicDecrement, Micro, u32>(NearestEven), None);
     /// # }
     /// ```
-    pub fn log_decrement<U: Unit, P2: FixedScale, T2: Storage>(self) -> Option<Fixed<U, P2, T2>> {
+    pub fn log_decrement<U: Unit, P2: FixedScale, T2: Storage>(
+        self,
+        r: Rounding,
+    ) -> Option<Fixed<U, P2, T2>> {
         let (s, z) = const {
             check(
                 U::DIM,
@@ -372,7 +385,7 @@ impl<P: FixedScale, T: Storage, B: Bounds<T>> Fixed<DampingRatio, P, T, B> {
             return None;
         }
         let l = TAU * zeta / sqrt_f64(1.0 - zeta * zeta);
-        settle(l, s).and_then(Fixed::from_number)
+        settle(l, s, r).and_then(Fixed::from_number)
     }
 }
 

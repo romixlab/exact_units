@@ -81,6 +81,32 @@ pub(crate) fn assert_rounded(p: i128, d: i128, r: Rounding, q: i128) {
     }
 }
 
+/// `q` is `x` rounded by `r` to a whole number, for an `x` known only to `tol` (a value worked in `f64` against `f64`'s
+/// own `ln`, `log10` or `sqrt`). Where `x` is within `tol` of a rounding step of `r` (a whole number for `Floor`,
+/// `Ceil` and `Truncate`, a half for the nearest modes) either neighbour passes; anywhere else `q` is the one answer.
+/// `None` fails: `x` has a value.
+pub(crate) fn assert_rounded_f64(x: f64, tol: f64, r: Rounding, q: Option<i128>, what: &str) {
+    let step = |y: f64| match r {
+        Rounding::Floor => y.floor(),
+        Rounding::Ceil => y.ceil(),
+        Rounding::Truncate => y.trunc(),
+        Rounding::NearestEven => y.round_ties_even(),
+        Rounding::NearestAway => y.round(),
+    };
+    let (lo, hi) = (step(x - tol), step(x + tol));
+    #[expect(
+        clippy::cast_precision_loss,
+        clippy::as_conversions,
+        reason = "q is a small whole number here, exact in f64"
+    )]
+    let qf = q.map(|q| q as f64);
+    // lo, hi and qf are whole: within a half is equal
+    assert!(
+        qf.is_some_and(|qf| (qf - lo).abs() < 0.5 || (qf - hi).abs() < 0.5),
+        "{what}: {x} ± {tol} {r:?} is {lo} or {hi}, not {q:?}"
+    );
+}
+
 /// `x` into `min..=max` by `o`; wrapping is modulo the span, as two's complement is for a full-width storage.
 pub(crate) fn settle(x: i128, min: i128, max: i128, o: Overflow) -> Option<i128> {
     match o {

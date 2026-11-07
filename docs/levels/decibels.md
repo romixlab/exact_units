@@ -192,6 +192,7 @@ With feature `levels` (in `quantities`), a level is a number of its own unit, no
 - The neper has a base dimension of its own, like the radian. So a level doesn't mix with a `Ratio`, and dB/m doesn't convert to m⁻¹.
 - A loss sits on a second base. A loss and a gain don't convert into each other; `as_gain` and `as_loss` negate.
 - A level has no 10·lg or 20·lg in it. The kind of the gain picks the form at the edge: `to_level` and `to_gain`.
+- A logarithm is no exact number. `to_level` works it in `f64` and rounds it once by the `Rounding` you pass.
 
 ```rust
 use exact_units::{Fixed, Rounding, fixed, prefix::{Centi, Micro, One}};
@@ -209,7 +210,7 @@ assert_eq!(np.get(), 2_037_788);
 
 // the edge to a gain: V/V takes 20·lg, and a loss is the gain negated
 let gain = Fixed::<Per<Volt, Volt>, One, f64>::bounded(0.1);
-let loss: Fixed<Loss<Decibel>, One, f64> = gain.to_level().unwrap();
+let loss: Fixed<Loss<Decibel>, One, f64> = gain.to_level(Rounding::NearestEven).unwrap();
 assert!((loss.get() - 20.0).abs() < 1e-12);
 assert!((loss.as_gain().get() + 20.0).abs() < 1e-12);
 ```

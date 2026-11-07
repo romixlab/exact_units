@@ -6,7 +6,7 @@
 )]
 
 use super::reference::{assert_rounded, round_div};
-use core::f64::consts::{LN_10, TAU};
+use core::f64::consts::{LN_10, PI, TAU};
 use exact_units::prefix::{Micro, Milli, One};
 use exact_units::units::{
     AngularVelocity, DampingCoefficient, DampingRatio, QualityFactor, Second,
@@ -62,7 +62,7 @@ pub(crate) fn damping_ratio(d: i16, w: i16, r: Rounding) {
 pub(crate) fn decrement_round_trip(zeta: f64) {
     use exact_units::units::LogarithmicDecrement;
     let z = Fixed::<DampingRatio, One, f64>::bounded(zeta);
-    let lambda = z.log_decrement::<LogarithmicDecrement, One, f64>();
+    let lambda = z.log_decrement::<LogarithmicDecrement, One, f64>(Rounding::NearestEven);
     assert!(lambda.is_some(), "ζ {zeta} in (−1, 1) has a decrement");
     let l = lambda.map_or(f64::NAN, Fixed::get);
     if zeta != 0.0 {
@@ -72,9 +72,35 @@ pub(crate) fn decrement_round_trip(zeta: f64) {
             "ζ {zeta}: Λ {l} gives {other}"
         );
     }
-    let back = lambda.and_then(Fixed::<DampingRatio, One, f64>::from_log_decrement);
+    let back = lambda.and_then(|l| {
+        Fixed::<DampingRatio, One, f64>::from_log_decrement(l, Rounding::NearestEven)
+    });
     let back = back.map_or(f64::NAN, Fixed::get);
     assert!((back - zeta).abs() <= 1e-12, "ζ {zeta}: back {back}");
+}
+
+/// `z` thousandths of a damping ratio as Λ in µNp per cycle, and `z` thousandths of an Np per cycle as ζ in millionths,
+/// each rounded by `r` against the formula worked in `f64` here (Λ = 2πζ/√(1 − ζ²), ζ = Λ/√(4π² + Λ²)): π and a root
+/// make both no exact number, so near a rounding step of `r` either neighbour passes. No Λ for |ζ| ≥ 1.
+#[cfg(feature = "counting")]
+pub(crate) fn decrement_rounded(z: i16, r: Rounding) {
+    use super::reference::assert_rounded_f64;
+    use exact_units::units::LogarithmicDecrement;
+    let zeta = f64::from(z) / 1000.0;
+    let lambda = Fixed::<DampingRatio, Milli, i16>::new(z)
+        .log_decrement::<LogarithmicDecrement, Micro, i32>(r)
+        .map(Fixed::get);
+    if z.unsigned_abs() >= 1000 {
+        assert_eq!(lambda, None, "ζ {z} m");
+    } else {
+        let x = TAU * zeta / (1.0 - zeta * zeta).sqrt() * 1e6;
+        assert_rounded_f64(x, x.abs() * 1e-12 + 1e-9, r, lambda.map(i128::from), "Λ");
+    }
+    let l = zeta; // the same digits as Λ in Np per cycle
+    let x = l / (4.0 * PI * PI + l * l).sqrt() * 1e6;
+    let lambda = Fixed::<LogarithmicDecrement, Milli, i16>::new(z);
+    let got = Fixed::<DampingRatio, Micro, i32>::from_log_decrement(lambda, r).map(Fixed::get);
+    assert_rounded_f64(x, x.abs() * 1e-12 + 1e-9, r, got.map(i128::from), "ζ");
 }
 
 /// Every i16 through every mode: ζ ↔ Q and the time constant in full.
@@ -85,6 +111,8 @@ fn every_i16() {
         for r in super::reference::MODES {
             zeta_to_q(x, r);
             time_constant(x, r);
+            #[cfg(feature = "counting")]
+            decrement_rounded(x, r);
         }
     }
 }
@@ -120,15 +148,17 @@ fn decrement_edges() {
     for zeta in [1.0, -1.0, 1.5, f64::INFINITY] {
         let z = Fixed::<DampingRatio, One, f64>::bounded(zeta);
         assert_eq!(
-            z.log_decrement::<LogarithmicDecrement, One, f64>(),
+            z.log_decrement::<LogarithmicDecrement, One, f64>(Rounding::NearestEven),
             None,
             "{zeta}"
         );
     }
     let np = Fixed::<LogarithmicDecrement, One, f64>::bounded(0.5);
     let db = Fixed::<Per<Loss<Decibel>, Cycle>, One, f64>::bounded(0.5 * 20.0 / LN_10);
-    let a: Fixed<DampingRatio, One, f64> = Fixed::from_log_decrement(np).unwrap();
-    let b: Fixed<DampingRatio, One, f64> = Fixed::from_log_decrement(db).unwrap();
+    let a: Fixed<DampingRatio, One, f64> =
+        Fixed::from_log_decrement(np, Rounding::NearestEven).unwrap();
+    let b: Fixed<DampingRatio, One, f64> =
+        Fixed::from_log_decrement(db, Rounding::NearestEven).unwrap();
     assert!((a.get() - b.get()).abs() < 1e-15);
 }
 

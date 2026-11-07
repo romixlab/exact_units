@@ -8,6 +8,7 @@ use core::f64::consts::{E, TAU};
 
 use exact_units::{
     Fixed,
+    Rounding::NearestEven,
     decibel::Decibels,
     prefix::{Deci, Micro, One},
     units::{Decibel, Feet100, Loss, Meter, Metres100, Neper, Per, Volt, Watt},
@@ -53,8 +54,12 @@ fn alpha() -> f64 {
     let alpha = np_per_m.get();
     // back through the crate: the loss over one "100 ft" span is the datasheet's own number
     let span = Fixed::<Feet100, One, f64>::new(1.0);
-    let loss: Fixed<Loss<Decibel>, One, f64> = per_100ft.over(span).unwrap();
-    assert!((loss.get() - 5.4).abs() < 1e-9, "{} dB over 100 ft", loss.get());
+    let loss: Fixed<Loss<Decibel>, One, f64> = per_100ft.over(span, NearestEven).unwrap();
+    assert!(
+        (loss.get() - 5.4).abs() < 1e-9,
+        "{} dB over 100 ft",
+        loss.get()
+    );
     alpha
 }
 

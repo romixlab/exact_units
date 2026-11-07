@@ -721,4 +721,5 @@ firmware that only needs units in its types builds without it; the bytes don't d
   from an interleaved buffer are `MaybeNan`.
 - `to_saturating`, `to_wrapping` and `into_rounded` into a float storage give 0 for a NaN, as they did into an integer
   one.
+- `to_level`, `over`, `log_decrement` and `from_log_decrement` take a `Rounding` (P2401#7nov-1843, rule 3: every lossy step is named). They rounded an integer result to the nearest stored value, ties to even, without naming it. Write `gain.to_level::<Decibel, Centi, i16>(Rounding::NearestEven)`, `rate.over(length, Rounding::NearestEven)`, `zeta.log_decrement(Rounding::NearestEven)` and `Fixed::from_log_decrement(lambda, Rounding::NearestEven)` for the old result, or `Floor`, `Ceil` and the rest. Their docs now say each is worked in `f64` (a logarithm, a root or π is no exact number), so within an ulp of a rounding step the result can be one step off; the book lists that under "Where the crate falls short today". A float target takes the nearest float, as before.
 

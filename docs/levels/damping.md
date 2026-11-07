@@ -56,11 +56,11 @@ let lambda = lambda.convert::<LogarithmicDecrement, Micro, i64>().unwrap();
 assert_eq!(lambda.get(), 31_416); // 31.4 mNp per cycle
 
 // ζ = Λ/√(4π² + Λ²), and back with log_decrement
-let zeta: Fixed<DampingRatio, Micro, i64> = Fixed::from_log_decrement(lambda).unwrap();
+let zeta: Fixed<DampingRatio, Micro, i64> = Fixed::from_log_decrement(lambda, NearestEven).unwrap();
 assert_eq!(zeta.get(), 5000);
 ```
 
-Λ ↔ ζ has a square root and π in it, so it is worked in `f64` and rounded to the nearest stored value. It needs neither `std` nor `libm`. `log_decrement` gives `None` for |ζ| ≥ 1: an overdamped system has no second peak.
+Λ ↔ ζ has a square root and π in it, so it is no exact number. It is worked in `f64` and rounded once by the `Rounding` you pass, so within an `f64` ulp of a rounding step it can be one step off. It needs neither `std` nor `libm`. `log_decrement` gives `None` for |ζ| ≥ 1: an overdamped system has no second peak.
 
 ## Ramps in dB/s
 

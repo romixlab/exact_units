@@ -41,16 +41,17 @@ assert_eq!(pad_loss.as_gain(), pad_gain);
 ## Attenuation per length
 
 [`Metres100`, `Feet100` and `Kilometre`](decibels.md#neper) are lengths of their own so that a rate prints as its
-datasheet does, and `Fixed::over` turns a rate into the loss across a run of cable. A single-mode fibre's spec
-sheet, 0.18 dB/km at 1550 nm, over an 80 km span:
+datasheet does, and `Fixed::over` turns a rate into the loss across a run of cable. It multiplies in `f64` and
+rounds the product once by the `Rounding` you pass, as `times_into` does. A single-mode fibre's spec sheet,
+0.18 dB/km at 1550 nm, over an 80 km span:
 
 ```rust
 # #[cfg(all(feature = "levels", feature = "mechanical"))] {
-use exact_units::{Fixed, prefix::{Centi, One}, units::{Decibel, Kilometre, Loss, Per}};
+use exact_units::{Fixed, Rounding::NearestEven, prefix::{Centi, One}, units::{Decibel, Kilometre, Loss, Per}};
 
 let alpha = Fixed::<Per<Loss<Decibel>, Kilometre>, Centi, i32>::new(18); // 0.18 dB/km
 let span = Fixed::<Kilometre, One, i32>::new(80);
-let budget: Fixed<Loss<Decibel>, Centi, i32> = alpha.over(span).unwrap();
+let budget: Fixed<Loss<Decibel>, Centi, i32> = alpha.over(span, NearestEven).unwrap();
 assert_eq!(budget.get(), 1440); // 14.4 dB over the span
 # }
 ```
@@ -102,7 +103,7 @@ assert_eq!(alpha.get(), 250); // 2.5 dB/cm = 250 dB/m
 
 // through 4 cm one way, and the round trip an echo makes of it
 let path = Fixed::<Meter, Centi, i32>::new(4);
-let one_way: Fixed<Loss<Decibel>, Deci, i32> = alpha.over(path).unwrap();
+let one_way: Fixed<Loss<Decibel>, Deci, i32> = alpha.over(path, NearestEven).unwrap();
 assert_eq!(one_way.get(), 100); // 10.0 dB
 assert_eq!((one_way + one_way).get(), 200); // 20.0 dB there and back
 # }

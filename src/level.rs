@@ -24,7 +24,7 @@
 //!
 //! ```
 //! # #[cfg(all(feature = "levels", feature = "electrical", feature = "mechanical"))] {
-//! use exact_units::{Fixed, fixed, prefix::{Centi, Micro, One}, units::{Decibel, Loss, Meter, Neper, Per, Volt}};
+//! use exact_units::{Fixed, Rounding, fixed, prefix::{Centi, Micro, One}, units::{Decibel, Loss, Meter, Neper, Per, Volt}};
 //!
 //! // a cable's 17.7 dB/100 m, positive as the datasheet writes it, in nepers per meter exactly rounded
 //! type Alpha = Fixed<Per<Loss<Neper>, Meter>, Micro, u32>;
@@ -33,7 +33,7 @@
 //!
 //! // a gain of 0.5 V/V is −6.02 dB, a loss of 6.02 dB
 //! let gain = Fixed::<Per<Volt, Volt>, One, f64>::bounded(0.5);
-//! let level: Fixed<Decibel, One, f64> = gain.to_level().unwrap();
+//! let level: Fixed<Decibel, One, f64> = gain.to_level(Rounding::NearestEven).unwrap();
 //! assert!((level.get() + 6.0206).abs() < 1e-4);
 //! assert!((level.as_loss().get() - 6.0206).abs() < 1e-4);
 //! # }
@@ -117,7 +117,7 @@
 //!
 //! // through 4 cm one way, and back: a round trip of 20 dB
 //! let path = Fixed::<Meter, Centi, i32>::new(4);
-//! let one_way: Fixed<Loss<Decibel>, Deci, i32> = alpha.over(path).unwrap();
+//! let one_way: Fixed<Loss<Decibel>, Deci, i32> = alpha.over(path, NearestEven).unwrap();
 //! assert_eq!(one_way.get(), 100); // 10.0 dB
 //! assert_eq!((one_way + one_way).get(), 200); // 20.0 dB
 //! # }
@@ -381,32 +381,40 @@ impl Via {
 #[cfg(any(feature = "std", feature = "libm"))]
 impl<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>> Fixed<U, P, T, B> {
     /// This gain as a level in `L` (Np, dB, a loss in them), scale `P2` and storage `T2`: `ln(x)` Np of a ratio of
-    /// root-power quantities (V/V, A/A), `½·ln(x)` Np of one of powers (W/W), negated for a loss. An integer storage
-    /// takes the nearest stored value, ties to even. `None` where it doesn't fit `T2`, or
-    /// for a gain of 0 or below. A kind without a level form (a plain [Ratio](crate::units::Ratio)) or a target that
-    /// isn't a level doesn't compile. Feature `std` or `libm`.
+    /// root-power quantities (V/V, A/A), `½·ln(x)` Np of one of powers (W/W), negated for a loss. A logarithm is no
+    /// exact number: the level is worked in `f64` (`log10` for a step that is a whole fraction of a dB, so 20 dB stays
+    /// 20 dB, else `ln`) and rounded once by `r` to an integer `T2` (a float `T2` takes the nearest float). Within an
+    /// `f64` ulp of a rounding step the result can be one step off. `None` where it doesn't fit `T2`, or for a gain of
+    /// 0 or below. A kind without a level form (a plain [Ratio](crate::units::Ratio)) or a target that isn't a level
+    /// doesn't compile. Feature `std` or `libm`.
     ///
     /// ```
     /// # #[cfg(all(feature = "levels", feature = "electrical"))] {
-    /// use exact_units::{Fixed, prefix::{Centi, One}, units::{Decibel, Loss, Neper, Per, Volt, Watt}};
+    /// use exact_units::{Fixed, Rounding::{Ceil, Floor, NearestEven}, prefix::{Centi, Deci, One}};
+    /// use exact_units::units::{Decibel, Loss, Neper, Per, Volt, Watt};
     /// let v = Fixed::<Per<Volt, Volt>, One, f64>::bounded(10.0);
-    /// assert_eq!(v.to_level::<Decibel, One, f64>(), Some(Fixed::<_, _, f64>::bounded(20.0)));
-    /// assert_eq!(v.to_level::<Loss<Decibel>, Centi, f32>(), Some(Fixed::<_, _, f32>::bounded(-2000.0)));
+    /// assert_eq!(v.to_level::<Decibel, One, f64>(NearestEven), Some(Fixed::<_, _, f64>::bounded(20.0)));
+    /// assert_eq!(v.to_level::<Loss<Decibel>, Centi, f32>(NearestEven), Some(Fixed::<_, _, f32>::bounded(-2000.0)));
     /// let p = Fixed::<Per<Watt, Watt>, One, f64>::bounded(100.0);
-    /// assert_eq!(p.to_level::<Decibel, One, f64>(), Some(Fixed::<_, _, f64>::bounded(20.0)));
+    /// assert_eq!(p.to_level::<Decibel, One, f64>(NearestEven), Some(Fixed::<_, _, f64>::bounded(20.0)));
     /// let e = Fixed::<Per<Volt, Volt>, One, f64>::bounded(core::f64::consts::E);
-    /// assert_eq!(e.to_level::<Neper, One, f64>(), Some(Fixed::<_, _, f64>::bounded(1.0)));
+    /// assert_eq!(e.to_level::<Neper, One, f64>(NearestEven), Some(Fixed::<_, _, f64>::bounded(1.0)));
+    /// // a voltage ratio of 2 is 6.0206 dB: the rounding is the caller's
+    /// let two = Fixed::<Per<Volt, Volt>, One, u8>::new(2);
+    /// assert_eq!(two.to_level::<Decibel, Deci, i16>(Floor), Some(Fixed::new(60)));
+    /// assert_eq!(two.to_level::<Decibel, Deci, i16>(Ceil), Some(Fixed::new(61)));
     /// # }
     /// ```
     ///
     /// ```compile_fail
     /// # #[cfg(not(feature = "levels"))] compile_error!("needs levels");
     /// use exact_units::{Fixed, prefix::One, units::{Decibel, Ratio}};
-    /// let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_level::<Decibel, One, f64>();
+    /// let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_level::<Decibel, One, f64>(exact_units::Rounding::NearestEven);
     /// ```
     #[must_use]
     pub fn to_level<L: Unit, P2: crate::FixedScale, T2: crate::Storage>(
         self,
+        r: crate::Rounding,
     ) -> Option<Fixed<L, P2, T2>> {
         let x = match const { Via::of::<L, P2>() } {
             Via::Db(k) => self.to_db() * k,
@@ -418,7 +426,7 @@ impl<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>> Fixe
         let x = if T2::IS_FLOAT {
             x
         } else {
-            crate::fixed::round_f64(x, crate::Rounding::NearestEven)
+            crate::fixed::round_f64(x, r)
         };
         // x is finite, so the storage's value is a number
         Some(Fixed::new_unchecked(crate::fixed::settle_f64(
@@ -491,23 +499,24 @@ impl<L: Unit, X: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds
     Fixed<Per<L, X>, P, T, B>
 {
     /// This rate over `length`: what it adds up to across it (a cable's dB/100 m times its length in meters is its
-    /// total loss in dB), in scale `P2` and storage `T2`. The two values' coherent numbers multiply, then the
-    /// product settles into `P2 · L`, rounded to the nearest stored value for an integer `T2` (ties to even). `None`
-    /// where it doesn't fit `T2`. Feature `std` or `libm`.
+    /// total loss in dB), in scale `P2` and storage `T2`. The two values' coherent numbers multiply in `f64`, then the
+    /// product settles into `P2 · L`, rounded once by `r` for an integer `T2` (a float `T2` takes the nearest float).
+    /// The `f64` product is not the exact one: within an ulp of a rounding step the result can be one step off.
+    /// `None` where it doesn't fit `T2`. Feature `std` or `libm`.
     ///
     /// ```
     /// # #[cfg(all(feature = "levels", feature = "mechanical"))] {
-    /// use exact_units::{Fixed, prefix::{Deci, One}, units::{Decibel, Feet100, Loss, Metres100, Per}};
+    /// use exact_units::{Fixed, Rounding::NearestEven, prefix::{Deci, One}, units::{Decibel, Feet100, Loss, Metres100, Per}};
     ///
     /// // Belden 8259: 5.4 dB/100 ft, over 820 ft (8.2 "100 ft" units) of cable
     /// let alpha = Fixed::<Per<Loss<Decibel>, Feet100>, Deci, i32>::new(54);
     /// let length = Fixed::<Feet100, Deci, i32>::new(82);
-    /// let loss: Fixed<Loss<Decibel>, One, f64> = alpha.over(length).unwrap();
+    /// let loss: Fixed<Loss<Decibel>, One, f64> = alpha.over(length, NearestEven).unwrap();
     /// assert!((loss.get() - 44.28).abs() < 1e-9);
     ///
     /// let alpha_si = Fixed::<Per<Loss<Decibel>, Metres100>, Deci, i32>::new(177); // 17.7 dB/100 m
     /// let length_si = Fixed::<Metres100, One, i32>::new(1);
-    /// let loss_si: Fixed<Loss<Decibel>, One, f64> = alpha_si.over(length_si).unwrap();
+    /// let loss_si: Fixed<Loss<Decibel>, One, f64> = alpha_si.over(length_si, NearestEven).unwrap();
     /// assert!((loss_si.get() - 17.7).abs() < 1e-9);
     /// # }
     /// ```
@@ -521,13 +530,14 @@ impl<L: Unit, X: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds
     >(
         self,
         length: Fixed<X, PX, TX, BX>,
+        r: crate::Rounding,
     ) -> Option<Fixed<L, P2, T2>> {
-        over(self, length)
+        over(self, length, r)
     }
 }
 
 /// The product of a rate `Per<L, X>` and a `length` in `X`, settled into `L`'s own `P2 · T2`: both sides' coherent
-/// numbers multiply, and the result is read back out through `L`'s own factor.
+/// numbers multiply, and the result is read back out through `L`'s own factor, rounded by `r`.
 #[cfg(any(feature = "std", feature = "libm"))]
 fn over<
     L: Unit,
@@ -543,6 +553,7 @@ fn over<
 >(
     rate: Fixed<Per<L, X>, P, T, B>,
     length: Fixed<X, PX, TX, BX>,
+    r: crate::Rounding,
 ) -> Option<Fixed<L, P2, T2>> {
     let level = coherent_f64(rate) * coherent_f64(length);
     let x = level / const { P2::SCALE.to_f64() * L::EXPR.factor() };
@@ -552,7 +563,7 @@ fn over<
     let x = if T2::IS_FLOAT {
         x
     } else {
-        crate::fixed::round_f64(x, crate::Rounding::NearestEven)
+        crate::fixed::round_f64(x, r)
     };
     // x is finite, so the storage's value is a number
     Some(Fixed::new_unchecked(crate::fixed::settle_f64(

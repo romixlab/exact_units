@@ -3,7 +3,8 @@
 //! example does; the `assert!`s fail `just docs-build` if a number on the figure stops matching the page.
 
 use exact_units::{
-    Fixed, Rounding::NearestEven,
+    Fixed,
+    Rounding::NearestEven,
     prefix::{Centi, Deci, Mega, One},
     units::{CentimetreMegahertz, Decibel, Hertz, Loss, Meter, Per},
 };
@@ -34,7 +35,7 @@ fn loss_db(mhz: i32, depth_cm: f64) -> f64 {
     let alpha: Fixed<Per<Loss<Decibel>, Meter>, One, f64> =
         Fixed::new(f64::from(alpha_per_metre(mhz).get()));
     let depth = Fixed::<Meter, Centi, f64>::new(depth_cm);
-    let loss: Fixed<Loss<Decibel>, One, f64> = alpha.over(depth).unwrap();
+    let loss: Fixed<Loss<Decibel>, One, f64> = alpha.over(depth, NearestEven).unwrap();
     loss.get()
 }
 
@@ -77,12 +78,7 @@ pub fn ultrasound() -> String {
     };
     s.axes(
         &p,
-        &[
-            (0.0, "0"),
-            (2.0, "2"),
-            (4.0, "4"),
-            (6.0, "6 cm"),
-        ],
+        &[(0.0, "0"), (2.0, "2"), (4.0, "4"), (6.0, "6 cm")],
         &[(0.0, "0"), (10.0, "10"), (20.0, "20"), (30.0, "30 dB")],
         "depth",
         "one-way loss",

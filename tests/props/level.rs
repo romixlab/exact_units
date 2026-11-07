@@ -117,6 +117,57 @@ pub(crate) fn molar_product(epsilon: u8, l: u8, c: u8) {
     assert_eq!(a.map(Fixed::get), Some(want), "{epsilon} {l} {c}");
 }
 
+/// `a` mdB/m of loss over `b` cm is `a · b / 100` mdB of loss exactly, rounded by `r`. `over` multiplies in
+/// `f64`, so where the exact value is a rounding step of `r` (whole for `Floor`, `Ceil` and `Truncate`, a half for the
+/// nearest modes) it may land on the neighbour, as documented; anywhere else it is `r`'s rounding of the exact
+/// product.
+#[cfg(any(feature = "std", feature = "libm"))]
+pub(crate) fn rate_over(a: i16, b: i16, r: Rounding) {
+    let p = i128::from(a) * i128::from(b);
+    let want = round_div(p, 100, r);
+    let rate = Fixed::<Per<Loss<Decibel>, Meter>, Milli, i16>::new(a);
+    let length = Fixed::<Meter, Centi, i16>::new(b);
+    let got: Option<Fixed<Loss<Decibel>, Milli, i32>> = rate.over(length, r);
+    let got = got.map(|f| i128::from(f.get()));
+    let on_step = match r {
+        Rounding::NearestEven | Rounding::NearestAway => p.rem_euclid(100) == 50,
+        Rounding::Floor | Rounding::Ceil | Rounding::Truncate => p.rem_euclid(100) == 0,
+    };
+    if on_step {
+        assert!(
+            got.is_some_and(|g| (g - want).abs() <= 1),
+            "{a} mdB/m over {b} cm {r:?}: {got:?}, {want} exactly"
+        );
+    } else {
+        assert_eq!(got, Some(want), "{a} mdB/m over {b} cm {r:?}");
+    }
+}
+
+/// A voltage gain of `n` is `200 · lg n` tenths of a dB, rounded by `r` against `f64`'s `log10`, and the same negated
+/// as a loss. A power of ten is a whole number of dB in every mode (`to_level` takes `log10` for a step that is a
+/// fraction of a dB). `None` for 0.
+#[cfg(any(feature = "std", feature = "libm"))]
+pub(crate) fn gain_to_level(n: u16, r: Rounding) {
+    use exact_units::{prefix::Deci, units::Volt};
+    let v = Fixed::<Per<Volt, Volt>, One, u16>::new(n);
+    let db: Option<Fixed<Decibel, Deci, i32>> = v.to_level(r);
+    let loss: Option<Fixed<Loss<Decibel>, Deci, i32>> = v.to_level(r);
+    if n == 0 {
+        assert_eq!(db, None);
+        assert_eq!(loss, None);
+        return;
+    }
+    let x = 200.0 * f64::from(n).log10();
+    let (db, loss) = (db.map(Fixed::get), loss.map(Fixed::get));
+    if matches!(n, 1 | 10 | 100 | 1000 | 10000) {
+        assert_eq!(db.map(f64::from), Some(x), "{n} V/V {r:?}");
+        assert_eq!(loss.map(f64::from), Some(-x), "{n} V/V {r:?}");
+    }
+    let tol = 1e-9;
+    super::reference::assert_rounded_f64(x, tol, r, db.map(i128::from), "dB");
+    super::reference::assert_rounded_f64(-x, tol, r, loss.map(i128::from), "dB of loss");
+}
+
 /// Every i16 of cdB through every mode, and of µNp back: what the proptests sample for i32, in full.
 #[cfg(not(kani))]
 #[test]
@@ -138,6 +189,24 @@ fn every_i16() {
     }
 }
 
+/// Every gain of a `u16` to a level, and every pair of `i8` through `over`, by every mode.
+#[cfg(all(not(kani), any(feature = "std", feature = "libm")))]
+#[test]
+fn level_edges_whole() {
+    for n in u16::MIN..=u16::MAX {
+        for r in super::reference::MODES {
+            gain_to_level(n, r);
+        }
+    }
+    for a in i8::MIN..=i8::MAX {
+        for b in i8::MIN..=i8::MAX {
+            for r in super::reference::MODES {
+                rate_over(i16::from(a), i16::from(b), r);
+            }
+        }
+    }
+}
+
 #[cfg(not(any(kani, fuzzing)))]
 mod tests {
     use super::*;
@@ -153,6 +222,12 @@ mod tests {
     }
 
     proptest! {
+        #[cfg(any(feature = "std", feature = "libm"))]
+        #[test]
+        fn rate_over_i16(a in strategy::i16(), b in strategy::i16(), r in strategy::mode()) {
+            rate_over(a, b, r);
+        }
+
         #[test]
         fn np_to_db_i32(x in strategy::i32(), r in strategy::mode()) {
             np_to_db(x, r);
@@ -194,12 +269,12 @@ mod tests {
         #[test]
         fn transmittance_edge(g in gain()) {
             let t = Fixed::<Per<Watt, Watt>, One, f64>::bounded(g);
-            let a: Fixed<Absorbance, One, f64> = t.to_level().unwrap();
-            let tau: Fixed<OpticalDepth, One, f64> = t.to_level().unwrap();
+            let a: Fixed<Absorbance, One, f64> = t.to_level(Rounding::NearestEven).unwrap();
+            let tau: Fixed<OpticalDepth, One, f64> = t.to_level(Rounding::NearestEven).unwrap();
             prop_assert!((a.get() + g.log10()).abs() <= 1e-12, "{g}: {}", a.get());
             prop_assert!((tau.get() + g.ln()).abs() <= 1e-12, "{g}: {}", tau.get());
             let v = Fixed::<Per<Volt, Volt>, One, f64>::bounded(g.sqrt());
-            let av: Fixed<Absorbance, One, f64> = v.to_level().unwrap();
+            let av: Fixed<Absorbance, One, f64> = v.to_level(Rounding::NearestEven).unwrap();
             prop_assert!((av.get() - a.get()).abs() <= 1e-12, "{g}: {}", av.get());
             let back: Fixed<Per<Watt, Watt>, One, f64> = tau.to_gain().unwrap();
             prop_assert!((back.get() / g - 1.0).abs() < 1e-13, "{g}: {}", back.get());
@@ -213,14 +288,14 @@ mod tests {
         #[test]
         fn gain_edge(g in gain()) {
             let v = Fixed::<Per<Volt, Volt>, One, f64>::bounded(g);
-            let db: Fixed<Decibel, One, f64> = v.to_level().unwrap();
+            let db: Fixed<Decibel, One, f64> = v.to_level(Rounding::NearestEven).unwrap();
             let back: Fixed<Per<Volt, Volt>, One, f64> = db.to_gain().unwrap();
             prop_assert!((back.get() / g - 1.0).abs() < 1e-13, "{g}: {}", back.get());
-            let loss: Fixed<Loss<Neper>, One, f64> = v.to_level().unwrap();
-            let np: Fixed<Neper, One, f64> = v.to_level().unwrap();
+            let loss: Fixed<Loss<Neper>, One, f64> = v.to_level(Rounding::NearestEven).unwrap();
+            let np: Fixed<Neper, One, f64> = v.to_level(Rounding::NearestEven).unwrap();
             prop_assert_eq!(loss.get().to_bits(), (-np.get()).to_bits());
             let p = Fixed::<Per<Watt, Watt>, One, f64>::bounded(g * g);
-            let pdb: Fixed<Decibel, One, f64> = p.to_level().unwrap();
+            let pdb: Fixed<Decibel, One, f64> = p.to_level(Rounding::NearestEven).unwrap();
             prop_assert!((pdb.get() - db.get()).abs() <= 1e-12 * db.get().abs().max(1.0));
         }
     }

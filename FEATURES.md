@@ -410,13 +410,13 @@ non-linear named scales.
   a datasheet's positive dB/100 m is typed as written and never mixes with a gain. Done (piece 1, e8af146): units
   `Neper`, `Decibel`, `NeperLoss`, `DecibelLoss`; `Loss<L>` over the `Level` / `LossLevel` traits, carried through
   `Per`; `as_loss` / `as_gain` negating by the bound's policy; the gain edge `to_level` / `to_gain` (`std` or
-  `libm`); `Dim::strip_neper` for exports; `Fixed::convert_rounded` (dB to Np in integers); `fixed!(v in S)` /
+  `libm`; `to_level` and `over` round by a `Rounding`, P2401#7nov-1843); `Dim::strip_neper` for exports; `Fixed::convert_rounded` (dB to Np in integers); `fixed!(v in S)` /
   `from_decimal_in`; `unit!` lines taking `counted(Other)` and `ln2` / `ln10` exponents. Done (piece 3, damping,
   cd88312): `DampingCoefficient` δ (`Per<Loss<Neper>, Second>`) and `LogarithmicDecrement` Λ
   (`Per<Loss<Neper>, Cycle>`), signed as a loss; markers `DampingRatio` ζ and `QualityFactor` Q, numbers of kinds
   of their own (neither converts to the other or to a `Ratio`); `time_constant` (1 Np / δ, any time unit),
   `damping_ratio(ω₀)` (δ/ω₀, rad/s only, Hz doesn't compile), `quality_factor` / `damping_ratio` (Q = 1/(2ζ)), each
-  one division rounded once; `from_log_decrement` / `log_decrement` (Λ ↔ ζ, `f64`, no `std` or `libm`). Book page
+  one division rounded once; `from_log_decrement` / `log_decrement` (Λ ↔ ζ, `f64`, rounded by a `Rounding`, no `std` or `libm`). Book page
   "Damping". Done (piece 5, Beer-Lambert, 72a6c3f): `Absorbance` (AU, `(ln 10)/2` of a neper of loss, A = −lg T),
   `OpticalDepth` (τ, ½ of one, τ = −ln T), `MolarCentimeter` (feature `chemical`); aliases `LinearAttenuation`
   (μ, natural), `DecadicAttenuation` and `MolarAbsorptivity` (ε, printed AU/(M·cm)); μ converts to the α of
