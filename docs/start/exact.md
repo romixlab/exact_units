@@ -154,6 +154,39 @@ let _ = Timeout::new(0); // `new` is only for values without bounds
 
 A value read from the wire or through serde is checked against its bounds too.
 
+A float is never NaN unless its type says so. Every compare with NaN is false, so a NaN reading would silently skip `if temp > limit { shutdown() }`. A float `Fixed` therefore refuses NaN wherever a value comes in (`try_new`, `bounded`, the wire, serde, text, a conversion). ±∞ stays a value.
+
+Arithmetic can make NaN ($\infty - \infty$, $0 \cdot \infty$, $0 / 0$), and checking every `+` would cost a compare and a branch on each one. So `+`, `-`, `*` and `/` of floats give a `MaybeNan`: the float's own operation, no check. A `MaybeNan` has no `<` or `==`. It compares through a method that names what NaN gives, `gt_or`, `ge_or`, `lt_or`, `le_or` and `eq_or`, each one float compare, or `not_nan` (`None` for NaN) takes it back to a checked value:
+
+```rust
+use exact_units::{Fixed, MaybeNan, prefix::One, units::Volt};
+
+type Reading = Fixed<Volt, One, f32>;
+assert!(Reading::try_new(f32::NAN).is_err());
+let inf = Reading::bounded(f32::INFINITY);
+assert!(inf.checked_sub(inf).is_none()); // ∞ − ∞ is no number
+
+let limit = Reading::bounded(80.0);
+let temp: Fixed<Volt, One, f32, MaybeNan> = inf - inf; // NaN, no panic
+assert!(temp.gt_or(limit, true)); // NaN counts as over the limit: shut down
+assert_eq!(temp.not_nan(), None);
+```
+
+On a Cortex-M4F (`thumbv7em-none-eabihf`, measured on 7 November 2026 at `opt-level` 3 and `z`) each costs what the plain `f32` code does: a `+` is 4 instructions either way, and `(a + b).gt_or(limit, true)` is the 9 (at `z`, 6) of `a + b > limit`, its compare `!(x <= limit)`.
+
+```rust,compile_fail
+use exact_units::{Fixed, prefix::One, units::Volt};
+
+let v = Fixed::<Volt, One, f32>::bounded(1.0);
+let _ = v + v > v; // a MaybeNan: `gt_or` says what NaN gives, or `not_nan` first
+```
+
+```rust,compile_fail
+use exact_units::{Fixed, prefix::One, units::Volt};
+
+let _ = Fixed::<Volt, One, f32>::new(1.5); // a float may be NaN: `try_new`, `bounded` or `MaybeNan`
+```
+
 ## 7. Every claim is checked
 
 Each rule above is a claim about every input, and tests check it so. A property states what the result must be, computed independently in `i128`, and the crate must agree. Where the inputs are few enough, a test tries all of them. This is one such walk, over every `i16`:

@@ -109,7 +109,9 @@ pub(crate) fn converts_float<O1, P1, T1, O2, P2>(
     P2: FixedScale,
     T1: Storage + FromF64,
 {
-    let p = Point::<O1, Fixed<Ratio, P1, T1>>::from_raw(T1::from_f64(x));
+    let p = Point::<O1, Fixed<Ratio, P1, T1>>::new(
+        Fixed::try_new(T1::from_f64(x)).expect("x is a number"),
+    );
     let x = T1::to_f64(T1::from_f64(x));
     let got = p.to::<O2, P2, f64>().map(Point::raw);
     #[expect(

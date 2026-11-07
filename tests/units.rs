@@ -104,7 +104,7 @@ fn kinds_of_markers() {
     let g = Fixed::<Per<Volt, Volt>, One, i16>::new(-3);
     assert_eq!(g.as_ratio().get(), -3);
     assert_eq!(g.as_ratio().as_gain::<Volt>(), g);
-    let gm = Fixed::<Per<Ampere, Volt>, One, f32>::new(0.02);
+    let gm = Fixed::<Per<Ampere, Volt>, One, f32>::bounded(0.02);
     assert_eq!(gm.as_conductance().as_transconductance(), gm);
     let r = Fixed::<Ohm, One, u8>::new(50);
     assert_eq!(r.as_transimpedance().as_resistance(), r);
@@ -124,15 +124,15 @@ fn kinds_of_markers() {
     // decibels by kind: 20·lg for V/V and A/A, 10·lg for W/W
     let db = |x: f64, y: f64| (x - y).abs() < 1e-12;
     assert!(db(
-        Fixed::<Per<Volt, Volt>, One, f64>::new(2.0).to_db(),
+        Fixed::<Per<Volt, Volt>, One, f64>::bounded(2.0).to_db(),
         6.020599913279624
     ));
     assert!(db(
-        Fixed::<Per<Watt, Watt>, One, f64>::new(2.0).to_db(),
+        Fixed::<Per<Watt, Watt>, One, f64>::bounded(2.0).to_db(),
         3.010299956639812
     ));
     assert!(db(
-        Fixed::<Per<Ampere, Ampere>, One, f64>::new(0.5).to_db(),
+        Fixed::<Per<Ampere, Ampere>, One, f64>::bounded(0.5).to_db(),
         -6.020599913279624
     ));
     let back = Fixed::<Per<Watt, Watt>, One, f64>::from_db(-3.0)
@@ -334,7 +334,7 @@ fn derived_kinds_and_conversions() {
     );
     assert_eq!(
         Fixed::<Per<Kelvin, Watt>, Milli, u16>::new(2500).convert::<ThermalResistance, One, f32>(),
-        Some(Fixed::new(2.5))
+        Some(Fixed::<_, _, f32>::bounded(2.5))
     );
     assert_eq!(
         Fixed::<Per<Speed, Acceleration>, One, u8>::new(3).convert::<Second, One, u8>(),

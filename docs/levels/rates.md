@@ -143,7 +143,7 @@ use exact_units::{Fixed, prefix::{Micro, One}};
 use exact_units::units::{Decibel, LinearAttenuation, Loss, Meter, Neper, Per};
 
 // a turbid medium's 10 dB/m of power loss
-let per_metre = Fixed::<Per<Loss<Decibel>, Meter>, One, f64>::new(10.0);
+let per_metre = Fixed::<Per<Loss<Decibel>, Meter>, One, f64>::bounded(10.0);
 let alpha = per_metre.convert::<Per<Loss<Neper>, Meter>, Micro, f64>().unwrap();
 let mu = per_metre.convert::<LinearAttenuation, Micro, f64>().unwrap();
 assert!((mu.get() - 2.0 * alpha.get()).abs() < 1e-9);
@@ -182,7 +182,7 @@ the distinction (UCUM, Pint, uom). Inside the crate, a damping coefficient refus
 # #[cfg(not(all(feature = "levels", feature = "time")))] compile_error!("needs levels, time");
 use exact_units::{Fixed, prefix::One, units::{Hertz, Neper, Per, Second}};
 
-let _ = Fixed::<Per<Neper, Second>, One, f32>::new(3.0).convert::<Hertz, One, f32>();
+let _ = Fixed::<Per<Neper, Second>, One, f32>::bounded(3.0).convert::<Hertz, One, f32>();
 ```
 
 and neither does a cable's attenuation become a wavenumber, however much it looks like m⁻¹ in SI:
@@ -191,7 +191,7 @@ and neither does a cable's attenuation become a wavenumber, however much it look
 # #[cfg(not(all(feature = "levels", feature = "mechanical")))] compile_error!("needs levels, mechanical");
 use exact_units::{Fixed, prefix::One, units::{Meter, Neper, Per, Wavenumber}};
 
-let _ = Fixed::<Per<Neper, Meter>, One, f32>::new(0.02).convert::<Wavenumber, One, f32>();
+let _ = Fixed::<Per<Neper, Meter>, One, f32>::bounded(0.02).convert::<Wavenumber, One, f32>();
 ```
 
 !!! warning "dBm/Hz is not a rate"

@@ -61,7 +61,7 @@ where
 pub(crate) fn numbers(x: i16, y: u32) {
     round_trip(&Fixed::<Volt, Milli, i16>::new(x));
     round_trip(&Fixed::<Volt, Milli, u32>::new(y));
-    round_trip(&Fixed::<Ratio, One, f32>::new(f32::from(x) / 7.0));
+    round_trip(&Fixed::<Ratio, One, f32>::bounded(f32::from(x) / 7.0));
     round_trip(&Complex::from_parts(
         Fixed::<Volt, Milli, i16>::new(x),
         Fixed::new(x.wrapping_neg()),

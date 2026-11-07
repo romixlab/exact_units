@@ -40,13 +40,13 @@
 //! ```
 
 use super::Complex;
-#[cfg(all(feature = "angle", any(feature = "std", feature = "libm")))]
-use crate::Bounds;
 use crate::fixed::format::pad;
 #[cfg(any(feature = "std", feature = "libm"))]
 use crate::num::math;
 #[cfg(all(feature = "angle", any(feature = "std", feature = "libm")))]
 use crate::units::{Phase, PlaneAngle, Radian};
+#[cfg(all(feature = "angle", any(feature = "std", feature = "libm")))]
+use crate::{Bounds, MaybeNan};
 use crate::{Fixed, Rounding, Storage, Unlimited, cordic};
 #[cfg(all(feature = "angle", any(feature = "std", feature = "libm")))]
 use crate::{FixedScale, Unit, prefix::One};
@@ -233,7 +233,7 @@ macro_rules! int_polar {
                 }
                 #[expect(clippy::cast_possible_truncation, reason = "both checked against the storage's range above")]
                 let (re, im) = (re as $ty, im as $ty);
-                Some(Self::of(re, im))
+                Some(Self::of_unchecked(re, im))
             }
         }
 
@@ -259,19 +259,21 @@ int_polar! {
 macro_rules! float_polar {
     ($($ty:ident $hypot:ident $atan2:ident $sincos:ident;)*) => {$(
         impl<U, P, B: Unlimited<$ty>> Complex<U, P, $ty, B> {
-            /// |z| = `hypot(re, im)`, without overflow or underflow on the way. Feature `std` or `libm`.
+            /// |z| = `hypot(re, im)`, without overflow or underflow on the way. Feature `std` or `libm`. Not for
+            /// [MaybeNan](crate::MaybeNan) parts.
             #[inline(always)]
             pub fn abs(self) -> Fixed<U, P, $ty> {
-                Fixed::new(math::$hypot(self.re, self.im))
+                Fixed::<U, P, $ty, B>::from_nan_free(math::$hypot(self.re, self.im)).unbounded()
             }
         }
 
         #[cfg(feature = "angle")]
         impl<U, P, B: Unlimited<$ty>> Complex<U, P, $ty, B> {
-            /// arg z = `atan2(im, re)`, the phase angle in radians in [−π, π]. Feature `std` or `libm`.
+            /// arg z = `atan2(im, re)`, the phase angle in radians in [−π, π]. Feature `std` or `libm`. Not for
+            /// [MaybeNan](crate::MaybeNan) parts.
             #[inline(always)]
             pub fn arg(self) -> Fixed<Phase<Radian>, One, $ty> {
-                Fixed::new(math::$atan2(self.im, self.re))
+                Fixed::<Phase<Radian>, One, $ty, B>::from_nan_free(math::$atan2(self.im, self.re)).unbounded()
             }
 
             /// |z| ([abs](Self::abs)) and arg z ([arg](Self::arg)).
@@ -279,9 +281,13 @@ macro_rules! float_polar {
             pub fn to_polar(self) -> Polar<U, P, $ty, Fixed<Phase<Radian>, One, $ty>> {
                 Polar::new(self.abs(), self.arg())
             }
+        }
 
+        #[cfg(feature = "angle")]
+        impl<U, P> Complex<U, P, $ty, MaybeNan> {
             /// |z| · (cos θ + j·sin θ) for a phase θ in any angle unit and scale: `Phase<Degree>` is turned into
-            /// radians by its exact factor first.
+            /// radians by its exact factor first. A [MaybeNan], as `*` gives: an infinite |z| at an angle whose sine
+            /// is 0, or an infinite angle, makes a NaN part.
             #[inline(always)]
             #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
             pub fn from_polar<A: PlaneAngle, PA: FixedScale, BP: Bounds<$ty>>(
@@ -291,7 +297,8 @@ macro_rules! float_polar {
                 #[allow(clippy::as_conversions, clippy::cast_possible_truncation, reason = "the factor to radians rounded to the storage's float (no From)")]
                 let rad = arg.get() * const { (PA::SCALE.to_f64() * <Phase<A>>::EXPR.factor()) as $ty };
                 let (s, c) = math::$sincos(rad);
-                Self::of(abs.get() * c, abs.get() * s)
+                let (re, im) = (abs.get() * c, abs.get() * s);
+                Self::of_unchecked(re, im)
             }
         }
 
@@ -299,8 +306,8 @@ macro_rules! float_polar {
         impl<U, P, A: PlaneAngle, PA: FixedScale, BP: Bounds<$ty>> Polar<U, P, $ty, Fixed<Phase<A>, PA, $ty, BP>> {
             /// The rectangular form ([Complex::from_polar]).
             #[inline(always)]
-            pub fn to_complex(self) -> Complex<U, P, $ty> {
-                Complex::<U, P, $ty>::from_polar(self.abs, self.arg)
+            pub fn to_complex(self) -> Complex<U, P, $ty, MaybeNan> {
+                Complex::<U, P, $ty, MaybeNan>::from_polar(self.abs, self.arg)
             }
         }
     )*};

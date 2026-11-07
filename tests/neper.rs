@@ -219,9 +219,9 @@ mod run_time {
     #[test]
     fn forms() {
         let e = E;
-        assert_eq!(VoltGain::<One, f64>::new(e).to_np(), 1.0);
-        assert!((PowerGain::<One, f64>::new(e * e).to_np() - 1.0).abs() < 1e-15);
-        assert_eq!(VoltGain::<One, f64>::new(1.0).to_np(), 0.0);
+        assert_eq!(VoltGain::<One, f64>::bounded(e).to_np(), 1.0);
+        assert!((PowerGain::<One, f64>::bounded(e * e).to_np() - 1.0).abs() < 1e-15);
+        assert_eq!(VoltGain::<One, f64>::bounded(1.0).to_np(), 0.0);
         // 100 mV/V of an amplitude is ln 0.1 = -2.302585 Np; 100 mW/W of a power is half of it
         let a = VoltGain::<Milli, u32>::new(100).to_np();
         let b = PowerGain::<Milli, u32>::new(100).to_np();

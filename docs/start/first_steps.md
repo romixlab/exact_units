@@ -77,7 +77,7 @@ assert_eq!(Adc::new(2048).to::<Milli, u16>(), Some(Fixed::new(1650)));
 use exact_units::{Fixed, prefix::Milli, units::Volt};
 
 let small: Fixed<Volt, Milli, i16> = Fixed::new(-1250);
-let float: Fixed<Volt, Milli, f32> = Fixed::new(-1250.0);
+let float: Fixed<Volt, Milli, f32> = Fixed::<_, _, f32>::bounded(-1250.0);
 assert_eq!(small.to_string(), "-1250 mV");
 assert_eq!(float.to_string(), "-1250 mV");
 ```

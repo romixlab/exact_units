@@ -32,14 +32,14 @@ The rules follow ISO 80000-1's kinds of quantity, as the C++ library mp-units im
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::One, units::{Per, Ratio, Volt}};
 
-let gain: Fixed<Per<Volt, Volt>, One, f32> = Fixed::new(4.0);
+let gain: Fixed<Per<Volt, Volt>, One, f32> = Fixed::<_, _, f32>::bounded(4.0);
 let _ = gain.convert::<Ratio, One, f32>(); // a gain is not a duty cycle
 ```
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::Mega, units::{Ampere, Ohm, Per, Volt}};
 
-let tia: Fixed<Per<Volt, Ampere>, Mega, f32> = Fixed::new(1.0);
+let tia: Fixed<Per<Volt, Ampere>, Mega, f32> = Fixed::<_, _, f32>::bounded(1.0);
 let _ = tia.convert::<Ohm, Mega, f32>(); // a transimpedance is not a resistor
 ```
 
@@ -65,10 +65,10 @@ Where crossing is right, it is a named step that keeps the number:
 use exact_units::{Fixed, prefix::{Mega, Micro, One}, units::{Ampere, Ohm, Per, Volt}};
 
 // a transimpedance amplifier: its feedback resistor sets its V/A
-let feedback = Fixed::<Ohm, Mega, f32>::new(1.0);
+let feedback = Fixed::<Ohm, Mega, f32>::bounded(1.0);
 let tia: Fixed<Per<Volt, Ampere>, Mega, f32> = feedback.as_transimpedance();
 // µA · MV/A is V
-let photo = Fixed::<Ampere, Micro, f32>::new(0.3);
+let photo = Fixed::<Ampere, Micro, f32>::bounded(0.3);
 let out: Fixed<Volt, One, f32> = (tia * photo).convert().unwrap();
 assert!((out.get() - 0.3).abs() < 1e-6);
 ```

@@ -74,13 +74,13 @@
 //! ```compile_fail
 //! # #[cfg(not(feature = "levels"))] compile_error!("needs levels");
 //! use exact_units::{Fixed, prefix::One, units::{DampingRatio, QualityFactor}};
-//! let _ = Fixed::<DampingRatio, One, f32>::new(0.5).convert::<QualityFactor, One, f32>();
+//! let _ = Fixed::<DampingRatio, One, f32>::bounded(0.5).convert::<QualityFactor, One, f32>();
 //! ```
 //!
 //! ```compile_fail
 //! # #[cfg(not(all(feature = "levels", feature = "dimensionless")))] compile_error!("needs levels, dimensionless");
 //! use exact_units::{Fixed, prefix::One, units::{DampingRatio, Ratio}};
-//! let _ = Fixed::<Ratio, One, f32>::new(0.5).convert::<DampingRatio, One, f32>();
+//! let _ = Fixed::<Ratio, One, f32>::bounded(0.5).convert::<DampingRatio, One, f32>();
 //! ```
 //!
 //! A time constant is of a loss: a gain rate is `as_loss` first.
@@ -88,7 +88,7 @@
 //! ```compile_fail
 //! # #[cfg(not(all(feature = "levels", feature = "time")))] compile_error!("needs levels, time");
 //! use exact_units::{Fixed, Rounding, prefix::One, units::{Neper, Per, Second}};
-//! let sigma = Fixed::<Per<Neper, Second>, One, f64>::new(-3.0);
+//! let sigma = Fixed::<Per<Neper, Second>, One, f64>::bounded(-3.0);
 //! let _: Option<Fixed<Second, One, f64>> = sigma.time_constant(Rounding::NearestEven);
 //! ```
 //!
@@ -97,7 +97,7 @@
 //! ```compile_fail
 //! # #[cfg(not(all(feature = "levels", feature = "time", feature = "mechanical")))] compile_error!("needs levels, time, mechanical");
 //! use exact_units::{Fixed, Rounding, prefix::One, units::{Loss, Meter, Neper, Per, Second}};
-//! let alpha = Fixed::<Per<Loss<Neper>, Meter>, One, f64>::new(0.02);
+//! let alpha = Fixed::<Per<Loss<Neper>, Meter>, One, f64>::bounded(0.02);
 //! let _: Option<Fixed<Second, One, f64>> = alpha.time_constant(Rounding::NearestEven);
 //! ```
 //!
@@ -106,7 +106,7 @@
 //! ```compile_fail
 //! # #[cfg(not(all(feature = "levels", feature = "time")))] compile_error!("needs levels, time");
 //! use exact_units::{Fixed, prefix::One, units::{DampingCoefficient, DampingRatio}};
-//! let delta = Fixed::<DampingCoefficient, One, f64>::new(3.0);
+//! let delta = Fixed::<DampingCoefficient, One, f64>::bounded(3.0);
 //! let _: Option<Fixed<DampingRatio, One, f64>> = Fixed::from_log_decrement(delta);
 //! ```
 
@@ -198,7 +198,7 @@ impl<L: Unit, X: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<Per<L, X>,
     /// let tau: Fixed<Second, Milli, u32> = delta.time_constant(Rounding::NearestEven).unwrap();
     /// assert_eq!(tau.get(), 400);
     /// // a decay of 8.686 dB per minute is 1 Np per minute: τ is a minute
-    /// let slow = Fixed::<Per<Loss<Decibel>, Minute>, Micro, f64>::new(8_685_889.638);
+    /// let slow = Fixed::<Per<Loss<Decibel>, Minute>, Micro, f64>::bounded(8_685_889.638);
     /// let tau: Fixed<Second, One, f64> = slow.time_constant(Rounding::NearestEven).unwrap();
     /// assert!((tau.get() - 60.0).abs() < 1e-6);
     /// # }
@@ -227,7 +227,7 @@ impl<L: Unit, X: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<Per<L, X>,
             crate::fixed::Requant::of_terms::<T, T2>(f, true, 1)
         };
         q.per(one::<T>()?, self.get(), r, Overflow::Checked)
-            .map(Fixed::new)
+            .and_then(Fixed::from_number)
     }
 
     /// The damping ratio of this damping coefficient δ at the undamped natural angular frequency ω₀: ζ = δ/ω₀, in
@@ -274,7 +274,7 @@ impl<L: Unit, X: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<Per<L, X>,
             crate::fixed::Requant::of_terms::<T, T3>(f, true, 1)
         };
         q.per(self.get(), omega0.get(), r, Overflow::Checked)
-            .map(Fixed::new)
+            .and_then(Fixed::from_number)
     }
 }
 
@@ -309,7 +309,7 @@ impl<P: FixedScale, T: Storage, B: Bounds<T>> Fixed<DampingRatio, P, T, B> {
         self,
         r: Rounding,
     ) -> Option<Fixed<QualityFactor, P2, T2>> {
-        half_recip::<P, T, P2, T2>(self.get(), r).map(Fixed::new)
+        half_recip::<P, T, P2, T2>(self.get(), r).and_then(Fixed::from_number)
     }
 
     /// The damping ratio of a logarithmic decrement Λ: ζ = Λ/√(4π² + Λ²) (Λ = 2πζ/√(1 − ζ²) solved for ζ), worked
@@ -372,7 +372,7 @@ impl<P: FixedScale, T: Storage, B: Bounds<T>> Fixed<DampingRatio, P, T, B> {
             return None;
         }
         let l = TAU * zeta / sqrt_f64(1.0 - zeta * zeta);
-        settle(l, s).map(Fixed::new)
+        settle(l, s).and_then(Fixed::from_number)
     }
 }
 
@@ -393,6 +393,6 @@ impl<P: FixedScale, T: Storage, B: Bounds<T>> Fixed<QualityFactor, P, T, B> {
         self,
         r: Rounding,
     ) -> Option<Fixed<DampingRatio, P2, T2>> {
-        half_recip::<P, T, P2, T2>(self.get(), r).map(Fixed::new)
+        half_recip::<P, T, P2, T2>(self.get(), r).and_then(Fixed::from_number)
     }
 }

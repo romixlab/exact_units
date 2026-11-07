@@ -6,3 +6,5 @@
 # everyone who runs the test benefits from these saved cases.
 cc b2d6a87ec06934ff5857e678d073000de42ffadfa3f464f8e92bbcc7bc8d22ee # shrinks to x = 0.0, i = 340282367
 cc b2d6a87ec06934ff5857e678d073000de42ffadfa3f464f8e92bbcc7bc8d22ee # shrinks to x = 0.0, i = 340282367, e = 0/1
+cc 6b7f5bb6f9e4876509389cbcc66e3912f74799064d7b0c037c071a2e0ee9d125 # shrinks to x = NaN, i = 0, e = 0/1
+cc 30471d3327d77ab5b43949975569431a7572a2c0afc728d6878effc2537dd01f # shrinks to x = NaN, i = 0

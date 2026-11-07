@@ -94,6 +94,14 @@ impl<U, P, T, B> OutOfRange<U, P, T, B> {
 
 impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> fmt::Display for OutOfRange<U, P, T, B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.value.is_nan() {
+            return write!(
+                f,
+                "NaN is no value of a NaN-free float ({}, {}; the bound MaybeNan holds NaN)",
+                U::EXPR.name(),
+                T::NAME
+            );
+        }
         self.value.fmt_number(f)?;
         write_prefix_unit::<P>(U::EXPR, f)?;
         f.write_str(" is out of ")?;
@@ -194,7 +202,8 @@ impl<'de, U, P, T: ComplexStorage + Deserialize<'de>, B: Unlimited<T>> Deseriali
 {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let ComplexParts { re, im } = ComplexParts::deserialize(deserializer)?;
-        Ok(Complex::of(re, im))
+        Complex::try_new(re, im)
+            .map_err(|_| de::Error::custom("a part of the complex value is NaN"))
     }
 }
 

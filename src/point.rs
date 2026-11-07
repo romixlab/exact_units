@@ -18,7 +18,8 @@
 use crate::fixed::Number;
 use crate::fixed::format::pad;
 use crate::{
-    Bounds, Fixed, FixedScale, Magnitude, OutOfBounds, Repr, Storage, Unit, UnitExpr, Unlimited,
+    Bounds, Fixed, FixedScale, Magnitude, MaybeNan, OutOfBounds, Repr, Storage, Unbounded, Unit,
+    UnitExpr, Unlimited,
 };
 use core::cmp::Ordering;
 use core::fmt;
@@ -604,12 +605,29 @@ fn wrap_float<
 impl<O: Origin<Unit = U>, U, P, T: Storage, B: Unlimited<T>> Point<O, Fixed<U, P, T, B>> {
     /// The point whose number is `raw` steps of `P` from the origin, for every bounds marker without limits
     /// ([Unbounded](crate::Unbounded), [Wrapping](crate::Wrapping) as in a [Bam16](crate::Bam16) heading,
-    /// [Saturating](crate::Saturating)).
+    /// [Saturating](crate::Saturating)). Integer storages only, as [Fixed::of]: a float point is made with
+    /// [bounded](Self::bounded) or `Point::new(Fixed::try_new(raw)?)`.
     #[inline(always)]
     pub const fn from_raw(raw: T) -> Self {
         Self::new(Fixed::of(raw))
     }
 }
+
+/// `bounded(raw)` of a float point, as [Fixed::bounded].
+macro_rules! bounded_float {
+    ($($ty:ident)*) => {$(
+        impl<O: Origin<Unit = U>, U, P, B: Bounds<$ty>> Point<O, Fixed<U, P, $ty, B>> {
+            /// The point `raw` steps of `P` from the origin: a compile error in `const` code when `raw` is NaN
+            /// (unless `B` is [MaybeNan](crate::MaybeNan)) or outside `B`, a panic at run time.
+            #[inline(always)]
+            pub const fn bounded(raw: $ty) -> Self {
+                Self::new(Fixed::<U, P, $ty, B>::bounded(raw))
+            }
+        }
+    )*};
+}
+
+bounded_float!(f32 f64);
 
 impl<O, F> Point<O, F> {
     /// The point `coord` from the origin.
@@ -640,6 +658,97 @@ impl<O: Origin<Unit = U>, U, P, T: Storage, B: Bounds<T>> Point<O, Fixed<U, P, T
     pub fn try_from_raw(raw: T) -> Result<Self, OutOfBounds> {
         Fixed::try_new(raw).map(Self::new)
     }
+
+    /// The same point without bounds, `None` where it is NaN: how a [MaybeNan] point (`+` of floats) goes back to a
+    /// checked one, which has `<` and `==`.
+    #[inline(always)]
+    pub fn not_nan(self) -> Option<Point<O, Fixed<U, P, T>>> {
+        self.coord.not_nan().map(Point::new)
+    }
+
+    /// `self > rhs`, and `nan` where `self` is NaN: a [MaybeNan] point compares so, the NaN outcome written at the
+    /// call, in one float compare ([Fixed::gt_or]).
+    ///
+    /// ```
+    /// # #[cfg(feature = "thermal")] {
+    /// use exact_units::{Fixed, Point, origins::Celsius, prefix::One, units::Kelvin};
+    ///
+    /// type DegC = Point<Celsius, Fixed<Kelvin, One, f32>>;
+    /// let limit = DegC::bounded(80.0);
+    /// let heat = Fixed::<Kelvin, One, f32>::bounded(f32::INFINITY);
+    /// let temp = DegC::bounded(f32::NEG_INFINITY) + heat; // a MaybeNan point
+    /// assert!(temp.gt_or(limit, true)); // NaN trips the shutdown
+    /// assert!(!(DegC::bounded(25.0) + heat - heat).gt_or(limit, false));
+    /// # }
+    /// ```
+    #[inline(always)]
+    #[expect(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "the negated compare is true for NaN, the `nan` of `true`"
+    )]
+    pub fn gt_or<R: Copy>(self, rhs: R, nan: bool) -> bool
+    where
+        Point<O, Fixed<U, P, T>>: PartialOrd<R>,
+    {
+        let v = Point::<O, _>::new(self.coord.unchecked_for_compare());
+        if nan { !(v <= rhs) } else { v > rhs }
+    }
+
+    /// `self >= rhs`, and `nan` where `self` is NaN. See [gt_or](Self::gt_or).
+    #[inline(always)]
+    #[expect(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "the negated compare is true for NaN, the `nan` of `true`"
+    )]
+    pub fn ge_or<R: Copy>(self, rhs: R, nan: bool) -> bool
+    where
+        Point<O, Fixed<U, P, T>>: PartialOrd<R>,
+    {
+        let v = Point::<O, _>::new(self.coord.unchecked_for_compare());
+        if nan { !(v < rhs) } else { v >= rhs }
+    }
+
+    /// `self < rhs`, and `nan` where `self` is NaN. See [gt_or](Self::gt_or).
+    #[inline(always)]
+    #[expect(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "the negated compare is true for NaN, the `nan` of `true`"
+    )]
+    pub fn lt_or<R: Copy>(self, rhs: R, nan: bool) -> bool
+    where
+        Point<O, Fixed<U, P, T>>: PartialOrd<R>,
+    {
+        let v = Point::<O, _>::new(self.coord.unchecked_for_compare());
+        if nan { !(v >= rhs) } else { v < rhs }
+    }
+
+    /// `self <= rhs`, and `nan` where `self` is NaN. See [gt_or](Self::gt_or).
+    #[inline(always)]
+    #[expect(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "the negated compare is true for NaN, the `nan` of `true`"
+    )]
+    pub fn le_or<R: Copy>(self, rhs: R, nan: bool) -> bool
+    where
+        Point<O, Fixed<U, P, T>>: PartialOrd<R>,
+    {
+        let v = Point::<O, _>::new(self.coord.unchecked_for_compare());
+        if nan { !(v > rhs) } else { v <= rhs }
+    }
+
+    /// `self == rhs`, and `nan` where `self` is NaN. See [gt_or](Self::gt_or).
+    #[inline(always)]
+    pub fn eq_or<R: Copy>(self, rhs: R, nan: bool) -> bool
+    where
+        Point<O, Fixed<U, P, T>>: PartialEq<R>,
+    {
+        let v = Point::<O, _>::new(self.coord.unchecked_for_compare());
+        if nan {
+            v == rhs || self.raw().is_nan()
+        } else {
+            v == rhs
+        }
+    }
 }
 
 impl<O: Origin<Unit = U>, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>>
@@ -664,7 +773,8 @@ impl<O: Origin<Unit = U>, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>>
             None => map.apply::<T, T2>(self.raw())?,
             Some(_) => reduce::<O2::Modulus, P2, T2>(map.apply_repr(self.raw())?)?,
         };
-        Some(Point::new(Fixed::new(y)))
+        // a MaybeNan point may be NaN, and NaN is no point of a NaN-free one
+        Some(Point::new(Fixed::try_new(y).ok()?))
     }
 
     /// This point measured against a zero only known at run time: `zero` is where `O`'s [Reference] lies in `O2`.
@@ -753,21 +863,23 @@ where
     /// The vector from `rhs` to `self`, `None` on overflow (a [Linear] origin's unsigned storage below `rhs`).
     #[inline(always)]
     pub fn checked_diff(self, rhs: Self) -> Option<PointDiff<O, P, T>> {
-        <O::Modulus as PointArith<P, T>>::checked_diff(self.raw(), rhs.raw()).map(Fixed::new)
+        <O::Modulus as PointArith<P, T>>::checked_diff(self.raw(), rhs.raw())
+            .and_then(Fixed::from_number)
     }
 }
 
 /// point + vector, point − vector, point − point: like `T`'s operators (panic on overflow in debug builds; a modulo
-/// origin wraps instead). A result outside `B` panics; `checked_add` and friends return `None`.
+/// origin wraps instead). A result outside `B` panics; `checked_add` and friends return `None`. A float point moves
+/// by IEEE 754 into a [MaybeNan](crate::MaybeNan) point, as `Fixed`'s `+` does: no check, no panic.
 mod arith {
-    use super::{Bounds, Fixed, Origin, Point, PointArith, PointDiff, Storage};
+    use super::{Bounds, Fixed, MaybeNan, Origin, Point, PointArith, Storage, Unbounded};
     use core::ops::{Add, AddAssign, Sub, SubAssign};
 
     impl<O, U, P, T, B> Add<Fixed<U, P, T>> for Point<O, Fixed<U, P, T, B>>
     where
         O: Origin<Unit = U>,
         O::Modulus: PointArith<P, T>,
-        T: Storage,
+        T: Storage<Arith = Unbounded>,
         B: Bounds<T>,
     {
         type Output = Self;
@@ -782,7 +894,7 @@ mod arith {
     where
         O: Origin<Unit = U>,
         O::Modulus: PointArith<P, T>,
-        T: Storage,
+        T: Storage<Arith = Unbounded>,
         B: Bounds<T>,
     {
         type Output = Self;
@@ -800,11 +912,17 @@ mod arith {
         T: Storage,
         B: Bounds<T>,
     {
-        type Output = PointDiff<O, P, T>;
+        /// The difference of two float points can be NaN (∞ − ∞): a [MaybeNan](crate::MaybeNan), as for `Fixed`.
+        type Output = Fixed<
+            U,
+            P,
+            <O::Modulus as PointArith<P, T>>::Diff,
+            <<O::Modulus as PointArith<P, T>>::Diff as Storage>::Arith,
+        >;
 
         #[inline(always)]
         fn sub(self, rhs: Self) -> Self::Output {
-            Fixed::new(<O::Modulus as PointArith<P, T>>::diff(
+            Fixed::new_unchecked(<O::Modulus as PointArith<P, T>>::diff(
                 self.raw(),
                 rhs.raw(),
             ))
@@ -815,7 +933,7 @@ mod arith {
     where
         O: Origin<Unit = U>,
         O::Modulus: PointArith<P, T>,
-        T: Storage,
+        T: Storage<Arith = Unbounded>,
         B: Bounds<T>,
     {
         #[inline(always)]
@@ -832,7 +950,7 @@ mod arith {
     where
         O: Origin<Unit = U>,
         O::Modulus: PointArith<P, T>,
-        T: Storage,
+        T: Storage<Arith = Unbounded>,
         B: Bounds<T>,
     {
         #[inline(always)]
@@ -843,6 +961,66 @@ mod arith {
         fn sub_assign(&mut self, v: Fixed<U, P, T>) {
             *self = *self - v;
         }
+    }
+
+    /// point ± vector of a float, either one [MaybeNan] or not: the float's own operation, a [MaybeNan] point
+    /// (∞ − ∞ is NaN), as for `Fixed`. `+=` and `-=` on a [MaybeNan] point.
+    macro_rules! float {
+        ($($ty:ident: $($b:ident $bv:ident),*;)*) => {$($(
+            impl<O, U, P> Add<Fixed<U, P, $ty, $bv>> for Point<O, Fixed<U, P, $ty, $b>>
+            where
+                O: Origin<Unit = U>,
+                O::Modulus: PointArith<P, $ty>,
+            {
+                type Output = Point<O, Fixed<U, P, $ty, MaybeNan>>;
+
+                #[inline(always)]
+                fn add(self, v: Fixed<U, P, $ty, $bv>) -> Self::Output {
+                    Point::new(Fixed::new_unchecked(<O::Modulus as PointArith<P, $ty>>::add(self.raw(), v.get())))
+                }
+            }
+
+            impl<O, U, P> Sub<Fixed<U, P, $ty, $bv>> for Point<O, Fixed<U, P, $ty, $b>>
+            where
+                O: Origin<Unit = U>,
+                O::Modulus: PointArith<P, $ty>,
+            {
+                type Output = Point<O, Fixed<U, P, $ty, MaybeNan>>;
+
+                #[inline(always)]
+                fn sub(self, v: Fixed<U, P, $ty, $bv>) -> Self::Output {
+                    Point::new(Fixed::new_unchecked(<O::Modulus as PointArith<P, $ty>>::sub(self.raw(), v.get())))
+                }
+            }
+        )*
+
+            impl<O, U, P, BV: Bounds<$ty>> AddAssign<Fixed<U, P, $ty, BV>> for Point<O, Fixed<U, P, $ty, MaybeNan>>
+            where
+                O: Origin<Unit = U>,
+                O::Modulus: PointArith<P, $ty>,
+            {
+                #[inline(always)]
+                fn add_assign(&mut self, v: Fixed<U, P, $ty, BV>) {
+                    *self = Point::new(Fixed::new_unchecked(<O::Modulus as PointArith<P, $ty>>::add(self.raw(), v.get())));
+                }
+            }
+
+            impl<O, U, P, BV: Bounds<$ty>> SubAssign<Fixed<U, P, $ty, BV>> for Point<O, Fixed<U, P, $ty, MaybeNan>>
+            where
+                O: Origin<Unit = U>,
+                O::Modulus: PointArith<P, $ty>,
+            {
+                #[inline(always)]
+                fn sub_assign(&mut self, v: Fixed<U, P, $ty, BV>) {
+                    *self = Point::new(Fixed::new_unchecked(<O::Modulus as PointArith<P, $ty>>::sub(self.raw(), v.get())));
+                }
+            }
+        )*};
+    }
+
+    float! {
+        f32: Unbounded Unbounded, Unbounded MaybeNan, MaybeNan Unbounded, MaybeNan MaybeNan;
+        f64: Unbounded Unbounded, Unbounded MaybeNan, MaybeNan Unbounded, MaybeNan MaybeNan;
     }
 
     #[inline(always)]

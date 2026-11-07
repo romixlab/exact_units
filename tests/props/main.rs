@@ -21,6 +21,8 @@ mod format;
 mod level;
 mod literal;
 mod magnitude;
+#[cfg(not(kani))]
+mod nan;
 mod niche;
 mod no_panic;
 mod numeric;

@@ -26,13 +26,19 @@ pub enum Repr {
 
 /// A number type a [Fixed](super::Fixed) is stored as: `u8`..`u64`, `i8`..`i64`, `f32`, `f64`, `UNib32`, `UVlq32`,
 /// `UVlq64`, `Nibble`. Arithmetic is that of the number inside (`UNib32` wraps like `u32`, `Nibble` at 16); for floats,
-/// `checked_*` is `None` for a result that isn't finite, `wrapping_*` and `saturating_*` are the plain operation.
+/// `checked_*` is `None` for a result that isn't finite, the plain operation, `wrapping_*` and `saturating_*` are IEEE
+/// 754's, NaN included.
 pub trait Storage: Copy + PartialOrd + 'static {
     /// The type's name: `"u32"`, `"UNib32"`.
     const NAME: &'static str;
 
     /// `f32` and `f64`.
     const IS_FLOAT: bool;
+
+    /// The bound of what `+`, `-`, `*` and `/` of an unbounded value give: [Unbounded](super::Unbounded) for an
+    /// integer, whose result is a number of the storage; [MaybeNan](super::MaybeNan) for a float, whose result can be
+    /// NaN (∞ − ∞, 0 · ∞, 0 / 0) at no cost of a check.
+    type Arith: super::Unlimited<Self>;
 
     /// 0.
     const ZERO: Self;
@@ -49,6 +55,12 @@ pub trait Storage: Copy + PartialOrd + 'static {
 
     /// The value as an exact integer or a float.
     fn to_repr(self) -> Repr;
+
+    /// Whether the value is NaN: never for an integer storage.
+    #[inline(always)]
+    fn is_nan(self) -> bool {
+        false
+    }
 
     /// `x` if it fits; a float storage takes the nearest float.
     fn from_int(x: i128) -> Option<Self>;
@@ -243,6 +255,8 @@ macro_rules! int {
             const NAME: &'static str = stringify!($ty);
 
             const IS_FLOAT: bool = false;
+
+            type Arith = super::Unbounded;
 
             const ZERO: Self = 0;
 
@@ -457,6 +471,8 @@ macro_rules! newtype {
 
             const IS_FLOAT: bool = false;
 
+            type Arith = super::Unbounded;
+
             const ZERO: Self = $ty(0);
 
             const BITS: u32 = $inner::BITS;
@@ -602,6 +618,8 @@ impl Storage for Nibble {
     const NAME: &'static str = "Nibble";
 
     const IS_FLOAT: bool = false;
+
+    type Arith = super::Unbounded;
 
     const ZERO: Self = Nibble::zero();
 
@@ -851,6 +869,8 @@ macro_rules! unsigned_exact {
 
             const IS_FLOAT: bool = false;
 
+            type Arith = super::Unbounded;
+
             const ZERO: Self = $ty::zero();
 
             const BITS: u32 = $bits;
@@ -1090,6 +1110,8 @@ macro_rules! signed_exact {
 
             const IS_FLOAT: bool = false;
 
+            type Arith = super::Unbounded;
+
             const ZERO: Self = $ty::zero();
 
             const BITS: u32 = $bits;
@@ -1312,6 +1334,8 @@ macro_rules! float {
 
             const IS_FLOAT: bool = true;
 
+            type Arith = super::MaybeNan;
+
             const ZERO: Self = 0.0;
 
             #[expect(clippy::cast_possible_truncation, reason = "a float is 4 or 8 bytes")]
@@ -1388,6 +1412,8 @@ macro_rules! float {
             #[inline(always)] fn checked_mul(self, rhs: Self) -> Option<Self> { Some(self * rhs).filter(|x| x.is_finite()) }
 
             #[inline(always)] fn checked_div(self, rhs: Self) -> Option<Self> { Some(self / rhs).filter(|x| x.is_finite()) }
+
+            #[inline(always)] fn is_nan(self) -> bool { $ty::is_nan(self) }
 
             #[inline(always)] fn wrapping_add(self, rhs: Self) -> Self { self + rhs }
 

@@ -164,7 +164,9 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> Index<Of, T, B> {
     /// How far `self` is after `earlier`, `None` when it is before it.
     #[inline(always)]
     pub fn checked_distance(self, earlier: Self) -> Option<Fixed<Of, One, T>> {
-        self.get().checked_sub(earlier.get()).map(Fixed::new)
+        self.get()
+            .checked_sub(earlier.get())
+            .and_then(Fixed::from_number)
     }
 
     /// Run on every value read from the wire: a position outside `B` is [shrink_wrap::Error::SubtypeOutOfRange].

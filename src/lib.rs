@@ -103,9 +103,9 @@ pub use exact::{OffTarget, Tolerance};
 #[cfg(feature = "angle")]
 pub use fixed::{Bam16, Bam32, PhaseBam16, PhaseBam32};
 pub use fixed::{
-    Bounds, Count, DecimalPrefix, Fixed, FixedScale, OutOfBounds, Overflow, Range, RangeDec,
-    RangeU64, Repr, Requantizer, Rounding, Saturating, Storage, StorageKind, Unbounded, Unlimited,
-    UnsignedStorage, Wrapping, prefix, requantize,
+    Bounds, Count, DecimalPrefix, Fixed, FixedScale, MaybeNan, NanFree, OutOfBounds, Overflow,
+    Range, RangeDec, RangeU64, Repr, Requantizer, Rounding, Saturating, Storage, StorageKind,
+    Unbounded, Unlimited, UnsignedStorage, Wrapping, prefix, requantize,
 };
 #[cfg(feature = "information")]
 pub use fixed::{Bytes, Gibibytes, Kibibytes, Mebibytes};

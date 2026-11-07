@@ -344,8 +344,8 @@ fn per_into_keeps_digits() {
 
 #[test]
 fn float_storages() {
-    let v = Fixed::<Volt, Milli, f32>::new(1500.0);
-    let i = Fixed::<Ampere, One, f32>::new(2.0);
+    let v = Fixed::<Volt, Milli, f32>::bounded(1500.0);
+    let i = Fixed::<Ampere, One, f32>::bounded(2.0);
     assert_eq!((v * i).get(), 3000.0);
     assert_eq!((v / i).get(), 750.0);
     assert_eq!(
@@ -355,12 +355,15 @@ fn float_storages() {
     let p: Fixed<_, One, f32> = v.times_into(i, Rounding::Floor).unwrap();
     assert_eq!(p.get(), 3.0);
     // a float into an integer storage rounds
-    let mw: Fixed<_, Milli, i32> = Fixed::<Volt, Milli, f32>::new(1.25)
-        .times_into(Fixed::<Ampere, One, f32>::new(1.0), Rounding::NearestEven)
+    let mw: Fixed<_, Milli, i32> = Fixed::<Volt, Milli, f32>::bounded(1.25)
+        .times_into(
+            Fixed::<Ampere, One, f32>::bounded(1.0),
+            Rounding::NearestEven,
+        )
         .unwrap();
     assert_eq!(mw.get(), 1);
     assert_eq!(
-        v.per_into::<_, _, _, One, f32>(Fixed::<Ampere, One, f32>::new(0.0), Rounding::Floor),
+        v.per_into::<_, _, _, One, f32>(Fixed::<Ampere, One, f32>::bounded(0.0), Rounding::Floor),
         None
     );
 }

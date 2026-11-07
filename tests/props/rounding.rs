@@ -9,13 +9,13 @@ use super::reference::{MODES, POLICIES, assert_rounded, range, round_div, settle
 use exact_units::units::Ratio;
 use exact_units::{
     Fixed, FixedScale, Magnitude, Overflow, Repr, Requantizer, Rounding, Storage, StorageKind,
-    requantize,
+    Unbounded, requantize,
 };
 
 /// A storage the properties read back as an exact integer.
-pub(crate) trait Int: Storage + Into<i128> + core::fmt::Debug {}
+pub(crate) trait Int: Storage<Arith = Unbounded> + Into<i128> + core::fmt::Debug {}
 
-impl<T: Storage + Into<i128> + core::fmt::Debug> Int for T {}
+impl<T: Storage<Arith = Unbounded> + Into<i128> + core::fmt::Debug> Int for T {}
 
 /// `x` of `P` into `P2` and `T2`, rounded by `r` and settled by `o`, against `x · num / den` (the factor `P / P2`):
 /// a result is the quotient rounded as `r` promises, `None` only where it doesn't fit `T2` and the policy is
@@ -127,7 +127,7 @@ pub(crate) fn requantizes_at_run_time(
 #[cfg(not(kani))]
 pub(crate) fn float_requantizes<T2: Int>(x: f64, r: Rounding, o: Overflow) {
     use exact_units::prefix::One;
-    let v: Fixed<Ratio, One, f64> = Fixed::new(x);
+    let v: Fixed<Ratio, One, f64, exact_units::MaybeNan> = Fixed::of(x);
     let (min, max) = (T2::MIN_INT, T2::MAX_INT);
     let got = match o {
         Overflow::Checked => v.to_rounded::<One, T2>(r).map(|f| f.get().into()),

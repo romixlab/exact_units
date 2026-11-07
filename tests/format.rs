@@ -112,11 +112,11 @@ fn width_fill_align_sign() {
 
 #[test]
 fn floats_and_other_ratios() {
-    let v = Fixed::<Volt, Milli, f32>::new(1500.0);
+    let v = Fixed::<Volt, Milli, f32>::bounded(1500.0);
     assert_eq!(format!("{v:#}"), "1.5 V");
     assert_eq!(format!("{v:#.3}"), "1.500 V");
     assert_eq!(format!("{v:>#9.2}"), "   1.50 V");
-    let v = Fixed::<Volt, One, f64>::new(-0.125);
+    let v = Fixed::<Volt, One, f64>::bounded(-0.125);
     assert_eq!(format!("{v:#.2}"), "-0.12 V");
     assert_eq!(format!("{v:#}"), "-0.125 V");
     // thirds: no finite decimal, a float without a precision, exactly rounded with one

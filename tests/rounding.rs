@@ -203,12 +203,12 @@ fn wide_storages() {
 
 #[test]
 fn floats_round_once() {
-    let v: Fixed<Volt, One, f32> = Fixed::new(2.5);
+    let v: Fixed<Volt, One, f32> = Fixed::<_, _, f32>::bounded(2.5);
     let r = |r| v.to_rounded::<One, i16>(r).map(Fixed::get);
     assert_eq!(r(Rounding::NearestEven), Some(2));
     assert_eq!(r(Rounding::NearestAway), Some(3));
     assert_eq!(r(Rounding::Floor), Some(2));
-    let v: Fixed<Volt, One, f64> = Fixed::new(-2.5);
+    let v: Fixed<Volt, One, f64> = Fixed::<_, _, f64>::bounded(-2.5);
     let r = |r| v.to_rounded::<One, i16>(r).map(Fixed::get);
     assert_eq!(r(Rounding::NearestEven), Some(-2));
     assert_eq!(r(Rounding::NearestAway), Some(-3));
@@ -216,14 +216,14 @@ fn floats_round_once() {
     assert_eq!(r(Rounding::Ceil), Some(-2));
     assert_eq!(r(Rounding::Floor), Some(-3));
     // mV in f32 to V in i8: 1499.9 mV is 1 V to nearest
-    let v: Fixed<Volt, Milli, f32> = Fixed::new(1499.9);
+    let v: Fixed<Volt, Milli, f32> = Fixed::<_, _, f32>::bounded(1499.9);
     assert_eq!(
         v.to_rounded::<One, i8>(Rounding::NearestEven)
             .map(Fixed::get),
         Some(1)
     );
     // out of range and NaN by policy
-    let big: Fixed<Volt, One, f64> = Fixed::new(1e10);
+    let big: Fixed<Volt, One, f64> = Fixed::<_, _, f64>::bounded(1e10);
     assert_eq!(big.to_rounded::<One, i16>(Rounding::Truncate), None);
     assert_eq!(
         big.to_saturating::<One, i16>(Rounding::Truncate).get(),
@@ -238,11 +238,11 @@ fn floats_round_once() {
         big.to_wrapping::<One, i16>(Rounding::Truncate).get(),
         wrapped
     );
-    let nan: Fixed<Volt, One, f64> = Fixed::new(f64::NAN);
+    let nan: Fixed<Volt, One, f64, exact_units::MaybeNan> = Fixed::of(f64::NAN);
     assert_eq!(nan.to_rounded::<One, i16>(Rounding::Truncate), None);
     assert_eq!(nan.to_saturating::<One, i16>(Rounding::Truncate).get(), 0);
     assert_eq!(nan.to_wrapping::<One, u8>(Rounding::Truncate).get(), 0);
-    let top: Fixed<Volt, One, f64> = Fixed::new(1.8446744073709552e19); // 2⁶⁴
+    let top: Fixed<Volt, One, f64> = Fixed::<_, _, f64>::bounded(1.8446744073709552e19); // 2⁶⁴
     assert_eq!(
         top.to_saturating::<One, u64>(Rounding::Truncate).get(),
         u64::MAX
@@ -258,7 +258,7 @@ fn floats_round_once() {
 #[test]
 fn float_sources_settle_by_policy() {
     let sat = |x: f64, r| {
-        Fixed::<Volt, One, f64>::new(x)
+        Fixed::<Volt, One, f64, exact_units::MaybeNan>::of(x)
             .to_saturating::<One, i16>(r)
             .get()
     };
@@ -280,7 +280,7 @@ fn float_sources_settle_by_policy() {
     assert_eq!(sat(f64::INFINITY, Rounding::Floor), i16::MAX);
     assert_eq!(sat(f64::NEG_INFINITY, Rounding::Floor), i16::MIN);
     let sat_u = |x: f64| {
-        Fixed::<Volt, One, f64>::new(x)
+        Fixed::<Volt, One, f64, exact_units::MaybeNan>::of(x)
             .to_saturating::<One, u64>(Rounding::Floor)
             .get()
     };
@@ -290,7 +290,7 @@ fn float_sources_settle_by_policy() {
     assert_eq!(sat_u(1e300), u64::MAX);
     // the same into 64-bit signed: in range from both sides of 2⁶³
     let sat_i = |x: f64| {
-        Fixed::<Volt, One, f64>::new(x)
+        Fixed::<Volt, One, f64, exact_units::MaybeNan>::of(x)
             .to_saturating::<One, i64>(Rounding::Floor)
             .get()
     };
@@ -301,7 +301,7 @@ fn float_sources_settle_by_policy() {
 
     // wrapping: modulo 2^bits of the whole value, 0 for what has no bits (infinities, 2¹²⁷ and up)
     let wrap = |x: f64| {
-        Fixed::<Volt, One, f64>::new(x)
+        Fixed::<Volt, One, f64, exact_units::MaybeNan>::of(x)
             .to_wrapping::<One, i16>(Rounding::Floor)
             .get()
     };

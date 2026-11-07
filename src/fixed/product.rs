@@ -39,11 +39,13 @@
 //!   the [Rounding] given (Q15 · Q15 back into Q15 is `times_into::<Pow2<-15>, i16>`).
 //! - **Overflow by the policy of the operands**, as `Fixed * T` does: for [Unbounded] `T`'s own (a panic in debug
 //!   builds), for [Wrapping] modulo 2^bits, for [Saturating] at the ends of `T`, and the result keeps the policy.
+//!   [Wrapping] and [Saturating] are for integers. Floats multiply as IEEE 754 does and the result is a [MaybeNan]
+//!   (0 · ∞ is NaN), with a [MaybeNan] on either side too, so `a * b * c` is one.
 //!   Two different policies don't multiply (`with_overflow` one of them first). The other policies are named:
 //!   [checked_times](Fixed::checked_times), [saturating_times](Fixed::saturating_times),
 //!   [wrapping_times](Fixed::wrapping_times) and their `_per` twins, for operands of any bounds. The rounding forms
 //!   take an [Overflow] ([times_requantize](Fixed::times_requantize)) or check ([times_into](Fixed::times_into)).
-//! - **Bounds of the result are [Unbounded].** A range of the result would need arithmetic on const parameters in
+//! - **Bounds of the result are [Unbounded]** ([MaybeNan] for floats). A range of the result would need arithmetic on const parameters in
 //!   the type. Two [Range]s still multiply with `*`: their corners are checked at compile time to fit `T`, so the
 //!   product can't overflow, and a pair whose product may not fit doesn't compile. Any other bounded operand takes
 //!   `checked_times` or `.unbounded()`.
@@ -156,7 +158,9 @@
 //! ```
 
 use super::rounding::{self, Overflow, Rounding};
-use super::{Bounds, Fixed, FixedScale, Range, Repr, Saturating, Storage, Unbounded, Wrapping};
+use super::{
+    Bounds, Fixed, FixedScale, MaybeNan, Range, Repr, Saturating, Storage, Unbounded, Wrapping,
+};
 use crate::Magnitude;
 use crate::prefix::{Product, Quotient};
 use crate::unit::Unit;
@@ -178,13 +182,15 @@ pub(crate) const fn check<U1: Unit, U2: Unit, P1: FixedScale, P2: FixedScale>(pe
     let _ = scale.as_pow10();
 }
 
-/// `*` and `/` of two values of one overflow policy, which the result keeps.
+/// `*` and `/` of two values of one overflow policy, which the result keeps; of two [Unbounded] floats a
+/// [MaybeNan] (0 · ∞, ∞ / ∞, 0 / 0), as for `Fixed * T` ([Storage::Arith]). [Wrapping] and [Saturating] are for
+/// integer storages.
 macro_rules! policy {
-    ($($b:ident $mul:ident $div:ident;)*) => {$(
-        impl<U1: Unit, P1: FixedScale, U2: Unit, P2: FixedScale, T: Storage> Mul<Fixed<U2, P2, T, $b>>
+    ($($b:ident [$($t:tt)*] $out:ty: $mul:ident $div:ident;)*) => {$(
+        impl<U1: Unit, P1: FixedScale, U2: Unit, P2: FixedScale, $($t)*> Mul<Fixed<U2, P2, T, $b>>
             for Fixed<U1, P1, T, $b>
         {
-            type Output = Fixed<Times<U1, U2>, Product<P1, P2>, T, $b>;
+            type Output = Fixed<Times<U1, U2>, Product<P1, P2>, T, $out>;
 
             #[inline(always)]
             fn mul(self, rhs: Fixed<U2, P2, T, $b>) -> Self::Output {
@@ -193,11 +199,11 @@ macro_rules! policy {
             }
         }
 
-        /// Division by 0 panics as for `T`; only `MIN / -1` of a signed `T` overflows.
-        impl<U1: Unit, P1: FixedScale, U2: Unit, P2: FixedScale, T: Storage> Div<Fixed<U2, P2, T, $b>>
+        /// Division by 0 panics as for an integer `T`; only `MIN / -1` of a signed `T` overflows.
+        impl<U1: Unit, P1: FixedScale, U2: Unit, P2: FixedScale, $($t)*> Div<Fixed<U2, P2, T, $b>>
             for Fixed<U1, P1, T, $b>
         {
-            type Output = Fixed<Per<U1, U2>, Quotient<P1, P2>, T, $b>;
+            type Output = Fixed<Per<U1, U2>, Quotient<P1, P2>, T, $out>;
 
             #[inline(always)]
             fn div(self, rhs: Fixed<U2, P2, T, $b>) -> Self::Output {
@@ -209,9 +215,44 @@ macro_rules! policy {
 }
 
 policy! {
-    Unbounded mul div;
-    Wrapping wrapping_mul wrapping_div;
-    Saturating saturating_mul saturating_div;
+    Unbounded [T: Storage] T::Arith: mul div;
+    Wrapping [T: Storage<Arith = Unbounded>] Wrapping: wrapping_mul wrapping_div;
+    Saturating [T: Storage<Arith = Unbounded>] Saturating: saturating_mul saturating_div;
+}
+
+/// `*` and `/` with a [MaybeNan] float on either side, the other [MaybeNan] or [Unbounded]: IEEE 754, a [MaybeNan],
+/// so `a * b * c` of floats is one.
+macro_rules! maybe_nan {
+    ($($ty:ident: $($b1:ident * $b2:ident),*;)*) => {$($(
+        impl<U1: Unit, P1: FixedScale, U2: Unit, P2: FixedScale> Mul<Fixed<U2, P2, $ty, $b2>>
+            for Fixed<U1, P1, $ty, $b1>
+        {
+            type Output = Fixed<Times<U1, U2>, Product<P1, P2>, $ty, MaybeNan>;
+
+            #[inline(always)]
+            fn mul(self, rhs: Fixed<U2, P2, $ty, $b2>) -> Self::Output {
+                const { check::<U1, U2, P1, P2>(false) };
+                Fixed::new_unchecked(self.value * rhs.value)
+            }
+        }
+
+        impl<U1: Unit, P1: FixedScale, U2: Unit, P2: FixedScale> Div<Fixed<U2, P2, $ty, $b2>>
+            for Fixed<U1, P1, $ty, $b1>
+        {
+            type Output = Fixed<Per<U1, U2>, Quotient<P1, P2>, $ty, MaybeNan>;
+
+            #[inline(always)]
+            fn div(self, rhs: Fixed<U2, P2, $ty, $b2>) -> Self::Output {
+                const { check::<U1, U2, P1, P2>(true) };
+                Fixed::new_unchecked(self.value / rhs.value)
+            }
+        }
+    )*)*};
+}
+
+maybe_nan! {
+    f32: MaybeNan * MaybeNan, MaybeNan * Unbounded, Unbounded * MaybeNan;
+    f64: MaybeNan * MaybeNan, MaybeNan * Unbounded, Unbounded * MaybeNan;
 }
 
 /// The product of two ranges, which can't overflow: the corners of the ranges are checked at compile time to fit
@@ -235,7 +276,7 @@ where
             proven_product::<T>(A0, A1, B0, B1);
         };
         // proven in range: wrapping is the plain multiply
-        Fixed::new(self.value.wrapping_mul(rhs.value))
+        Fixed::new_unchecked(self.value.wrapping_mul(rhs.value))
     }
 }
 
@@ -287,27 +328,31 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         rhs: Fixed<U2, P2, T, B2>,
     ) -> Option<Fixed<Times<U, U2>, Product<P, P2>, T>> {
         const { check::<U, U2, P, P2>(false) };
-        self.value.checked_mul(rhs.value).map(Fixed::new)
+        self.value
+            .checked_mul(rhs.value)
+            .and_then(Fixed::from_number)
     }
 
-    /// `self · rhs` in the scale [Product]`<P, P2>`, at the nearest end of `T` where it doesn't fit.
+    /// `self · rhs` in the scale [Product]`<P, P2>`, at the nearest end of `T` where it doesn't fit. For floats the
+    /// plain product, a [MaybeNan].
     #[inline(always)]
     pub fn saturating_times<U2: Unit, P2: FixedScale, B2: Bounds<T>>(
         self,
         rhs: Fixed<U2, P2, T, B2>,
-    ) -> Fixed<Times<U, U2>, Product<P, P2>, T> {
+    ) -> Fixed<Times<U, U2>, Product<P, P2>, T, T::Arith> {
         const { check::<U, U2, P, P2>(false) };
-        Fixed::new(self.value.saturating_mul(rhs.value))
+        Fixed::new_unchecked(self.value.saturating_mul(rhs.value))
     }
 
-    /// `self · rhs` in the scale [Product]`<P, P2>`, modulo 2^bits of `T`.
+    /// `self · rhs` in the scale [Product]`<P, P2>`, modulo 2^bits of `T`. For floats the plain product, a
+    /// [MaybeNan].
     #[inline(always)]
     pub fn wrapping_times<U2: Unit, P2: FixedScale, B2: Bounds<T>>(
         self,
         rhs: Fixed<U2, P2, T, B2>,
-    ) -> Fixed<Times<U, U2>, Product<P, P2>, T> {
+    ) -> Fixed<Times<U, U2>, Product<P, P2>, T, T::Arith> {
         const { check::<U, U2, P, P2>(false) };
-        Fixed::new(self.value.wrapping_mul(rhs.value))
+        Fixed::new_unchecked(self.value.wrapping_mul(rhs.value))
     }
 
     /// `self / rhs` in the scale [Quotient]`<P, P2>`, truncated as `T` divides; `None` for a zero divisor (of an
@@ -322,27 +367,31 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         rhs: Fixed<U2, P2, T, B2>,
     ) -> Option<Fixed<Per<U, U2>, Quotient<P, P2>, T>> {
         const { check::<U, U2, P, P2>(true) };
-        self.value.checked_div(rhs.value).map(Fixed::new)
+        self.value
+            .checked_div(rhs.value)
+            .and_then(Fixed::from_number)
     }
 
-    /// `self / rhs` in the scale [Quotient]`<P, P2>`, `MIN / -1` at `MAX`; a zero divisor panics as for `T`.
+    /// `self / rhs` in the scale [Quotient]`<P, P2>`, `MIN / -1` at `MAX`; a zero divisor panics as for `T`. For
+    /// floats the plain quotient, a [MaybeNan].
     #[inline(always)]
     pub fn saturating_per<U2: Unit, P2: FixedScale, B2: Bounds<T>>(
         self,
         rhs: Fixed<U2, P2, T, B2>,
-    ) -> Fixed<Per<U, U2>, Quotient<P, P2>, T> {
+    ) -> Fixed<Per<U, U2>, Quotient<P, P2>, T, T::Arith> {
         const { check::<U, U2, P, P2>(true) };
-        Fixed::new(self.value.saturating_div(rhs.value))
+        Fixed::new_unchecked(self.value.saturating_div(rhs.value))
     }
 
-    /// `self / rhs` in the scale [Quotient]`<P, P2>`, `MIN / -1` at `MIN`; a zero divisor panics as for `T`.
+    /// `self / rhs` in the scale [Quotient]`<P, P2>`, `MIN / -1` at `MIN`; a zero divisor panics as for `T`. For
+    /// floats the plain quotient, a [MaybeNan].
     #[inline(always)]
     pub fn wrapping_per<U2: Unit, P2: FixedScale, B2: Bounds<T>>(
         self,
         rhs: Fixed<U2, P2, T, B2>,
-    ) -> Fixed<Per<U, U2>, Quotient<P, P2>, T> {
+    ) -> Fixed<Per<U, U2>, Quotient<P, P2>, T, T::Arith> {
         const { check::<U, U2, P, P2>(true) };
-        Fixed::new(self.value.wrapping_div(rhs.value))
+        Fixed::new_unchecked(self.value.wrapping_div(rhs.value))
     }
 
     /// `self · rhs` in the scale `P3` and storage `T3`, rounded once by `r`; `None` where it doesn't fit `T3`. The
@@ -397,7 +446,8 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
             check::<U, U2, P, P2>(false);
             Requant::of::<T, T3>(Product::<P, P2>::SCALE.div(P3::SCALE), false)
         };
-        q.times(self.value, rhs.value, r, o).map(Fixed::new)
+        q.times(self.value, rhs.value, r, o)
+            .and_then(Fixed::from_number)
     }
 
     /// `self / rhs` in the scale `P3` and storage `T3`, rounded once by `r`: the quotient with the digits `P3`
@@ -442,7 +492,8 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
             check::<U, U2, P, P2>(true);
             Requant::of::<T, T3>(Quotient::<P, P2>::SCALE.div(P3::SCALE), true)
         };
-        q.per(self.value, rhs.value, r, o).map(Fixed::new)
+        q.per(self.value, rhs.value, r, o)
+            .and_then(Fixed::from_number)
     }
 }
 

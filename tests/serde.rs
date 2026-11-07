@@ -60,7 +60,7 @@ fn fixed_is_its_number() {
     round_trip(&Millis::<u32>::new(1500), "1500", 1500u32);
     round_trip(&Timeout::try_new(250).unwrap(), "250", 250u16);
     round_trip(&Fixed::<Volt, Milli, i16>::new(-3300), "-3300", -3300i16);
-    round_trip(&Fixed::<Volt, One, f32>::new(1.5), "1.5", 1.5f32);
+    round_trip(&Fixed::<Volt, One, f32>::bounded(1.5), "1.5", 1.5f32);
     round_trip(&Q15::<Ratio>::of(-32768), "-32768", -32768i16);
     round_trip(&Bam16::of(0xC000), "49152", 0xC000u16);
     round_trip(&PhaseBam16::of(1), "1", 1u16);
@@ -129,7 +129,7 @@ fn complex_is_re_and_im() {
         r#"{"re":16384,"im":-8192}"#,
         (16384i16, -8192i16),
     );
-    let c = Complex::<Volt, One, f64>::new(0.5, -0.25);
+    let c = Complex::<Volt, One, f64>::bounded(0.5, -0.25);
     round_trip(&c, r#"{"re":0.5,"im":-0.25}"#, (0.5f64, -0.25f64));
     assert!(json_err::<CQ15>(r#"{"re": 1}"#).contains("missing field `im`"));
 }
@@ -249,7 +249,7 @@ fn with_unit_round_trips_text() {
 }
 
 /// A `Fixed` in the text form.
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(transparent)]
 struct Text<
     U: exact_units::Unit,
@@ -339,12 +339,17 @@ fn with_unit_reads_prefixes_and_spellings() {
         read::<Volt, One, f64, exact_units::Unbounded>("-inf V"),
         Ok(f64::NEG_INFINITY)
     );
+    // NaN is no value of a NaN-free float, only of MaybeNan
+    assert_eq!(
+        read::<Volt, One, f64, exact_units::Unbounded>("NaN V"),
+        Err("NaN is no value of a NaN-free float (Volt, f64; the bound MaybeNan holds NaN)".into())
+    );
     assert!(
-        read::<Volt, One, f64, exact_units::Unbounded>("NaN V")
+        read::<Volt, One, f64, exact_units::MaybeNan>("NaN V")
             .unwrap()
             .is_nan()
     );
-    assert_eq!(write(Fixed::<Volt, Milli, f32>::new(1500.0)), "1.5 V");
+    assert_eq!(write(Fixed::<Volt, Milli, f32>::bounded(1500.0)), "1.5 V");
 }
 
 #[test]

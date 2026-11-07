@@ -32,7 +32,7 @@
 //! assert_eq!(ALPHA.get(), 20_378); // 0.177 dB/m = 0.0203779.. Np/m
 //!
 //! // a gain of 0.5 V/V is −6.02 dB, a loss of 6.02 dB
-//! let gain = Fixed::<Per<Volt, Volt>, One, f64>::new(0.5);
+//! let gain = Fixed::<Per<Volt, Volt>, One, f64>::bounded(0.5);
 //! let level: Fixed<Decibel, One, f64> = gain.to_level().unwrap();
 //! assert!((level.get() + 6.0206).abs() < 1e-4);
 //! assert!((level.as_loss().get() - 6.0206).abs() < 1e-4);
@@ -65,7 +65,7 @@
 //! assert!((t.get() - 0.2388).abs() < 1e-4);
 //!
 //! // a fibre's 0.2 dB/km: μ is twice α
-//! let fibre = Fixed::<Per<Loss<Decibel>, Meter>, Milli, f64>::new(0.2);
+//! let fibre = Fixed::<Per<Loss<Decibel>, Meter>, Milli, f64>::bounded(0.2);
 //! let alpha = fibre.convert::<Per<Loss<Neper>, Meter>, Micro, f64>().unwrap();
 //! let mu = fibre.convert::<LinearAttenuation, Micro, f64>().unwrap();
 //! assert!((alpha.get() - 23.03).abs() < 0.01);
@@ -86,14 +86,14 @@
 //! use exact_units::{Fixed, prefix::{Deci, One}, units::{Decibel, Feet100, Kilometre, Loss, Metres100, Per}};
 //!
 //! // a fibre's 0.2 dB/km at 1550 nm
-//! let per_km = Fixed::<Per<Loss<Decibel>, Kilometre>, One, f64>::new(0.2);
+//! let per_km = Fixed::<Per<Loss<Decibel>, Kilometre>, One, f64>::bounded(0.2);
 //! assert_eq!(format!("{per_km:#}"), "0.2 dB/km");
 //!
 //! // Belden 8259 (RG-58): 5.4 dB/100 ft at 100 MHz, as the datasheet writes it
 //! let per_100ft = Fixed::<Per<Loss<Decibel>, Feet100>, Deci, i32>::new(54);
 //! assert_eq!(format!("{per_100ft:#}"), "5.4 dB/100 ft");
 //!
-//! let per_100m = Fixed::<Per<Loss<Decibel>, Metres100>, One, f64>::new(17.7);
+//! let per_100m = Fixed::<Per<Loss<Decibel>, Metres100>, One, f64>::bounded(17.7);
 //! assert_eq!(format!("{per_100m:#}"), "17.7 dB/100 m");
 //! # }
 //! ```
@@ -128,7 +128,7 @@
 //! ```compile_fail
 //! # #[cfg(not(feature = "levels"))] compile_error!("needs levels");
 //! use exact_units::{Fixed, prefix::One, units::{Decibel, Loss}};
-//! let _ = Fixed::<Loss<Decibel>, One, f32>::new(3.0).convert::<Decibel, One, f32>();
+//! let _ = Fixed::<Loss<Decibel>, One, f32>::bounded(3.0).convert::<Decibel, One, f32>();
 //! ```
 //!
 //! ```compile_fail
@@ -140,25 +140,25 @@
 //! ```compile_fail
 //! # #[cfg(not(all(feature = "levels", feature = "mechanical")))] compile_error!("needs levels, mechanical");
 //! use exact_units::{Fixed, prefix::One, units::{Meter, Neper, Per, Wavenumber}};
-//! let _ = Fixed::<Per<Neper, Meter>, One, f32>::new(0.02).convert::<Wavenumber, One, f32>();
+//! let _ = Fixed::<Per<Neper, Meter>, One, f32>::bounded(0.02).convert::<Wavenumber, One, f32>();
 //! ```
 //!
 //! ```compile_fail
 //! # #[cfg(not(all(feature = "levels", feature = "time")))] compile_error!("needs levels, time");
 //! use exact_units::{Fixed, prefix::One, units::{Hertz, Neper, Per, Second}};
-//! let _ = Fixed::<Per<Neper, Second>, One, f32>::new(3.0).convert::<Hertz, One, f32>();
+//! let _ = Fixed::<Per<Neper, Second>, One, f32>::bounded(3.0).convert::<Hertz, One, f32>();
 //! ```
 //!
 //! ```compile_fail
 //! # #[cfg(not(all(feature = "levels", feature = "time")))] compile_error!("needs levels, time");
 //! use exact_units::{Fixed, prefix::One, units::{Decibel, Hertz, Per, Second}};
-//! let _ = Fixed::<Per<Decibel, Second>, One, f32>::new(3.0).convert::<Hertz, One, f32>();
+//! let _ = Fixed::<Per<Decibel, Second>, One, f32>::bounded(3.0).convert::<Hertz, One, f32>();
 //! ```
 //!
 //! ```compile_fail
 //! # #[cfg(not(all(feature = "levels", feature = "angle", feature = "time")))] compile_error!("needs levels, angle, time");
 //! use exact_units::{Fixed, prefix::One, units::{AngularVelocity, Neper, Per, Second}};
-//! let _ = Fixed::<Per<Neper, Second>, One, f32>::new(3.0).convert::<AngularVelocity, One, f32>();
+//! let _ = Fixed::<Per<Neper, Second>, One, f32>::bounded(3.0).convert::<AngularVelocity, One, f32>();
 //! ```
 //!
 //! α(f) = α₀·f takes a frequency in hertz, not an angular velocity (a factor 2π lost, and cm·MHz / (rad/s) isn't a
@@ -179,7 +179,7 @@
 //! ```compile_fail
 //! # #[cfg(not(feature = "levels"))] compile_error!("needs levels");
 //! use exact_units::{Fixed, prefix::One, units::{Absorbance, Decibel}};
-//! let _ = Fixed::<Absorbance, One, f32>::new(1.0).convert::<Decibel, One, f32>();
+//! let _ = Fixed::<Absorbance, One, f32>::bounded(1.0).convert::<Decibel, One, f32>();
 //! ```
 //!
 //! ```compile_fail
@@ -191,7 +191,7 @@
 //! ```compile_fail
 //! # #[cfg(not(all(feature = "levels", feature = "mechanical")))] compile_error!("needs levels, mechanical");
 //! use exact_units::{Fixed, prefix::One, units::{LinearAttenuation, Wavenumber}};
-//! let _ = Fixed::<LinearAttenuation, One, f32>::new(0.02).convert::<Wavenumber, One, f32>();
+//! let _ = Fixed::<LinearAttenuation, One, f32>::bounded(0.02).convert::<Wavenumber, One, f32>();
 //! ```
 
 mod damping;
@@ -257,7 +257,6 @@ impl<L: LossLevel, X: Unit> LossLevel for Per<L, X> {
     type Gain = Per<L::Gain, X>;
 }
 
-#[expect(private_bounds, reason = "the policy is a detail of the three markers")]
 impl<L: Level, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Fixed<L, P, T, B> {
     /// The same level signed as a loss: a gain of −3 dB is a loss of 3 dB. The negation follows `B` as `-` does:
     /// `MIN` panics in debug builds for [Unbounded](crate::Unbounded), wraps for [Wrapping](crate::Wrapping) and
@@ -276,7 +275,6 @@ impl<L: Level, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Fixed<L, P, T,
     }
 }
 
-#[expect(private_bounds, reason = "the policy is a detail of the three markers")]
 impl<L: LossLevel, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Fixed<L, P, T, B> {
     /// The same level signed as a gain: a loss of 3 dB is a gain of −3 dB. The negation follows `B` as in
     /// [as_loss](Fixed::as_loss).
@@ -391,20 +389,20 @@ impl<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>> Fixe
     /// ```
     /// # #[cfg(all(feature = "levels", feature = "electrical"))] {
     /// use exact_units::{Fixed, prefix::{Centi, One}, units::{Decibel, Loss, Neper, Per, Volt, Watt}};
-    /// let v = Fixed::<Per<Volt, Volt>, One, f64>::new(10.0);
-    /// assert_eq!(v.to_level::<Decibel, One, f64>(), Some(Fixed::new(20.0)));
-    /// assert_eq!(v.to_level::<Loss<Decibel>, Centi, f32>(), Some(Fixed::new(-2000.0)));
-    /// let p = Fixed::<Per<Watt, Watt>, One, f64>::new(100.0);
-    /// assert_eq!(p.to_level::<Decibel, One, f64>(), Some(Fixed::new(20.0)));
-    /// let e = Fixed::<Per<Volt, Volt>, One, f64>::new(core::f64::consts::E);
-    /// assert_eq!(e.to_level::<Neper, One, f64>(), Some(Fixed::new(1.0)));
+    /// let v = Fixed::<Per<Volt, Volt>, One, f64>::bounded(10.0);
+    /// assert_eq!(v.to_level::<Decibel, One, f64>(), Some(Fixed::<_, _, f64>::bounded(20.0)));
+    /// assert_eq!(v.to_level::<Loss<Decibel>, Centi, f32>(), Some(Fixed::<_, _, f32>::bounded(-2000.0)));
+    /// let p = Fixed::<Per<Watt, Watt>, One, f64>::bounded(100.0);
+    /// assert_eq!(p.to_level::<Decibel, One, f64>(), Some(Fixed::<_, _, f64>::bounded(20.0)));
+    /// let e = Fixed::<Per<Volt, Volt>, One, f64>::bounded(core::f64::consts::E);
+    /// assert_eq!(e.to_level::<Neper, One, f64>(), Some(Fixed::<_, _, f64>::bounded(1.0)));
     /// # }
     /// ```
     ///
     /// ```compile_fail
     /// # #[cfg(not(feature = "levels"))] compile_error!("needs levels");
     /// use exact_units::{Fixed, prefix::One, units::{Decibel, Ratio}};
-    /// let _ = Fixed::<Ratio, One, f64>::new(0.5).to_level::<Decibel, One, f64>();
+    /// let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_level::<Decibel, One, f64>();
     /// ```
     #[must_use]
     pub fn to_level<L: Unit, P2: crate::FixedScale, T2: crate::Storage>(
@@ -422,7 +420,8 @@ impl<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>> Fixe
         } else {
             crate::fixed::round_f64(x, crate::Rounding::NearestEven)
         };
-        Some(Fixed::new(crate::fixed::settle_f64(
+        // x is finite, so the storage's value is a number
+        Some(Fixed::new_unchecked(crate::fixed::settle_f64(
             x,
             crate::Overflow::Checked,
         )?))
@@ -439,15 +438,15 @@ impl<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>> Fixe
     /// let loss = Fixed::<Loss<Decibel>, Centi, u16>::new(2000); // 20 dB of loss
     /// assert_eq!(loss.to_gain::<Per<Volt, Volt>, Milli, u32>(), Some(Fixed::new(100)));
     /// assert_eq!(loss.to_gain::<Per<Watt, Watt>, Milli, u32>(), Some(Fixed::new(10)));
-    /// let gain = Fixed::<Decibel, One, f64>::new(20.0);
-    /// assert_eq!(gain.to_gain::<Per<Volt, Volt>, One, f64>(), Some(Fixed::new(10.0)));
+    /// let gain = Fixed::<Decibel, One, f64>::bounded(20.0);
+    /// assert_eq!(gain.to_gain::<Per<Volt, Volt>, One, f64>(), Some(Fixed::<_, _, f64>::bounded(10.0)));
     /// # }
     /// ```
     ///
     /// ```compile_fail
     /// # #[cfg(not(feature = "levels"))] compile_error!("needs levels");
     /// use exact_units::{Fixed, prefix::One, units::{Decibel, Ratio}};
-    /// let _ = Fixed::<Decibel, One, f64>::new(-3.0).to_gain::<Ratio, One, f64>();
+    /// let _ = Fixed::<Decibel, One, f64>::bounded(-3.0).to_gain::<Ratio, One, f64>();
     /// ```
     #[must_use]
     pub fn to_gain<G: Unit, P2: crate::FixedScale, T2: crate::Storage>(
@@ -555,7 +554,8 @@ fn over<
     } else {
         crate::fixed::round_f64(x, crate::Rounding::NearestEven)
     };
-    Some(Fixed::new(crate::fixed::settle_f64(
+    // x is finite, so the storage's value is a number
+    Some(Fixed::new_unchecked(crate::fixed::settle_f64(
         x,
         crate::Overflow::Checked,
     )?))

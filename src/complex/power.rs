@@ -10,13 +10,13 @@
 //! use exact_units::{Complex, prefix::One, units::{Ampere, Volt}};
 //!
 //! // 230 V at 0°, 10 A lagging 30° behind it
-//! let v = Complex::<Volt, One, f64>::new(230.0, 0.0);
-//! let i = Complex::<Ampere, One, f64>::new(8.660254037844387, -5.0);
+//! let v = Complex::<Volt, One, f64>::bounded(230.0, 0.0);
+//! let i = Complex::<Ampere, One, f64>::bounded(8.660254037844387, -5.0);
 //! let s = v.apparent_power(i);
 //! assert_eq!(s.active().get().round(), 1992.0); // active power, W
 //! assert_eq!(s.reactive().get(), 1150.0); // reactive power, var
 //! assert_eq!(s.apparent().unwrap().get().round(), 2300.0); // |S|, VA
-//! assert!((s.power_factor().get() - 0.8660254037844387).abs() < 1e-9); // cos 30°
+//! assert!((s.power_factor().unwrap().get() - 0.8660254037844387).abs() < 1e-9); // cos 30°
 //! # }
 //! ```
 //!
@@ -24,12 +24,12 @@
 //!
 //! ```compile_fail
 //! use exact_units::{Fixed, prefix::One, units::{Var, Watt}};
-//! let _ = Fixed::<Var, One, f64>::new(500.0).convert::<Watt, One, f64>();
+//! let _ = Fixed::<Var, One, f64>::bounded(500.0).convert::<Watt, One, f64>();
 //! ```
 //!
 //! ```compile_fail
 //! use exact_units::{Fixed, prefix::One, units::{VoltAmpere, Watt}};
-//! let _ = Fixed::<VoltAmpere, One, f64>::new(2300.0).convert::<Watt, One, f64>();
+//! let _ = Fixed::<VoltAmpere, One, f64>::bounded(2300.0).convert::<Watt, One, f64>();
 //! ```
 
 use super::{Complex, ComplexStorage, NormStorage, Policy};
@@ -75,10 +75,6 @@ fn magnitude_f64<T: NormStorage>(re: T, im: T) -> f64 {
     crate::num::sqrt_f64(to_f64(T::norm_sqr(re, im)))
 }
 
-#[expect(
-    private_bounds,
-    reason = "the policy is a detail of the three markers, as in the `complex` module"
-)]
 impl<P: FixedScale, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Complex<Volt, P, T, B> {
     /// `S = V · I*`, the complex power of an RMS voltage and current phasor (ISO 80000-6), as
     /// `Complex<VoltAmpere, ..>`: [active](Complex::active), [reactive](Complex::reactive) and
@@ -93,9 +89,9 @@ impl<P: FixedScale, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Complex<Volt
     pub fn apparent_power<P2: FixedScale>(
         self,
         i: Complex<Ampere, P2, T, B>,
-    ) -> Complex<VoltAmpere, Product<P, P2>, T, B> {
+    ) -> Complex<VoltAmpere, Product<P, P2>, T, B::Out> {
         let s = self * i.conj();
-        Complex::of(s.re, s.im)
+        Complex::of_unchecked(s.re, s.im)
     }
 }
 
@@ -118,16 +114,14 @@ impl<P, T: NormStorage, B: Unlimited<T>> Complex<VoltAmpere, P, T, B> {
     /// where `T` holds it exactly (always, for a float `T`; a Pythagorean triple, for an integer one). `None`
     /// otherwise, or where it doesn't fit `T`.
     pub fn apparent(self) -> Option<Fixed<VoltAmpere, P, T, B>> {
-        Some(Fixed::new_unchecked(T::from_float(magnitude_f64(
-            self.re, self.im,
-        ))?))
+        Fixed::from_number(T::from_float(magnitude_f64(self.re, self.im))?)
     }
 
     /// The power factor, `cos φ = P / S` (ISO 80000-6's `λ`), a plain [Ratio]: 1 for a resistive load, 0 for a
-    /// purely reactive one, `NaN` where `S` is zero.
-    pub fn power_factor(self) -> Fixed<Ratio, One, f64> {
+    /// purely reactive one. `None` where `S` is zero (0 / 0) or infinite.
+    pub fn power_factor(self) -> Option<Fixed<Ratio, One, f64>> {
         let apparent = magnitude_f64(self.re, self.im);
-        Fixed::new_unchecked(to_f64(self.re) / apparent)
+        Fixed::from_number(to_f64(self.re) / apparent)
     }
 }
 
@@ -150,14 +144,14 @@ mod tests {
     #[test]
     fn apparent_power_of_a_resistive_load() {
         // a real current in phase with the voltage: all of it active, none reactive
-        let v = Complex::<Volt, One, f64>::new(230.0, 0.0);
-        let i = Complex::<Ampere, One, f64>::new(2.0, 0.0);
+        let v = Complex::<Volt, One, f64>::bounded(230.0, 0.0);
+        let i = Complex::<Ampere, One, f64>::bounded(2.0, 0.0);
         let s = v.apparent_power(i);
         assert_eq!(s.get(), (460.0, 0.0));
         assert_eq!(s.active().get(), 460.0);
         assert_eq!(s.reactive().get(), 0.0);
         assert_eq!(s.apparent().unwrap().get(), 460.0);
-        assert_eq!(s.power_factor().get(), 1.0);
+        assert_eq!(s.power_factor().unwrap().get(), 1.0);
     }
 
     #[test]
@@ -167,7 +161,7 @@ mod tests {
         assert_eq!(s.active().get(), 3);
         assert_eq!(s.reactive().get(), 4);
         assert_eq!(s.apparent().unwrap().get(), 5);
-        assert_eq!(s.power_factor().get(), 0.6);
+        assert_eq!(s.power_factor().unwrap().get(), 0.6);
     }
 
     #[test]
@@ -179,11 +173,11 @@ mod tests {
     #[test]
     fn purely_reactive_load() {
         // a current 90° behind the voltage: all of it reactive, none active
-        let v = Complex::<Volt, One, f64>::new(230.0, 0.0);
-        let i = Complex::<Ampere, One, f64>::new(0.0, -2.0);
+        let v = Complex::<Volt, One, f64>::bounded(230.0, 0.0);
+        let i = Complex::<Ampere, One, f64>::bounded(0.0, -2.0);
         let s = v.apparent_power(i);
         assert_eq!(s.active().get(), 0.0);
         assert_eq!(s.reactive().get(), 460.0);
-        assert_eq!(s.power_factor().get(), 0.0);
+        assert_eq!(s.power_factor().unwrap().get(), 0.0);
     }
 }

@@ -3,7 +3,7 @@
 use crate::fixed::FixedScale;
 use crate::tree::{is_ratio, takes_bare_prefix, write_unit};
 use crate::units::{Per, Times};
-use crate::{Bounds, Fixed, Magnitude, Prefix, Repr, Rounding, Storage, Unit};
+use crate::{Bounds, Fixed, Magnitude, NanFree, Prefix, Repr, Rounding, Storage, Unit};
 use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{Hash, Hasher};
@@ -388,14 +388,14 @@ impl<U: Unit> Exact<U> {
         if !steps.is_integer() {
             return None;
         }
-        T::from_int(steps.round(Rounding::Truncate)?).map(Fixed::new)
+        T::from_int(steps.round(Rounding::Truncate)?).and_then(Fixed::from_number)
     }
 
     /// The same value as a [Fixed] of scale `P` in an integer storage `T`, rounded by `r` where it isn't a whole
     /// number of `P`: `Floor` and `Ceil` are the integers below and above. `None` only when it doesn't fit `T`.
     #[must_use]
     pub fn to_rounded<P: FixedScale, T: Storage>(self, r: Rounding) -> Option<Fixed<U, P, T>> {
-        T::from_int(self.steps::<P, T>()?.round(r)?).map(Fixed::new)
+        T::from_int(self.steps::<P, T>()?.round(r)?).and_then(Fixed::from_number)
     }
 
     fn steps<P: FixedScale, T: Storage>(self) -> Option<Fraction> {
@@ -626,27 +626,31 @@ impl<U> Hash for Exact<U> {
     }
 }
 
-/// Equal where the order is ([PartialOrd]): exactly the same value. A NaN is equal to none.
-impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> PartialEq<Fixed<U, P, T, B>> for Exact<U> {
+/// Equal where the order is ([PartialOrd]): exactly the same value. For NaN-free values; a [MaybeNan](crate::MaybeNan)
+/// compares by [eq_or](Fixed::eq_or).
+impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T> + NanFree> PartialEq<Fixed<U, P, T, B>>
+    for Exact<U>
+{
     fn eq(&self, other: &Fixed<U, P, T, B>) -> bool {
         self.partial_cmp(other) == Some(Ordering::Equal)
     }
 }
 
-/// Exactly, across scales, for every value: a float of any size, ±∞ past every `Exact`; `None` only for NaN. A
+/// Exactly, across scales, for every value: a float of any size, ±∞ past every `Exact`, always `Some` (NaN only in a [MaybeNan](crate::MaybeNan), which has [lt_or](Fixed::lt_or) and its kin instead). A
 /// scale that isn't a fraction of `u128`s (π, a root, past `u128`) doesn't compile, as for [to](Exact::to): an
 /// `Exact` is a fraction, and a number of π steps is never one.
 ///
 /// ```
 /// # #[cfg(feature = "time")] {
-/// use exact_units::{Exact, Fixed, prefix::{One, Quetta}, units::Hertz};
+/// use exact_units::{Exact, Fixed, MaybeNan, prefix::{One, Quetta}, units::Hertz};
 ///
 /// let max = Exact::<Hertz>::int(i128::MAX);
-/// assert!(Fixed::<Hertz, One, f64>::new(1e300) > max);
-/// assert!(Fixed::<Hertz, One, f64>::new(1e-300) < Exact::new(1, u128::MAX));
-/// assert!(Fixed::<Hertz, One, f64>::new(f64::NEG_INFINITY) < -max);
+/// assert!(Fixed::<Hertz, One, f64>::bounded(1e300) > max);
+/// assert!(Fixed::<Hertz, One, f64>::bounded(1e-300) < Exact::new(1, u128::MAX));
+/// assert!(Fixed::<Hertz, One, f64>::bounded(f64::NEG_INFINITY) < -max);
 /// assert!(Fixed::<Hertz, Quetta, i64>::new(i64::MAX) > max);
-/// assert_eq!(Fixed::<Hertz, One, f64>::new(f64::NAN).partial_cmp(&max), None);
+/// // NaN only in a MaybeNan, which compares by naming what NaN gives
+/// assert!(Fixed::<Hertz, One, f64, MaybeNan>::of(f64::NAN).lt_or(max, true));
 /// # }
 /// ```
 ///
@@ -658,7 +662,9 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> PartialEq<Fixed<U, P, T, 
 /// let _ = Exact::<Hertz>::int(3) < Fixed::<Hertz, PiSteps, i32>::new(1);
 /// # }
 /// ```
-impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> PartialOrd<Fixed<U, P, T, B>> for Exact<U> {
+impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T> + NanFree> PartialOrd<Fixed<U, P, T, B>>
+    for Exact<U>
+{
     fn partial_cmp(&self, other: &Fixed<U, P, T, B>) -> Option<Ordering> {
         compare::order(other.get().to_repr(), const { scale_of::<P>() }, self.value)
             .map(Ordering::reverse)
@@ -666,14 +672,18 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> PartialOrd<Fixed<U, P, T,
 }
 
 /// See `PartialEq<Fixed> for Exact`.
-impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> PartialEq<Exact<U>> for Fixed<U, P, T, B> {
+impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T> + NanFree> PartialEq<Exact<U>>
+    for Fixed<U, P, T, B>
+{
     fn eq(&self, other: &Exact<U>) -> bool {
         other == self
     }
 }
 
 /// See `PartialOrd<Fixed> for Exact`.
-impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> PartialOrd<Exact<U>> for Fixed<U, P, T, B> {
+impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T> + NanFree> PartialOrd<Exact<U>>
+    for Fixed<U, P, T, B>
+{
     fn partial_cmp(&self, other: &Exact<U>) -> Option<Ordering> {
         compare::order(self.get().to_repr(), const { scale_of::<P>() }, other.value)
     }

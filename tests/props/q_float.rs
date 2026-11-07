@@ -10,10 +10,10 @@
 )]
 
 use core::cmp::Ordering;
-use exact_units::Fixed;
 use exact_units::literal::Decimal;
 use exact_units::prefix::{Centi, Micro, Milli, One, Pow2, Rational};
 use exact_units::units::{Kilometre, Meter};
+use exact_units::{Fixed, MaybeNan};
 use num_bigint::BigInt;
 use num_rational::BigRational;
 
@@ -73,7 +73,7 @@ macro_rules! orders {
         pub(crate) fn $name(t: $raw, num: i64, exp: i16) {
             if fits($num_s, $den_s, num, exp) {
                 let want = order(t.into(), $num_s, $den_s, num, exp);
-                let got = <$ty>::new(t).literal_order::<$s>(Decimal::new(num, exp));
+                let got = <$ty>::of(t).literal_order::<$s>(Decimal::new(num, exp));
                 assert_eq!(got, ops(want), "{t:e} against {num}e{exp}");
             }
         }
@@ -81,14 +81,14 @@ macro_rules! orders {
 }
 
 orders! {
-    centi_f32: Fixed<Meter, Centi, f32>, f32, Meter, 1, 100;
-    third_f32: Fixed<Meter, Rational<1, 3>, f32>, f32, Meter, 1, 3;
-    km_in_cm_f32: Fixed<Meter, Centi, f32>, f32, Kilometre, 1, 100_000;
+    centi_f32: Fixed<Meter, Centi, f32, MaybeNan>, f32, Meter, 1, 100;
+    third_f32: Fixed<Meter, Rational<1, 3>, f32, MaybeNan>, f32, Meter, 1, 3;
+    km_in_cm_f32: Fixed<Meter, Centi, f32, MaybeNan>, f32, Kilometre, 1, 100_000;
     // steps of 2^120 m: a literal of a centimetre is a subnormal number of them
-    pow2_f32: Fixed<Meter, Pow2<63>, f32>, f32, Meter, 1 << 63, 1;
-    one_f64: Fixed<Meter, One, f64>, f64, Meter, 1, 1;
-    milli_f64: Fixed<Meter, Milli, f64>, f64, Meter, 1, 1000;
-    micro_f64: Fixed<Meter, Micro, f64>, f64, Meter, 1, 1_000_000;
+    pow2_f32: Fixed<Meter, Pow2<63>, f32, MaybeNan>, f32, Meter, 1 << 63, 1;
+    one_f64: Fixed<Meter, One, f64, MaybeNan>, f64, Meter, 1, 1;
+    milli_f64: Fixed<Meter, Milli, f64, MaybeNan>, f64, Meter, 1, 1000;
+    micro_f64: Fixed<Meter, Micro, f64, MaybeNan>, f64, Meter, 1, 1_000_000;
 }
 
 #[cfg(not(any(kani, fuzzing)))]
@@ -164,32 +164,50 @@ mod tests {
         }
     }
 
-    /// Every operator of stored value `t` against a `q!` literal that is a float, both ways round, is order `ord`.
+    /// Every operator of stored value `t` (a [MaybeNan]) against a `q!` literal that is a float, both ways round, is
+    /// order `ord`; `eq_or` gives `ord`'s `==` and its fallback for NaN.
     macro_rules! agrees {
         ($t:expr, $lit:expr, $ord:expr) => {{
             let (t, lit, ord): (_, _, Option<Ordering>) = ($t, $lit, $ord);
             ordered!(t, lit, ord);
-            assert_eq!(t == lit, ord == Some(Ordering::Equal), "{t:?}");
-            assert_eq!(t != lit, ord != Some(Ordering::Equal), "{t:?}");
-            assert_eq!(lit == t, ord == Some(Ordering::Equal), "{t:?}");
+            for nan in [false, true] {
+                assert_eq!(t.eq_or(lit, nan), ord.map_or(nan, Ordering::is_eq), "{t:?}");
+            }
+            if let Some(t) = t.not_nan() {
+                assert_eq!(t == lit, ord == Some(Ordering::Equal), "{t:?}");
+                assert_eq!(t != lit, ord != Some(Ordering::Equal), "{t:?}");
+                assert_eq!(lit == t, ord == Some(Ordering::Equal), "{t:?}");
+            }
         }};
     }
 
-    /// The order of stored value `t` against a `q!` literal, both ways round, is `ord`: every operator but `==` and
-    /// `!=`, which don't compile with a literal no float is.
+    /// The order of stored value `t` (a [MaybeNan]) against a `q!` literal is `ord`: `lt_or` and its kin give it,
+    /// and their fallback for NaN; after `not_nan` every operator but `==` and `!=` (which don't compile with a
+    /// literal no float is), both ways round. NaN is the one value `not_nan` refuses.
     macro_rules! ordered {
         ($t:expr, $lit:expr, $ord:expr) => {{
             let (t, lit, ord): (_, _, Option<Ordering>) = ($t, $lit, $ord);
-            assert_eq!(t.partial_cmp(&lit), ord, "{t:?}");
-            assert_eq!(t < lit, ord == Some(Ordering::Less), "{t:?}");
-            assert_eq!(t <= lit, ord.is_some_and(Ordering::is_le), "{t:?}");
-            assert_eq!(t > lit, ord == Some(Ordering::Greater), "{t:?}");
-            assert_eq!(t >= lit, ord.is_some_and(Ordering::is_ge), "{t:?}");
-            assert_eq!(lit.partial_cmp(&t), ord.map(Ordering::reverse), "{t:?}");
-            assert_eq!(lit < t, ord == Some(Ordering::Greater), "{t:?}");
-            assert_eq!(lit <= t, ord.is_some_and(Ordering::is_ge), "{t:?}");
-            assert_eq!(lit > t, ord == Some(Ordering::Less), "{t:?}");
-            assert_eq!(lit >= t, ord.is_some_and(Ordering::is_le), "{t:?}");
+            for nan in [false, true] {
+                assert_eq!(t.lt_or(lit, nan), ord.map_or(nan, Ordering::is_lt), "{t:?}");
+                assert_eq!(t.le_or(lit, nan), ord.map_or(nan, Ordering::is_le), "{t:?}");
+                assert_eq!(t.gt_or(lit, nan), ord.map_or(nan, Ordering::is_gt), "{t:?}");
+                assert_eq!(t.ge_or(lit, nan), ord.map_or(nan, Ordering::is_ge), "{t:?}");
+            }
+            match t.not_nan() {
+                None => assert_eq!(ord, None, "{t:?}"),
+                Some(t) => {
+                    assert_eq!(t.partial_cmp(&lit), ord, "{t:?}");
+                    assert_eq!(t < lit, ord == Some(Ordering::Less), "{t:?}");
+                    assert_eq!(t <= lit, ord.is_some_and(Ordering::is_le), "{t:?}");
+                    assert_eq!(t > lit, ord == Some(Ordering::Greater), "{t:?}");
+                    assert_eq!(t >= lit, ord.is_some_and(Ordering::is_ge), "{t:?}");
+                    assert_eq!(lit.partial_cmp(&t), ord.map(Ordering::reverse), "{t:?}");
+                    assert_eq!(lit < t, ord == Some(Ordering::Greater), "{t:?}");
+                    assert_eq!(lit <= t, ord.is_some_and(Ordering::is_ge), "{t:?}");
+                    assert_eq!(lit > t, ord == Some(Ordering::Less), "{t:?}");
+                    assert_eq!(lit >= t, ord.is_some_and(Ordering::is_le), "{t:?}");
+                }
+            }
         }};
     }
 
@@ -243,7 +261,7 @@ mod tests {
     fn every_f32_against_rational_literals() {
         walk(|t| {
             let w = |num_s, den_s, num, exp| order(t.into(), num_s, den_s, num, exp);
-            let v = Fixed::<Volt, One, f32>::new(t);
+            let v = Fixed::<Volt, One, f32, MaybeNan>::of(t);
             ordered!(v, q!(0.1 V), w(1, 1, 1, -1));
             ordered!(v, q!(-3.3 V), w(1, 1, -33, -1));
             agrees!(v, q!(0.75 V), w(1, 1, 75, -2));
@@ -251,15 +269,15 @@ mod tests {
             ordered!(v, q!(1e30 V), w(1, 1, 1, 30));
             ordered!(v, q!(-1.5e-30 V), w(1, 1, -15, -31));
             ordered!(v, q!(100 mV), w(1, 1, 1, -1));
-            let s = Fixed::<Speed, Centi, f32>::new(t);
+            let s = Fixed::<Speed, Centi, f32, MaybeNan>::of(t);
             agrees!(s, q!(100 m/s), w(1, 100, 100, 0));
             ordered!(s, q!(-0.155 m/s), w(1, 100, -155, -3));
             ordered!(s, q!(359.9 km/h), w(36, 1000, 3599, -1));
             // a centimetre in steps of 2^120 m is a subnormal f32
-            let p = Fixed::<Meter, Pow2<63>, f32>::new(t);
+            let p = Fixed::<Meter, Pow2<63>, f32, MaybeNan>::of(t);
             ordered!(p, q!(1e-19 m), w(1 << 63, 1, 1, -19));
             ordered!(p, q!(-1e-19 m), w(1 << 63, 1, -1, -19));
-            let d = Fixed::<Meter, One, f64>::new(t.into());
+            let d = Fixed::<Meter, One, f64, MaybeNan>::of(t.into());
             ordered!(d, q!(0.1 m), w(1, 1, 1, -1));
             agrees!(d, q!(-2.5 km), w(1, 1, -2500, 0));
         });
@@ -269,12 +287,12 @@ mod tests {
     #[test]
     fn every_f32_against_degrees_in_radians() {
         walk(|t| {
-            let r = Fixed::<Radian, One, f32>::new(t);
+            let r = Fixed::<Radian, One, f32, MaybeNan>::of(t);
             ordered!(r, q!(90 deg), against_degrees(t.into(), 90));
             ordered!(r, q!(-45 deg), against_degrees(t.into(), -45));
-            let r = Fixed::<Radian, One, f64>::new(t.into());
+            let r = Fixed::<Radian, One, f64, MaybeNan>::of(t.into());
             ordered!(r, q!(180 deg), against_degrees(t.into(), 180));
-            let a = Fixed::<Degree, One, f32>::new(t);
+            let a = Fixed::<Degree, One, f32, MaybeNan>::of(t);
             agrees!(a, q!(90 deg), order(t.into(), 1, 1, 90, 0));
         });
     }
@@ -283,16 +301,17 @@ mod tests {
     /// a float equals it.
     #[test]
     fn next_to_a_literal() {
-        let v = |x: f32| Fixed::<Volt, One, f32>::new(x);
+        let v = |x: f32| Fixed::<Volt, One, f32>::bounded(x);
         assert!(v(0.1) > q!(0.1 V));
         assert!(v(0.1f32.next_down()) < q!(0.1 V));
         assert_eq!(v(0.75), q!(0.75 V));
         assert!(v(0.75f32.next_down()) < q!(0.75 V));
         assert!(v(0.75f32.next_up()) > q!(0.75 V));
         assert_eq!(v(-0.0), q!(0 V));
-        assert!(v(f32::NAN).partial_cmp(&q!(1 V)).is_none());
-        assert!(!(v(f32::NAN) >= q!(1 V) || v(f32::NAN) < q!(1 V)));
-        let d = Fixed::<Volt, One, f64>::new(0.1);
+        let nan = Fixed::<Volt, One, f32, MaybeNan>::of(f32::NAN);
+        assert_eq!(nan.not_nan(), None);
+        assert!(nan.ge_or(q!(1 V), true) && !nan.lt_or(q!(1 V), false));
+        let d = Fixed::<Volt, One, f64>::bounded(0.1);
         assert!(d > q!(0.1 V) && d < q!(0.1000000000000001 V));
     }
 }

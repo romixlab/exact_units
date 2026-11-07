@@ -519,15 +519,15 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     /// ```
     /// # #[cfg(feature = "electrical")] {
     /// use exact_units::{Fixed, prefix::{Milli, One}, units::{Ampere, Per, Volt, Watt}};
-    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f64>::new(10.0).to_db(), 20.0);
+    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f64>::bounded(10.0).to_db(), 20.0);
     /// assert_eq!(Fixed::<Per<Ampere, Ampere>, Milli, u32>::new(100).to_db(), -20.0);
-    /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::new(100.0).to_db(), 20.0);
+    /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::bounded(100.0).to_db(), 20.0);
     /// # }
     /// ```
     ///
     /// ```compile_fail
     /// use exact_units::{Fixed, prefix::One, units::Ratio};
-    /// let _ = Fixed::<Ratio, One, f64>::new(0.5).to_db();
+    /// let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_db();
     /// ```
     pub fn to_db(self) -> f64 {
         let form = const { Self::LEVEL_FORM };
@@ -551,7 +551,7 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     /// # #[cfg(feature = "electrical")] {
     /// use exact_units::{Fixed, prefix::{Milli, One}, units::{Per, Volt, Watt}};
     /// assert_eq!(Fixed::<Per<Volt, Volt>, Milli, u32>::from_db(40.0), Some(Fixed::new(100_000)));
-    /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::from_db(30.0), Some(Fixed::new(1000.0)));
+    /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::from_db(30.0), Some(Fixed::<_, _, f64>::bounded(1000.0)));
     /// # }
     /// ```
     #[must_use]
@@ -567,7 +567,7 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     /// ```
     /// # #[cfg(feature = "electrical")] {
     /// use exact_units::{Fixed, prefix::{Milli, One}, units::{Per, Volt}};
-    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f32>::new(10.0).to_db_f32(), 20.0);
+    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f32>::bounded(10.0).to_db_f32(), 20.0);
     /// assert_eq!(Fixed::<Per<Volt, Volt>, Milli, u16>::new(100).to_db_f32(), -20.0);
     /// # }
     /// ```
@@ -621,14 +621,14 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     /// # #[cfg(feature = "electrical")] {
     /// use exact_units::{Fixed, prefix::One, units::{Per, Volt, Watt}};
     /// let e = core::f64::consts::E;
-    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f64>::new(e).to_np(), 1.0);
-    /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::new(e * e).to_np(), 1.0);
+    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f64>::bounded(e).to_np(), 1.0);
+    /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::bounded(e * e).to_np(), 1.0);
     /// # }
     /// ```
     ///
     /// ```compile_fail
     /// use exact_units::{Fixed, prefix::One, units::Ratio};
-    /// let _ = Fixed::<Ratio, One, f64>::new(0.5).to_np();
+    /// let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_np();
     /// ```
     pub fn to_np(self) -> f64 {
         let form = const { Self::LEVEL_FORM };
@@ -652,7 +652,7 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     /// # #[cfg(feature = "electrical")] {
     /// use exact_units::{Fixed, prefix::{Milli, One}, units::{Per, Volt, Watt}};
     /// assert_eq!(Fixed::<Per<Volt, Volt>, Milli, u32>::from_np(0.0), Some(Fixed::new(1000)));
-    /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::from_np(0.0), Some(Fixed::new(1.0)));
+    /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::from_np(0.0), Some(Fixed::<_, _, f64>::bounded(1.0)));
     /// # }
     /// ```
     #[must_use]
@@ -668,7 +668,7 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     /// ```
     /// # #[cfg(feature = "electrical")] {
     /// use exact_units::{Fixed, prefix::One, units::{Per, Volt}};
-    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f32>::new(1.0).to_np_f32(), 0.0);
+    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f32>::bounded(1.0).to_np_f32(), 0.0);
     /// # }
     /// ```
     pub fn to_np_f32(self) -> f32 {

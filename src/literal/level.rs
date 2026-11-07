@@ -28,7 +28,7 @@
 //! let p = Fixed::<Per<Watt, Watt>, Milli, u16>::new(501);
 //! assert!(p < q!(-3 dB)); // 0.50118.. W/W: 10·lg
 //! assert!(p > q!(-0.35 Np)); // e^(−0.7) = 0.49658.. W/W
-//! let g = Fixed::<Per<Volt, Volt>, One, f32>::new(0.5);
+//! let g = Fixed::<Per<Volt, Volt>, One, f32>::bounded(0.5);
 //! assert!(g < q!(-6 dB)); // 0.50118.. V/V
 //! assert!(g > q!(-6.03 dB));
 //! # }
@@ -73,7 +73,7 @@ use core::marker::PhantomData;
 use super::Decimal;
 use super::quantity::{AtMost, Below, Cut, cut_scale};
 use crate::decibel::exact::Interval;
-use crate::{Bounds, Fixed, FixedScale, LevelForm, Magnitude, Unit};
+use crate::{Bounds, Fixed, FixedScale, LevelForm, Magnitude, NanFree, Unit};
 
 /// A level of a gain as a type, `NUM · 10^EXP` of the level `L` ([Db] or [Np]): what `q!(-3 dB)` gives, compared
 /// with a linear gain whose kind picks the form ([module](crate::literal::level)).
@@ -356,8 +356,14 @@ const fn interval(g: Gain) -> Interval {
 /// The reverse compares, `q!(-3 dB) > gain`, from the forward ones.
 macro_rules! level_reverse {
     ($ty:ident) => {
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, L: LevelSymbol, const N: i64, const E: i16>
-            PartialEq<Fixed<U, P, $ty, B>> for LevelLiteral<N, E, L>
+        impl<
+            U: Unit,
+            P: FixedScale,
+            B: Bounds<$ty> + NanFree,
+            L: LevelSymbol,
+            const N: i64,
+            const E: i16,
+        > PartialEq<Fixed<U, P, $ty, B>> for LevelLiteral<N, E, L>
         {
             #[inline]
             fn eq(&self, t: &Fixed<U, P, $ty, B>) -> bool {
@@ -365,8 +371,14 @@ macro_rules! level_reverse {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, L: LevelSymbol, const N: i64, const E: i16>
-            PartialOrd<Fixed<U, P, $ty, B>> for LevelLiteral<N, E, L>
+        impl<
+            U: Unit,
+            P: FixedScale,
+            B: Bounds<$ty> + NanFree,
+            L: LevelSymbol,
+            const N: i64,
+            const E: i16,
+        > PartialOrd<Fixed<U, P, $ty, B>> for LevelLiteral<N, E, L>
         {
             #[inline]
             fn partial_cmp(&self, t: &Fixed<U, P, $ty, B>) -> Option<Ordering> {
@@ -416,7 +428,7 @@ macro_rules! level_cmp {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, L: LevelSymbol, const N: i64, const E: i16>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty> + NanFree, L: LevelSymbol, const N: i64, const E: i16>
             PartialEq<LevelLiteral<N, E, L>> for Fixed<U, P, $ty, B>
         {
             #[inline]
@@ -425,7 +437,7 @@ macro_rules! level_cmp {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, L: LevelSymbol, const N: i64, const E: i16>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty> + NanFree, L: LevelSymbol, const N: i64, const E: i16>
             PartialOrd<LevelLiteral<N, E, L>> for Fixed<U, P, $ty, B>
         {
             #[inline]
@@ -481,7 +493,7 @@ macro_rules! level_cmp_float {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, L: LevelSymbol, const N: i64, const E: i16>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty> + NanFree, L: LevelSymbol, const N: i64, const E: i16>
             PartialEq<LevelLiteral<N, E, L>> for Fixed<U, P, $ty, B>
         {
             #[inline]
@@ -494,7 +506,7 @@ macro_rules! level_cmp_float {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, L: LevelSymbol, const N: i64, const E: i16>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty> + NanFree, L: LevelSymbol, const N: i64, const E: i16>
             PartialOrd<LevelLiteral<N, E, L>> for Fixed<U, P, $ty, B>
         {
             #[inline]

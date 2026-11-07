@@ -10,7 +10,7 @@ use exact_units::{
 fn main() {
     let gain = Fixed::<Per<Volt, Volt>, Milli, u16>::new(707);
     let _ = gain == q!(-3 dB);
-    let fgain = Fixed::<Per<Volt, Volt>, One, f32>::new(0.5);
+    let fgain = Fixed::<Per<Volt, Volt>, One, f32>::bounded(0.5);
     let _ = fgain != q!(-6 dB);
     let ratio = Fixed::<Ratio, Milli, u16>::new(707);
     let _ = ratio < q!(-3 dB);

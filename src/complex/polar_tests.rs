@@ -224,7 +224,7 @@ mod float {
     use super::*;
     use crate::prefix::{Milli, Pow2};
     use crate::units::{Per, Volt, Watt};
-    use crate::{Fixed, decibel::Decibels};
+    use crate::{Fixed, MaybeNan, decibel::Decibels};
 
     /// Within `ulps` units in the last place of `exact`.
     fn near(got: f64, exact: f64, ulps: f64) -> bool {
@@ -235,14 +235,14 @@ mod float {
     fn abs_and_arg_are_libms() {
         for (re, im) in pairs_i32(2_000) {
             let (re, im) = (f64::from(re) * 1e-3, f64::from(im) * 1e-7);
-            let z = Complex::<Ratio, One, f64>::new(re, im);
+            let z = Complex::<Ratio, One, f64>::bounded(re, im);
             assert!(near(z.abs().get(), libm::hypot(re, im), 1.0));
             #[expect(
                 clippy::cast_possible_truncation,
                 reason = "the f32 case takes the parts rounded to f32"
             )]
             let (re32, im32) = (re as f32, im as f32);
-            let zf = Complex::<Ratio, One, f32>::new(re32, im32);
+            let zf = Complex::<Ratio, One, f32>::bounded(re32, im32);
             let a = libm::hypotf(re32, im32);
             assert!((zf.abs().get() - a).abs() <= f32::EPSILON * a);
             #[cfg(feature = "angle")]
@@ -252,7 +252,7 @@ mod float {
         for e in [900, -1000] {
             let (a, b) = (libm::ldexp(3.0, e), libm::ldexp(4.0, e));
             assert_eq!(
-                Complex::<Ratio, One, f64>::new(a, b).abs().get(),
+                Complex::<Ratio, One, f64>::bounded(a, b).abs().get(),
                 libm::ldexp(5.0, e)
             );
         }
@@ -262,17 +262,17 @@ mod float {
     #[test]
     fn from_polar_in_any_angle_unit() {
         use crate::units::{Degree, Phase, Radian};
-        let z = Complex::<Ratio, Milli, f64>::from_polar(
-            Fixed::new(2.0),
-            Fixed::<Phase<Degree>, One, f64>::new(30.0),
+        let z = Complex::<Ratio, Milli, f64, MaybeNan>::from_polar(
+            Fixed::<_, _, f64>::bounded(2.0),
+            Fixed::<Phase<Degree>, One, f64>::bounded(30.0),
         );
         assert!(near(z.re().get(), libm::sqrt(3.0), 2.0));
         assert!(near(z.im().get(), 1.0, 2.0));
-        let w = Complex::<Ratio, One, f64>::new(-1.5, 0.25);
+        let w = Complex::<Ratio, One, f64>::bounded(-1.5, 0.25);
         let p = w.to_polar();
         assert_eq!(
             p.arg(),
-            Fixed::<Phase<Radian>, One, f64>::new(libm::atan2(0.25, -1.5))
+            Fixed::<Phase<Radian>, One, f64>::bounded(libm::atan2(0.25, -1.5))
         );
         let back = p.to_complex();
         // each part within a few ulps of |z|
@@ -330,8 +330,10 @@ mod float {
 
         #[test]
         fn worked_values() {
-            let z0 = Impedance::<One, f64>::new(50.0, 0.0);
-            let g = Impedance::<One, f64>::new(100.0, 0.0).reflection(z0);
+            let z0 = Impedance::<One, f64>::bounded(50.0, 0.0);
+            let g = Impedance::<One, f64>::bounded(100.0, 0.0)
+                .reflection(z0)
+                .unwrap();
             assert!(near(g.re().get(), 1.0 / 3.0, 1.0) && g.im().get() == 0.0);
             assert!(near(g.vswr().get(), 2.0, 4.0));
             assert!(near(g.return_loss_db(), 20.0 * libm::log10(3.0), 2.0));
@@ -342,7 +344,9 @@ mod float {
                 4.0
             ));
             // 25 + 25j Ω: Γ = (−25 + 25j) / (75 + 25j) = −0.2 + 0.4j
-            let g = Impedance::<One, f64>::new(25.0, 25.0).reflection(z0);
+            let g = Impedance::<One, f64>::bounded(25.0, 25.0)
+                .reflection(z0)
+                .unwrap();
             assert!(near(g.re().get(), -0.2, 2.0) && near(g.im().get(), 0.4, 2.0));
             let m = libm::sqrt(0.2);
             assert!(near(g.vswr().get(), (1.0 + m) / (1.0 - m), 4.0));
@@ -352,33 +356,37 @@ mod float {
 
         #[test]
         fn ends() {
-            let z0 = Impedance::<Milli, f32>::new(50_000.0, 0.0);
-            let matched = z0.reflection(z0);
+            let z0 = Impedance::<Milli, f32>::bounded(50_000.0, 0.0);
+            let matched = z0.reflection(z0).unwrap();
             assert_eq!(matched.get(), (0.0, 0.0));
             assert_eq!(matched.vswr().get(), 1.0);
             assert_eq!(matched.return_loss_db_f32(), f32::INFINITY);
             assert_eq!(matched.mismatch_loss().get(), 1.0);
-            let short = Impedance::<Milli, f32>::new(0.0, 0.0).reflection(z0);
+            let short = Impedance::<Milli, f32>::bounded(0.0, 0.0)
+                .reflection(z0)
+                .unwrap();
             assert_eq!(short.get(), (-1.0, 0.0));
             assert_eq!(short.vswr().get(), f32::INFINITY);
             assert_eq!(short.return_loss_db_f32(), 0.0);
             assert_eq!(short.mismatch_loss().get(), 0.0);
-            let reactive = Impedance::<Milli, f32>::new(0.0, 30_000.0).reflection(z0);
+            let reactive = Impedance::<Milli, f32>::bounded(0.0, 30_000.0)
+                .reflection(z0)
+                .unwrap();
             assert!((reactive.abs().get() - 1.0).abs() < 1e-6);
         }
 
         #[test]
         fn admittance_round_trip() {
             for (re, im) in pairs_i32(1_000).filter(|&p| p != (0, 0)) {
-                let z = Impedance::<Milli, f64>::new(f64::from(re), f64::from(im));
-                let y: Admittance<Pow2<-20>, f64> = z.to_admittance();
+                let z = Impedance::<Milli, f64>::bounded(f64::from(re), f64::from(im));
+                let y: Admittance<Pow2<-20>, f64> = z.to_admittance().unwrap();
                 let (zr, zi) = (z.re().get() * 1e-3, z.im().get() * 1e-3);
                 let n = zr * zr + zi * zi;
                 // each part within a few ulps of |Y|, which a small part can't promise of itself
                 let tol = 8.0 * f64::EPSILON * y.abs().get();
                 assert!((y.re().get() - zr / n * libm::ldexp(1.0, 20)).abs() <= tol);
                 assert!((y.im().get() + zi / n * libm::ldexp(1.0, 20)).abs() <= tol);
-                let back = y.to_impedance::<Milli>();
+                let back = y.to_impedance::<Milli>().unwrap();
                 let tol = 16.0 * f64::EPSILON * z.abs().get();
                 assert!((back.re().get() - z.re().get()).abs() <= tol);
                 assert!((back.im().get() - z.im().get()).abs() <= tol);

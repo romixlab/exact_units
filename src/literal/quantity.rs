@@ -36,13 +36,15 @@
 //!
 //! ```
 //! # #[cfg(feature = "electrical")] {
-//! use exact_units::{Fixed, q, prefix::One, units::Volt};
-//! let v = |x: f32| Fixed::<Volt, One, f32>::new(x);
+//! use exact_units::{Fixed, MaybeNan, q, prefix::One, units::Volt};
+//! let v = |x: f32| Fixed::<Volt, One, f32>::bounded(x);
 //! assert!(v(0.1) > q!(0.1 V)); // 0.100000001490116.. as an f32
 //! assert!(v(0.1f32.next_down()) < q!(0.1 V));
 //! assert!(v(0.75) == q!(0.75 V)); // a float itself
 //! assert!(v(-0.0) == q!(0 V)); // −0.0 is 0
-//! assert!(v(f32::NAN).partial_cmp(&q!(0.1 V)).is_none());
+//! // a MaybeNan has no `<`: its compare names what NaN gives
+//! let nan = Fixed::<Volt, One, f32, MaybeNan>::of(f32::NAN);
+//! assert!(nan.gt_or(q!(0.1 V), true) && !nan.lt_or(q!(0.1 V), false));
 //! # }
 //! ```
 //!
@@ -70,7 +72,7 @@
 //! ```compile_fail
 //! # #[cfg(feature = "electrical")] {
 //! use exact_units::{Fixed, q, prefix::One, units::Volt};
-//! let v = Fixed::<Volt, One, f32>::new(0.1);
+//! let v = Fixed::<Volt, One, f32>::bounded(0.1);
 //! let _ = v == q!(0.1 V);
 //! # }
 //! # #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
@@ -82,7 +84,7 @@
 //! ```compile_fail
 //! # #[cfg(feature = "electrical")] {
 //! use exact_units::{Fixed, q, prefix::One, units::Volt};
-//! let v = Fixed::<Volt, One, f32>::new(0.1);
+//! let v = Fixed::<Volt, One, f32>::bounded(0.1);
 //! let _ = v != q!(3.4028235e38 V); // f32::MAX is 3.40282346..e38
 //! # }
 //! # #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
@@ -91,7 +93,7 @@
 //! ```compile_fail
 //! # #[cfg(feature = "angle")] {
 //! use exact_units::{Fixed, q, prefix::One, units::Radian};
-//! let a = Fixed::<Radian, One, f64>::new(1.5707963267948966);
+//! let a = Fixed::<Radian, One, f64>::bounded(1.5707963267948966);
 //! let _ = a == q!(90 deg);
 //! # }
 //! # #[cfg(not(feature = "angle"))] compile_error!("the case needs angle");
@@ -148,7 +150,7 @@ use core::marker::PhantomData;
 use super::{Decimal, LiteralIn, scale_in};
 use crate::decibel::exact::Interval;
 use crate::prefix::One;
-use crate::{Bounds, Exact, Fixed, FixedScale, Fraction, Magnitude, Unit};
+use crate::{Bounds, Exact, Fixed, FixedScale, Fraction, Magnitude, NanFree, Unit};
 
 impl<const N: i64, const E: i16, S> LiteralIn<N, E, S> {
     /// The literal as a value: what `q!` gives.
@@ -313,7 +315,7 @@ macro_rules! literal_cmp {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty> + NanFree, S: Unit, const N: i64, const E: i16>
             PartialEq<LiteralIn<N, E, S>> for Fixed<U, P, $ty, B>
         {
             #[inline]
@@ -322,7 +324,7 @@ macro_rules! literal_cmp {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty> + NanFree, S: Unit, const N: i64, const E: i16>
             PartialOrd<LiteralIn<N, E, S>> for Fixed<U, P, $ty, B>
         {
             #[inline]
@@ -357,7 +359,7 @@ macro_rules! literal_cmp {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty> + NanFree, S: Unit, const N: i64, const E: i16>
             PartialEq<Fixed<U, P, $ty, B>> for LiteralIn<N, E, S>
         {
             #[inline]
@@ -366,7 +368,7 @@ macro_rules! literal_cmp {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty> + NanFree, S: Unit, const N: i64, const E: i16>
             PartialOrd<Fixed<U, P, $ty, B>> for LiteralIn<N, E, S>
         {
             #[inline]
@@ -497,7 +499,7 @@ macro_rules! literal_cmp_float {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty> + NanFree, S: Unit, const N: i64, const E: i16>
             PartialEq<LiteralIn<N, E, S>> for Fixed<U, P, $ty, B>
         {
             #[inline]
@@ -506,7 +508,7 @@ macro_rules! literal_cmp_float {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty> + NanFree, S: Unit, const N: i64, const E: i16>
             PartialOrd<LiteralIn<N, E, S>> for Fixed<U, P, $ty, B>
         {
             #[inline]
@@ -543,7 +545,7 @@ macro_rules! literal_cmp_float {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty> + NanFree, S: Unit, const N: i64, const E: i16>
             PartialEq<Fixed<U, P, $ty, B>> for LiteralIn<N, E, S>
         {
             #[inline]
@@ -552,7 +554,7 @@ macro_rules! literal_cmp_float {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, S: Unit, const N: i64, const E: i16>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty> + NanFree, S: Unit, const N: i64, const E: i16>
             PartialOrd<Fixed<U, P, $ty, B>> for LiteralIn<N, E, S>
         {
             #[inline]

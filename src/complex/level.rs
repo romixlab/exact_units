@@ -90,8 +90,8 @@ macro_rules! norm_sqr_at {
         let x = x as $norm;
         Fixed::new(x)
     }};
-    (@to_f32 $gain:expr, $norm:ident) => { Fixed::new($gain.to_f32()) };
-    (@to_f64 $gain:expr, $norm:ident) => { Fixed::new($gain.to_f64()) };
+    (@to_f32 $gain:expr, $norm:ident) => { Fixed::<_, _, f32>::bounded($gain.to_f32()) };
+    (@to_f64 $gain:expr, $norm:ident) => { Fixed::<_, _, f64>::bounded($gain.to_f64()) };
 }
 
 norm_sqr_at! {
@@ -111,14 +111,14 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
     /// ```
     /// # #[cfg(feature = "electrical")] {
     /// use exact_units::{Complex, prefix::{Milli, One}, units::{Per, Volt}};
-    /// assert_eq!(Complex::<Per<Volt, Volt>, One, f64>::new(6.0, 8.0).to_db(), 20.0); // |z| = 10
+    /// assert_eq!(Complex::<Per<Volt, Volt>, One, f64>::bounded(6.0, 8.0).to_db(), 20.0); // |z| = 10
     /// assert_eq!(Complex::<Per<Volt, Volt>, Milli, i16>::new(60, -80).to_db(), -20.0); // 0.1
     /// # }
     /// ```
     ///
     /// ```compile_fail
     /// use exact_units::{Complex, prefix::One, units::Ratio};
-    /// let _ = Complex::<Ratio, One, f64>::new(0.5, 0.5).to_db();
+    /// let _ = Complex::<Ratio, One, f64>::bounded(0.5, 0.5).to_db();
     /// ```
     pub fn to_db(self) -> f64 {
         let form = const { Fixed::<U, P, T>::LEVEL_FORM };

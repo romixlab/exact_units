@@ -306,8 +306,9 @@ fn write_step<U: Unit, P: FixedScale>(f: &mut fmt::Formatter<'_>) -> fmt::Result
     write_prefix_unit::<P>(U::EXPR, f)
 }
 
+/// `v` for an error message only: it may be NaN, and is never handed out.
 fn fixed<U, P, T: Storage>(v: T) -> Fixed<U, P, T> {
-    Fixed::new(v)
+    Fixed::new_unchecked(v)
 }
 
 /// `s` as a value of the field.

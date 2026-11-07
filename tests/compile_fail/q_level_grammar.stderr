@@ -46,13 +46,14 @@ error[E0277]: can't compare `exact_units::Exact<Per<Volt, Volt>>` with `LevelLit
 help: `exact_units::Exact<U>` implements trait `PartialOrd<Rhs>`
   --> src/literal/quantity.rs
    |
-   | impl<U: Unit, S: Unit, const N: i64, const E: i16> PartialOrd<LiteralIn<N, E, S>> for Exact<U> {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `PartialOrd<LiteralIn<N, E, S>>`
+   |   impl<U: Unit, S: Unit, const N: i64, const E: i16> PartialOrd<LiteralIn<N, E, S>> for Exact<U> {
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `PartialOrd<LiteralIn<N, E, S>>`
    |
   ::: src/exact.rs
    |
-   | impl<U> PartialOrd for Exact<U> {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `PartialOrd`
+   |   impl<U> PartialOrd for Exact<U> {
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `PartialOrd`
 ...
-   | impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> PartialOrd<Fixed<U, P, T, B>> for Exact<U> {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `PartialOrd<Fixed<U, P, T, B>>`
+   | / impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T> + NanFree> PartialOrd<Fixed<U, P, T, B>>
+   | |     for Exact<U>
+   | |________________^ `PartialOrd<Fixed<U, P, T, B>>`

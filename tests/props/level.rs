@@ -193,12 +193,12 @@ mod tests {
         #[cfg(any(feature = "std", feature = "libm"))]
         #[test]
         fn transmittance_edge(g in gain()) {
-            let t = Fixed::<Per<Watt, Watt>, One, f64>::new(g);
+            let t = Fixed::<Per<Watt, Watt>, One, f64>::bounded(g);
             let a: Fixed<Absorbance, One, f64> = t.to_level().unwrap();
             let tau: Fixed<OpticalDepth, One, f64> = t.to_level().unwrap();
             prop_assert!((a.get() + g.log10()).abs() <= 1e-12, "{g}: {}", a.get());
             prop_assert!((tau.get() + g.ln()).abs() <= 1e-12, "{g}: {}", tau.get());
-            let v = Fixed::<Per<Volt, Volt>, One, f64>::new(g.sqrt());
+            let v = Fixed::<Per<Volt, Volt>, One, f64>::bounded(g.sqrt());
             let av: Fixed<Absorbance, One, f64> = v.to_level().unwrap();
             prop_assert!((av.get() - a.get()).abs() <= 1e-12, "{g}: {}", av.get());
             let back: Fixed<Per<Watt, Watt>, One, f64> = tau.to_gain().unwrap();
@@ -212,14 +212,14 @@ mod tests {
         #[cfg(any(feature = "std", feature = "libm"))]
         #[test]
         fn gain_edge(g in gain()) {
-            let v = Fixed::<Per<Volt, Volt>, One, f64>::new(g);
+            let v = Fixed::<Per<Volt, Volt>, One, f64>::bounded(g);
             let db: Fixed<Decibel, One, f64> = v.to_level().unwrap();
             let back: Fixed<Per<Volt, Volt>, One, f64> = db.to_gain().unwrap();
             prop_assert!((back.get() / g - 1.0).abs() < 1e-13, "{g}: {}", back.get());
             let loss: Fixed<Loss<Neper>, One, f64> = v.to_level().unwrap();
             let np: Fixed<Neper, One, f64> = v.to_level().unwrap();
             prop_assert_eq!(loss.get().to_bits(), (-np.get()).to_bits());
-            let p = Fixed::<Per<Watt, Watt>, One, f64>::new(g * g);
+            let p = Fixed::<Per<Watt, Watt>, One, f64>::bounded(g * g);
             let pdb: Fixed<Decibel, One, f64> = p.to_level().unwrap();
             prop_assert!((pdb.get() - db.get()).abs() <= 1e-12 * db.get().abs().max(1.0));
         }

@@ -202,7 +202,7 @@ impl fmt::Display for Kind<'_> {
 ///
 /// // mV/V to V/V: the same kind, another scale
 /// let gain = Fixed::<Per<Volt, Volt>, Milli, u32>::new(2500);
-/// assert_eq!(gain.convert::<Per<Volt, Volt>, One, f32>(), Some(Fixed::new(2.5)));
+/// assert_eq!(gain.convert::<Per<Volt, Volt>, One, f32>(), Some(Fixed::<_, _, f32>::bounded(2.5)));
 /// // a voltage gain is a ratio, a transimpedance a resistance, when said so
 /// let _: Fixed<Ratio, Milli, u32> = gain.as_ratio();
 /// let r: Fixed<Ohm, One, u16> = Fixed::<Per<Volt, Ampere>, One, u16>::new(50).as_resistance();
@@ -214,47 +214,47 @@ impl fmt::Display for Kind<'_> {
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{Ampere, Per, Volt}};
-/// let _ = Fixed::<Per<Volt, Volt>, One, f32>::new(2.0).convert::<Per<Ampere, Ampere>, One, f32>();
+/// let _ = Fixed::<Per<Volt, Volt>, One, f32>::bounded(2.0).convert::<Per<Ampere, Ampere>, One, f32>();
 /// ```
 ///
 /// nor a power gain:
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{Per, Volt, Watt}};
-/// let _ = Fixed::<Per<Volt, Volt>, One, f32>::new(2.0).convert::<Per<Watt, Watt>, One, f32>();
+/// let _ = Fixed::<Per<Volt, Volt>, One, f32>::bounded(2.0).convert::<Per<Watt, Watt>, One, f32>();
 /// ```
 ///
 /// nor a plain ratio, a duty cycle:
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{Per, Ratio, Volt}};
-/// let _ = Fixed::<Per<Volt, Volt>, One, f32>::new(2.0).convert::<Ratio, One, f32>();
+/// let _ = Fixed::<Per<Volt, Volt>, One, f32>::bounded(2.0).convert::<Ratio, One, f32>();
 /// ```
 ///
 /// and a duty cycle is no gain:
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{Per, Ratio, Volt}};
-/// let _ = Fixed::<Ratio, One, f32>::new(0.5).convert::<Per<Volt, Volt>, One, f32>();
+/// let _ = Fixed::<Ratio, One, f32>::bounded(0.5).convert::<Per<Volt, Volt>, One, f32>();
 /// ```
 ///
 /// A transimpedance V/A is not a resistance, nor a resistance a transimpedance:
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{Ampere, Ohm, Per, Volt}};
-/// let _ = Fixed::<Per<Volt, Ampere>, One, f32>::new(50.0).convert::<Ohm, One, f32>();
+/// let _ = Fixed::<Per<Volt, Ampere>, One, f32>::bounded(50.0).convert::<Ohm, One, f32>();
 /// ```
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{Ampere, Ohm, Per, Volt}};
-/// let _ = Fixed::<Ohm, One, f32>::new(50.0).convert::<Per<Volt, Ampere>, One, f32>();
+/// let _ = Fixed::<Ohm, One, f32>::bounded(50.0).convert::<Per<Volt, Ampere>, One, f32>();
 /// ```
 ///
 /// A transconductance A/V is not a conductance:
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{Ampere, Per, Siemens, Volt}};
-/// let _ = Fixed::<Per<Ampere, Volt>, One, f32>::new(0.02).convert::<Siemens, One, f32>();
+/// let _ = Fixed::<Per<Ampere, Volt>, One, f32>::bounded(0.02).convert::<Siemens, One, f32>();
 /// ```
 ///
 /// A gain times a voltage is a plain voltage, and converts like one:
@@ -294,19 +294,19 @@ struct KindsInConversions;
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{Phase, Turn}};
-/// let _ = Fixed::<Phase<Turn>, One, f32>::new(0.5).convert::<Turn, One, f32>();
+/// let _ = Fixed::<Phase<Turn>, One, f32>::bounded(0.5).convert::<Turn, One, f32>();
 /// ```
 ///
 /// nor in degrees, nor a plane angle a phase:
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{Degree, Phase, Turn}};
-/// let _ = Fixed::<Phase<Turn>, One, f32>::new(0.5).convert::<Degree, One, f32>();
+/// let _ = Fixed::<Phase<Turn>, One, f32>::bounded(0.5).convert::<Degree, One, f32>();
 /// ```
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{Phase, Radian}};
-/// let _ = Fixed::<Radian, One, f32>::new(1.0).convert::<Phase<Radian>, One, f32>();
+/// let _ = Fixed::<Radian, One, f32>::bounded(1.0).convert::<Phase<Radian>, One, f32>();
 /// ```
 ///
 /// A field-oriented control that takes the electrical angle doesn't take the encoder's mechanical one, the classic
@@ -323,7 +323,7 @@ struct KindsInConversions;
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{Phase, Watt}};
-/// let _ = Fixed::<Phase<Watt>, One, f32>::new(1.0).convert::<Phase<Watt>, One, f32>();
+/// let _ = Fixed::<Phase<Watt>, One, f32>::bounded(1.0).convert::<Phase<Watt>, One, f32>();
 /// ```
 #[cfg(feature = "angle")]
 #[expect(dead_code, reason = "a holder of doctests")]
@@ -343,14 +343,15 @@ mod phase {
 
         /// The electrical angle of a motor with `pole_pairs` pole pairs at this mechanical (rotor) angle:
         /// `pole_pairs · self`, multiplied by the overflow policy of `B` (a [Bam16](crate::Bam16) wraps at a turn, as
-        /// an electrical angle does). Feed this, not the encoder's angle, to a field-oriented control.
+        /// an electrical angle does; a float's is a [MaybeNan](crate::MaybeNan), as its `*` gives). Feed this, not the
+        /// encoder's angle, to a field-oriented control.
         #[expect(
             clippy::arithmetic_side_effects,
             reason = "the `*` of B's overflow policy, as documented: a Bam16 wraps at a turn"
         )]
-        pub fn electrical(self, pole_pairs: T) -> Fixed<Phase<A>, P, T, B>
+        pub fn electrical<B2: Bounds<T>>(self, pole_pairs: T) -> Fixed<Phase<A>, P, T, B2>
         where
-            Self: Mul<T, Output = Self>,
+            Self: Mul<T, Output = Fixed<A, P, T, B2>>,
         {
             (self * pole_pairs).as_phase()
         }
@@ -411,10 +412,10 @@ mod electrical {
 /// // J/m³ is a plain compound: it is a pressure by conversion, an energy density by a named step
 /// assert_eq!(w.convert::<Pascal, One, u32>(), Some(Fixed::new(12000)));
 /// assert_eq!(w.as_energy_density().get(), 12);
-/// let c = Fixed::<Per<Joule, Kelvin>, One, f32>::new(4.2);
+/// let c = Fixed::<Per<Joule, Kelvin>, One, f32>::bounded(4.2);
 /// let _: Option<Fixed<HeatCapacity, One, f32>> = c.convert();
 /// let s: Fixed<Entropy, One, f32> = c.as_entropy();
-/// assert_eq!(s.as_heat_capacity(), Fixed::new(4.2));
+/// assert_eq!(s.as_heat_capacity(), Fixed::<_, _, f32>::bounded(4.2));
 /// # }
 /// ```
 ///
@@ -422,14 +423,14 @@ mod electrical {
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{EnergyDensity, Pascal}};
-/// let _ = Fixed::<Pascal, One, f32>::new(1.0).convert::<EnergyDensity, One, f32>();
+/// let _ = Fixed::<Pascal, One, f32>::bounded(1.0).convert::<EnergyDensity, One, f32>();
 /// ```
 ///
 /// nor a heat capacity entropy:
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, prefix::One, units::{Entropy, HeatCapacity}};
-/// let _ = Fixed::<HeatCapacity, One, f32>::new(1.0).convert::<Entropy, One, f32>();
+/// let _ = Fixed::<HeatCapacity, One, f32>::bounded(1.0).convert::<Entropy, One, f32>();
 /// ```
 #[cfg(all(feature = "mechanical", feature = "thermal"))]
 #[expect(dead_code, reason = "a holder of doctests")]
@@ -574,7 +575,7 @@ mod tests {
         use crate::prefix::One;
         use crate::units::{Per, Sqrt, Watt};
         // |S21| = |b2/a1| of 0.1 is -20 dB, not -10
-        let s21 = Fixed::<Per<Sqrt<Watt>, Sqrt<Watt>>, One, f64>::new(0.1);
+        let s21 = Fixed::<Per<Sqrt<Watt>, Sqrt<Watt>>, One, f64>::bounded(0.1);
         assert!((s21.to_db() + 20.0).abs() < 1e-12);
     }
 
@@ -606,10 +607,12 @@ mod tests {
         // the policy of B decides: a saturating angle saturates
         let s = Fixed::<Degree, One, i16, Saturating>::of(20000);
         assert_eq!(s.electrical(4).get(), i16::MAX);
-        // an unbounded one multiplies as `*` does
+        // an unbounded one multiplies as `*` does, a float into a MaybeNan
         assert_eq!(
-            Fixed::<Radian, One, f32>::new(0.5).electrical(4.0),
-            Fixed::new(2.0)
+            Fixed::<Radian, One, f32>::bounded(0.5)
+                .electrical(4.0)
+                .not_nan(),
+            Some(Fixed::<_, _, f32>::bounded(2.0))
         );
     }
 

@@ -59,7 +59,7 @@
 //!
 //! ```compile_fail
 //! use exact_units::{Complex, prefix::One, units::{Ohm, Siemens}};
-//! let _ = Complex::<Ohm, One, f32>::new(1.0, 2.0) + Complex::<Siemens, One, f32>::new(1.0, 2.0);
+//! let _ = Complex::<Ohm, One, f32>::bounded(1.0, 2.0) + Complex::<Siemens, One, f32>::bounded(1.0, 2.0);
 //! ```
 //!
 //! and no division by a complex integer:
@@ -73,8 +73,8 @@ use crate::fixed::{Number, Requant, check_product, format, write_prefix_unit};
 use crate::prefix::{Product, Quotient};
 use crate::units::{Per, Times};
 use crate::{
-    Fixed, FixedScale, Overflow, Repr, Rounding, Saturating, Storage, Unbounded, Unit, Unlimited,
-    Wrapping,
+    Fixed, FixedScale, MaybeNan, NanFree, OutOfBounds, Overflow, Repr, Rounding, Saturating,
+    Storage, Unbounded, Unit, Unlimited, Wrapping,
 };
 use core::fmt;
 use core::hash::{Hash, Hasher};
@@ -140,6 +140,25 @@ macro_rules! complex_float {
 
 complex_float!(f32 f64);
 
+/// `bounded(re, im)` of a float storage: a compile error in `const` code for a NaN part.
+macro_rules! bounded_float {
+    ($($ty:ident)*) => {$(
+        impl<U, P, B: Unlimited<$ty>> Complex<U, P, $ty, B> {
+            /// `re + j·im` in units of `P`: a compile error in `const` code where a part is NaN (unless `B` is
+            /// [MaybeNan]), a panic at run time ([try_new](Self::try_new) doesn't).
+            #[inline(always)]
+            pub const fn bounded(re: $ty, im: $ty) -> Self {
+                if !B::ALLOWS_NAN && (re.is_nan() || im.is_nan()) {
+                    panic!("a NaN-free float can't be NaN");
+                }
+                Self::of_unchecked(re, im)
+            }
+        }
+    )*};
+}
+
+bounded_float!(f32 f64);
+
 /// A storage whose |z|² has a type that always holds it: `u16` for `i8`, `u32` for `i16`, `u64` for `i32` (|−2³¹ −
 /// 2³¹j|² is 2⁶³), the float itself for `f32` and `f64`. `i64` has none (|z|² reaches 2¹²⁷): take
 /// it after [to](Complex::to) or [requantize](Complex::requantize) into `i32` or a float.
@@ -193,7 +212,12 @@ impl NormStorage for f64 {
 /// the [module](crate::complex) for the design.
 #[cfg_attr(
     feature = "shrink_wrap",
-    derive_shrink_wrap(borrowed, owned(feature = "std"), sized)
+    derive_shrink_wrap(
+        borrowed,
+        owned(feature = "std"),
+        sized,
+        validate = Self::validate
+    )
 )]
 #[repr(C)]
 pub struct Complex<U, P, T: ComplexStorage, B: Unlimited<T> = Unbounded> {
@@ -218,7 +242,8 @@ pub type Impedance<P, T> = Complex<crate::units::Ohm, P, T>;
 pub type Admittance<P, T> = Complex<crate::units::Siemens, P, T>;
 
 impl<U, P, T: ComplexStorage> Complex<U, P, T> {
-    /// `re + j·im` in units of `P`.
+    /// `re + j·im` in units of `P`, for an integer storage. A float part may be NaN, so a float `Complex` is made with
+    /// [try_new](Self::try_new) or [bounded](Self::bounded); `new` of a float doesn't compile.
     #[inline(always)]
     pub const fn new(re: T, im: T) -> Self {
         Self::of(re, im)
@@ -226,9 +251,44 @@ impl<U, P, T: ComplexStorage> Complex<U, P, T> {
 }
 
 impl<U, P, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T, B> {
-    /// `re + j·im` in units of `P`, for every overflow policy: `new` of [Wrapping] and [Saturating].
+    /// `re + j·im` in units of `P`, for every overflow policy: `new` of [Wrapping] and [Saturating]. Integer storages
+    /// only, as [Fixed::of].
     #[inline(always)]
     pub const fn of(re: T, im: T) -> Self {
+        const {
+            assert!(
+                B::ALLOWS_NAN || !T::IS_FLOAT,
+                "a float Complex may be NaN: make it with try_new or bounded"
+            );
+        }
+        Self::of_unchecked(re, im)
+    }
+
+    /// `re + j·im`, `Err` where a part is NaN (a float storage without [MaybeNan]).
+    #[inline(always)]
+    pub fn try_new(re: T, im: T) -> Result<Self, OutOfBounds> {
+        if B::contains(re) && B::contains(im) {
+            Ok(Self::of_unchecked(re, im))
+        } else {
+            Err(OutOfBounds)
+        }
+    }
+
+    /// Run on every value read from the wire: a NaN part (without [MaybeNan]) is
+    /// [shrink_wrap::Error::SubtypeOutOfRange].
+    #[cfg(feature = "shrink_wrap")]
+    #[inline(always)]
+    fn validate(&self) -> Result<(), shrink_wrap::Error> {
+        if B::contains(self.re) && B::contains(self.im) {
+            Ok(())
+        } else {
+            Err(shrink_wrap::Error::SubtypeOutOfRange)
+        }
+    }
+
+    /// Without the NaN check: for parts checked some other way.
+    #[inline(always)]
+    pub(crate) const fn of_unchecked(re: T, im: T) -> Self {
         Complex {
             re,
             im,
@@ -241,13 +301,13 @@ impl<U, P, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T, B> {
     /// The value of two `Fixed` parts.
     #[inline(always)]
     pub const fn from_parts(re: Fixed<U, P, T, B>, im: Fixed<U, P, T, B>) -> Self {
-        Self::of(re.get(), im.get())
+        Self::of_unchecked(re.get(), im.get())
     }
 
     /// A real value, `re + j·0`.
     #[inline(always)]
     pub const fn from_re(re: Fixed<U, P, T, B>) -> Self {
-        Self::of(re.get(), T::ZERO)
+        Self::of_unchecked(re.get(), T::ZERO)
     }
 
     /// The real part: the resistance of an impedance, the in-phase part of an IQ sample.
@@ -268,16 +328,42 @@ impl<U, P, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T, B> {
         (self.re, self.im)
     }
 
-    /// The same value with the overflow policy of `B2`. Free.
+    /// The same value with the overflow policy of `B2`. Free; from [MaybeNan] to a NaN-free policy doesn't compile,
+    /// [not_nan](Self::not_nan) checks.
     #[inline(always)]
     pub const fn with_overflow<B2: Unlimited<T>>(self) -> Complex<U, P, T, B2> {
-        Complex::of(self.re, self.im)
+        const {
+            assert!(
+                !B::ALLOWS_NAN || B2::ALLOWS_NAN,
+                "a MaybeNan value may be NaN: not_nan() checks it"
+            );
+        }
+        Complex::of_unchecked(self.re, self.im)
+    }
+
+    /// The same value without NaN, `None` where a part is NaN: how a [MaybeNan] value (a float quotient, `+` of
+    /// floats) goes back to a checked one, which has `==`.
+    ///
+    /// ```
+    /// use exact_units::{Complex, prefix::One, units::Ohm};
+    ///
+    /// let z = Complex::<Ohm, One, f32>::bounded(3.0, 4.0);
+    /// assert_eq!((z + z).not_nan(), Some(Complex::<Ohm, One, f32>::bounded(6.0, 8.0)));
+    /// assert_eq!((z / Complex::<Ohm, One, f32>::default()).not_nan(), None);
+    /// ```
+    #[inline(always)]
+    pub fn not_nan(self) -> Option<Complex<U, P, T>> {
+        if self.re.is_nan() || self.im.is_nan() {
+            None
+        } else {
+            Some(Complex::of_unchecked(self.re, self.im))
+        }
     }
 
     /// `self + rhs`, `None` where a part overflows.
     #[inline(always)]
     pub fn checked_add(self, rhs: Self) -> Option<Self> {
-        Some(Self::of(
+        Some(Self::of_unchecked(
             self.re.checked_add(rhs.re)?,
             self.im.checked_add(rhs.im)?,
         ))
@@ -286,7 +372,7 @@ impl<U, P, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T, B> {
     /// `self - rhs`, `None` where a part overflows.
     #[inline(always)]
     pub fn checked_sub(self, rhs: Self) -> Option<Self> {
-        Some(Self::of(
+        Some(Self::of_unchecked(
             self.re.checked_sub(rhs.re)?,
             self.im.checked_sub(rhs.im)?,
         ))
@@ -295,65 +381,84 @@ impl<U, P, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T, B> {
     /// `self · n` for a number `n`, `None` where a part overflows.
     #[inline(always)]
     pub fn checked_scale(self, n: T) -> Option<Self> {
-        Some(Self::of(self.re.checked_mul(n)?, self.im.checked_mul(n)?))
+        Some(Self::of_unchecked(
+            self.re.checked_mul(n)?,
+            self.im.checked_mul(n)?,
+        ))
     }
 
     /// The conjugate `re − j·im`, `None` for an integer `im` of `T::MIN`.
     #[inline(always)]
     pub fn checked_conj(self) -> Option<Self> {
-        Some(Self::of(self.re, self.im.checked_neg()?))
+        Some(Self::of_unchecked(self.re, self.im.checked_neg()?))
     }
 }
 
-/// The operations whose overflow follows `B`, one impl per policy.
-pub(crate) trait Policy<T: ComplexStorage> {
-    fn add(a: T, b: T) -> T;
+/// The operations whose overflow follows `B`. A public trait in a private module, so that an operator's `Output` may
+/// name `B::Out`; outside the crate it can't be named or implemented.
+mod policy {
+    use super::{ComplexStorage, MaybeNan, Saturating, Storage, Unbounded, Unlimited, Wrapping};
 
-    fn sub(a: T, b: T) -> T;
+    /// The operations whose overflow follows `B`, one impl per policy. `Out` is the bound of a result: `B` itself, but
+    /// [MaybeNan] for an [Unbounded] float, whose `+`, `-`, `*` and `/` can make NaN ([Storage::Arith]).
+    pub trait Policy<T: ComplexStorage> {
+        type Out: Unlimited<T>;
 
-    fn mul(a: T, b: T) -> T;
+        fn add(a: T, b: T) -> T;
 
-    fn div(a: T, b: T) -> T;
+        fn sub(a: T, b: T) -> T;
 
-    fn neg(a: T) -> T;
+        fn mul(a: T, b: T) -> T;
+
+        fn div(a: T, b: T) -> T;
+
+        fn neg(a: T) -> T;
+    }
+
+    macro_rules! policy {
+        ($($b:ident [$($g:tt)*] $t:ty => $out:ty: $add:ident $sub:ident $mul:ident $div:ident $neg:ident;)*) => {$(
+            impl<$($g)*> Policy<$t> for $b {
+                type Out = $out;
+
+                #[inline(always)] fn add(a: $t, b: $t) -> $t { Storage::$add(a, b) }
+
+                #[inline(always)] fn sub(a: $t, b: $t) -> $t { Storage::$sub(a, b) }
+
+                #[inline(always)] fn mul(a: $t, b: $t) -> $t { Storage::$mul(a, b) }
+
+                #[inline(always)] fn div(a: $t, b: $t) -> $t { Storage::$div(a, b) }
+
+                #[inline(always)] fn neg(a: $t) -> $t { ComplexStorage::$neg(a) }
+            }
+        )*};
+    }
+
+    policy! {
+        Unbounded [T: ComplexStorage] T => T::Arith: add sub mul div neg;
+        Wrapping [T: ComplexStorage<Arith = Unbounded>] T => Wrapping:
+            wrapping_add wrapping_sub wrapping_mul wrapping_div wrapping_neg;
+        Saturating [T: ComplexStorage<Arith = Unbounded>] T => Saturating:
+            saturating_add saturating_sub saturating_mul saturating_div saturating_neg;
+        MaybeNan [] f32 => MaybeNan: add sub mul div neg;
+        MaybeNan [] f64 => MaybeNan: add sub mul div neg;
+    }
 }
 
-macro_rules! policy {
-    ($($b:ident $add:ident $sub:ident $mul:ident $div:ident $neg:ident;)*) => {$(
-        impl<T: ComplexStorage> Policy<T> for $b {
-            #[inline(always)] fn add(a: T, b: T) -> T { a.$add(b) }
+pub(crate) use policy::Policy;
 
-            #[inline(always)] fn sub(a: T, b: T) -> T { a.$sub(b) }
-
-            #[inline(always)] fn mul(a: T, b: T) -> T { a.$mul(b) }
-
-            #[inline(always)] fn div(a: T, b: T) -> T { a.$div(b) }
-
-            #[inline(always)] fn neg(a: T) -> T { ComplexStorage::$neg(a) }
-        }
-    )*};
-}
-
-policy! {
-    Unbounded add sub mul div neg;
-    Wrapping wrapping_add wrapping_sub wrapping_mul wrapping_div wrapping_neg;
-    Saturating saturating_add saturating_sub saturating_mul saturating_div saturating_neg;
-}
-
-#[expect(private_bounds, reason = "the policy is a detail of the three markers")]
 impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Complex<U, P, T, B> {
     /// The conjugate `re − j·im`, negated by the policy.
     #[inline(always)]
     #[must_use]
     pub fn conj(self) -> Self {
-        Self::of(self.re, B::neg(self.im))
+        Self::of_unchecked(self.re, B::neg(self.im))
     }
 
     /// `self · j`: a quarter turn forward, `−im + j·re`.
     #[inline(always)]
     #[must_use]
     pub fn mul_j(self) -> Self {
-        Self::of(B::neg(self.im), self.re)
+        Self::of_unchecked(B::neg(self.im), self.re)
     }
 }
 
@@ -370,7 +475,11 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
     /// ```
     #[inline(always)]
     pub fn norm_sqr(self) -> Fixed<Times<U, U>, Product<P, P>, T::Norm> {
-        Fixed::new(T::norm_sqr(self.re, self.im))
+        const {
+            assert!(!B::ALLOWS_NAN, "a MaybeNan part may be NaN");
+        }
+        // a sum of squares of numbers is a number
+        Fixed::new_unchecked(T::norm_sqr(self.re, self.im))
     }
 }
 
@@ -378,10 +487,11 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
     /// The same value in scale `P2` and storage `T2`, if both parts are exact there ([Fixed::to]).
     #[inline(always)]
     pub fn to<P2: FixedScale, T2: ComplexStorage>(self) -> Option<Complex<U, P2, T2>> {
-        Some(Complex::new(
+        Complex::try_new(
             self.re().to::<P2, T2>()?.get(),
             self.im().to::<P2, T2>()?.get(),
-        ))
+        )
+        .ok()
     }
 
     /// The same value in scale `P2` and storage `T2`, each part rounded by `r` and settled by `o`
@@ -392,10 +502,11 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
         r: Rounding,
         o: Overflow,
     ) -> Option<Complex<U, P2, T2>> {
-        Some(Complex::new(
+        Complex::try_new(
             self.re().requantize::<P2, T2>(r, o)?.get(),
             self.im().requantize::<P2, T2>(r, o)?.get(),
-        ))
+        )
+        .ok()
     }
 
     /// The same value in another unit `U2` of the same dimension and [kind](crate::kind), scale `P2` and storage
@@ -404,10 +515,11 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
     pub fn convert<U2: Unit, P2: FixedScale, T2: ComplexStorage>(
         self,
     ) -> Option<Complex<U2, P2, T2>> {
-        Some(Complex::new(
+        Complex::try_new(
             self.re().convert::<U2, P2, T2>()?.get(),
             self.im().convert::<U2, P2, T2>()?.get(),
-        ))
+        )
+        .ok()
     }
 
     /// `self · rhs` in the scale `P3` and storage `T3`, each part rounded once by `r` from the exact result in the
@@ -456,7 +568,7 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
         o: Overflow,
     ) -> Option<Complex<Times<U, U2>, P3, T3>> {
         let (re, im) = self.wide_product::<U2, P2, B2, P3, T3>(rhs, false, r, o)?;
-        Some(Complex::new(re, im))
+        Complex::try_new(re, im).ok()
     }
 
     /// `self · conj(rhs)` in the scale `P3` and storage `T3`, each part rounded once by `r` from the exact result
@@ -503,7 +615,7 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
         o: Overflow,
     ) -> Option<Complex<Times<U, U2>, P3, T3>> {
         let (re, im) = self.wide_product::<U2, P2, B2, P3, T3>(rhs, true, r, o)?;
-        Some(Complex::new(re, im))
+        Complex::try_new(re, im).ok()
     }
 
     /// The parts of `self · rhs`, or of `self · conj(rhs)`, in `P3` and `T3`: (ac − bd) + j(ad + bc) or (ac + bd) +
@@ -553,10 +665,11 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
     ) -> Option<Complex<Times<U, U2>, Product<P, P2>, T>> {
         const { check_product::<U, U2, P, P2>(false) };
         let (a, b, c, d) = (self.re, self.im, rhs.re, rhs.im);
-        Some(Complex::new(
+        Complex::try_new(
             a.checked_mul(c)?.checked_sub(b.checked_mul(d)?)?,
             a.checked_mul(d)?.checked_add(b.checked_mul(c)?)?,
-        ))
+        )
+        .ok()
     }
 }
 
@@ -571,14 +684,14 @@ impl<U, P, T: ComplexStorage, B: Unlimited<T>> Copy for Complex<U, P, T, B> {}
 
 impl<U, P, T: ComplexStorage, B: Unlimited<T>> Default for Complex<U, P, T, B> {
     fn default() -> Self {
-        Self::of(T::ZERO, T::ZERO)
+        Self::of_unchecked(T::ZERO, T::ZERO)
     }
 }
 
 /// Values of one unit, scale and storage are equal as their numbers, whatever the policy. No order: complex numbers
-/// have none.
-impl<U, P, T: ComplexStorage, B: Unlimited<T>, B2: Unlimited<T>> PartialEq<Complex<U, P, T, B2>>
-    for Complex<U, P, T, B>
+/// have none. A [MaybeNan] value has no `==`: [not_nan](Complex::not_nan) first.
+impl<U, P, T: ComplexStorage, B: Unlimited<T> + NanFree, B2: Unlimited<T> + NanFree>
+    PartialEq<Complex<U, P, T, B2>> for Complex<U, P, T, B>
 {
     #[inline(always)]
     fn eq(&self, other: &Complex<U, P, T, B2>) -> bool {
@@ -586,7 +699,7 @@ impl<U, P, T: ComplexStorage, B: Unlimited<T>, B2: Unlimited<T>> PartialEq<Compl
     }
 }
 
-impl<U, P, T: ComplexStorage + Eq, B: Unlimited<T>> Eq for Complex<U, P, T, B> {}
+impl<U, P, T: ComplexStorage + Eq, B: Unlimited<T> + NanFree> Eq for Complex<U, P, T, B> {}
 
 impl<U, P, T: ComplexStorage + Hash, B: Unlimited<T>> Hash for Complex<U, P, T, B> {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -613,20 +726,20 @@ mod arith {
     };
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Add for Complex<U, P, T, B> {
-        type Output = Self;
+        type Output = Complex<U, P, T, B::Out>;
 
         #[inline(always)]
-        fn add(self, rhs: Self) -> Self {
-            Self::of(B::add(self.re, rhs.re), B::add(self.im, rhs.im))
+        fn add(self, rhs: Self) -> Self::Output {
+            Complex::of_unchecked(B::add(self.re, rhs.re), B::add(self.im, rhs.im))
         }
     }
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Sub for Complex<U, P, T, B> {
-        type Output = Self;
+        type Output = Complex<U, P, T, B::Out>;
 
         #[inline(always)]
-        fn sub(self, rhs: Self) -> Self {
-            Self::of(B::sub(self.re, rhs.re), B::sub(self.im, rhs.im))
+        fn sub(self, rhs: Self) -> Self::Output {
+            Complex::of_unchecked(B::sub(self.re, rhs.re), B::sub(self.im, rhs.im))
         }
     }
 
@@ -635,30 +748,32 @@ mod arith {
 
         #[inline(always)]
         fn neg(self) -> Self {
-            Self::of(B::neg(self.re), B::neg(self.im))
+            Self::of_unchecked(B::neg(self.re), B::neg(self.im))
         }
     }
 
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Mul<T> for Complex<U, P, T, B> {
-        type Output = Self;
+        type Output = Complex<U, P, T, B::Out>;
 
         #[inline(always)]
-        fn mul(self, n: T) -> Self {
-            Self::of(B::mul(self.re, n), B::mul(self.im, n))
+        fn mul(self, n: T) -> Self::Output {
+            Complex::of_unchecked(B::mul(self.re, n), B::mul(self.im, n))
         }
     }
 
     /// Division by 0 panics as for `T`.
     impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Div<T> for Complex<U, P, T, B> {
-        type Output = Self;
+        type Output = Complex<U, P, T, B::Out>;
 
         #[inline(always)]
-        fn div(self, n: T) -> Self {
-            Self::of(B::div(self.re, n), B::div(self.im, n))
+        fn div(self, n: T) -> Self::Output {
+            Complex::of_unchecked(B::div(self.re, n), B::div(self.im, n))
         }
     }
 
-    impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> AddAssign for Complex<U, P, T, B> {
+    impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T, Out = B>> AddAssign
+        for Complex<U, P, T, B>
+    {
         #[inline(always)]
         #[expect(
             clippy::arithmetic_side_effects,
@@ -669,7 +784,9 @@ mod arith {
         }
     }
 
-    impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> SubAssign for Complex<U, P, T, B> {
+    impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T, Out = B>> SubAssign
+        for Complex<U, P, T, B>
+    {
         #[inline(always)]
         #[expect(
             clippy::arithmetic_side_effects,
@@ -680,7 +797,9 @@ mod arith {
         }
     }
 
-    impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> MulAssign<T> for Complex<U, P, T, B> {
+    impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T, Out = B>> MulAssign<T>
+        for Complex<U, P, T, B>
+    {
         #[inline(always)]
         #[expect(
             clippy::arithmetic_side_effects,
@@ -691,7 +810,9 @@ mod arith {
         }
     }
 
-    impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> DivAssign<T> for Complex<U, P, T, B> {
+    impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T, Out = B>> DivAssign<T>
+        for Complex<U, P, T, B>
+    {
         #[inline(always)]
         #[expect(
             clippy::arithmetic_side_effects,
@@ -703,7 +824,7 @@ mod arith {
         }
     }
 
-    impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T>> Sum for Complex<U, P, T, B> {
+    impl<U, P, T: ComplexStorage, B: Unlimited<T> + Policy<T, Out = B>> Sum for Complex<U, P, T, B> {
         #[expect(
             clippy::arithmetic_side_effects,
             reason = "Complex's `+`, whose policy B says what overflow does"
@@ -719,13 +840,13 @@ mod arith {
     where
         B: Unlimited<T> + Policy<T>,
     {
-        type Output = Complex<Times<U, U2>, Product<P, P2>, T, B>;
+        type Output = Complex<Times<U, U2>, Product<P, P2>, T, B::Out>;
 
         #[inline(always)]
         fn mul(self, rhs: Fixed<U2, P2, T, B>) -> Self::Output {
             const { check_product::<U, U2, P, P2>(false) };
             let x = rhs.get();
-            Complex::of(B::mul(self.re, x), B::mul(self.im, x))
+            Complex::of_unchecked(B::mul(self.re, x), B::mul(self.im, x))
         }
     }
 
@@ -736,13 +857,13 @@ mod arith {
     where
         B: Unlimited<T> + Policy<T>,
     {
-        type Output = Complex<Per<U, U2>, Quotient<P, P2>, T, B>;
+        type Output = Complex<Per<U, U2>, Quotient<P, P2>, T, B::Out>;
 
         #[inline(always)]
         fn div(self, rhs: Fixed<U2, P2, T, B>) -> Self::Output {
             const { check_product::<U, U2, P, P2>(true) };
             let x = rhs.get();
-            Complex::of(B::div(self.re, x), B::div(self.im, x))
+            Complex::of_unchecked(B::div(self.re, x), B::div(self.im, x))
         }
     }
 
@@ -752,13 +873,13 @@ mod arith {
     where
         B: Unlimited<T> + Policy<T>,
     {
-        type Output = Complex<Times<U, U2>, Product<P, P2>, T, B>;
+        type Output = Complex<Times<U, U2>, Product<P, P2>, T, B::Out>;
 
         #[inline(always)]
         fn mul(self, rhs: Complex<U2, P2, T, B>) -> Self::Output {
             const { check_product::<U, U2, P, P2>(false) };
             let (a, b, c, d) = (self.re, self.im, rhs.re, rhs.im);
-            Complex::of(
+            Complex::of_unchecked(
                 B::sub(B::mul(a, c), B::mul(b, d)),
                 B::add(B::mul(a, d), B::mul(b, c)),
             )
@@ -766,20 +887,20 @@ mod arith {
     }
 
     /// A complex quotient of floats: (a + jb) / (c + jd) = ((ac + bd) + j(bc − ad)) / (c² + d²), the unit
-    /// [Per]`<U, U2>` and scale [Quotient]`<P, P2>`. A zero divisor gives NaN parts.
+    /// [Per]`<U, U2>` and scale [Quotient]`<P, P2>`, a [MaybeNan]: a zero divisor makes NaN parts.
     macro_rules! float_div {
         ($($ty:ident)*) => {$(
             impl<U: Unit, P: FixedScale, U2: Unit, P2: FixedScale> Div<Complex<U2, P2, $ty>>
                 for Complex<U, P, $ty>
             {
-                type Output = Complex<Per<U, U2>, Quotient<P, P2>, $ty>;
+                type Output = Complex<Per<U, U2>, Quotient<P, P2>, $ty, crate::MaybeNan>;
 
                 #[inline(always)]
                 fn div(self, rhs: Complex<U2, P2, $ty>) -> Self::Output {
                     const { check_product::<U, U2, P, P2>(true) };
                     let (a, b, c, d) = (self.re, self.im, rhs.re, rhs.im);
                     let n = c * c + d * d;
-                    Complex::new((a * c + b * d) / n, (b * c - a * d) / n)
+                    Complex::of_unchecked((a * c + b * d) / n, (b * c - a * d) / n)
                 }
             }
         )*};

@@ -34,28 +34,28 @@ type Duty = Fixed<Ratio, One, f32>;
 /// The PWM driver takes a duty cycle, and only a duty cycle.
 fn set_backlight(duty: Duty) -> Duty16 {
     // 0.0..1.0 into the timer's compare register, where 65535 is 100 %
-    let d: Fixed<Ratio, One, f32> = Fixed::new(duty.get().clamp(0.0, 1.0));
+    let d: Fixed<Ratio, One, f32> = Fixed::<_, _, f32>::bounded(duty.get().clamp(0.0, 1.0));
     d.to_rounded(Rounding::NearestEven).unwrap()
 }
 
 fn main() {
     // the feedback resistor is a resistance; that it sets the amplifier's V/A is a named step
-    let feedback = Fixed::<Ohm, Mega, f32>::new(1.0);
+    let feedback = Fixed::<Ohm, Mega, f32>::bounded(1.0);
     let tia: Fixed<Per<Volt, Ampere>, Mega, f32> = feedback.as_transimpedance();
 
     // the schematic, left to right: µA · MV/A is V, V/V · V is V
-    let photo = Fixed::<Ampere, Micro, f32>::new(0.3);
+    let photo = Fixed::<Ampere, Micro, f32>::bounded(0.3);
     let at_tia: Fixed<Volt, One, f32> = (tia * photo).convert().unwrap();
-    let stage = Gain::new(4.0);
+    let stage = Gain::bounded(4.0);
     let at_adc: Fixed<Volt, Milli, f32> = (stage * at_tia).convert().unwrap();
     println!("{photo} through {tia} and {stage}: {at_adc} at the ADC");
 
     // two gains in a row are still a gain (V/V · V/V), not a duty cycle
-    let total: Gain = (stage * Gain::new(0.5)).convert().unwrap();
+    let total: Gain = (stage * Gain::bounded(0.5)).convert().unwrap();
     println!("two stages: {total}");
 
     // the brightness law: darker room, dimmer backlight. A duty cycle, computed as one
-    let duty = Duty::new(at_adc.get() / 3300.0);
+    let duty = Duty::bounded(at_adc.get() / 3300.0);
     let reg = set_backlight(duty);
     println!(
         "backlight duty {:.1} % = {reg} in the timer register",
@@ -63,7 +63,7 @@ fn main() {
     );
 
     // a gain used as a duty on purpose (a calibration that is a ratio either way) is written down as such
-    let as_duty: Duty = Gain::new(0.25).as_ratio();
+    let as_duty: Duty = Gain::bounded(0.25).as_ratio();
     assert_eq!(as_duty.get(), 0.25);
 
     // what it costs: a kind is a compile-time property of the unit marker. `stage * at_tia` is one f32 multiply,

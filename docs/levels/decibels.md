@@ -23,8 +23,8 @@ In `exact_units` the unit's [kind](../maths/kinds.md) picks the form, so nobody 
 ```rust
 use exact_units::{Fixed, prefix::{Milli, One}, units::{Ampere, Per, Volt, Watt}};
 
-assert_eq!(Fixed::<Per<Volt, Volt>, One, f64>::new(10.0).to_db(), 20.0);   // 20·lg
-assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::new(100.0).to_db(), 20.0);  // 10·lg
+assert_eq!(Fixed::<Per<Volt, Volt>, One, f64>::bounded(10.0).to_db(), 20.0);   // 20·lg
+assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::bounded(100.0).to_db(), 20.0);  // 10·lg
 assert_eq!(Fixed::<Per<Ampere, Ampere>, Milli, u32>::new(100).to_db(), -20.0);
 ```
 
@@ -33,7 +33,7 @@ A plain `Ratio` (a duty cycle) has no level. 0.5 duty is not −3 dB, and the co
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::One, units::Ratio};
 
-let _ = Fixed::<Ratio, One, f64>::new(0.5).to_db();
+let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_db();
 ```
 
 ## `db!`: a level as a constant
@@ -173,8 +173,8 @@ At run time `to_np` and `from_np` (`f64`; `to_np_f32` and `from_np_f32` for the 
 use exact_units::{Fixed, prefix::One, units::{Per, Volt, Watt}};
 
 let e = core::f64::consts::E;
-let volts = Fixed::<Per<Volt, Volt>, One, f64>::new(1.0 / e);
-let watts = Fixed::<Per<Watt, Watt>, One, f64>::new(1.0 / (e * e));
+let volts = Fixed::<Per<Volt, Volt>, One, f64>::bounded(1.0 / e);
+let watts = Fixed::<Per<Watt, Watt>, One, f64>::bounded(1.0 / (e * e));
 assert!((volts.to_np() + 1.0).abs() < 1e-12);
 assert!((watts.to_np() + 1.0).abs() < 1e-12);
 
@@ -208,7 +208,7 @@ let np = db.convert_rounded::<Neper, Micro, i32>(Rounding::NearestEven).unwrap()
 assert_eq!(np.get(), 2_037_788);
 
 // the edge to a gain: V/V takes 20·lg, and a loss is the gain negated
-let gain = Fixed::<Per<Volt, Volt>, One, f64>::new(0.1);
+let gain = Fixed::<Per<Volt, Volt>, One, f64>::bounded(0.1);
 let loss: Fixed<Loss<Decibel>, One, f64> = gain.to_level().unwrap();
 assert!((loss.get() - 20.0).abs() < 1e-12);
 assert!((loss.as_gain().get() + 20.0).abs() < 1e-12);
@@ -219,7 +219,7 @@ A loss is not a gain, so the compiler refuses to mix them:
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::One, units::{Decibel, Loss}};
 
-let _ = Fixed::<Loss<Decibel>, One, f32>::new(3.0).convert::<Decibel, One, f32>();
+let _ = Fixed::<Loss<Decibel>, One, f32>::bounded(3.0).convert::<Decibel, One, f32>();
 ```
 
 ## Absorbance and optical depth
@@ -253,7 +253,7 @@ let t = a.to_gain::<Per<Watt, Watt>, One, f64>().unwrap();
 assert!((t.get() - 0.2388).abs() < 1e-4);
 
 // a fibre's 0.2 dB/km is 23 µNp/m of field, and μ is twice that
-let fibre = Fixed::<Per<Loss<Decibel>, Meter>, Milli, f64>::new(0.2);
+let fibre = Fixed::<Per<Loss<Decibel>, Meter>, Milli, f64>::bounded(0.2);
 let alpha = fibre.convert::<Per<Loss<Neper>, Meter>, Micro, f64>().unwrap();
 let mu = fibre.convert::<LinearAttenuation, Micro, f64>().unwrap();
 assert!((mu.get() / alpha.get() - 2.0).abs() < 1e-12);

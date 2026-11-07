@@ -100,7 +100,7 @@ pub(crate) fn any_bytes_all(bytes: &[u8]) {
 
 /// A [Fixed] in the `with_unit` text form.
 #[cfg(not(kani))]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(transparent)]
 struct Text<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>>(
     #[serde(with = "exact_units::serde::with_unit")] Fixed<U, P, T, B>,
@@ -263,12 +263,12 @@ mod tests {
 
         #[test]
         fn text_round_trip_f32(v: f32) {
-            super::text_round_trip(Fixed::<Volt, Milli, f32>::new(v));
+            super::text_round_trip(Fixed::<Volt, Milli, f32>::bounded(v));
         }
 
         #[test]
         fn text_round_trip_f64(v: f64) {
-            super::text_round_trip(Fixed::<Second, exact_units::prefix::One, f64>::new(v));
+            super::text_round_trip(Fixed::<Second, exact_units::prefix::One, f64>::bounded(v));
         }
 
         #[test]

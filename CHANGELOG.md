@@ -692,4 +692,33 @@ firmware that only needs units in its types builds without it; the bytes don't d
 - `==` and `!=` between a `Fixed` of integer storage and a `q!` literal no stored value can equal don't compile (NUM-15): a literal between two steps of the scale (`speed == q!(0.155 m/s)` in steps of 1 cm/s) or past the storage's range (`q!(1000 m/s)` for an `i16` of cm/s). Such a compare was `false` (or `true` for `!=`) for every value, which hides a wrong scale or a typo; the fold now stops in its `const` block with "between two steps" or "past the storage's range". `<`, `<=`, `>`, `>=` and `partial_cmp` with such a literal compile and order as before. Tests: `compile_fail` doctests of both cases in `literal::quantity`; `tests/props/q_literal.rs` checks `==` and `!=` only against literals on a step, both ways round, and `literal_order` still answers `false` for the others.
 - `==` and `!=` between a `Fixed` of `f32` or `f64` storage and a `q!` literal that is no float of the storage don't compile (NUM-16, P2401#7nov-1737): `v == q!(0.1 V)` on an `f32` (no float is 0.1), a literal past the float's range (`q!(3.4028235e38 V)`, above `f32::MAX`), and any literal against a scale with π in it (`radians == q!(90 deg)`). Such a compare was `false` (or `true` for `!=`) for every value; the fold now stops in its `const` block with "not a float of the storage" or "past the float's range". `<`, `<=`, `>`, `>=` and `partial_cmp` with such a literal compile and order as before; `partial_cmp` no longer goes through `==`. Tests: `compile_fail` doctests in `literal::quantity`, the `tests/compile_fail/q_float.rs` snapshot, unit tests of the fold's refusals, `tests/props/q_float.rs` checks `==` only against literals that are floats.
 - A literal of `-0` (`-0`, `-0.0`, `-0e5`) doesn't compile in `fixed!` or `q!`, and `Decimal::parse` refuses it (NUM-7, P2401#7nov-1737): a decimal has no negative zero, so `fixed!(-0.0)` into an `f32` or `f64` gave +0.0 with nothing saying so. Write `0`. Tests: unit tests of both readers, a `compile_fail` doctest, the `fixed_grammar` and `q_grammar` snapshots, `tests/props/text.rs` writes zero every way against the reference, which refuses `-0` too, and a `decimal` fuzz seed.
+- A float `Fixed` is never NaN unless its type says so (NUM-19, P2401#7nov-1741). Every compare with NaN is false, so
+  a NaN reading silently skipped `if temp > limit { shutdown() }`. Now every bound refuses NaN, `Unbounded` included:
+  `try_new`, the wire, serde, text and every conversion refuse it. ±∞ stays a value. The new bound `MaybeNan` holds
+  NaN; `not_nan` (`None` for NaN) and `maybe_nan` (free) move between the two.
+- `+`, `-`, `*` and `/` of floats give a `MaybeNan` (∞ − ∞, 0 · ∞ and 0 / 0 are NaN): the float's own operation, no
+  check and no panic, the same instructions as a plain `f32` on Cortex-M. So do `Sum`, `Fixed * Fixed` and `/`
+  products, `saturating_times`/`wrapping_times` and their `_per` twins, `electrical`, a float point ± a vector, complex
+  `+`, `-`, `*`, `/` and `Complex::from_polar` (now on `Complex<.., MaybeNan>`) and `Polar::to_complex`. A `MaybeNan`
+  meets a NaN-free value of its unit and scale on either side, so `a + b + c` is one `MaybeNan`. `+=`, `-=`, `*=`,
+  `/=` and `sum` into the same type are on a `MaybeNan` (also with a NaN-free right side) and not on a NaN-free float,
+  whose type the result doesn't have. `checked_*` keeps the NaN-free type, `None` where the result isn't finite.
+  Integers are unchanged.
+- A `MaybeNan` has no `==`, `<` or `partial_cmp`, against a value, a `q!` literal or an `Exact`: it compares through
+  `gt_or(rhs, nan)`, `ge_or`, `lt_or`, `le_or` and `eq_or`, where `nan` is the answer for NaN
+  (`temp.gt_or(q!(353.15 K), true)` trips a shutdown on NaN too), each one float compare; or after `not_nan`. Points
+  have the same methods and `not_nan`; `Complex` has `not_nan` and no `==` for `MaybeNan`. `Wrapping` and `Saturating`
+  arithmetic is for integer storages only.
+- `Fixed::new`, `From<f32>`, `Fixed::of`, `Complex::new`, `Complex::of` and `Point::from_raw` no longer compile for a
+  float storage without `MaybeNan`. Use `try_new`, or the new `const fn bounded` for `f32` and `f64` (`Fixed`,
+  `Complex`, `Point`), a compile error in `const` code for NaN. `Fixed::bounded(x)` needs the storage named,
+  `Fixed::<_, _, f32>::bounded(x)`, as the integer `bounded` does. `Complex::try_new` is new.
+- `Complex::reflection`, `to_admittance` and `to_impedance` return `Option`, `None` where the result was NaN (Z = −Z₀,
+  a short). `Complex::power_factor` returns `Option`, `None` for zero apparent power. A `Complex` read from the wire
+  or serde refuses a NaN part (a `validate` on its `derive_shrink_wrap`, no byte changes).
+- `Complex::abs`, `arg` and `norm_sqr` and `Fixed::unbounded` don't compile for `MaybeNan`;
+  `with_overflow` from `MaybeNan` to a NaN-free bound neither (`not_nan` checks). Float points and complex values read
+  from an interleaved buffer are `MaybeNan`.
+- `to_saturating`, `to_wrapping` and `into_rounded` into a float storage give 0 for a NaN, as they did into an integer
+  one.
 

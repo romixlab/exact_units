@@ -37,15 +37,15 @@ const SLIP: GammaSqr = db!(-15);
 
 fn main() {
     // the bench tool, in f64 on a host
-    let z0 = Impedance::<One, f64>::new(50.0, 0.0);
+    let z0 = Impedance::<One, f64>::bounded(50.0, 0.0);
     println!("antenna against {z0:#}:");
     for (mhz, z) in [
         (430.0, (38.0, -21.0)),
         (435.0, (47.5, 4.0)),
         (440.0, (82.0, 35.0)),
     ] {
-        let z = Impedance::<One, f64>::new(z.0, z.1);
-        let gamma = z.reflection(z0);
+        let z = Impedance::<One, f64>::bounded(z.0, z.1);
+        let gamma = z.reflection(z0).unwrap();
         let p = gamma.to_polar();
         let deg = p.arg().convert::<Phase<Degree>, One, f64>().unwrap();
         println!(
@@ -59,13 +59,17 @@ fn main() {
     }
 
     // a worked check: 100 Ω on 50 Ω is Γ = 1/3, VSWR 2, return loss 9.54 dB, mismatch loss 0.51 dB
-    let gamma = Impedance::<One, f64>::new(100.0, 0.0).reflection(z0);
+    let gamma = Impedance::<One, f64>::bounded(100.0, 0.0)
+        .reflection(z0)
+        .unwrap();
     assert!((gamma.vswr().get() - 2.0).abs() < 1e-12);
     assert!((gamma.return_loss_db() - 9.542).abs() < 1e-3);
     assert!((gamma.mismatch_loss().to_db() + 0.512).abs() < 1e-3);
 
     // a shunt element is chosen in admittance: Y = 1/Z, here in mS
-    let y: Admittance<Milli, f64> = Impedance::<One, f64>::new(82.0, 35.0).to_admittance();
+    let y: Admittance<Milli, f64> = Impedance::<One, f64>::bounded(82.0, 35.0)
+        .to_admittance()
+        .unwrap();
     println!(
         "440 MHz as an admittance: {y:.3} (a shunt capacitor of {:.2} mS cancels its susceptance)",
         -y.im().get()

@@ -614,7 +614,7 @@ macro_rules! complex_literal {
         impl<U, P: FixedScale, B: Unlimited<$ty>, const N1: i64, const E1: i16, const N2: i64, const E2: i16>
             AtLiteral<(Literal<N1, E1>, Literal<N2, E2>)> for Complex<U, P, $ty, B>
         {
-            const AT: Self = Complex::of(
+            const AT: Self = Complex::of_unchecked(
                 Fixed::<U, P, $ty>::from_decimal(Decimal::new(N1, E1)).get(),
                 Fixed::<U, P, $ty>::from_decimal(Decimal::new(N2, E2)).get(),
             );

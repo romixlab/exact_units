@@ -67,10 +67,11 @@ $|z|$ is in the unsigned twin of `T`: $|-32768 - 32768j|$ is 46341, which no `i1
 On a float impedance: the reflection coefficient $\Gamma = \frac{Z - Z_0}{Z + Z_0}$, VSWR, return loss and mismatch loss.
 
 ```rust
-use exact_units::{Complex, Impedance, prefix::One};
+use exact_units::{Impedance, prefix::One};
 
-let z0: Impedance<One, f64> = Complex::new(50.0, 0.0);
-let gamma = Impedance::<One, f64>::new(100.0, 0.0).reflection(z0);
+let z0 = Impedance::<One, f64>::bounded(50.0, 0.0);
+// None for Z = −Z₀, where Γ is 0 / 0
+let gamma = Impedance::<One, f64>::bounded(100.0, 0.0).reflection(z0).unwrap();
 assert!((gamma.vswr().get() - 2.0).abs() < 1e-12);
 assert!((gamma.return_loss_db() - 9.542425094393248).abs() < 1e-12);
 ```

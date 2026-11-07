@@ -94,7 +94,7 @@ fn coefficient_over_a_path() {
     assert_eq!(np.get(), 1150);
     assert_eq!(tau.convert::<Loss<Neper>, Milli, u32>(), Some(np));
     // 2 AU/cm in AU/m and into μ
-    let per_cm = Fixed::<DecadicAttenuation, Hecto, f64>::new(2.0);
+    let per_cm = Fixed::<DecadicAttenuation, Hecto, f64>::bounded(2.0);
     let mu = per_cm.convert::<LinearAttenuation, One, f64>().unwrap();
     assert!((mu.get() - 200.0 * LN_10).abs() < 1e-11);
 }
@@ -115,10 +115,10 @@ fn literal_in_absorbance() {
 fn transmittance() {
     use exact_units::units::{Irradiance, Volt, Watt};
 
-    let t = Fixed::<Per<Watt, Watt>, One, f64>::new(0.01);
+    let t = Fixed::<Per<Watt, Watt>, One, f64>::bounded(0.01);
     assert_eq!(
         t.to_level::<Absorbance, One, f64>(),
-        Some(Fixed::new(2.0)),
+        Some(Fixed::<_, _, f64>::bounded(2.0)),
         "a whole number of decades stays exact"
     );
     let tau = t.to_level::<OpticalDepth, One, f64>().unwrap();
@@ -126,18 +126,21 @@ fn transmittance() {
     let back = tau.to_gain::<Per<Watt, Watt>, One, f64>().unwrap();
     assert!((back.get() - 0.01).abs() < 1e-15);
 
-    let e = Fixed::<OpticalDepth, One, f64>::new(1.0);
+    let e = Fixed::<OpticalDepth, One, f64>::bounded(1.0);
     let t = e.to_gain::<Per<Watt, Watt>, One, f64>().unwrap();
     assert!((t.get() - (-1.0f64).exp()).abs() < 1e-15);
 
-    let i = Fixed::<Per<Irradiance, Irradiance>, One, f64>::new(0.01);
+    let i = Fixed::<Per<Irradiance, Irradiance>, One, f64>::bounded(0.01);
     assert_eq!(
         i.to_level::<Absorbance, Milli, u16>(),
         Some(Fixed::new(2000))
     );
     // a field ratio of 0.1 is a power ratio of 0.01
-    let v = Fixed::<Per<Volt, Volt>, One, f64>::new(0.1);
-    assert_eq!(v.to_level::<Absorbance, One, f64>(), Some(Fixed::new(2.0)));
+    let v = Fixed::<Per<Volt, Volt>, One, f64>::bounded(0.1);
+    assert_eq!(
+        v.to_level::<Absorbance, One, f64>(),
+        Some(Fixed::<_, _, f64>::bounded(2.0))
+    );
 }
 
 /// The text `{}` writes reads back in the `with_unit` form, for each new symbol.

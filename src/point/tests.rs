@@ -123,7 +123,7 @@ mod thermal {
         assert_eq!(f.to::<AbsoluteZero, One, f64>().unwrap().raw(), 298.15);
         // a float to an integer only when whole: 298.15 isn't exactly a float, 300.5 is
         assert_eq!(
-            Point::<AbsoluteZero, Fixed<Kelvin, One, f64>>::from_raw(300.5)
+            Point::<AbsoluteZero, Fixed<Kelvin, One, f64>>::bounded(300.5)
                 .to::<Celsius, Centi, i16>()
                 .map(Point::raw),
             Some(2735)
@@ -281,7 +281,7 @@ mod thermal {
             "Celsius(25 °C, 2500 cK i16)"
         );
         assert_eq!(
-            Point::<Celsius, Fixed<Kelvin, One, f32>>::from_raw(21.5).to_string(),
+            Point::<Celsius, Fixed<Kelvin, One, f32>>::bounded(21.5).to_string(),
             "21.5 °C"
         );
     }
@@ -421,12 +421,15 @@ mod angle {
     fn float_angles() {
         use core::f64::consts::TAU;
         type Rad = Point<Angle<Radian>, Fixed<Radian, One, f64>>;
-        let p = Rad::from_raw(3.0) + Fixed::new(4.0);
+        let p = Rad::bounded(3.0) + Fixed::<_, _, f64>::bounded(4.0);
         assert!((p.raw() - (7.0 - TAU)).abs() < 1e-12);
-        let d = Rad::from_raw(0.1) - Rad::from_raw(TAU - 0.1);
+        let d = Rad::bounded(0.1) - Rad::bounded(TAU - 0.1);
         assert!((d.get() - 0.2).abs() < 1e-12);
         type Deg = Point<Angle<Degree>, Fixed<Degree, One, f32>>;
-        assert_eq!((Deg::from_raw(350.0) + Fixed::new(20.0)).raw(), 10.0);
+        assert_eq!(
+            (Deg::bounded(350.0) + Fixed::<_, _, f32>::bounded(20.0)).raw(),
+            10.0
+        );
     }
 
     crate::scale! {
@@ -444,14 +447,14 @@ mod angle {
         use core::f64::consts::{FRAC_PI_2, PI};
         type Rad = Point<Bearing, Fixed<Radian, One, f64>>;
         type Deg = Point<Bearing, Fixed<Radian, DegStep, f64>>;
-        let rad = |d: f64| Deg::from_raw(d).to::<Bearing, One, f64>().map(Point::raw);
+        let rad = |d: f64| Deg::bounded(d).to::<Bearing, One, f64>().map(Point::raw);
         assert_eq!(rad(0.0), Some(0.0));
         assert!((rad(180.0).unwrap() - PI).abs() < 1e-12);
         assert!((rad(90.0).unwrap() - FRAC_PI_2).abs() < 1e-12);
         assert!((rad(-90.0).unwrap() + FRAC_PI_2).abs() < 1e-12);
         // back: radians to steps of a degree
         let deg = |r: f64| {
-            Rad::from_raw(r)
+            Rad::bounded(r)
                 .to::<Bearing, DegStep, f64>()
                 .map(Point::raw)
         };
@@ -471,7 +474,7 @@ mod angle {
     fn float_angles_wrap_negative_numbers() {
         type Deg = Point<Angle<Degree>, Fixed<Degree, One, f64>>;
         let same = |d: f64| {
-            Deg::from_raw(d)
+            Deg::bounded(d)
                 .to::<Angle<Degree>, One, f64>()
                 .map(Point::raw)
         };
@@ -562,14 +565,20 @@ fn checked_steps_and_differences_have_results() {
     assert_eq!(UDegC::from_raw(4).checked_diff(u), None);
     // floats: finite results only
     type FDegC = Point<Celsius, Fixed<Kelvin, One, f32>>;
-    let f = FDegC::from_raw(1.5);
-    assert_eq!(f.checked_sub(Fixed::new(0.5)), Some(FDegC::from_raw(1.0)));
+    let f = FDegC::bounded(1.5);
     assert_eq!(
-        f.checked_diff(FDegC::from_raw(0.5)).map(Fixed::get),
+        f.checked_sub(Fixed::<_, _, f32>::bounded(0.5)),
+        Some(FDegC::bounded(1.0))
+    );
+    assert_eq!(
+        f.checked_diff(FDegC::bounded(0.5)).map(Fixed::get),
         Some(1.0)
     );
-    assert_eq!(f.checked_sub(Fixed::new(f32::INFINITY)), None);
-    assert_eq!(f.checked_diff(FDegC::from_raw(f32::NAN)), None);
+    assert_eq!(
+        f.checked_sub(Fixed::<_, _, f32>::bounded(f32::INFINITY)),
+        None
+    );
+    assert!(Fixed::<Kelvin, One, f32>::try_new(f32::NAN).is_err());
 }
 
 #[cfg(all(feature = "time", feature = "angle"))]

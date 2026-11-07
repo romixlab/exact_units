@@ -18,7 +18,7 @@ use core::cmp::Ordering;
 use exact_units::literal::{Db, Decimal, Np};
 use exact_units::prefix::{Micro, Milli, One, Pow2};
 use exact_units::units::{Kilometre, Meter, Per, Volt, Watt};
-use exact_units::{Exact, Fixed};
+use exact_units::{Exact, Fixed, MaybeNan};
 use num_bigint::BigInt;
 use num_rational::BigRational;
 
@@ -102,7 +102,7 @@ macro_rules! float_orders {
                 } else {
                     BigRational::from_float(t).map(|a| $order(&a, num, exp, $f))
                 };
-                let got = <$ty>::new(t).level_order::<$l>(Decimal::new(num, exp));
+                let got = <$ty>::of(t).level_order::<$l>(Decimal::new(num, exp));
                 assert_eq!(got, ops5(want), "{t:e} against {num}e{exp}");
             }
         }
@@ -110,9 +110,9 @@ macro_rules! float_orders {
 }
 
 float_orders! {
-    db_root_f32: Fixed<Per<Volt, Volt>, One, f32>, f32, Db, order_db, 20;
-    db_power_f64: Fixed<Per<Watt, Watt>, One, f64>, f64, Db, order_db, 10;
-    np_root_f64: Fixed<Per<Volt, Volt>, One, f64>, f64, Np, order_np, 1;
+    db_root_f32: Fixed<Per<Volt, Volt>, One, f32, MaybeNan>, f32, Db, order_db, 20;
+    db_power_f64: Fixed<Per<Watt, Watt>, One, f64, MaybeNan>, f64, Db, order_db, 10;
+    np_root_f64: Fixed<Per<Volt, Volt>, One, f64, MaybeNan>, f64, Np, order_np, 1;
 }
 
 /// An `Exact` of `n / d` m against `num · 10^exp` of a literal in m (`k` 1) or in km (`k` 1000): the exact order of
@@ -272,7 +272,7 @@ mod tests {
             let b = high << 16;
             for b in [b.wrapping_sub(1), b, b + 1] {
                 let t = f32::from_bits(b);
-                let g = Fixed::<Per<Volt, Volt>, One, f32>::new(t);
+                let m = Fixed::<Per<Volt, Volt>, One, f32, MaybeNan>::of(t);
                 let want = |num, exp| {
                     if t.is_nan() {
                         None
@@ -285,6 +285,20 @@ mod tests {
                     } else {
                         BigRational::from_float(t).map(|a| order_db(&a, num, exp, 20))
                     }
+                };
+                // a MaybeNan compares by naming what NaN gives
+                for nan in [false, true] {
+                    let or = |is: fn(Ordering) -> bool| want(-3, 0).map_or(nan, is);
+                    assert_eq!(m.lt_or(q!(-3 dB), nan), or(Ordering::is_lt), "{t:e}");
+                    assert_eq!(m.le_or(q!(-3 dB), nan), or(Ordering::is_le), "{t:e}");
+                    assert_eq!(m.gt_or(q!(-3 dB), nan), or(Ordering::is_gt), "{t:e}");
+                    assert_eq!(m.ge_or(q!(-3 dB), nan), or(Ordering::is_ge), "{t:e}");
+                    let or = |is: fn(Ordering) -> bool| want(20, 0).map_or(nan, is);
+                    assert_eq!(m.eq_or(q!(20 dB), nan), or(Ordering::is_eq), "{t:e}");
+                }
+                let Some(g) = m.not_nan() else {
+                    assert_eq!(want(-3, 0), None, "{t:e}");
+                    continue;
                 };
                 let got = |lt, le, gt, ge| [lt, le, false, gt, ge];
                 let mut w = ops5(want(-3, 0));

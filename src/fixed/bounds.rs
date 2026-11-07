@@ -18,8 +18,8 @@ use shrink_wrap::{Nibble, UNib32, UVlq32, UVlq64};
 /// The range a value of `T` must be in, both ends inclusive, `None` for no limit: a zero-size marker, never sent. A
 /// bound that doesn't fit `T` is a compile error where the type is used. Bytes never change because of a bound.
 ///
-/// The markers of this crate are [Unbounded], [Range] (integers up to `i64`), [RangeU64] (the top of `u64`) and
-/// [RangeDec] (floats). An API's own marker works in Rust, but introspection sees only its name, while dynamic clients
+/// The markers of this crate are [Unbounded], [Range] (integers up to `i64`), [RangeU64] (the top of `u64`),
+/// [RangeDec] (floats) and [MaybeNan] (a float that may be NaN). Every marker but [MaybeNan] refuses NaN. An API's own marker works in Rust, but introspection sees only its name, while dynamic clients
 /// read the limits of these three from their parameters.
 pub trait Bounds<T: Storage>: Copy + Default + 'static {
     /// The lowest value allowed, `None` for no limit.
@@ -32,13 +32,20 @@ pub trait Bounds<T: Storage>: Copy + Default + 'static {
     /// range from. `None` (the default) proves from the whole range of `T`, which is never narrower.
     const INT_RANGE: Option<(i128, i128)> = None;
 
-    /// `MIN <= x <= MAX`; `false` for `NaN` when there is a bound.
+    /// Whether a float may be NaN: `true` only for [MaybeNan]. Every other bound refuses NaN, [Unbounded] included:
+    /// NaN is no number of the storage's range.
+    const ALLOWS_NAN: bool = false;
+
+    /// `MIN <= x <= MAX`, and not NaN unless [ALLOWS_NAN](Self::ALLOWS_NAN).
     #[inline(always)]
     #[expect(
         clippy::neg_cmp_op_on_partial_ord,
         reason = "`!(x >= min)` and not `x < min`: `NaN` compares false both ways and has to be refused"
     )]
     fn contains(x: T) -> bool {
+        if !Self::ALLOWS_NAN && x.is_nan() {
+            return false;
+        }
         if let Some(min) = Self::MIN
             && !(x >= min)
         {
@@ -69,6 +76,10 @@ impl core::error::Error for OutOfBounds {}
 /// No bounds: the whole range of the storage. The default of [Fixed](super::Fixed)'s `B`. Its overflow policy is
 /// checked: `+` is `T`'s (a panic on overflow in debug builds), and `checked_*`, `saturating_*` and `wrapping_*` name
 /// the others.
+///
+/// For a float storage the range is every number from −∞ to +∞, and NaN is none of them: a NaN is refused where a
+/// value is made ([try_new](super::Fixed::try_new), the wire, serde, text, a conversion). Arithmetic can make NaN
+/// (∞ − ∞, 0 · ∞, 0 / 0), so `+`, `-`, `*` and `/` of a float give a [MaybeNan]: the float's own operation, no check.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Unbounded;
 
@@ -83,7 +94,70 @@ pub struct Wrapping;
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Saturating;
 
-/// A bounds marker without limits: [Unbounded], [Wrapping] or [Saturating]. The three are the same values and
+/// No bounds, and NaN allowed: a float (`f32`, `f64`) that may be NaN. It is what `+`, `-`, `*` and `/` of a float
+/// give, the float's own IEEE 754 operation without a check, and a value that is NaN on purpose ("no reading").
+///
+/// Every compare with NaN is false, so `if temp > limit { shutdown() }` would silently not trip. A `MaybeNan` has no
+/// `<`, `>` or `==`: it compares through a method that names what NaN gives ([gt_or](super::Fixed::gt_or) and its
+/// kin), or after [not_nan](super::Fixed::not_nan), which is `None` for NaN.
+///
+/// ```
+/// use exact_units::{Fixed, prefix::One, units::Volt};
+///
+/// let inf = Fixed::<Volt, One, f32>::bounded(f32::INFINITY);
+/// let nan = inf - inf; // a MaybeNan
+/// assert!(nan.get().is_nan());
+/// assert_eq!(nan.not_nan(), None);
+/// assert!(nan.gt_or(inf, true)); // NaN counts as past the limit here
+/// assert_eq!((inf + inf).not_nan(), Some(inf));
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, prefix::One, units::Volt};
+///
+/// let v = Fixed::<Volt, One, f32>::bounded(1.0);
+/// let _ = v + v > v; // a MaybeNan has no `>`: gt_or, or not_nan first
+/// ```
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct MaybeNan;
+
+impl Bounds<f32> for MaybeNan {
+    const MIN: Option<f32> = None;
+
+    const MAX: Option<f32> = None;
+
+    const ALLOWS_NAN: bool = true;
+}
+
+impl Bounds<f64> for MaybeNan {
+    const MIN: Option<f64> = None;
+
+    const MAX: Option<f64> = None;
+
+    const ALLOWS_NAN: bool = true;
+}
+
+impl Unlimited<f32> for MaybeNan {}
+
+impl Unlimited<f64> for MaybeNan {}
+
+/// A bound that refuses NaN: every bound but [MaybeNan]. Only values of such bounds have `<`, `>` and `==`, as a
+/// compare with NaN is false and would pass for an answer. An API's own bounds marker implements it to compare.
+pub trait NanFree {}
+
+impl NanFree for Unbounded {}
+
+impl NanFree for Wrapping {}
+
+impl NanFree for Saturating {}
+
+impl<const MIN: i64, const MAX: i64> NanFree for Range<MIN, MAX> {}
+
+impl<const MIN: u64, const MAX: u64> NanFree for RangeU64<MIN, MAX> {}
+
+impl<const MIN: i64, const MAX: i64, const EXP: i8> NanFree for RangeDec<MIN, MAX, EXP> {}
+
+/// A bounds marker without limits: [Unbounded], [Wrapping], [Saturating] or [MaybeNan]. The first three are the same values and
 /// convert into each other for free ([Fixed::with_overflow](super::Fixed::with_overflow)); they differ in what
 /// arithmetic does at the ends of the storage.
 pub trait Unlimited<T: Storage>: Bounds<T> {}
@@ -442,6 +516,35 @@ macro_rules! bounded {
         }
     )*};
 }
+
+/// `bounded(value)` of a float storage: a compile error in `const` code for NaN or a value outside `B`.
+macro_rules! bounded_float {
+    ($($ty:ident)*) => {$(
+        impl<U, P, B: Bounds<$ty>> super::Fixed<U, P, $ty, B> {
+            /// `value` in units of `P`: a compile error in `const` code when it is NaN (unless `B` is [MaybeNan]) or
+            /// outside `B`, a panic at run time ([try_new](Self::try_new) doesn't).
+            #[inline(always)]
+            pub const fn bounded(value: $ty) -> Self {
+                if !B::ALLOWS_NAN && value.is_nan() {
+                    panic!("a NaN-free float can't be NaN");
+                }
+                if let Some(min) = B::MIN
+                    && value < min
+                {
+                    panic!("value below its bound");
+                }
+                if let Some(max) = B::MAX
+                    && value > max
+                {
+                    panic!("value above its bound");
+                }
+                Self::new_unchecked(value)
+            }
+        }
+    )*};
+}
+
+bounded_float!(f32 f64);
 
 bounded! {
     u8 x => x;

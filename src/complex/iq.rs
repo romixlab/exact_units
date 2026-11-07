@@ -149,7 +149,7 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
         r: Rounding,
     ) -> Complex<Times<U, U2>, P, T, Saturating> {
         let (re, im) = self.saturating_product::<U2, P, B2>(rhs, false, r);
-        Complex::of(re, im)
+        Complex::of_unchecked(re, im)
     }
 
     /// `self · conj(rhs)` as [mul_round](Self::mul_round) does `self · rhs`: rounded once, saturated per part, the
@@ -170,7 +170,7 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
         r: Rounding,
     ) -> Complex<Times<U, U2>, P, T, Saturating> {
         let (re, im) = self.saturating_product::<U2, P, B2>(rhs, true, r);
-        Complex::of(re, im)
+        Complex::of_unchecked(re, im)
     }
 
     /// The parts of `self · rhs` (or `· conj(rhs)`) in `P`, `T`, saturated.
@@ -218,7 +218,7 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
         r: Rounding,
     ) -> Complex<U, P, T, Saturating> {
         let (re, im) = self.saturating_product::<Ratio, PL, BL>(lo, false, r);
-        Complex::of(re, im)
+        Complex::of_unchecked(re, im)
     }
 
     /// `self · conj(lo)`: the down-conversion of an IQ sample by e^(−jθ) when `lo` is e^(jθ), as [mix](Self::mix).
@@ -229,7 +229,7 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
         r: Rounding,
     ) -> Complex<U, P, T, Saturating> {
         let (re, im) = self.saturating_product::<Ratio, PL, BL>(lo, true, r);
-        Complex::of(re, im)
+        Complex::of_unchecked(re, im)
     }
 }
 
@@ -335,7 +335,7 @@ impl<U: Unit, P: FixedScale, T: IqStorage> Mac<U, P, T> {
             };
             settle_i128::<T3>(y, o)
         };
-        Some(Complex::new(part(self.re)?, part(self.im)?))
+        Complex::try_new(part(self.re)?, part(self.im)?).ok()
     }
 
     /// Whether the mean of the real sum over `n` products is at least `threshold`, `Σ re ≥ threshold · n`, exact:
@@ -557,7 +557,8 @@ impl<U, P, T: ComplexStorage, B: Unlimited<T>> ExactSizeIterator for Interleaved
 impl<U, P, T: ComplexStorage, B: Unlimited<T>> FusedIterator for Interleaved<'_, U, P, T, B> {}
 
 /// Interleaved buffers `[re₀, im₀, re₁, im₁, ..]`, the layout of an ADC's or a radio's IQ stream, in and out
-/// without `unsafe`: two numbers at a time as `[T; 2]` by `as_chunks`.
+/// without `unsafe`: two numbers at a time as `[T; 2]` by `as_chunks`. A float buffer may hold NaN, so its samples
+/// are read as [MaybeNan](crate::MaybeNan) (`Complex<U, P, f32, MaybeNan>`); a NaN-free float doesn't compile here.
 impl<U, P, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T, B> {
     /// The samples of an interleaved buffer.
     ///
@@ -735,7 +736,7 @@ impl Nco {
     #[must_use]
     pub fn phasor<T: IqStorage>(&self) -> Complex<Ratio, T::Q, T, Saturating> {
         let (c, s) = T::unit_phasor(self.phase);
-        Complex::of(c, s)
+        Complex::of_unchecked(c, s)
     }
 
     /// e^(jθ) of the current phase, then a step on.

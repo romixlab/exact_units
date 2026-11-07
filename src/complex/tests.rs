@@ -75,8 +75,8 @@ fn products_in_the_type() {
 
 #[test]
 fn float_quotient() {
-    let a = Complex::<Ratio, One, f64>::new(-5.0, 10.0);
-    let b = Complex::<Ratio, One, f64>::new(3.0, 4.0);
+    let a = Complex::<Ratio, One, f64>::bounded(-5.0, 10.0);
+    let b = Complex::<Ratio, One, f64>::bounded(3.0, 4.0);
     let q = a / b;
     assert_eq!(q.get(), (1.0, 2.0));
 }
@@ -87,7 +87,7 @@ fn norm_sqr_always_fits() {
     assert_eq!(z.norm_sqr().get(), 32768u16);
     let z = Complex::<Ratio, One, i32>::new(i32::MIN, i32::MIN);
     assert_eq!(z.norm_sqr().get(), 1u64 << 63);
-    let z = Complex::<Ratio, One, f32>::new(3.0, 4.0);
+    let z = Complex::<Ratio, One, f32>::bounded(3.0, 4.0);
     assert_eq!(z.norm_sqr().get(), 25.0);
 }
 
@@ -139,7 +139,10 @@ fn conversions_per_part() {
     assert_eq!(z.to::<One, i16>(), None);
     let r = z.requantize::<One, i16>(Rounding::NearestEven, Overflow::Checked);
     assert_eq!(r, Some(Complex::new(2, -2)));
-    assert_eq!(z.to::<One, f32>(), Some(Complex::new(1.5, -2.0)));
+    assert_eq!(
+        z.to::<One, f32>(),
+        Some(Complex::<_, _, f32>::bounded(1.5, -2.0))
+    );
 }
 
 #[test]
@@ -147,7 +150,7 @@ fn shown() {
     let z = Complex::<Ratio, Milli, i32>::new(1500, -2000);
     assert_eq!(z.to_string(), "1500-2000j ‰");
     assert_eq!(format!("{z:#}"), "1.5-2j");
-    let f = Complex::<Times<Ratio, Ratio>, One, f32>::new(1.0, -0.0);
+    let f = Complex::<Times<Ratio, Ratio>, One, f32>::bounded(1.0, -0.0);
     assert!(f.to_string().starts_with("1-0j"));
     assert!(format!("{:?}", Complex::<Ratio, One, i8>::new(1, 2)).ends_with("(1+2j i8)"));
 }
@@ -169,14 +172,14 @@ mod electrical {
     #[test]
     fn impedance_times_admittance_is_a_ratio() {
         // (1 + 1j) Ω · (0.5 − 0.5j) S = 1
-        let z: Impedance<One, f64> = Complex::new(1.0, 1.0);
-        let y: Admittance<One, f64> = Complex::new(0.5, -0.5);
+        let z: Impedance<One, f64> = Complex::<_, _, f64>::bounded(1.0, 1.0);
+        let y: Admittance<One, f64> = Complex::<_, _, f64>::bounded(0.5, -0.5);
         let zy: Complex<Ratio, One, f64> = (z * y).convert().unwrap();
         assert_eq!(zy.get(), (1.0, 0.0));
         // Z / Z is a ratio of resistances, not a plain ratio
-        let r = z / Complex::<Ohm, One, f64>::new(1.0, 1.0);
+        let r = z / Complex::<Ohm, One, f64>::bounded(1.0, 1.0);
         assert_eq!(r.get(), (1.0, 0.0));
-        let _ = Complex::<Siemens, One, f64>::new(0.0, 0.0);
+        let _ = Complex::<Siemens, One, f64>::bounded(0.0, 0.0);
     }
 }
 
@@ -217,7 +220,7 @@ mod wire {
 
         let frame = Frame {
             a: iq,
-            b: Complex::new(1.5, -0.25),
+            b: Complex::<_, _, f32>::bounded(1.5, -0.25),
         };
         let (mut b1, mut b2) = ([0u8; 32], [0u8; 32]);
         let bytes = frame.to_ww_bytes(&mut b1).unwrap();

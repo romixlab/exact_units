@@ -174,7 +174,9 @@ pub(crate) mod big {
     use core::cmp::Ordering;
     use exact_units::prefix::{Kilo, Mega, One, Pow10, Quecto, Quetta, Rational};
     use exact_units::units::Hertz;
-    use exact_units::{Exact, Fixed, FixedScale, Fraction, Repr, Rounding, Storage};
+    use exact_units::{
+        Bounds, Exact, Fixed, FixedScale, Fraction, MaybeNan, Repr, Rounding, Storage,
+    };
     use num_rational::BigRational;
 
     pub(crate) fn big(x: Fraction) -> BigRational {
@@ -309,8 +311,8 @@ pub(crate) mod big {
     }
 
     /// `f`'s exact value at a scale of `num/den` hertz a step, `None` for NaN, and ±∞ as `Err` of its sign.
-    fn value<P: FixedScale, T: Storage>(
-        f: Fixed<Hertz, P, T>,
+    fn value<P: FixedScale, T: Storage, B: Bounds<T>>(
+        f: Fixed<Hertz, P, T, B>,
         (num, den): (u128, u128),
     ) -> Option<Result<BigRational, Ordering>> {
         let x = match f.get().to_repr() {
@@ -328,14 +330,27 @@ pub(crate) mod big {
         Some(Ok(x * reference::rational(false, num, den)))
     }
 
-    /// A `Fixed` of `num/den` hertz a step and an `Exact` order as their exact values do, both ways: NaN alone has
-    /// no order, ±∞ is past every `Exact`. `==` is exactly where the order is `Equal`.
-    pub(crate) fn order<P: FixedScale, T: Storage>(
-        f: Fixed<Hertz, P, T>,
+    /// A `Fixed` of `num/den` hertz a step and an `Exact` order as their exact values do, both ways: ±∞ is past
+    /// every `Exact`, NaN (of a [MaybeNan]) alone has no order and gives the fallback of `gt_or` and its kin, the one
+    /// value `not_nan` refuses. `==` is exactly where the order is `Equal`.
+    pub(crate) fn order<P: FixedScale, T: Storage, B: Bounds<T>>(
+        f: Fixed<Hertz, P, T, B>,
         scale: (u128, u128),
         e: Exact<Hertz>,
     ) {
         let want = value(f, scale).map(|v| v.map_or_else(|o| o, |x| x.cmp(&big(e.get()))));
+        for nan in [false, true] {
+            let or = |is: fn(Ordering) -> bool| want.map_or(nan, is);
+            assert_eq!(f.lt_or(e, nan), or(Ordering::is_lt), "{f:?} < {e:?}");
+            assert_eq!(f.le_or(e, nan), or(Ordering::is_le), "{f:?} <= {e:?}");
+            assert_eq!(f.gt_or(e, nan), or(Ordering::is_gt), "{f:?} > {e:?}");
+            assert_eq!(f.ge_or(e, nan), or(Ordering::is_ge), "{f:?} >= {e:?}");
+            assert_eq!(f.eq_or(e, nan), or(Ordering::is_eq), "{f:?} == {e:?}");
+        }
+        let Some(f) = f.not_nan() else {
+            assert_eq!(want, None, "{f:?} refused by not_nan");
+            return;
+        };
         assert_eq!(f.partial_cmp(&e), want, "{f:?} against {e:?}");
         assert_eq!(
             e.partial_cmp(&f),
@@ -360,12 +375,20 @@ pub(crate) mod big {
     /// kind: `x` as an `f64` and an `f32`, `i` as an `i64` and a `u64`.
     pub(crate) fn orders(x: f64, i: i64, e: Exact<Hertz>) {
         const Q: u128 = 10u128.pow(30);
-        order(Fixed::<Hertz, One, f64>::new(x), (1, 1), e);
-        order(Fixed::<Hertz, Quetta, f64>::new(x), (Q, 1), e);
-        order(Fixed::<Hertz, Quecto, f64>::new(x), (1, Q), e);
-        order(Fixed::<Hertz, Rational<1, 3>, f64>::new(x), (1, 3), e);
+        order(Fixed::<Hertz, One, f64, MaybeNan>::of(x), (1, 1), e);
+        order(Fixed::<Hertz, Quetta, f64, MaybeNan>::of(x), (Q, 1), e);
+        order(Fixed::<Hertz, Quecto, f64, MaybeNan>::of(x), (1, Q), e);
+        order(
+            Fixed::<Hertz, Rational<1, 3>, f64, MaybeNan>::of(x),
+            (1, 3),
+            e,
+        );
         #[expect(clippy::cast_possible_truncation, reason = "any f32 will do")]
-        order(Fixed::<Hertz, Kilo, f32>::new(x as f32), (1000, 1), e);
+        order(
+            Fixed::<Hertz, Kilo, f32, MaybeNan>::of(x as f32),
+            (1000, 1),
+            e,
+        );
         order(Fixed::<Hertz, One, i64>::new(i), (1, 1), e);
         order(Fixed::<Hertz, Quetta, i64>::new(i), (Q, 1), e);
         order(Fixed::<Hertz, Quecto, i64>::new(i), (1, Q), e);

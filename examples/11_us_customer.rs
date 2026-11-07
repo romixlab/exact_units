@@ -61,16 +61,16 @@ fn main() {
     println!("{mile} is {inches}");
 
     // the orbiter's impulse: lbf·s and N·s are the same dimension, so they convert, by 4.448…, never by 1
-    let impulse = Fixed::<Times<PoundForce, Second>, One, f64>::new(1.0);
+    let impulse = Fixed::<Times<PoundForce, Second>, One, f64>::bounded(1.0);
     let si: Fixed<Times<Newton, Second>, One, f64> = impulse.convert().unwrap();
     println!("{impulse} is {si}");
 
     // the weather service reports the air pressure in inHg: conventional (a defined density) or at 32 °F (a
     // measured one) are a quarter of a pascal apart here, and the type says which; the measured one names its source
-    let baro = Fixed::<InchOfMercuryConventional, One, f32>::new(29.92)
+    let baro = Fixed::<InchOfMercuryConventional, One, f32>::bounded(29.92)
         .convert::<Pascal, One, f32>()
         .unwrap();
-    let baro_32f = Fixed::<InchOfMercury32f, One, f32>::new(29.92)
+    let baro_32f = Fixed::<InchOfMercury32f, One, f32>::bounded(29.92)
         .convert::<Pascal, One, f32>()
         .unwrap();
     println!("29.92 inHg is {baro} (conventional), {baro_32f} (at 32 °F)");

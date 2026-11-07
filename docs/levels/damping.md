@@ -93,7 +93,7 @@ let _: Option<Fixed<DampingRatio, Milli, i64>> = delta.damping_ratio(f0, Roundin
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::One, units::{DampingRatio, QualityFactor}};
 
-let _ = Fixed::<DampingRatio, One, f32>::new(0.5).convert::<QualityFactor, One, f32>();
+let _ = Fixed::<DampingRatio, One, f32>::bounded(0.5).convert::<QualityFactor, One, f32>();
 ```
 
 For an export to a system without a level dimension (UCUM, Pint, uom), `Dim::strip_neper` turns Np/s into s⁻¹. It is never applied by itself.

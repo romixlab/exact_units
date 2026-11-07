@@ -241,6 +241,17 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   `q!` literal, exactly: the literal a `Fraction` of `U` at compile time, a factor with π a compile error, no
   `Exact` against a level. Tests: `tests/props/q_level.rs` (exact big-integer and series references, whole walks of
   `q!` over every u16 and every f32 with low 16 bits 0), `tests/compile_fail/q_level*.rs`, `q_exact.rs`.
+- ✅ **NUM-19 NaN-free floats** — a float `Fixed` (and `Complex`, `Point`) is never NaN unless its bound is
+  `MaybeNan`. Every bound refuses NaN, `Unbounded` included: `try_new`, the wire, serde, text and every conversion
+  refuse it. ±∞ stays a value. Arithmetic never checks and never panics: `+`, `-`, `*`, `/`, `Sum`, products, point ±
+  vector and complex arithmetic of floats give a `MaybeNan`, the IEEE 754 result, as many instructions as a plain
+  `f32` on Cortex-M; `checked_*` keeps the NaN-free type. A `MaybeNan` has no `==` or `<`: `gt_or(rhs, nan)` and its
+  kin name what NaN gives, in one float compare, or `not_nan` goes back. `new`, `of` and `From` don't compile for a
+  NaN-free float: `try_new` and the `const fn bounded`. Tests: `tests/props/nan.rs` (construction on every `f32` whose
+  low 16 bits are 0; every operator and `*_or` compare on every pair of ±0, subnormals, ±1, the largest finite, ±∞
+  and NaN, and on drawn floats, against IEEE 754; the wire), the `*_or` compares against `q!` literals in
+  `tests/props/q_float.rs` and against `Exact` in `tests/props/exact.rs`, the NaN cases of `tests/serde.rs`.
+  P2401#7nov-1741. Follow-ups: NUM-20 `Finite` bound, NUM-21 `Eq`/`Ord`/`Hash` for NaN-free floats.
 
 ## Units and markers (`UNIT`)
 

@@ -61,7 +61,7 @@ pub(crate) fn damping_ratio(d: i16, w: i16, r: Rounding) {
 #[cfg(feature = "counting")]
 pub(crate) fn decrement_round_trip(zeta: f64) {
     use exact_units::units::LogarithmicDecrement;
-    let z = Fixed::<DampingRatio, One, f64>::new(zeta);
+    let z = Fixed::<DampingRatio, One, f64>::bounded(zeta);
     let lambda = z.log_decrement::<LogarithmicDecrement, One, f64>();
     assert!(lambda.is_some(), "ζ {zeta} in (−1, 1) has a decrement");
     let l = lambda.map_or(f64::NAN, Fixed::get);
@@ -117,16 +117,16 @@ fn damping_ratio_sweeps() {
 #[test]
 fn decrement_edges() {
     use exact_units::units::{Cycle, Decibel, LogarithmicDecrement, Loss, Per};
-    for zeta in [1.0, -1.0, 1.5, f64::NAN, f64::INFINITY] {
-        let z = Fixed::<DampingRatio, One, f64>::new(zeta);
+    for zeta in [1.0, -1.0, 1.5, f64::INFINITY] {
+        let z = Fixed::<DampingRatio, One, f64>::bounded(zeta);
         assert_eq!(
             z.log_decrement::<LogarithmicDecrement, One, f64>(),
             None,
             "{zeta}"
         );
     }
-    let np = Fixed::<LogarithmicDecrement, One, f64>::new(0.5);
-    let db = Fixed::<Per<Loss<Decibel>, Cycle>, One, f64>::new(0.5 * 20.0 / LN_10);
+    let np = Fixed::<LogarithmicDecrement, One, f64>::bounded(0.5);
+    let db = Fixed::<Per<Loss<Decibel>, Cycle>, One, f64>::bounded(0.5 * 20.0 / LN_10);
     let a: Fixed<DampingRatio, One, f64> = Fixed::from_log_decrement(np).unwrap();
     let b: Fixed<DampingRatio, One, f64> = Fixed::from_log_decrement(db).unwrap();
     assert!((a.get() - b.get()).abs() < 1e-15);

@@ -89,7 +89,7 @@ A float storage converts by its factor and rounds as floats do. `f32` and `f64` 
 ```rust
 use exact_units::{Fixed, prefix::One, units::{Degree, Radian}};
 
-let a: Fixed<Degree, One, f64> = Fixed::new(180.0);
+let a: Fixed<Degree, One, f64> = Fixed::<_, _, f64>::bounded(180.0);
 let r = a.convert::<Radian, One, f64>().unwrap();
 assert!((r.get() - core::f64::consts::PI).abs() < 1e-15);
 ```

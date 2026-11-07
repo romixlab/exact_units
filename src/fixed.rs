@@ -11,7 +11,8 @@ use core::marker::PhantomData;
 use shrink_wrap::prelude::*;
 
 pub use bounds::{
-    Bounds, OutOfBounds, Range, RangeDec, RangeU64, Saturating, Unbounded, Unlimited, Wrapping,
+    Bounds, MaybeNan, NanFree, OutOfBounds, Range, RangeDec, RangeU64, Saturating, Unbounded,
+    Unlimited, Wrapping,
 };
 pub use prefix::{DecimalPrefix, FixedScale};
 pub use rounding::{Overflow, Requantizer, Rounding, StorageKind, requantize};
@@ -200,9 +201,23 @@ pub type Percent<T> = Fixed<crate::units::Ratio, prefix::Centi, T>;
 pub type Permille<T> = Fixed<crate::units::Ratio, prefix::Milli, T>;
 
 impl<U, P, T: Storage> Fixed<U, P, T> {
-    /// `value` in units of `P`.
+    /// `value` in units of `P`, for an integer storage. A float may be NaN, so it has
+    /// [try_new](Self::try_new) and [bounded](Self::bounded) instead, or the bound [MaybeNan]; `new` of a float
+    /// doesn't compile:
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Fixed, prefix::One, units::Volt};
+    ///
+    /// let _ = Fixed::<Volt, One, f32>::new(1.5);
+    /// ```
     #[inline(always)]
     pub const fn new(value: T) -> Self {
+        const {
+            assert!(
+                !T::IS_FLOAT,
+                "a float Fixed may be NaN: make it with try_new or bounded, or hold NaN with the bound MaybeNan"
+            );
+        }
         Fixed {
             value,
             _unit: PhantomData,
@@ -230,12 +245,25 @@ impl<U, P, T: Storage, B: Unlimited<T>> Fixed<U, P, T, B> {
     /// (`Bam16::of(16384)`), which can't share the name with [Unbounded]'s `new` without making `Fixed::new` ambiguous.
     #[inline(always)]
     pub const fn of(value: T) -> Self {
+        const {
+            assert!(
+                B::ALLOWS_NAN || !T::IS_FLOAT,
+                "a float Fixed may be NaN: make it with try_new or bounded, or hold NaN with the bound MaybeNan"
+            );
+        }
         Self::new_unchecked(value)
     }
 
-    /// The same value with the overflow policy of `B2`: [Unbounded] (checked), [Wrapping] or [Saturating]. Free.
+    /// The same value with the overflow policy of `B2`: [Unbounded] (checked), [Wrapping], [Saturating] or
+    /// [MaybeNan]. Free; from [MaybeNan] to a NaN-free bound doesn't compile, [not_nan](Self::not_nan) checks.
     #[inline(always)]
     pub const fn with_overflow<B2: Unlimited<T>>(self) -> Fixed<U, P, T, B2> {
+        const {
+            assert!(
+                B2::ALLOWS_NAN || !B::ALLOWS_NAN,
+                "a MaybeNan value may be NaN: not_nan() checks it"
+            );
+        }
         Fixed::new_unchecked(self.value)
     }
 }
@@ -245,6 +273,39 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     #[inline(always)]
     pub const fn get(self) -> T {
         self.value
+    }
+
+    /// `value` where it is a number, `None` for NaN: what a conversion gives, as a NaN converts to no value.
+    #[inline(always)]
+    pub(crate) fn from_number(value: T) -> Option<Self> {
+        if !B::ALLOWS_NAN && value.is_nan() {
+            None
+        } else {
+            Some(Self::new_unchecked(value))
+        }
+    }
+
+    /// `value`, 0 for NaN: the named lossy conversions (`to_saturating`, `to_wrapping`, `into_rounded`), which
+    /// document that a NaN becomes 0.
+    #[inline(always)]
+    pub(crate) fn nan_to_zero(value: T) -> Self {
+        if !B::ALLOWS_NAN && value.is_nan() {
+            Self::new_unchecked(T::ZERO)
+        } else {
+            Self::new_unchecked(value)
+        }
+    }
+
+    /// A float result that can't be NaN because its inputs aren't (`hypot`, `atan2`, a sum of squares): `B` must
+    /// refuse NaN, which a `const` check makes a compile error otherwise. Checked in debug builds.
+    #[cfg(any(feature = "electrical", feature = "std", feature = "libm"))]
+    #[inline(always)]
+    pub(crate) fn from_nan_free(value: T) -> Self {
+        const {
+            assert!(!B::ALLOWS_NAN, "only for a NaN-free bound");
+        }
+        debug_assert!(!value.is_nan(), "NaN from inputs that aren't NaN");
+        Self::new_unchecked(value)
     }
 
     /// Without the bounds check: for bounds checked some other way.
@@ -270,10 +331,129 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         }
     }
 
-    /// The same value without bounds.
+    /// The same value without bounds. A [MaybeNan] value has [not_nan](Self::not_nan) instead.
     #[inline(always)]
     pub fn unbounded(self) -> Fixed<U, P, T> {
-        Fixed::new(self.value)
+        const {
+            assert!(
+                !B::ALLOWS_NAN,
+                "a MaybeNan value may be NaN: not_nan() checks it"
+            );
+        }
+        Fixed::new_unchecked(self.value)
+    }
+
+    /// The same value without bounds, `None` where it is NaN: how a [MaybeNan] value goes back to a checked one.
+    #[inline(always)]
+    pub fn not_nan(self) -> Option<Fixed<U, P, T>> {
+        if self.value.is_nan() {
+            None
+        } else {
+            Some(Fixed::new_unchecked(self.value))
+        }
+    }
+
+    /// The same value as [MaybeNan]: IEEE 754 arithmetic without a check. Free.
+    #[inline(always)]
+    pub const fn maybe_nan(self) -> Fixed<U, P, T, MaybeNan>
+    where
+        MaybeNan: Bounds<T>,
+    {
+        Fixed::new_unchecked(self.value)
+    }
+
+    /// `self > rhs`, and `nan` where `self` is NaN: how a [MaybeNan] value compares, the NaN outcome written at the
+    /// call. `rhs` is anything a NaN-free value of this unit, scale and storage compares with: a value, a `q!`
+    /// literal, an [Exact](crate::Exact). A [MaybeNan] `rhs` goes through [not_nan](Self::not_nan) first.
+    ///
+    /// One float compare, as the plain `>` is: for a `nan` of `true` it is `!(self <= rhs)`, which IEEE 754 makes
+    /// true for NaN.
+    ///
+    /// ```
+    /// # #[cfg(feature = "thermal")] {
+    /// use exact_units::{Fixed, MaybeNan, q, prefix::One, units::Kelvin};
+    ///
+    /// let shutdown = |temp: Fixed<Kelvin, One, f32, MaybeNan>| temp.gt_or(q!(353.15 K), true);
+    /// assert!(shutdown(Fixed::of(360.0)));
+    /// assert!(!shutdown(Fixed::of(300.0)));
+    /// assert!(shutdown(Fixed::of(f32::NAN))); // a sensor gone NaN trips it too
+    /// # }
+    /// ```
+    #[inline(always)]
+    #[expect(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "the negated compare is true for NaN, the `nan` of `true`"
+    )]
+    pub fn gt_or<R: Copy>(self, rhs: R, nan: bool) -> bool
+    where
+        Fixed<U, P, T>: PartialOrd<R>,
+    {
+        let v = self.unchecked_for_compare();
+        if nan { !(v <= rhs) } else { v > rhs }
+    }
+
+    /// `self >= rhs`, and `nan` where `self` is NaN. See [gt_or](Self::gt_or).
+    #[inline(always)]
+    #[expect(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "the negated compare is true for NaN, the `nan` of `true`"
+    )]
+    pub fn ge_or<R: Copy>(self, rhs: R, nan: bool) -> bool
+    where
+        Fixed<U, P, T>: PartialOrd<R>,
+    {
+        let v = self.unchecked_for_compare();
+        if nan { !(v < rhs) } else { v >= rhs }
+    }
+
+    /// `self < rhs`, and `nan` where `self` is NaN. See [gt_or](Self::gt_or).
+    #[inline(always)]
+    #[expect(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "the negated compare is true for NaN, the `nan` of `true`"
+    )]
+    pub fn lt_or<R: Copy>(self, rhs: R, nan: bool) -> bool
+    where
+        Fixed<U, P, T>: PartialOrd<R>,
+    {
+        let v = self.unchecked_for_compare();
+        if nan { !(v >= rhs) } else { v < rhs }
+    }
+
+    /// `self <= rhs`, and `nan` where `self` is NaN. See [gt_or](Self::gt_or).
+    #[inline(always)]
+    #[expect(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "the negated compare is true for NaN, the `nan` of `true`"
+    )]
+    pub fn le_or<R: Copy>(self, rhs: R, nan: bool) -> bool
+    where
+        Fixed<U, P, T>: PartialOrd<R>,
+    {
+        let v = self.unchecked_for_compare();
+        if nan { !(v > rhs) } else { v <= rhs }
+    }
+
+    /// `self == rhs`, and `nan` where `self` is NaN. See [gt_or](Self::gt_or).
+    #[inline(always)]
+    pub fn eq_or<R: Copy>(self, rhs: R, nan: bool) -> bool
+    where
+        Fixed<U, P, T>: PartialEq<R>,
+    {
+        let v = self.unchecked_for_compare();
+        if nan {
+            v == rhs || self.value.is_nan()
+        } else {
+            v == rhs
+        }
+    }
+
+    /// The number as a NaN-free value, NaN included: for the `*_or` compares only. Every compare of the crate is
+    /// IEEE 754's for a float, false with NaN (the properties of `tests/props/nan.rs`, `q_float.rs` and `exact.rs`
+    /// check each with NaN), so `!(v <= rhs)` is `v > rhs` or NaN.
+    #[inline(always)]
+    pub(crate) fn unchecked_for_compare(self) -> Fixed<U, P, T> {
+        Fixed::new_unchecked(self.value)
     }
 
     /// Run on every value read from the wire: a value outside `B` is [shrink_wrap::Error::SubtypeOutOfRange].
@@ -316,7 +496,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     #[inline(always)]
     pub fn to<P2: FixedScale, T2: Storage>(self) -> Option<Fixed<U, P2, T2>> {
         let c = const { Conversion::of::<P, P2, T, T2>(false) };
-        c.apply::<T, T2>(self.value).map(Fixed::new)
+        c.apply::<T, T2>(self.value).and_then(Fixed::from_number)
     }
 
     /// The same value in scale `P2` and storage `T2`, rounded by `r` where it isn't a whole number of `P2`: `None`
@@ -351,7 +531,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     #[inline(always)]
     pub fn to_saturating<P2: FixedScale, T2: Storage>(self, r: Rounding) -> Fixed<U, P2, T2> {
         let c = const { Conversion::of::<P, P2, T, T2>(true) };
-        Fixed::new(
+        Fixed::nan_to_zero(
             c.apply_rounded(self.value, r, Overflow::Saturate)
                 .unwrap_or(T2::ZERO),
         )
@@ -362,7 +542,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     #[inline(always)]
     pub fn to_wrapping<P2: FixedScale, T2: Storage>(self, r: Rounding) -> Fixed<U, P2, T2> {
         let c = const { Conversion::of::<P, P2, T, T2>(true) };
-        Fixed::new(
+        Fixed::nan_to_zero(
             c.apply_rounded(self.value, r, Overflow::Wrap)
                 .unwrap_or(T2::ZERO),
         )
@@ -377,7 +557,8 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         o: Overflow,
     ) -> Option<Fixed<U, P2, T2>> {
         let c = const { Conversion::of::<P, P2, T, T2>(true) };
-        c.apply_rounded(self.value, r, o).map(Fixed::new)
+        c.apply_rounded(self.value, r, o)
+            .and_then(Fixed::from_number)
     }
 
     /// The same value in scale `P2` and storage `T2`, rounded by `r`, infallible: the bounds `B` (or the whole range
@@ -404,7 +585,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     pub fn into_rounded<P2: FixedScale, T2: Storage>(self, r: Rounding) -> Fixed<U, P2, T2> {
         let c = const { Conversion::proven::<P, P2, T, T2, B>(false) };
         // proven in range: wrapping is the plain cast
-        Fixed::new(
+        Fixed::nan_to_zero(
             c.apply_rounded(self.value, r, Overflow::Wrap)
                 .unwrap_or(T2::ZERO),
         )
@@ -443,7 +624,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     #[inline(always)]
     pub fn convert<U2: Unit, P2: FixedScale, T2: Storage>(self) -> Option<Fixed<U2, P2, T2>> {
         let c = const { Conversion::between::<U, P, U2, P2, T, T2>(false) };
-        c.apply::<T, T2>(self.value).map(Fixed::new)
+        c.apply::<T, T2>(self.value).and_then(Fixed::from_number)
     }
 
     /// The same value in another unit `U2` of the same dimension and kind, scale `P2` and storage `T2`, rounded by
@@ -468,7 +649,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     ) -> Option<Fixed<U2, P2, T2>> {
         let c = const { Conversion::between::<U, P, U2, P2, T, T2>(true) };
         c.apply_rounded(self.value, r, Overflow::Checked)
-            .map(Fixed::new)
+            .and_then(Fixed::from_number)
     }
 
     /// The value `x · scale` (in the unit `U` itself) in this prefix and storage, if it is exact (as [to](Self::to))
@@ -609,7 +790,7 @@ where
     #[inline(always)]
     fn from(x: Fixed<U, P, T, Range<MIN, MAX>>) -> Self {
         let c = const { Conversion::proven::<P, P2, T, T2, Range<MIN, MAX>>(true) };
-        Fixed::new(
+        Fixed::nan_to_zero(
             c.apply_rounded(x.value, Rounding::Truncate, Overflow::Wrap)
                 .unwrap_or(T2::ZERO),
         )
@@ -637,8 +818,8 @@ where
 /// // mV and µV: convert first
 /// let _ = Fixed::<Volt, Milli, u32>::new(1) < Fixed::<Volt, Micro, u32>::new(1);
 /// ```
-impl<U, P, T: Storage, B: Bounds<T>, B2: Bounds<T>> PartialEq<Fixed<U, P, T, B2>>
-    for Fixed<U, P, T, B>
+impl<U, P, T: Storage, B: Bounds<T> + NanFree, B2: Bounds<T> + NanFree>
+    PartialEq<Fixed<U, P, T, B2>> for Fixed<U, P, T, B>
 {
     #[inline(always)]
     fn eq(&self, other: &Fixed<U, P, T, B2>) -> bool {
@@ -646,10 +827,10 @@ impl<U, P, T: Storage, B: Bounds<T>, B2: Bounds<T>> PartialEq<Fixed<U, P, T, B2>
     }
 }
 
-impl<U, P, T: Storage + Eq, B: Bounds<T>> Eq for Fixed<U, P, T, B> {}
+impl<U, P, T: Storage + Eq, B: Bounds<T> + NanFree> Eq for Fixed<U, P, T, B> {}
 
-impl<U, P, T: Storage, B: Bounds<T>, B2: Bounds<T>> PartialOrd<Fixed<U, P, T, B2>>
-    for Fixed<U, P, T, B>
+impl<U, P, T: Storage, B: Bounds<T> + NanFree, B2: Bounds<T> + NanFree>
+    PartialOrd<Fixed<U, P, T, B2>> for Fixed<U, P, T, B>
 {
     #[inline(always)]
     fn partial_cmp(&self, other: &Fixed<U, P, T, B2>) -> Option<Ordering> {
@@ -657,7 +838,7 @@ impl<U, P, T: Storage, B: Bounds<T>, B2: Bounds<T>> PartialOrd<Fixed<U, P, T, B2
     }
 }
 
-impl<U, P, T: Storage + Ord, B: Bounds<T>> Ord for Fixed<U, P, T, B> {
+impl<U, P, T: Storage + Ord, B: Bounds<T> + NanFree> Ord for Fixed<U, P, T, B> {
     #[inline(always)]
     fn cmp(&self, other: &Self) -> Ordering {
         self.value.cmp(&other.value)
@@ -673,51 +854,68 @@ impl<U, P, T: Storage + Hash, B: Bounds<T>> Hash for Fixed<U, P, T, B> {
 /// `+` and `-` of the same type, `*` and `/` by a number, by the overflow policy in `B`: for [Unbounded] like the
 /// same operator on `T` (panics on overflow in debug builds), for [Wrapping] modulo 2^bits, for [Saturating] at the
 /// ends of `T`. A bounded value has [checked_add](Fixed::checked_add) and friends.
+///
+/// A float's result can be NaN (∞ − ∞, 0 · ∞, 0 / 0), so `+`, `-`, `*` and `/` of a NaN-free float give a
+/// [MaybeNan]: the float's own operation and nothing more, no check ([Storage::Arith]). A [MaybeNan] adds to a
+/// NaN-free value of its unit and scale either way round, so `a + b + c` is one [MaybeNan]. `+=` and its kin exist
+/// on a [MaybeNan] variable and not on a NaN-free one, whose type the result doesn't have; `sum` of NaN-free floats is
+/// a [MaybeNan] too. `checked_*` keeps the NaN-free type and is `None` where the result isn't finite.
+///
+/// ```
+/// use exact_units::{Fixed, MaybeNan, prefix::One, units::Volt};
+///
+/// let a = Fixed::<Volt, One, f32>::bounded(1.5);
+/// let s: Fixed<Volt, One, f32, MaybeNan> = a + a - a;
+/// assert_eq!(s.not_nan(), Some(a));
+/// let mut acc = s;
+/// acc += a;
+/// assert!(acc.ge_or(a, false));
+/// ```
 mod arith {
-    use super::{Fixed, Saturating, Storage, Wrapping};
+    use super::{Fixed, MaybeNan, Saturating, Storage, Unbounded, Wrapping};
     use core::iter::Sum;
     use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
     macro_rules! policy {
         ($($b:ident $add:ident $sub:ident $mul:ident $div:ident;)*) => {$(
-            impl<U, P, T: Storage> Add for Fixed<U, P, T, $b> {
+            impl<U, P, T: Storage<Arith = Unbounded>> Add for Fixed<U, P, T, $b> {
                 type Output = Self;
 
                 #[inline(always)]
                 fn add(self, rhs: Self) -> Self {
-                    Self::of(self.value.$add(rhs.value))
+                    Self::new_unchecked(self.value.$add(rhs.value))
                 }
             }
 
-            impl<U, P, T: Storage> Sub for Fixed<U, P, T, $b> {
+            impl<U, P, T: Storage<Arith = Unbounded>> Sub for Fixed<U, P, T, $b> {
                 type Output = Self;
 
                 #[inline(always)]
                 fn sub(self, rhs: Self) -> Self {
-                    Self::of(self.value.$sub(rhs.value))
+                    Self::new_unchecked(self.value.$sub(rhs.value))
                 }
             }
 
-            impl<U, P, T: Storage> Mul<T> for Fixed<U, P, T, $b> {
+            impl<U, P, T: Storage<Arith = Unbounded>> Mul<T> for Fixed<U, P, T, $b> {
                 type Output = Self;
 
                 #[inline(always)]
                 fn mul(self, n: T) -> Self {
-                    Self::of(self.value.$mul(n))
+                    Self::new_unchecked(self.value.$mul(n))
                 }
             }
 
             /// Division by 0 panics as for `T`; only `MIN / -1` of a signed `T` overflows.
-            impl<U, P, T: Storage> Div<T> for Fixed<U, P, T, $b> {
+            impl<U, P, T: Storage<Arith = Unbounded>> Div<T> for Fixed<U, P, T, $b> {
                 type Output = Self;
 
                 #[inline(always)]
                 fn div(self, n: T) -> Self {
-                    Self::of(self.value.$div(n))
+                    Self::new_unchecked(self.value.$div(n))
                 }
             }
 
-            impl<U, P, T: Storage> AddAssign for Fixed<U, P, T, $b> {
+            impl<U, P, T: Storage<Arith = Unbounded>> AddAssign for Fixed<U, P, T, $b> {
                 #[expect(
                     clippy::arithmetic_side_effects,
                     reason = "the same op as this bound's `+`, which wraps or saturates"
@@ -728,7 +926,7 @@ mod arith {
                 }
             }
 
-            impl<U, P, T: Storage> SubAssign for Fixed<U, P, T, $b> {
+            impl<U, P, T: Storage<Arith = Unbounded>> SubAssign for Fixed<U, P, T, $b> {
                 #[expect(
                     clippy::arithmetic_side_effects,
                     reason = "the same op as this bound's `-`, which wraps or saturates"
@@ -739,7 +937,7 @@ mod arith {
                 }
             }
 
-            impl<U, P, T: Storage> MulAssign<T> for Fixed<U, P, T, $b> {
+            impl<U, P, T: Storage<Arith = Unbounded>> MulAssign<T> for Fixed<U, P, T, $b> {
                 #[expect(
                     clippy::arithmetic_side_effects,
                     reason = "the same op as this bound's `*`, which wraps or saturates"
@@ -750,7 +948,7 @@ mod arith {
                 }
             }
 
-            impl<U, P, T: Storage> DivAssign<T> for Fixed<U, P, T, $b> {
+            impl<U, P, T: Storage<Arith = Unbounded>> DivAssign<T> for Fixed<U, P, T, $b> {
                 #[expect(
                     clippy::arithmetic_side_effects,
                     reason = "the same op as this bound's `/`, which wraps or saturates; a zero n panics as for `T`"
@@ -761,10 +959,10 @@ mod arith {
                 }
             }
 
-            impl<U, P, T: Storage> Sum for Fixed<U, P, T, $b> {
+            impl<U, P, T: Storage<Arith = Unbounded>> Sum for Fixed<U, P, T, $b> {
                 #[expect(clippy::arithmetic_side_effects, reason = "this bound's `+`, which wraps or saturates")]
                 fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-                    iter.fold(Self::of(T::ZERO), |a, b| a + b)
+                    iter.fold(Self::new_unchecked(T::ZERO), |a, b| a + b)
                 }
             }
         )*};
@@ -775,39 +973,147 @@ mod arith {
         Saturating saturating_add saturating_sub saturating_mul saturating_div;
     }
 
+    /// One float operator between two bounds, into a [MaybeNan]: IEEE 754, no check.
+    macro_rules! ieee {
+        ($ty:ident: $($lhs:ident $op:ident $f:ident $rhs:ident;)*) => {$(
+            impl<U, P> $op<Fixed<U, P, $ty, $rhs>> for Fixed<U, P, $ty, $lhs> {
+                type Output = Fixed<U, P, $ty, MaybeNan>;
+
+                #[inline(always)]
+                fn $f(self, rhs: Fixed<U, P, $ty, $rhs>) -> Self::Output {
+                    Fixed::new_unchecked($op::$f(self.value, rhs.value))
+                }
+            }
+        )*};
+    }
+
+    /// [MaybeNan]: IEEE 754 arithmetic, NaN in and out, no check; with a NaN-free value of its unit and scale on
+    /// either side.
+    macro_rules! maybe_nan {
+        ($($ty:ident)*) => {$(
+            ieee! { $ty:
+                MaybeNan Add add MaybeNan;
+                MaybeNan Add add Unbounded;
+                Unbounded Add add MaybeNan;
+                MaybeNan Sub sub MaybeNan;
+                MaybeNan Sub sub Unbounded;
+                Unbounded Sub sub MaybeNan;
+            }
+
+            impl<U, P> Mul<$ty> for Fixed<U, P, $ty, MaybeNan> {
+                type Output = Self;
+
+                #[inline(always)]
+                fn mul(self, n: $ty) -> Self {
+                    Self::new_unchecked(self.value * n)
+                }
+            }
+
+            impl<U, P> Div<$ty> for Fixed<U, P, $ty, MaybeNan> {
+                type Output = Self;
+
+                #[inline(always)]
+                fn div(self, n: $ty) -> Self {
+                    Self::new_unchecked(self.value / n)
+                }
+            }
+
+            impl<U, P> AddAssign for Fixed<U, P, $ty, MaybeNan> {
+                #[inline(always)]
+                fn add_assign(&mut self, rhs: Self) {
+                    self.value += rhs.value;
+                }
+            }
+
+            impl<U, P> AddAssign<Fixed<U, P, $ty>> for Fixed<U, P, $ty, MaybeNan> {
+                #[inline(always)]
+                fn add_assign(&mut self, rhs: Fixed<U, P, $ty>) {
+                    self.value += rhs.value;
+                }
+            }
+
+            impl<U, P> SubAssign for Fixed<U, P, $ty, MaybeNan> {
+                #[inline(always)]
+                fn sub_assign(&mut self, rhs: Self) {
+                    self.value -= rhs.value;
+                }
+            }
+
+            impl<U, P> SubAssign<Fixed<U, P, $ty>> for Fixed<U, P, $ty, MaybeNan> {
+                #[inline(always)]
+                fn sub_assign(&mut self, rhs: Fixed<U, P, $ty>) {
+                    self.value -= rhs.value;
+                }
+            }
+
+            impl<U, P> MulAssign<$ty> for Fixed<U, P, $ty, MaybeNan> {
+                #[inline(always)]
+                fn mul_assign(&mut self, n: $ty) {
+                    self.value *= n;
+                }
+            }
+
+            impl<U, P> DivAssign<$ty> for Fixed<U, P, $ty, MaybeNan> {
+                #[inline(always)]
+                fn div_assign(&mut self, n: $ty) {
+                    self.value /= n;
+                }
+            }
+
+            impl<U, P> Sum for Fixed<U, P, $ty, MaybeNan> {
+                fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+                    Self::new_unchecked(iter.fold(0.0, |a, x| a + x.value))
+                }
+            }
+
+            /// The sum of NaN-free floats, which can be NaN (∞ + −∞).
+            impl<U, P> Sum<Fixed<U, P, $ty>> for Fixed<U, P, $ty, MaybeNan> {
+                fn sum<I: Iterator<Item = Fixed<U, P, $ty>>>(iter: I) -> Self {
+                    Self::new_unchecked(iter.fold(0.0, |a, x| a + x.value))
+                }
+            }
+        )*};
+    }
+
+    maybe_nan!(f32 f64);
+
     impl<U, P, T: Storage> Add for Fixed<U, P, T> {
-        type Output = Self;
+        type Output = Fixed<U, P, T, T::Arith>;
+
         #[inline(always)]
-        fn add(self, rhs: Self) -> Self {
-            Self::new(self.value.add(rhs.value))
+        fn add(self, rhs: Self) -> Self::Output {
+            Fixed::new_unchecked(self.value.add(rhs.value))
         }
     }
 
     impl<U, P, T: Storage> Sub for Fixed<U, P, T> {
-        type Output = Self;
+        type Output = Fixed<U, P, T, T::Arith>;
+
         #[inline(always)]
-        fn sub(self, rhs: Self) -> Self {
-            Self::new(self.value.sub(rhs.value))
+        fn sub(self, rhs: Self) -> Self::Output {
+            Fixed::new_unchecked(self.value.sub(rhs.value))
         }
     }
 
     impl<U, P, T: Storage> Mul<T> for Fixed<U, P, T> {
-        type Output = Self;
+        type Output = Fixed<U, P, T, T::Arith>;
+
         #[inline(always)]
-        fn mul(self, n: T) -> Self {
-            Self::new(self.value.mul(n))
+        fn mul(self, n: T) -> Self::Output {
+            Fixed::new_unchecked(self.value.mul(n))
         }
     }
 
     impl<U, P, T: Storage> Div<T> for Fixed<U, P, T> {
-        type Output = Self;
+        type Output = Fixed<U, P, T, T::Arith>;
+
         #[inline(always)]
-        fn div(self, n: T) -> Self {
-            Self::new(self.value.div(n))
+        fn div(self, n: T) -> Self::Output {
+            Fixed::new_unchecked(self.value.div(n))
         }
     }
 
-    impl<U, P, T: Storage> AddAssign for Fixed<U, P, T> {
+    impl<U, P, T: Storage<Arith = Unbounded>> AddAssign for Fixed<U, P, T> {
         #[expect(
             clippy::arithmetic_side_effects,
             reason = "the same op as Fixed's `+`: overflow panics in debug and wraps in release, as `T`'s `+`; \
@@ -819,7 +1125,7 @@ mod arith {
         }
     }
 
-    impl<U, P, T: Storage> SubAssign for Fixed<U, P, T> {
+    impl<U, P, T: Storage<Arith = Unbounded>> SubAssign for Fixed<U, P, T> {
         #[expect(
             clippy::arithmetic_side_effects,
             reason = "the same op as Fixed's `-`: overflow panics in debug and wraps in release, as `T`'s `-`; \
@@ -831,7 +1137,7 @@ mod arith {
         }
     }
 
-    impl<U, P, T: Storage> MulAssign<T> for Fixed<U, P, T> {
+    impl<U, P, T: Storage<Arith = Unbounded>> MulAssign<T> for Fixed<U, P, T> {
         #[expect(
             clippy::arithmetic_side_effects,
             reason = "the same op as Fixed's `*`: overflow panics in debug and wraps in release, as `T`'s `*`; \
@@ -843,7 +1149,7 @@ mod arith {
         }
     }
 
-    impl<U, P, T: Storage> DivAssign<T> for Fixed<U, P, T> {
+    impl<U, P, T: Storage<Arith = Unbounded>> DivAssign<T> for Fixed<U, P, T> {
         #[expect(
             clippy::arithmetic_side_effects,
             reason = "the same op as Fixed's `/`: overflow panics in debug and wraps in release, as `T`'s `/`; \
@@ -855,14 +1161,14 @@ mod arith {
         }
     }
 
-    impl<U, P, T: Storage> Sum for Fixed<U, P, T> {
+    impl<U, P, T: Storage<Arith = Unbounded>> Sum for Fixed<U, P, T> {
         #[expect(
             clippy::arithmetic_side_effects,
             reason = "Fixed's `+`: overflow panics in debug and wraps in release, as `T`'s `+`; documented on \
                       mod arith"
         )]
         fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-            iter.fold(Self::new(T::ZERO), |a, b| a + b)
+            iter.fold(Self::new_unchecked(T::ZERO), |a, b| a + b)
         }
     }
 }
@@ -1479,13 +1785,16 @@ mod tests {
             Some(Fixed::new(-3))
         );
         assert_eq!(Micros::new(-3000i32).to::<Milli, u8>(), None);
-        assert_eq!(t.to::<One, f32>(), Some(Fixed::new(0.0015)));
         assert_eq!(
-            Fixed::<Second, One, f32>::new(0.5).to::<Milli, u16>(),
+            t.to::<One, f32>(),
+            Some(Fixed::<_, _, f32>::bounded(0.0015))
+        );
+        assert_eq!(
+            Fixed::<Second, One, f32>::bounded(0.5).to::<Milli, u16>(),
             Some(Fixed::new(500))
         );
         assert_eq!(
-            Fixed::<Second, One, f32>::new(0.0005).to::<Milli, u16>(),
+            Fixed::<Second, One, f32>::bounded(0.0005).to::<Milli, u16>(),
             None
         );
         // binary and decimal
@@ -1548,7 +1857,10 @@ mod tests {
         assert_eq!(format!("{:#}", Fixed::<Byte, Kibi, u16>::new(4)), "4096 B");
         assert_eq!(format!("{}", Fixed::<Ratio, Centi, u8>::new(50)), "50 %");
         assert_eq!(format!("{}", Ppb::new(-12i32)), "-12 ppb");
-        assert_eq!(format!("{}", Fixed::<Volt, Kilo, f32>::new(1.5)), "1.5 kV");
+        assert_eq!(
+            format!("{}", Fixed::<Volt, Kilo, f32>::bounded(1.5)),
+            "1.5 kV"
+        );
         assert_eq!(format!("{}", Bytes::new(UNib32(7))), "7 B");
         assert_eq!(format!("{:?}", Micros::new(1500u32)), "Second(1500 µs u32)");
         type T = Fixed<Second, Milli, u16, Range<1, 5000>>;
@@ -1631,13 +1943,12 @@ mod tests {
         // and with the overflow policies, which are the same numbers
         assert_eq!(Fixed::<Second, Milli, u16, Wrapping>::of(300), t);
         assert!(Fixed::<Second, Milli, u16, Saturating>::of(299) < t);
-        // floats: NaN is unordered
+        // floats: a MaybeNan compares by a method that names what NaN gives
         let x = Fixed::<Ratio, One, f32, RangeDec<0, 10, 0>>::try_new(1.0).unwrap();
-        assert!(x < Fixed::<Ratio, One, f32>::new(2.0));
-        assert_eq!(
-            x.partial_cmp(&Fixed::<Ratio, One, f32>::new(f32::NAN)),
-            None
-        );
+        assert!(x < Fixed::<Ratio, One, f32>::bounded(2.0));
+        let nan = Fixed::<Ratio, One, f32, MaybeNan>::of(f32::NAN);
+        assert!(nan.gt_or(x, true) && !nan.gt_or(x, false));
+        assert!(Fixed::<Ratio, One, f32, MaybeNan>::of(2.0).gt_or(x, false));
     }
 
     #[test]
