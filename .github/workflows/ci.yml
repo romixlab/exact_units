@@ -78,6 +78,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          # tests/q_asm.rs builds tools/q_literal_asm for it and reads the asm
+          target: thumbv6m-none-eabi
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest

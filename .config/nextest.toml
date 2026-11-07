@@ -1,0 +1,7 @@
+nextest-version = { required = "0.9.50" }
+
+# tests/q_asm.rs skips, with a note, where the thumbv6m-none-eabi target isn't installed: that note is its
+# only output on the path that matters (the target is missing), so it should read even on a pass.
+[[profile.default.overrides]]
+filter = 'test(speed_literal_is_the_typed_const_compare)'
+success-output = "immediate"

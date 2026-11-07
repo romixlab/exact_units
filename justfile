@@ -54,6 +54,7 @@ lint:
     cargo clippy --all-targets --no-default-features --features std -- -D warnings
     RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
     cargo clippy --manifest-path tools/book_plots/Cargo.toml --target-dir target -- -D warnings
+    cargo clippy --manifest-path tools/q_literal_asm/Cargo.toml --target-dir target -- -D warnings
 
 # cargo check the feature sets a firmware and a host use: no unit group, defmt, a few groups, without and with the wire format, CORDIC on an M0, q! on an M0
 check:

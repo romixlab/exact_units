@@ -201,6 +201,11 @@ required-features = ["shrink_wrap"]
 name = "serde"
 required-features = ["serde"]
 
+# speed < q!(100 m/s) is the typed-const compare, on thumbv6m: builds tools/q_literal_asm and reads its asm
+[[test]]
+name = "q_asm"
+required-features = ["q", "std"]
+
 # examples/NN_*.rs: one story each, in reading order; the README's Examples section lists them
 [[example]]
 # the unit and scale in the type: µs and ms don't mix, a conversion is exact or refused, and no_std

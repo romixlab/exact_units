@@ -175,9 +175,11 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   group that is off named with the feature. Tests: `tests/props/q_literal.rs` (the fold against the `i128` reference
   for i8 to i64 and u8 to u32, whole walks of `q!` over every i16, u16, i8 and u8 for prefixes, powers, strings,
   degrees against mrad, bytes; a Kani proof over i16), `tests/props/q_text.rs` and the `q_text` fuzz target (any
-  text, never a panic), `tests/compile_fail/q_*.rs` snapshots for each refusal. The generated symbol table (UNIT-11),
-  float storages (NUM-16), points (PT-5), `fixed!(100 m/s)` (NUM-17), `Exact` and levels (NUM-18) and the thumbv6m
-  check that `q!` compiles to the typed-const compare follow.
+  text, never a panic), `tests/compile_fail/q_*.rs` snapshots for each refusal, `tests/q_asm.rs` (builds
+  `tools/q_literal_asm` for thumbv6m-none-eabi with `--emit asm` and checks `speed < q!(100 m/s)` is the exact
+  instructions of the typed-const and hand-written compares, a literal past the storage's range a bare `true`;
+  skipped where that target isn't installed). The generated symbol table (UNIT-11), float storages (NUM-16),
+  points (PT-5), `fixed!(100 m/s)` (NUM-17) and `Exact` and levels (NUM-18) follow.
 - ✅ **NUM-15 `q!`, a literal that names its unit** — the cargo feature `q`, on by default; `speed < q!(100 m/s)`: a decimal and its unit (symbols joined
   by `*` and `/` left to right, powers `^2` and `^-1`, groups `( .. )`, a leading `/`; a type, `q!(100 Speed)`; or a
   string for what Rust's lexer refuses, `q!(90 "°")`, `q!("9.81 m/s²")`), a zero-sized `LiteralIn<N, E, S>` whose
