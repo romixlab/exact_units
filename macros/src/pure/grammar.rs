@@ -1,7 +1,7 @@
 //! The grammar of `q!`: a number and a unit.
 //!
 //! ```text
-//! literal := '-'? NUMBER (unit | ORIGIN | unit? '@' TYPE) | STRING   (the whole literal in a string)
+//! literal := '-'? NUMBER (unit | ORIGIN | LEVEL | unit? '@' TYPE) | STRING   (the whole literal in a string)
 //! unit    := (term | '/' term) (('*' | '/') term)*   (left to right: m/s/s is (m/s)/s; /ms is 1/ms)
 //! term    := atom ('^' '-'? INTEGER)?
 //! atom    := SYMBOL | TYPE | '(' unit ')' | '%' | STRING   (a unit in a string)
@@ -14,11 +14,14 @@
 //! A point literal is a number at an origin: an origin symbol alone after the number (`25 degC`, `25 "°C"`, the
 //! number in the origin's own step), or `@` and the origin's type after a unit (`300 K @ AbsoluteZero`) or after the
 //! number alone (`77 @ Fahrenheit`, again in the origin's step).
+//!
+//! A level literal is `dB` or `Np` alone after the number (`-3 dB`, `-3 "dB"`): a level of a gain, whose kind picks
+//! the form. Inside a unit the two are refused, as they read two ways there (a level of gain or of loss).
 
 use super::model::{Delim, Error, Tok};
 use super::number::{self, Decimal};
 use super::prefix::Scale;
-use super::resolve::{Symbol, resolve};
+use super::resolve::{Symbol, level, resolve};
 use super::strlex;
 
 /// A unit as written, prefixes taken out.
@@ -49,6 +52,13 @@ pub(crate) enum Unit {
     One,
     /// The step of a point literal's origin, for a number without a unit: `q!(25 degC)`, `q!(77 @ Fahrenheit)`.
     Steps,
+    /// A level of a gain, `dB` or `Np` alone after the number: `q!(-3 dB)`.
+    Level {
+        /// The level marker's path under exact_units' root, `literal::Db`.
+        marker: &'static str,
+        /// The symbol's token.
+        id: usize,
+    },
 }
 
 /// The origin of a point literal.
@@ -149,6 +159,9 @@ fn number_and_unit(toks: &[Tok], whole: usize, in_string: bool) -> Result<Litera
     if let Some(at) = origin_symbol(rest, in_string)? {
         return fold(num, Unit::Steps, num_id, Some(at));
     }
+    if let Some(unit) = level_symbol(rest, in_string)? {
+        return fold(num, unit, num_id, None);
+    }
     let mut p = Parser {
         toks: rest,
         at: 0,
@@ -185,6 +198,25 @@ fn origin_symbol(rest: &[Tok], in_string: bool) -> Result<Option<At>, Error> {
         })),
         _ => Ok(None),
     }
+}
+
+/// `rest` as one level symbol, `dB` or `"Np"`, if it is one.
+fn level_symbol(rest: &[Tok], in_string: bool) -> Result<Option<Unit>, Error> {
+    let (text, id) = match rest {
+        [Tok::Ident { text, id }] => (text.clone(), *id),
+        [Tok::Lit { text, id }] if !in_string => match strlex::content(text) {
+            Some(s) => match strlex::lex(s.map_err(|m| Error::at(*id, m))?, *id)?.as_slice() {
+                [Tok::Ident { text, .. }] => (text.clone(), *id),
+                _ => return Ok(None),
+            },
+            None => return Ok(None),
+        },
+        _ => return Ok(None),
+    };
+    Ok(level(&text).map(|l| Unit::Level {
+        marker: l.marker,
+        id,
+    }))
 }
 
 /// A point literal with `@` at `rest[k]`: the unit before it (none: the origin's step), the origin's type after.
@@ -310,7 +342,7 @@ fn walk(unit: &Unit, times: i64, f: &mut impl FnMut(usize, i64, i64, i64)) {
         Unit::Marker {
             id, pow10, pow1024, ..
         } => f(*id, *pow10, *pow1024, times),
-        Unit::Type(_) | Unit::One | Unit::Steps => {}
+        Unit::Type(_) | Unit::One | Unit::Steps | Unit::Level { .. } => {}
         Unit::Mul(a, b) => {
             walk(a, times, f);
             walk(b, times, f);

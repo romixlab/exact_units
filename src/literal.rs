@@ -625,9 +625,13 @@ macro_rules! complex_literal {
 complex_literal!(i8 i16 i32 i64 f32 f64);
 
 #[cfg(feature = "q")]
+pub mod level;
+#[cfg(feature = "q")]
 pub mod point;
 #[cfg(feature = "q")]
 pub mod quantity;
+#[cfg(feature = "q")]
+pub use level::{Db, LevelLiteral, LevelSymbol, Np};
 #[cfg(feature = "q")]
 pub use point::{LiteralAt, PointUnit, Steps};
 #[cfg(feature = "q")]

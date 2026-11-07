@@ -1,0 +1,58 @@
+error: q!: `dB` reads more than one way (Decibel, DecibelLoss, deci Byte): write the one you mean as a type, as in q!(5 Decibel); alone after the number it is a level of a gain, q!(-3 dB), which a V/V or W/W reads one way
+  --> tests/compile_fail/q_level_grammar.rs:11:20
+   |
+11 |     let _ = q!(0.2 dB / km);
+   |                    ^^
+
+error: q!: `Np` reads more than one way (Neper, NeperLoss): write the one you mean as a type, as in q!(5 Neper); alone after the number it is a level of a gain, q!(-3 Np), which a V/V or W/W reads one way
+  --> tests/compile_fail/q_level_grammar.rs:12:18
+   |
+12 |     let _ = q!(1 Np / s);
+   |                  ^^
+
+error: fixed!: `dB` is a level, and fixed! a number of its context's unit: write the gain as db!(x), the level as fixed!(x Decibel) or fixed!(x Loss<Decibel>)
+  --> tests/compile_fail/q_level_grammar.rs:13:59
+   |
+13 |     let _: Fixed<Per<Volt, Volt>, Milli, u16> = fixed!(-3 dB);
+   |                                                           ^^
+
+error[E0277]: the trait bound `Fixed<Per<Volt, Volt>, exact_units::prefix::Milli, u16>: AtLiteral<()>` is not satisfied
+  --> tests/compile_fail/q_level_grammar.rs:13:49
+   |
+13 |     let _: Fixed<Per<Volt, Volt>, Milli, u16> = fixed!(-3 dB);
+   |                                                 ^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Per<Volt, Volt>, exact_units::prefix::Milli, u16>`
+   |
+   = help: the following other types implement trait `AtLiteral<L>`:
+             `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
+             `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+             `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
+             `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+             `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
+             `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+             `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
+             `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+           and $N others
+   = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: can't compare `exact_units::Exact<Per<Volt, Volt>>` with `LevelLiteral<-3, 0, Db>`
+  --> tests/compile_fail/q_level_grammar.rs:14:49
+   |
+14 |     let _ = Exact::<Per<Volt, Volt>>::new(1, 2) < q!(-3 dB);
+   |             ----------------------------------- ^ ---------
+   |                                                 |
+   |                                                 no implementation for `exact_units::Exact<Per<Volt, Volt>> < LevelLiteral<-3, 0, Db>` and `exact_units::Exact<Per<Volt, Volt>> > LevelLiteral<-3, 0, Db>`
+   |
+   = help: the trait `PartialOrd<LevelLiteral<-3, 0, Db>>` is not implemented for `exact_units::Exact<Per<Volt, Volt>>`
+help: `exact_units::Exact<U>` implements trait `PartialOrd<Rhs>`
+  --> src/literal/quantity.rs
+   |
+   | impl<U: Unit, S: Unit, const N: i64, const E: i16> PartialOrd<LiteralIn<N, E, S>> for Exact<U> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `PartialOrd<LiteralIn<N, E, S>>`
+   |
+  ::: src/exact.rs
+   |
+   | impl<U> PartialOrd for Exact<U> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `PartialOrd`
+...
+   | impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> PartialOrd<Fixed<U, P, T, B>> for Exact<U> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `PartialOrd<Fixed<U, P, T, B>>`

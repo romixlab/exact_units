@@ -10,10 +10,14 @@
 //! and read `thumbv6m-none-eabi/release/deps/q_literal_asm-*.s` in the target directory. LLVM merges the bodies that
 //! are the same: `below_literal`, `below_literal_kmh`, `below_const` and `below_inexact` come out as aliases of
 //! `at_most_raw` (`cmp` against 10000, `blt`), `below_past_range` as `movs r0, #1`.
+//!
+//! A gain against a level is the same: `gain < q!(-3 dB)` on a V/V in steps of 1 mV/V is `gain.get() <= 707`
+//! (10^(−3/20) = 0.70794..), and on an `f32` V/V one float compare against the largest `f32` at or below the gain
+//! (`gain_f32_below_level`, read on `thumbv7em-none-eabihf`, which has the FPU).
 #![no_std]
 
 use exact_units::prefix::Centi;
-use exact_units::units::Speed;
+use exact_units::units::{Per, Speed, Volt};
 use exact_units::{Fixed, fixed, q};
 
 /// A speed in steps of 1 cm/s.
@@ -64,4 +68,34 @@ pub fn below_right_angle(
     angle: Fixed<exact_units::units::Radian, exact_units::prefix::Milli, i16>,
 ) -> bool {
     angle < q!(90 deg)
+}
+
+/// A gain in steps of 1 mV/V.
+pub type MilliGain = Fixed<Per<Volt, Volt>, exact_units::prefix::Milli, u16>;
+
+/// A gain as an `f32` V/V.
+pub type GainF32 = Fixed<Per<Volt, Volt>, exact_units::prefix::One, f32>;
+
+/// `gain < q!(-3 dB)`: 10^(−3/20) is 707.94.. mV/V, so `gain <= 707`.
+#[unsafe(no_mangle)]
+pub fn gain_below_level(gain: MilliGain) -> bool {
+    gain < q!(-3 dB)
+}
+
+/// `gain <= 707` written by hand on the stored value.
+#[unsafe(no_mangle)]
+pub fn gain_at_most_raw(gain: MilliGain) -> bool {
+    gain.get() <= 707
+}
+
+/// `gain < q!(-3 dB)` on an `f32`: `gain <= 0.70794576..`, the largest `f32` below 10^(−3/20).
+#[unsafe(no_mangle)]
+pub fn gain_f32_below_level(gain: GainF32) -> bool {
+    gain < q!(-3 dB)
+}
+
+/// The same written by hand: the `f32` whose bits are `0x3f35_3bef`, 0.707945764.., just below 0.707945784...
+#[unsafe(no_mangle)]
+pub fn gain_f32_at_most_raw(gain: GainF32) -> bool {
+    gain.get() <= f32::from_bits(0x3f35_3bef)
 }

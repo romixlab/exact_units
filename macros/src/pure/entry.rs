@@ -47,3 +47,13 @@ pub(crate) struct Origin {
     /// The cargo feature the origin needs.
     pub(crate) group: &'static str,
 }
+
+/// A symbol `q!` reads as a level of a gain when it stands alone after the number: `q!(-3 dB)`. The gain's kind picks
+/// the form (20·lg of V/V, 10·lg of W/W), so it reads one way there; inside a unit (`dB/km`) it stays refused.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Level {
+    /// The symbol: `dB`, `Np`.
+    pub(crate) symbol: &'static str,
+    /// The level marker's path under exact_units' root: `literal::Db`.
+    pub(crate) marker: &'static str,
+}

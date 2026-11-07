@@ -1,0 +1,98 @@
+error[E0080]: evaluation panicked: a literal's unit converts only between units of the same dimension: Meter (m) is m, not Hertz (Hz) which is s⁻¹; they differ by m·s
+ --> src/literal/quantity.rs
+  |
+  |                 .compare(const { fraction::<S, U>(Decimal::new(N, E)) }),
+  |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::quantity::<impl std::cmp::PartialOrd<exact_units::literal::LiteralIn<1, 0, exact_units::units::Meter>> for exact_units::Exact<exact_units::units::Hertz>>::partial_cmp::{constant#0}` failed inside this call
+  |
+note: inside `quantity::fraction::<Meter, Hertz>`
+ --> src/literal/quantity.rs
+  |
+  |     let scale = scale_in::<S, U, One>();
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::scale_in::<Meter, Hertz, One>`
+ --> src/literal.rs
+  |
+  |         crate::conv_error::dim_mismatch::<S, U>("a literal's unit");
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `exact_units::conv_error::dim_mismatch::<Meter, Hertz>`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/conv_error.rs
+  |
+  |     panic!("{}", msg.as_str())
+  |     -------------------------- in this macro invocation
+
+note: erroneous constant encountered
+ --> src/literal/quantity.rs
+  |
+  |                 .compare(const { fraction::<S, U>(Decimal::new(N, E)) }),
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+note: the above error was encountered while instantiating `fn quantity::<impl PartialOrd<LiteralIn<1, 0, Meter>> for exact_units::Exact<Hertz>>::partial_cmp`
+ --> $RUST/core/src/cmp.rs
+  |
+  |         self.partial_cmp(other).is_some_and(Ordering::is_lt)
+  |         ^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: an Exact is a fraction, and this literal in its unit isn't one (a factor with π, ln 10 or a root): write it in the Exact's unit
+ --> src/literal/quantity.rs
+  |
+  |                 .compare(const { fraction::<S, U>(Decimal::new(N, E)) }),
+  |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::quantity::<impl std::cmp::PartialOrd<exact_units::literal::LiteralIn<9, 1, exact_units::units::Degree>> for exact_units::Exact<exact_units::units::Radian>>::partial_cmp::{constant#0}` failed inside this call
+  |
+note: inside `quantity::fraction::<Degree, Radian>`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/quantity.rs
+  |
+  | /     assert!(
+  | |         scale.is_rational(),
+  | |         "an Exact is a fraction, and this literal in its unit isn't one (a factor with π, ln 10 or a root): \
+  | |          write it in the Exact's unit"
+  | |     );
+  | |_____- in this macro invocation
+
+note: the above error was encountered while instantiating `fn quantity::<impl PartialOrd<LiteralIn<9, 1, Degree>> for exact_units::Exact<Radian>>::partial_cmp`
+ --> $RUST/core/src/cmp.rs
+  |
+  |         self.partial_cmp(other).is_some_and(Ordering::is_lt)
+  |         ^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: an Exact is a fraction, and this literal in its unit isn't one (a factor with π, ln 10 or a root): write it in the Exact's unit
+ --> src/literal/quantity.rs
+  |
+  |             .compare(const { fraction::<S, U>(Decimal::new(N, E)) })
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::quantity::<impl std::cmp::PartialEq<exact_units::literal::LiteralIn<9, 1, exact_units::units::Degree>> for exact_units::Exact<exact_units::units::Radian>>::eq::{constant#0}` failed inside this call
+  |
+note: inside `quantity::fraction::<Degree, Radian>`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/quantity.rs
+  |
+  | /     assert!(
+  | |         scale.is_rational(),
+  | |         "an Exact is a fraction, and this literal in its unit isn't one (a factor with π, ln 10 or a root): \
+  | |          write it in the Exact's unit"
+  | |     );
+  | |_____- in this macro invocation
+
+note: erroneous constant encountered
+ --> src/literal/quantity.rs
+  |
+  |             .compare(const { fraction::<S, U>(Decimal::new(N, E)) })
+  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+note: the above error was encountered while instantiating `fn quantity::<impl PartialEq<LiteralIn<9, 1, Degree>> for exact_units::Exact<Radian>>::eq`
+ --> $RUST/core/src/cmp.rs
+  |
+  |             PartialEq::eq(*self, *other)
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

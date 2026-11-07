@@ -64,6 +64,53 @@ let p: Fixed<Per<Watt, Watt>, Milli, u16> = db!(-6);
 assert_eq!(p.get(), 251); // 10^(−6/10)
 ```
 
+## `q!`: a level compared without a constant { #q }
+
+`db!` rounds the gain to the nearest stored value: a constant has to be one. A compare doesn't. `q!(-3 dB)` keeps the level exact and folds it in the compare itself: `gain < q!(-3 dB)` is `gain <= 707` for a V/V in steps of 1 mV/V, since 10^(−3/20) is 707.94.. mV/V, and no stored value is equal to it.
+
+```rust
+use exact_units::{Fixed, db, q, prefix::Milli, units::{Per, Volt, Watt}};
+
+type Gain = Fixed<Per<Volt, Volt>, Milli, u16>;
+
+let g = Gain::new(708);
+assert!(g > q!(-3 dB));   // 708 is above 707.94..
+const HALF_POWER: Gain = db!(-3);
+assert!(g == HALF_POWER); // db!(-3) rounded to 708: the constant is the nearest step, not the level
+assert!(Gain::new(1000) == q!(0 dB)); // a whole number of decades is a step: == compiles
+assert!(Gain::new(449) < q!(-0.8 Np)); // e^(−0.8) = 0.4493..: the neper too
+
+let p = Fixed::<Per<Watt, Watt>, Milli, u16>::new(501);
+assert!(p < q!(-3 dB)); // 10^(−3/10) = 0.50118..: the kind picks 10·lg
+```
+
+- The kind picks the form, as for `db!`: `dB` reads one way against a V/V or a W/W. Against a plain `Ratio` it doesn't compile.
+- No rounding: the gain's floor in steps comes from the same interval arithmetic as `db!`, at compile time. A level too close to a step to tell is a compile error, never a guess.
+- `==` compiles only where a stored value is the gain: `q!(0 dB)`, `q!(20 dB)` of a V/V in mV/V. `gain == q!(-3 dB)` is a compile error, as no number of mV/V is 10^(−3/20).
+- It costs one compare: `tests/q_asm.rs` checks that `gain < q!(-3 dB)` builds to the same instructions as `gain.get() <= 707` on a Cortex-M0, and on a Cortex-M4F to one `vcmp.f32` against the largest `f32` below the gain for an `f32` V/V.
+- A value stored as a level (`Fixed<Decibel>`, `Loss<Decibel>`) doesn't take `q!(x dB)`: there a level of gain and one of loss differ in sign, so it asks for the unit, `q!(-3 Decibel)` or `q!(3 Loss<Decibel>)`.
+
+```rust,compile_fail
+use exact_units::{Fixed, q, prefix::Milli, units::{Per, Volt}};
+let _ = Fixed::<Per<Volt, Volt>, Milli, u16>::new(707) == q!(-3 dB); // no step is 10^(−3/20)
+```
+
+```rust,compile_fail
+use exact_units::{Fixed, q, prefix::Milli, units::Ratio};
+let _ = Fixed::<Ratio, Milli, u16>::new(707) < q!(-3 dB); // 20·lg or 10·lg?
+```
+
+```rust,compile_fail
+use exact_units::{Fixed, q, prefix::Centi, units::Decibel};
+let _ = Fixed::<Decibel, Centi, i16>::new(-300) < q!(-3 dB); // a gain, or a loss? write q!(-3 Decibel)
+```
+
+```rust
+use exact_units::{Fixed, q, prefix::Centi, units::{Decibel, Loss}};
+assert!(Fixed::<Decibel, Centi, i16>::new(-301) < q!(-3 Decibel));
+assert!(Fixed::<Loss<Decibel>, Centi, i16>::new(301) > q!(3 Loss<Decibel>));
+```
+
 ## At run time
 
 | Method | Float | Needs |

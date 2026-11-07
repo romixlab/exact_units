@@ -1,7 +1,8 @@
-//! `speed < q!(100 m/s)` is the same code as `speed < LIMIT` for a typed `const`: builds
-//! `tools/q_literal_asm` for a Cortex-M0 (`thumbv6m-none-eabi`) with `--emit asm` and compares the
-//! normalised instructions of each pair named in its doc comment. Skipped, with a note, where that target
-//! isn't installed (`rustup target add thumbv6m-none-eabi`); run in CI (`.github/workflows/ci.yml`, job
+//! `speed < q!(100 m/s)` is the same code as `speed < LIMIT` for a typed `const`, and `gain < q!(-3 dB)` the same
+//! as `gain.get() <= 707`: builds `tools/q_literal_asm` for a Cortex-M0 (`thumbv6m-none-eabi`) and a Cortex-M4F
+//! (`thumbv7em-none-eabihf`, for the float compare in its FPU) with `--emit asm` and compares the normalised
+//! instructions of each pair named in its doc comment. Skipped, with a note, where a target isn't installed
+//! (`rustup target add thumbv6m-none-eabi thumbv7em-none-eabihf`); run in CI (`.github/workflows/ci.yml`, job
 //! `test`) and from `just test`.
 //!
 //! Labels are normalised, not compared literally: LLVM numbers a function's local labels (`.LBB0_2`,
@@ -34,14 +35,14 @@ fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
 }
 
-/// Builds `tools/q_literal_asm` for `thumbv6m-none-eabi` with `--emit asm` into `target_dir`, `cargo`'s own
+/// Builds `tools/q_literal_asm` for `target` with `--emit asm` into `target_dir`, `cargo`'s own
 /// build directory as well as its target directory. The `.s` is a build artifact `cargo` never uplifts to a
 /// public target directory (only `--emit`'s declared kinds, `link` and `metadata`, are): pointing
 /// `--target-dir` at a directory cargo also uses as its *build* directory (`--config build.build-dir=..`)
 /// keeps it there to be read; a host whose cargo config gives builds a build directory of their own (ops'
 /// build nodes do, for smaller per-workspace target directories) throws it away unseen otherwise. A host
 /// without that config builds the same either way.
-fn build(target_dir: &Path) -> Output {
+fn build(target_dir: &Path, target: &str) -> Output {
     Command::new(env!("CARGO"))
         .current_dir(root())
         .arg("rustc")
@@ -49,7 +50,7 @@ fn build(target_dir: &Path) -> Output {
         .arg("--manifest-path")
         .arg(root().join("tools/q_literal_asm/Cargo.toml"))
         .arg("--target")
-        .arg("thumbv6m-none-eabi")
+        .arg(target)
         .arg("--target-dir")
         .arg(target_dir)
         .arg("--config")
@@ -63,8 +64,8 @@ fn build(target_dir: &Path) -> Output {
 
 /// The one `.s` file `build` emits, `q_literal_asm`'s own (cargo passes `--emit asm` only to the package
 /// named by `--manifest-path`, never to `exact_units` or `exact_units_macros`).
-fn asm_file(target_dir: &Path) -> String {
-    let deps = target_dir.join("thumbv6m-none-eabi/release/deps");
+fn asm_file(target_dir: &Path, target: &str) -> String {
+    let deps = target_dir.join(target).join("release/deps");
     let file = std::fs::read_dir(&deps)
         .unwrap_or_else(|e| panic!("{}: {e}", deps.display()))
         .filter_map(Result::ok)
@@ -224,22 +225,29 @@ fn same_as_at_most_raw(asm: &str, name: &str) {
     );
 }
 
-#[test]
-fn speed_literal_is_the_typed_const_compare() {
+/// `tools/q_literal_asm`'s asm for `target`, `None` (with a note) where the target isn't installed.
+fn asm_for(target: &str) -> Option<String> {
     let target_dir = root().join("tools/q_literal_asm/target/asm_test");
-    let output = build(&target_dir);
+    let output = build(&target_dir, target);
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if stderr.contains("E0463") {
             println!(
-                "q_asm: skipped, the `thumbv6m-none-eabi` target isn't installed here \
-                 (`rustup target add thumbv6m-none-eabi`); it runs in CI and on a machine that has it"
+                "q_asm: skipped, the `{target}` target isn't installed here (`rustup target add {target}`); it \
+                 runs in CI and on a machine that has it"
             );
-            return;
+            return None;
         }
-        panic!("cargo rustc tools/q_literal_asm --target thumbv6m-none-eabi failed:\n{stderr}");
+        panic!("cargo rustc tools/q_literal_asm --target {target} failed:\n{stderr}");
     }
-    let asm = asm_file(&target_dir);
+    Some(asm_file(&target_dir, target))
+}
+
+#[test]
+fn speed_literal_is_the_typed_const_compare() {
+    let Some(asm) = asm_for("thumbv6m-none-eabi") else {
+        return;
+    };
 
     // speed < q!(100 m/s) on CmPerS (steps of 1 cm/s, i16): 100 m/s is 10_000 steps, so `speed < x` is
     // `speed <= 9_999`, at_most_raw's own body (its `speed.get() <= 9_999`, written by hand).
@@ -278,4 +286,57 @@ fn speed_literal_is_the_typed_const_compare() {
         expected_compare(true, 1571),
         "below_right_angle (q!(90 deg) against mrad) should compare against 1571 (<= 1570 is < 1571)"
     );
+}
+
+/// The instructions of `body` that compare: `cmp`, `cmp.w`, `vcmp.f32`, or a call to the soft-float compare a
+/// Cortex-M0 has instead of an FPU (`__aeabi_fcmple`).
+fn compares(body: &[String]) -> usize {
+    body.iter()
+        .filter(|l| {
+            let op = l.split(' ').next().unwrap_or("");
+            op == "cmp" || op == "cmp.w" || op.starts_with("vcmp") || l.contains("__aeabi_fcmp")
+        })
+        .count()
+}
+
+/// `gain < q!(-3 dB)` is one compare against the floor of 10^(−3/20) in the gain's steps, the same instructions as
+/// written by hand on the stored value: `gain_below_level` is `gain_at_most_raw`'s body (`gain.get() <= 707`) and
+/// `gain_f32_below_level` is `gain_f32_at_most_raw`'s (`<=` the largest `f32` below the gain), on a Cortex-M0 and
+/// on a Cortex-M4F, where the float compare is one `vcmp.f32` in the FPU.
+#[test]
+fn gain_level_is_one_compare() {
+    for target in ["thumbv6m-none-eabi", "thumbv7em-none-eabihf"] {
+        let Some(asm) = asm_for(target) else {
+            continue;
+        };
+        for (level, raw) in [
+            ("gain_below_level", "gain_at_most_raw"),
+            ("gain_f32_below_level", "gain_f32_at_most_raw"),
+        ] {
+            let body = normalize(&resolve(&asm, raw));
+            assert_eq!(
+                normalize(&resolve(&asm, level)),
+                body,
+                "{target}: {level} should be {raw}'s body, but its asm differs"
+            );
+            assert_eq!(
+                compares(&body),
+                1,
+                "{target}: {raw} should be one compare: {body:#?}"
+            );
+        }
+        let f32_body = normalize(&resolve(&asm, "gain_f32_at_most_raw"));
+        assert!(
+            f32_body
+                .iter()
+                .any(|l| l.contains("1060453359") || l.contains("0x3f353bef")),
+            "{target}: gain_f32_at_most_raw should compare against the f32 0x3f353bef: {f32_body:#?}"
+        );
+        if target == "thumbv7em-none-eabihf" {
+            assert!(
+                f32_body.iter().any(|l| l.starts_with("vcmp.f32")),
+                "{target}: the f32 compare should be the FPU's vcmp.f32: {f32_body:#?}"
+            );
+        }
+    }
 }

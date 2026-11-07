@@ -181,7 +181,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   `tools/q_literal_asm` for thumbv6m-none-eabi with `--emit asm` and checks `speed < q!(100 m/s)` is the exact
   instructions of the typed-const and hand-written compares, a literal past the storage's range a bare `true`;
   skipped where that target isn't installed). The generated symbol table (UNIT-11), float storages (NUM-16),
-  `fixed!(100 m/s)` (NUM-17) and points (PT-5) are in; `Exact` and levels (NUM-18) follow.
+  `fixed!(100 m/s)` (NUM-17), points (PT-5), `Exact` and levels (NUM-18) are in.
 - 📋 **NUM-10 Measured constants as exact symbols** · `foundations` — μ₀ and G in `Magnitude` beside π, ln 2 and ln 10
   (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
   old 4π·10⁻⁷ only as the opt-in `Ampere1948`; a conversion that needs a symbol doesn't compile without a set, floats
@@ -231,8 +231,16 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   read `fixed!: ..`, not `q!: ..`. Doctests in `src/literal.rs` and `docs/start/literals.md`, compile-fail snapshots
   `tests/compile_fail/fixed_dim_mismatch.{rs,stderr}` (a unit that doesn't convert) and `fixed_grammar.{rs,stderr}`
   (a grammar refusal shared with `q!`, named `fixed!:`).
-- 📋 **NUM-18 `q!` against `Exact` and the level types** — the same exact order against an `Exact<U>` at run time and
-  against the level types where a compare means something.
+- ✅ **NUM-18 `q!` against `Exact` and the level types** — `q!(-3 dB)` and `q!(-0.5 Np)`, `dB` or `Np` alone after
+  the number, are a `LevelLiteral` that compares with a linear gain whose kind picks the form (20·lg / ln for V/V,
+  A/A, Pa/Pa; 10·lg / ½·ln for W/W), every integer and float storage, both ways round: the gain 10^(x/20) or e^x
+  folded to its floor in steps in a `const` block through `Interval`, one compare at run time (`tests/q_asm.rs`
+  checks it on thumbv6m and, for `f32`, one `vcmp.f32` on thumbv7em), too close to a step a compile error, `==`
+  only where a step is the gain. Refused with what to write: no level form (`Ratio`), a value stored as a level
+  (`Decibel`, `Loss<Decibel>`: write `q!(-3 Decibel)`), `dB` inside a unit, `fixed!(-3 dB)`. `Exact<U>` against a
+  `q!` literal, exactly: the literal a `Fraction` of `U` at compile time, a factor with π a compile error, no
+  `Exact` against a level. Tests: `tests/props/q_level.rs` (exact big-integer and series references, whole walks of
+  `q!` over every u16 and every f32 with low 16 bits 0), `tests/compile_fail/q_level*.rs`, `q_exact.rs`.
 
 ## Units and markers (`UNIT`)
 

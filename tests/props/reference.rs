@@ -185,3 +185,72 @@ pub(crate) fn fits_u128(r: &num_rational::BigRational) -> bool {
     let max = num_bigint::BigInt::from(u128::MAX);
     r.numer().magnitude() <= max.magnitude() && *r.denom() <= max
 }
+
+/// The order of `a` against `10^(n/d)`, `d > 0`, exactly: `a^d` against `10^n` in big integers. A gain is above 0,
+/// so `a <= 0` is below it.
+#[cfg(all(feature = "q", feature = "electrical", not(any(kani, fuzzing))))]
+pub(crate) fn order_pow10(a: &num_rational::BigRational, n: i64, d: u32) -> core::cmp::Ordering {
+    use num_bigint::BigInt;
+    if *a.numer() <= BigInt::from(0) {
+        return core::cmp::Ordering::Less;
+    }
+    // (p/q)^d against 10^n: p^d · 10^-n against q^d
+    let (p, q) = (a.numer().pow(d), a.denom().pow(d));
+    let ten = BigInt::from(10).pow(n.unsigned_abs().try_into().unwrap_or(u32::MAX));
+    if n >= 0 {
+        p.cmp(&(q * ten))
+    } else {
+        (p * ten).cmp(&q)
+    }
+}
+
+/// The order of `a` against `e^y`, exactly: `e^|y|` lies between the series' partial sum and that sum plus its last
+/// term once the terms fall by half or more, refined until the bounds leave `a` out. They always do for `y ≠ 0`, as
+/// `e^y` is irrational for a rational `y ≠ 0`; `y = 0` is 1. A gain is above 0, so `a <= 0` is below it.
+#[cfg(all(feature = "q", feature = "electrical", not(any(kani, fuzzing))))]
+#[expect(
+    clippy::panic,
+    reason = "a reference fails the test by panicking where 10000 terms don't decide"
+)]
+pub(crate) fn order_exp(
+    a: &num_rational::BigRational,
+    y: &num_rational::BigRational,
+) -> core::cmp::Ordering {
+    use core::cmp::Ordering;
+    use num_rational::BigRational;
+    let zero = BigRational::from_integer(0.into());
+    let one = BigRational::from_integer(1.into());
+    if *a <= zero {
+        return Ordering::Less;
+    }
+    if *y == zero {
+        return a.cmp(&one);
+    }
+    // a against e^y; for y < 0, 1/a against e^-y, reversed
+    let (a, y, flip) = if *y < zero {
+        (one.clone() / a, -y.clone(), true)
+    } else {
+        (a.clone(), y.clone(), false)
+    };
+    let (mut sum, mut term) = (one.clone(), one);
+    for k in 1u32..10_000 {
+        term = term * &y / BigRational::from_integer(k.into());
+        sum += &term;
+        // the next term is y/(k+1) of this one: from k + 1 >= 2y on each is at most half the last, so the rest of
+        // the series is below this term
+        if BigRational::from_integer((k + 1).into())
+            < y.clone() * BigRational::from_integer(2.into())
+        {
+            continue;
+        }
+        let o = if a < sum {
+            Ordering::Less
+        } else if a > sum.clone() + &term {
+            Ordering::Greater
+        } else {
+            continue;
+        };
+        return if flip { o.reverse() } else { o };
+    }
+    panic!("e^y and a too close for 10000 terms")
+}

@@ -244,6 +244,42 @@ assert!(room == q!(68 degF)); // 68 °F is exactly 20 °C
 # }
 ```
 
+### Levels
+
+`dB` or `Np` alone after the number is a level of a gain, and compares with a linear gain whose kind picks the form: 20·lg for a V/V, 10·lg for a W/W. The gain 10^(x/20) is folded exactly at compile time, so `gain < q!(-3 dB)` is one compare; `==` compiles only where a stored value is the gain. [Decibels](../levels/decibels.md#q) has the details and the refusals.
+
+```rust
+# #[cfg(feature = "electrical")] {
+use exact_units::{Fixed, q, prefix::Milli, units::{Per, Volt}};
+
+let gain = Fixed::<Per<Volt, Volt>, Milli, u16>::new(707);
+assert!(gain < q!(-3 dB)); // 10^(−3/20) = 707.94.. mV/V
+assert!(Fixed::<Per<Volt, Volt>, Milli, u16>::new(1000) == q!(0 dB));
+# }
+```
+
+### Against an `Exact`
+
+An [`Exact`](../maths/fractions.md) compares with a `q!` literal exactly too, at run time: the literal is a fraction of the `Exact`'s unit, worked out at compile time, and the compare is one of two fractions. A literal whose unit converts only by a factor with π (degrees against radians) doesn't compile, as an `Exact` is a fraction and that literal isn't one. A level has no compare with an `Exact`: 10^(x/20) is no fraction.
+
+```rust
+# #[cfg(feature = "time")] {
+use exact_units::{Exact, q, units::Hertz};
+
+let pll = Exact::<Hertz>::new(80_000_000, 3); // 26.(6) MHz
+assert!(pll > q!(26.666666 MHz) && pll < q!(26.666667 MHz));
+assert!(q!(80 MHz) == (pll * 3).unwrap());
+# }
+```
+
+```rust,compile_fail
+# #[cfg(feature = "angle")] {
+use exact_units::{Exact, q, units::Radian};
+let _ = Exact::<Radian>::new(3, 2) < q!(90 deg); // π/2 rad is no fraction
+# }
+# #[cfg(not(feature = "angle"))] compile_error!("the case needs angle");
+```
+
 ### The string form
 
 `°`, `²`, `Ω` and the rest of a unit's own signs are not tokens Rust's lexer accepts bare in source. A string

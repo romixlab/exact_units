@@ -18,6 +18,11 @@
 //!   `P`: `q!(0.75 V)`, never `q!(0.1 V)`, which no `f32` is, nor one past the float's range. A scale with π in it
 //!   makes no literal a float, so `==` never compiles there; `<` and `<=` do.
 //!
+//! - An [Exact] compares too, exactly at run time: the literal is a [Fraction] of the `Exact`'s unit, worked out at
+//!   compile time, and the compare is one of two fractions, never rounded. A literal whose unit converts only by a
+//!   factor with π or a root (90° against radians) doesn't compile, as an `Exact` is a fraction and that literal in
+//!   its unit isn't one.
+//!
 //! ```
 //! # #[cfg(feature = "mechanical")] {
 //! use exact_units::{Fixed, q, prefix::Centi, units::Speed};
@@ -39,6 +44,25 @@
 //! assert!(v(-0.0) == q!(0 V)); // −0.0 is 0
 //! assert!(v(f32::NAN).partial_cmp(&q!(0.1 V)).is_none());
 //! # }
+//! ```
+//!
+//! ```
+//! # #[cfg(feature = "time")] {
+//! use exact_units::{Exact, q, units::Hertz};
+//! let f = Exact::<Hertz>::new(80_000_000, 3); // 26.(6) MHz
+//! assert!(f > q!(26.666666 MHz));
+//! assert!(f < q!(26.666667 MHz));
+//! assert!(q!(80 MHz) == (f * 3).unwrap());
+//! assert!(Exact::<Hertz>::new(1, 3) != q!(0.333333333333333333 Hz));
+//! # }
+//! ```
+//!
+//! ```compile_fail
+//! # #[cfg(feature = "angle")] {
+//! use exact_units::{Exact, q, units::Radian};
+//! let _ = Exact::<Radian>::new(3, 2) < q!(90 deg); // π/2 is no fraction
+//! # }
+//! # #[cfg(not(feature = "angle"))] compile_error!("the case needs angle");
 //! ```
 //!
 //! `==` against a literal no float is doesn't compile: `v(0.1) == q!(0.1 V)` would be `false` for every `f32`.
@@ -122,7 +146,9 @@ use core::cmp::Ordering;
 use core::marker::PhantomData;
 
 use super::{Decimal, LiteralIn, scale_in};
-use crate::{Bounds, Fixed, FixedScale, Magnitude, Unit};
+use crate::decibel::exact::Interval;
+use crate::prefix::One;
+use crate::{Bounds, Exact, Fixed, FixedScale, Fraction, Magnitude, Unit};
 
 impl<const N: i64, const E: i16, S> LiteralIn<N, E, S> {
     /// The literal as a value: what `q!` gives.
@@ -248,7 +274,7 @@ macro_rules! literal_cmp {
             }
 
             /// The stored value an `==` with a `q!` literal compares with: a compile error where none equals `x`.
-            const fn equal(x: Cut) -> $ty {
+            pub(super) const fn equal(x: Cut) -> $ty {
                 assert!(
                     x.exact,
                     "this literal is between two steps of the scale: no stored value equals it"
@@ -386,13 +412,18 @@ macro_rules! literal_cmp_float {
         impl Below<$ty> {
             /// `x` of `S` in steps of `P · U`, exact: the floor of its magnitude as a float for `x >= 0`, minus the
             /// ceiling's for `x < 0` (the next float up where the magnitude isn't a float).
+            pub(super) const fn of<S: Unit, U: Unit, P: FixedScale>(x: Decimal) -> Self {
+                Self::of_interval(x.to_interval_any(scale_in::<S, U, P>()), x.num() < 0)
+            }
+
+            /// `±abs` (`None` for 0), minus where `negative`, as [of](Self::of) folds it.
             #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
             #[expect(
                 clippy::arithmetic_side_effects,
                 reason = "bits is at most the largest finite float's, so bits + 1 fits (it is +∞'s)"
             )]
-            pub(super) const fn of<S: Unit, U: Unit, P: FixedScale>(x: Decimal) -> Self {
-                let Some(abs) = x.to_interval_any(scale_in::<S, U, P>()) else {
+            pub(super) const fn of_interval(abs: Option<Interval>, negative: bool) -> Self {
+                let Some(abs) = abs else {
                     return Below { down: 0.0, exact: true };
                 };
                 let (bits, exact) = abs.float_below($bits, $max_exp);
@@ -401,7 +432,7 @@ macro_rules! literal_cmp_float {
                     reason = "float_below gives the bits of a float of this width"
                 )]
                 let bits = bits as $raw;
-                if x.num() >= 0 {
+                if !negative {
                     Below { down: $ty::from_bits(bits), exact }
                 } else {
                     let up = if exact { bits } else { bits + 1 };
@@ -411,19 +442,19 @@ macro_rules! literal_cmp_float {
 
             /// `t < x`: below `down`, or at it where `x` is above it.
             #[inline(always)]
-            fn lt(self, t: $ty) -> bool {
+            pub(super) fn lt(self, t: $ty) -> bool {
                 if self.exact { t < self.down } else { t <= self.down }
             }
 
             /// `t <= x`.
             #[inline(always)]
-            fn le(self, t: $ty) -> bool {
+            pub(super) fn le(self, t: $ty) -> bool {
                 t <= self.down
             }
 
             /// `t == x`: only where `x` is a float.
             #[inline(always)]
-            fn eq(self, t: $ty) -> bool {
+            pub(super) fn eq(self, t: $ty) -> bool {
                 self.exact && t == self.down
             }
 
@@ -442,13 +473,13 @@ macro_rules! literal_cmp_float {
 
             /// `t > x`, false for NaN as `!le` is not.
             #[inline(always)]
-            fn gt(self, t: $ty) -> bool {
+            pub(super) fn gt(self, t: $ty) -> bool {
                 t > self.down
             }
 
             /// `t >= x`.
             #[inline(always)]
-            fn ge(self, t: $ty) -> bool {
+            pub(super) fn ge(self, t: $ty) -> bool {
                 if self.exact { t >= self.down } else { t > self.down }
             }
         }
@@ -880,4 +911,78 @@ macro_rules! __q_customary {
             " needs exact_units' feature `customary`"
         ))
     };
+}
+
+/// `x` of `S` as a value of `U`, exactly: a [Fraction], or a compile error for units that don't convert, a factor
+/// with π, ln 10 or a root in it (an [Exact] is a fraction, and 90° is no fraction of radians), or a literal past
+/// what a `Fraction` holds.
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time): a literal no Fraction is"
+)]
+const fn fraction<S: Unit, U: Unit>(x: Decimal) -> Fraction {
+    let scale = scale_in::<S, U, One>();
+    assert!(
+        scale.is_rational(),
+        "an Exact is a fraction, and this literal in its unit isn't one (a factor with π, ln 10 or a root): \
+         write it in the Exact's unit"
+    );
+    if x.num() == 0 {
+        return Fraction::ZERO;
+    }
+    let (p, q) = x.over(scale);
+    match Fraction::from_parts(x.num() < 0, p, q) {
+        Some(f) => f,
+        None => panic!("a literal's fraction has a denominator of 0"),
+    }
+}
+
+impl<U: Unit> Exact<U> {
+    /// The order of `self` against decimal `x` in units of `S`, at run time: what the compares with a `q!` literal
+    /// fold in a `const` block, for the properties of `tests/props`. Panics for units that don't convert or a
+    /// literal that is no fraction of `U`.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn literal_order<S: Unit>(&self, x: Decimal) -> Ordering {
+        self.get().compare(fraction::<S, U>(x))
+    }
+}
+
+/// Exactly, at run time: the literal is a [Fraction] of `U`, worked out at compile time, and the compare is
+/// [Fraction::compare]. A literal whose unit converts to `U` only by a factor with π or a root doesn't compile (an
+/// `Exact` is a fraction), as for an `Exact` against a `Fixed` of such a scale.
+impl<U: Unit, S: Unit, const N: i64, const E: i16> PartialEq<LiteralIn<N, E, S>> for Exact<U> {
+    #[inline]
+    fn eq(&self, _: &LiteralIn<N, E, S>) -> bool {
+        self.get()
+            .compare(const { fraction::<S, U>(Decimal::new(N, E)) })
+            .is_eq()
+    }
+}
+
+/// See `PartialEq<LiteralIn> for Exact`.
+impl<U: Unit, S: Unit, const N: i64, const E: i16> PartialOrd<LiteralIn<N, E, S>> for Exact<U> {
+    #[inline]
+    fn partial_cmp(&self, _: &LiteralIn<N, E, S>) -> Option<Ordering> {
+        Some(
+            self.get()
+                .compare(const { fraction::<S, U>(Decimal::new(N, E)) }),
+        )
+    }
+}
+
+/// See `PartialEq<LiteralIn> for Exact`.
+impl<U: Unit, S: Unit, const N: i64, const E: i16> PartialEq<Exact<U>> for LiteralIn<N, E, S> {
+    #[inline]
+    fn eq(&self, e: &Exact<U>) -> bool {
+        e == self
+    }
+}
+
+/// See `PartialEq<LiteralIn> for Exact`.
+impl<U: Unit, S: Unit, const N: i64, const E: i16> PartialOrd<Exact<U>> for LiteralIn<N, E, S> {
+    #[inline]
+    fn partial_cmp(&self, e: &Exact<U>) -> Option<Ordering> {
+        e.partial_cmp(self).map(Ordering::reverse)
+    }
 }

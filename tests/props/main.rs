@@ -30,6 +30,8 @@ mod point;
 mod prefix;
 #[cfg(all(feature = "q", not(kani)))]
 mod q_float;
+#[cfg(all(feature = "q", feature = "electrical", not(kani)))]
+mod q_level;
 #[cfg(feature = "q")]
 mod q_literal;
 #[cfg(all(feature = "q", feature = "thermal", feature = "angle"))]

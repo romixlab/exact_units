@@ -1,7 +1,7 @@
 //! The symbol table of `q!`, generated from exact_units' `unit!` and `origin!` lines by its test
 //! `tests/q_symbols.rs`: `just q-symbols` writes it, `just test` fails when it is stale. Don't edit it by hand.
 
-use super::entry::{Entry, Origin, Prefixes, Refused};
+use super::entry::{Entry, Level, Origin, Prefixes, Refused};
 
 /// The symbols read as unit markers, sorted.
 #[rustfmt::skip]
@@ -178,4 +178,11 @@ pub(crate) static ORIGINS: &[Origin] = &[
     Origin { symbol: "°R", path: "origins::Rankine", group: "thermal" },
     Origin { symbol: "℃", path: "origins::Celsius", group: "thermal" },
     Origin { symbol: "℉", path: "origins::Fahrenheit", group: "thermal" },
+];
+
+/// The symbols read as a level of a gain when they stand alone after the number, sorted.
+#[rustfmt::skip]
+pub(crate) static LEVELS: &[Level] = &[
+    Level { symbol: "Np", marker: "literal::Np" },
+    Level { symbol: "dB", marker: "literal::Db" },
 ];

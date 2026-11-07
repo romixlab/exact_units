@@ -1,0 +1,199 @@
+error[E0080]: evaluation panicked: this literal is between two steps of the scale: no stored value equals it
+ --> src/literal/level.rs
+  |
+  |                 self.get() == const { AtMost::<$ty>::equal(cut(gain::<U, P, L>(Decimal::new(N, E)))) }
+  |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::level::<impl std::cmp::PartialEq<exact_units::literal::LevelLiteral<-3, 0, exact_units::literal::Db>> for exact_units::Fixed<exact_units::units::Per<exact_units::units::Volt, exact_units::units::Volt>, exact_units::prefix::Milli, u16>>::eq::{constant#0}` failed inside this call
+...
+  | level_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+  |
+note: inside `quantity::AtMost::<u16>::equal`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/quantity.rs
+  |
+  | literal_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------- in this macro invocation
+  = note: this error originates in the macro `level_cmp` which comes from the expansion of the macro `literal_cmp` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: erroneous constant encountered
+ --> src/literal/level.rs
+  |
+  |                 self.get() == const { AtMost::<$ty>::equal(cut(gain::<U, P, L>(Decimal::new(N, E)))) }
+  |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | level_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+  |
+  = note: this note originates in the macro `level_cmp` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn exact_units::literal::level::<impl PartialEq<LevelLiteral<-3, 0, Db>> for Fixed<Per<Volt, Volt>, exact_units::prefix::Milli, u16>>::eq`
+  --> tests/compile_fail/q_level.rs:12:13
+   |
+12 |     let _ = gain == q!(-3 dB);
+   |             ^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: this literal is not a float of the storage: no stored value equals it
+ --> src/literal/level.rs
+  |
+  | /                         Below::<$ty>::of_interval(Some(interval(gain::<U, P, L>(Decimal::new(N, E)))), false)
+  | |                             .equal()
+  | |____________________________________^ evaluation of `exact_units::literal::level::<impl std::cmp::PartialEq<exact_units::literal::LevelLiteral<-6, 0, exact_units::literal::Db>> for exact_units::Fixed<exact_units::units::Per<exact_units::units::Volt, exact_units::units::Volt>, exact_units::prefix::One, f32>>::eq::{constant#0}` failed inside this call
+...
+  |   level_cmp_float!(f32 f64);
+  |   ------------------------- in this macro invocation
+  |
+note: inside `quantity::Below::<f32>::equal`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/quantity.rs
+  |
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+  = note: this error originates in the macro `level_cmp_float` which comes from the expansion of the macro `literal_cmp_float` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: erroneous constant encountered
+ --> src/literal/level.rs
+  |
+  |                       == const {
+  |  ________________________^
+  | |                         Below::<$ty>::of_interval(Some(interval(gain::<U, P, L>(Decimal::new(N, E)))), false)
+  | |                             .equal()
+  | |                     }
+  | |_____________________^
+...
+  |   level_cmp_float!(f32 f64);
+  |   ------------------------- in this macro invocation
+  |
+  = note: this note originates in the macro `level_cmp_float` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn exact_units::literal::level::<impl PartialEq<LevelLiteral<-6, 0, Db>> for Fixed<Per<Volt, Volt>, One, f32>>::eq`
+ --> $RUST/core/src/cmp.rs
+  |
+  |         !self.eq(other)
+  |          ^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: q!(x dB) and q!(x Np) compare with a gain of root-power quantities (V/V, A/A, Pa/Pa: 20·lg) or of powers (W/W: 10·lg): a plain Ratio or another kind has no level form
+ --> src/literal/level.rs
+  |
+  |                 const { AtMost::<$ty>::lt(cut(gain::<U, P, L>(Decimal::new(N, E)))) }.test(self.get())
+  |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::level::<impl std::cmp::PartialOrd<exact_units::literal::LevelLiteral<-3, 0, exact_units::literal::Db>> for exact_units::Fixed<exact_units::units::Ratio, exact_units::prefix::Milli, u16>>::lt::{constant#0}` failed inside this call
+...
+  | level_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+  |
+note: inside `exact_units::literal::level::gain::<Ratio, exact_units::prefix::Milli, Db>`
+ --> src/literal/level.rs
+  |
+  |     let form = form::<U>();
+  |                ^^^^^^^^^^^
+note: inside `exact_units::literal::level::form::<Ratio>`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/level.rs
+  |
+  |           None => panic!(
+  |  _________________-
+  | |             "q!(x dB) and q!(x Np) compare with a gain of root-power quantities (V/V, A/A, Pa/Pa: 20·lg) or of \
+  | |              powers (W/W: 10·lg): a plain Ratio or another kind has no level form"
+  | |         ),
+  | |_________- in this macro invocation
+
+note: erroneous constant encountered
+ --> src/literal/level.rs
+  |
+  |                 const { AtMost::<$ty>::lt(cut(gain::<U, P, L>(Decimal::new(N, E)))) }.test(self.get())
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | level_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+  |
+  = note: this note originates in the macro `level_cmp` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn exact_units::literal::level::<impl PartialOrd<LevelLiteral<-3, 0, Db>> for Fixed<Ratio, exact_units::prefix::Milli, u16>>::lt`
+  --> tests/compile_fail/q_level.rs:16:13
+   |
+16 |     let _ = ratio < q!(-3 dB);
+   |             ^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: q!(x dB) and q!(x Np) are levels of a gain; against a value stored as a level, a level of gain and one of loss differ in sign: write its unit, q!(-3 Decibel) or q!(3 Loss<Decibel>)
+ --> src/literal/level.rs
+  |
+  |                 const { AtMost::<$ty>::lt(cut(gain::<U, P, L>(Decimal::new(N, E)))) }.test(self.get())
+  |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::level::<impl std::cmp::PartialOrd<exact_units::literal::LevelLiteral<-3, 0, exact_units::literal::Db>> for exact_units::Fixed<exact_units::units::Decibel, exact_units::prefix::Milli, i16>>::lt::{constant#0}` failed inside this call
+...
+  | level_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+  |
+note: inside `exact_units::literal::level::gain::<Decibel, exact_units::prefix::Milli, Db>`
+ --> src/literal/level.rs
+  |
+  |     let form = form::<U>();
+  |                ^^^^^^^^^^^
+note: inside `exact_units::literal::level::form::<Decibel>`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/level.rs
+  |
+  |           None if !U::DIM.same(U::DIM.strip_neper()) => panic!(
+  |  _______________________________________________________-
+  | |             "q!(x dB) and q!(x Np) are levels of a gain; against a value stored as a level, a level of gain and one \
+  | |              of loss differ in sign: write its unit, q!(-3 Decibel) or q!(3 Loss<Decibel>)"
+  | |         ),
+  | |_________- in this macro invocation
+
+note: the above error was encountered while instantiating `fn exact_units::literal::level::<impl PartialOrd<LevelLiteral<-3, 0, Db>> for Fixed<Decibel, exact_units::prefix::Milli, i16>>::lt`
+  --> tests/compile_fail/q_level.rs:18:13
+   |
+18 |     let _ = level < q!(-3 dB);
+   |             ^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: q!(x dB) and q!(x Np) are levels of a gain; against a value stored as a level, a level of gain and one of loss differ in sign: write its unit, q!(-3 Decibel) or q!(3 Loss<Decibel>)
+ --> src/literal/level.rs
+  |
+  |                 const { AtMost::<$ty>::lt(cut(gain::<U, P, L>(Decimal::new(N, E)))) }.test(self.get())
+  |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::level::<impl std::cmp::PartialOrd<exact_units::literal::LevelLiteral<5, -1, exact_units::literal::Np>> for exact_units::Fixed<exact_units::units::DecibelLoss, exact_units::prefix::Milli, i16>>::lt::{constant#0}` failed inside this call
+...
+  | level_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+  |
+note: inside `exact_units::literal::level::gain::<DecibelLoss, exact_units::prefix::Milli, Np>`
+ --> src/literal/level.rs
+  |
+  |     let form = form::<U>();
+  |                ^^^^^^^^^^^
+note: inside `exact_units::literal::level::form::<DecibelLoss>`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/level.rs
+  |
+  |           None if !U::DIM.same(U::DIM.strip_neper()) => panic!(
+  |  _______________________________________________________-
+  | |             "q!(x dB) and q!(x Np) are levels of a gain; against a value stored as a level, a level of gain and one \
+  | |              of loss differ in sign: write its unit, q!(-3 Decibel) or q!(3 Loss<Decibel>)"
+  | |         ),
+  | |_________- in this macro invocation
+
+note: the above error was encountered while instantiating `fn exact_units::literal::level::<impl PartialOrd<LevelLiteral<5, -1, Np>> for Fixed<DecibelLoss, exact_units::prefix::Milli, i16>>::lt`
+ --> $RUST/core/src/cmp.rs
+  |
+  |             PartialOrd::lt(*self, *other)
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

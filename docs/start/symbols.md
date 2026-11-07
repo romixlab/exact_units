@@ -227,22 +227,42 @@ Each reads more than one way, so `q!` refuses it and names the readings. Write t
 
 ## Origins
 
-A temperature in °C, °F or °R is a point against its origin, and compares with a `Point` only.
+A temperature in °C, °F or °R is a point against its origin, and compares with a `Point` only. Each origin has an ASCII spelling written bare, `q!(25 degC)`; the others hold a character Rust's lexer doesn't take (`°`, `℃`), so they are written in quotes, `q!(25 "°C")`.
 
 <!-- generated: origins -->
 
-| Symbol | Origin | Feature |
-|---|---|---|
-| `degC` | `origins::Celsius` | `thermal` |
-| `degF` | `origins::Fahrenheit` | `thermal` |
-| `degR` | `origins::Rankine` | `thermal` |
-| `°C` | `origins::Celsius` | `thermal` |
-| `°F` | `origins::Fahrenheit` | `thermal` |
-| `°R` | `origins::Rankine` | `thermal` |
-| `℃` | `origins::Celsius` | `thermal` |
-| `℉` | `origins::Fahrenheit` | `thermal` |
+| Origin | Feature | Written bare | Written in quotes |
+|---|---|---|---|
+| `origins::Celsius` | `thermal` | `degC` | `"°C"`, `"℃"` |
+| `origins::Fahrenheit` | `thermal` | `degF` | `"°F"`, `"℉"` |
+| `origins::Rankine` | `thermal` | `degR` | `"°R"` |
 
 <!-- end: origins -->
+
+## Levels
+
+`dB` and `Np` alone after the number are a level of a gain, `q!(-3 dB)`, and compare with a linear gain whose kind has a level form: a ratio of root-power quantities (V/V, A/A, Pa/Pa) reads 20·lg, one of powers (W/W) 10·lg, so the symbol reads one way there. The compare is exact: `gain < q!(-3 dB)` is one compare against the floor of 10^(−3/20) in the gain's steps, worked out at compile time.
+
+```rust
+use exact_units::{Fixed, q, prefix::Milli, units::{Per, Volt, Watt}};
+
+let v = Fixed::<Per<Volt, Volt>, Milli, u16>::new(707);
+assert!(v < q!(-3 dB)); // 0.70794.. V/V
+let p = Fixed::<Per<Watt, Watt>, Milli, u16>::new(501);
+assert!(p < q!(-3 dB)); // 0.50118.. W/W
+assert!(p > q!(-0.35 Np)); // e^(−0.7) = 0.49658.. W/W
+```
+
+Against a value stored as a level (`Decibel`, `Loss<Decibel>`, `Neper`) or inside a unit (`dB/km`) they stay refused, as a level of gain and one of loss differ in sign: write the marker, `q!(-3 Decibel)` or `q!(3 Loss<Decibel>)`.
+
+<!-- generated: levels -->
+
+| Symbol | Level | A gain of V/V, A/A, Pa/Pa | A gain of W/W |
+|---|---|---|---|
+| `Np` | `literal::Np` | e^x | e^(2x) |
+| `dB` | `literal::Db` | 10^(x/20) | 10^(x/10) |
+
+<!-- end: levels -->
 
 ## Written as a type
 

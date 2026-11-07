@@ -272,3 +272,29 @@ fn point_refusals() {
     assert!(refused("25 kmh @ Celsius").contains("no unit symbol"));
     assert!(refused("@ Celsius").contains("number"));
 }
+
+#[test]
+fn levels() {
+    for (s, want) in [
+        ("- 3 dB", "literal::Db"),
+        ("- 3 \"dB\"", "literal::Db"),
+        ("\"-3.01 dB\"", "literal::Db"),
+        ("0.5 Np", "literal::Np"),
+    ] {
+        let l = lit(s);
+        assert!(
+            matches!(l.unit, Unit::Level { marker, .. } if marker == want),
+            "{s}: {:?}",
+            l.unit
+        );
+        assert!(l.at.is_none(), "{s}");
+    }
+    let l = lit("- 3.01 dB");
+    assert_eq!((l.num, l.exp), (-301, -2));
+    // inside a unit, or with a prefix, a level reads two ways (gain or loss): refused
+    for s in ["0.2 dB / km", "1 Np / s", "1 dB * m", "1 mdB", "1 dB ^ 2"] {
+        let m = refused(s);
+        assert!(!m.is_empty(), "{s}");
+    }
+    assert!(refused("0.2 dB / km").contains("level of a gain"));
+}

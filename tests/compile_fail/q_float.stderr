@@ -13,8 +13,8 @@ error[E0080]: evaluation panicked: a literal's unit converts only between units 
 note: inside `quantity::Below::<f32>::of::<Meter, Speed, exact_units::prefix::Centi>`
  --> src/literal/quantity.rs
   |
-  |                   let Some(abs) = x.to_interval_any(scale_in::<S, U, P>()) else {
-  |                                                     ^^^^^^^^^^^^^^^^^^^^^
+  |                   Self::of_interval(x.to_interval_any(scale_in::<S, U, P>()), x.num() < 0)
+  |                                                       ^^^^^^^^^^^^^^^^^^^^^
 ...
   | / literal_cmp_float! {
   | |     f32 u32 24 127;

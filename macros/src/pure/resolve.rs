@@ -1,8 +1,8 @@
 //! A symbol to its unit: the table's own symbols, then a prefix split off one.
 
-use super::entry::{Entry, Origin, Prefixes};
+use super::entry::{Entry, Level, Origin, Prefixes};
 use super::prefix::{PREFIXES, Prefix, Scale};
-use super::table::{ORIGINS, REFUSED, UNITS};
+use super::table::{LEVELS, ORIGINS, REFUSED, UNITS};
 
 /// What a symbol reads as.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -28,6 +28,12 @@ pub(crate) fn unit(symbol: &str) -> Option<&'static Entry> {
         .and_then(|i| UNITS.get(i))
 }
 
+/// The level `symbol` reads as where it stands alone after the number (`q!(-3 dB)`), if it is one. Inside a unit
+/// [resolve] refuses it.
+pub(crate) fn level(symbol: &str) -> Option<&'static Level> {
+    LEVELS.iter().find(|l| l.symbol == symbol)
+}
+
 /// Whether `entry` takes `prefix`.
 fn takes(entry: &Entry, prefix: &Prefix) -> bool {
     match (entry.prefixes, prefix.scale) {
@@ -46,8 +52,15 @@ pub(crate) fn resolve(symbol: &str) -> Result<Symbol, String> {
                 "`{symbol}` names a unit only with its qualifier, so no bare default is picked: write the type, as in q!(5 {only})"
             ));
         }
+        let alone = if level(symbol).is_some() {
+            format!(
+                "; alone after the number it is a level of a gain, q!(-3 {symbol}), which a V/V or W/W reads one way"
+            )
+        } else {
+            String::new()
+        };
         return Err(format!(
-            "`{symbol}` reads more than one way ({}): write the one you mean as a type, as in q!(5 {})",
+            "`{symbol}` reads more than one way ({}): write the one you mean as a type, as in q!(5 {}){alone}",
             r.readings.join(", "),
             r.readings.first().copied().unwrap_or("Unit")
         ));

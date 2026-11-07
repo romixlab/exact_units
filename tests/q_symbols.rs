@@ -74,6 +74,10 @@ const ORIGIN_SYMBOLS: &[(&str, &str)] = &[
     ("degR", "Rankine"),
 ];
 
+/// Symbols `q!` reads as a level of a gain when they stand alone after the number (`q!(-3 dB)`), compared with a
+/// gain whose kind picks 20·lg or 10·lg; inside a unit they stay refused. `(symbol, marker under literal::)`.
+const LEVEL_SYMBOLS: &[(&str, &str)] = &[("Np", "Np"), ("dB", "Db")];
+
 /// Scaled units the SI lets take a prefix (SI Brochure, 9th ed., tables 8 and 4.1): gram, litre, electronvolt.
 const SCALED_WITH_PREFIX: &[&str] = &["Gram", "Litre", "ElectronVolt"];
 
@@ -515,7 +519,7 @@ fn table_rs(g: &Generated) -> String {
         "//! The symbol table of `q!`, generated from exact_units' `unit!` and `origin!` lines by its test\n\
          //! `tests/q_symbols.rs`: `just q-symbols` writes it, `just test` fails when it is stale. Don't edit it by hand.\n\
          \n\
-         use super::entry::{Entry, Origin, Prefixes, Refused};\n\
+         use super::entry::{Entry, Level, Origin, Prefixes, Refused};\n\
          \n\
          /// The symbols read as unit markers, sorted.\n\
          #[rustfmt::skip]\n\
@@ -553,6 +557,16 @@ fn table_rs(g: &Generated) -> String {
         )
         .unwrap();
     }
+    out.push_str(
+        "];\n\n/// The symbols read as a level of a gain when they stand alone after the number, sorted.\n#[rustfmt::skip]\npub(crate) static LEVELS: &[Level] = &[\n",
+    );
+    for (symbol, marker) in LEVEL_SYMBOLS {
+        writeln!(
+            out,
+            "    Level {{ symbol: {symbol:?}, marker: \"literal::{marker}\" }},"
+        )
+        .unwrap();
+    }
     out.push_str("];\n");
     out
 }
@@ -569,6 +583,69 @@ fn superscript(e: i8) -> String {
                 .unwrap(),
         })
         .collect()
+}
+
+/// Whether Rust's lexer takes `s` as one identifier, so `q!` reads it without quotes: `degC`, not `°C` or `℃`.
+fn bare_ident(s: &str) -> bool {
+    let mut c = s.chars();
+    c.next().is_some_and(|f| f.is_alphabetic() || f == '_')
+        && c.all(|x| x.is_alphanumeric() || x == '_')
+}
+
+/// An origin's spellings: those written bare, those written in quotes.
+type Spellings<'a> = (Vec<&'a str>, Vec<&'a str>);
+
+/// The origins' table of the book's page: one row per origin, its spellings split by whether Rust's lexer takes
+/// them bare.
+fn origins_table(g: &Generated) -> String {
+    let mut by_origin: BTreeMap<(&str, &str), Spellings<'_>> = BTreeMap::new();
+    for (symbol, path, group) in &g.origins {
+        let row = by_origin.entry((path, group)).or_default();
+        if bare_ident(symbol) {
+            row.0.push(symbol);
+        } else {
+            row.1.push(symbol);
+        }
+    }
+    let mut origins = String::from(
+        "| Origin | Feature | Written bare | Written in quotes |\n|---|---|---|---|\n",
+    );
+    for ((path, group), (bare, quoted)) in &by_origin {
+        let list = |v: &[&str], q: &str| {
+            v.iter()
+                .map(|s| format!("`{q}{s}{q}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        writeln!(
+            origins,
+            "| `{path}` | `{group}` | {} | {} |",
+            list(bare, ""),
+            list(quoted, "\"")
+        )
+        .unwrap();
+    }
+    origins
+}
+
+/// The levels' table of the book's page: each level symbol, its marker and its gain of each form.
+fn levels_table() -> String {
+    let mut levels = String::from(
+        "| Symbol | Level | A gain of V/V, A/A, Pa/Pa | A gain of W/W |\n|---|---|---|---|\n",
+    );
+    for (symbol, marker) in LEVEL_SYMBOLS {
+        let (root, power) = match *marker {
+            "Db" => ("10^(x/20)", "10^(x/10)"),
+            "Np" => ("e^x", "e^(2x)"),
+            m => panic!("no level form for {m}"),
+        };
+        writeln!(
+            levels,
+            "| `{symbol}` | `literal::{marker}` | {root} | {power} |"
+        )
+        .unwrap();
+    }
+    levels
 }
 
 /// The tables of the book's page `docs/start/symbols.md`, by the name of their generated block.
@@ -614,10 +691,8 @@ fn docs_blocks(g: &Generated) -> Vec<(&'static str, String)> {
         )
         .unwrap();
     }
-    let mut origins = String::from("| Symbol | Origin | Feature |\n|---|---|---|\n");
-    for (symbol, path, group) in &g.origins {
-        writeln!(origins, "| `{symbol}` | `{path}` | `{group}` |").unwrap();
-    }
+    let origins = origins_table(g);
+    let levels = levels_table();
     let mut types = String::from("| `unit!` symbol | Marker |\n|---|---|\n");
     for (symbol, marker) in &g.not_symbols {
         writeln!(types, "| {symbol} | `{marker}` |").unwrap();
@@ -644,6 +719,7 @@ fn docs_blocks(g: &Generated) -> Vec<(&'static str, String)> {
         ("folded", folded),
         ("refused", refused),
         ("origins", origins),
+        ("levels", levels),
         ("types", types),
     ]
 }
@@ -756,6 +832,16 @@ fn resolve_agrees() {
         assert!(
             matches!(resolve(symbol), Ok(Symbol::Origin(o)) if o.path == path),
             "{symbol} is {path}"
+        );
+    }
+    for (symbol, marker) in LEVEL_SYMBOLS {
+        assert!(
+            g.refused.iter().any(|(r, _)| r == symbol),
+            "{symbol} is refused inside a unit, a level only alone"
+        );
+        assert!(
+            matches!(resolve::level(symbol), Some(l) if l.marker == format!("literal::{marker}")),
+            "{symbol} is the level literal::{marker}"
         );
     }
     let refused = |s: &str| g.refused.iter().any(|(r, _)| r == s);

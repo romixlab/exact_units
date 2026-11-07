@@ -29,9 +29,10 @@ pub fn q(input: TokenStream) -> TokenStream {
     match grammar::literal(&toks, 0) {
         Ok(lit) => {
             let mut out = Out::new(&krate);
-            match &lit.at {
-                None => out.literal(&lit, &side),
-                Some(at) => out.point(&lit, at, &side),
+            match (&lit.at, &lit.unit) {
+                (None, Unit::Level { marker, .. }) => out.level(&lit, marker),
+                (None, _) => out.literal(&lit, &side),
+                (Some(at), _) => out.point(&lit, at, &side),
             }
             out.ts
         }
@@ -57,6 +58,20 @@ pub fn fixed(input: TokenStream) -> TokenStream {
     let toks = side.convert(trees.collect());
     match grammar::literal(&toks, 0) {
         Ok(lit) => match &lit.at {
+            None if matches!(lit.unit, Unit::Level { .. }) => {
+                let Unit::Level { id, marker } = lit.unit else {
+                    return TokenStream::new();
+                };
+                let name = if marker.ends_with("Np") { "np" } else { "db" };
+                let e = Error::at(
+                    id,
+                    format!(
+                        "`{}` is a level, and fixed! a number of its context's unit: write the gain as {name}!(x), the level as fixed!(x Decibel) or fixed!(x Loss<Decibel>)",
+                        side.text(id)
+                    ),
+                );
+                error(&e, &side, "fixed!")
+            }
             None => {
                 let mut out = Out::new(&krate);
                 out.literal_type(&lit, &side);
@@ -211,6 +226,14 @@ impl<'a> Out<'a> {
         self.text(">::NEW");
     }
 
+    /// A level literal: `$crate::literal::LevelLiteral::<N, E, $crate::literal::Db>::NEW`.
+    fn level(&mut self, lit: &grammar::Literal, marker: &str) {
+        self.krate("::literal::LevelLiteral::<");
+        self.number(lit);
+        self.krate(&format!("::{marker}"));
+        self.text(">::NEW");
+    }
+
     /// A point literal: `$crate::literal::LiteralAt::<N, E, Unit, Origin>::NEW`, the unit `literal::Steps` for a
     /// number in the origin's own step.
     fn point(&mut self, lit: &grammar::Literal, at: &At, side: &Side) {
@@ -295,6 +318,7 @@ impl<'a> Out<'a> {
             } => self.marker(path, group, *id, side),
             Unit::One => self.krate("::literal::Unitless"),
             Unit::Steps => self.krate("::literal::Steps"),
+            Unit::Level { marker, .. } => self.krate(&format!("::{marker}")),
             Unit::Type(ids) => self.tokens(ids, side),
             Unit::Mul(a, b) => match b.as_ref() {
                 Unit::Pow(x, n) if *n < 0 => {
