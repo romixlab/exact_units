@@ -18,6 +18,8 @@ pages! {
     Units = "start/units.md";
     Display = "start/display.md";
     Literals = "start/literals.md";
+    #[cfg(all(feature = "electrical", feature = "time"))]
+    Symbols = "start/symbols.md";
     Firmware = "start/firmware.md";
     Arithmetic = "maths/arithmetic.md";
     Conversions = "maths/conversions.md";

@@ -274,6 +274,13 @@ counted units, and the kinds that keep look-alike quantities apart.
   both in `quantities`. The named markers are plain, so their compounds convert to them, except where a named
   marker of the same dimension is another kind (`EnergyDensity`, `Entropy`); `units::spellings(name)` gives a
   unit's other spellings (`nit`, `nt`), read by `serde::with_unit` too (42d53d7).
+- ✅ **UNIT-11 `q!`'s symbol table, generated** — `macros/src/pure/table.rs` is written from the `unit!` and `origin!`
+  lines and the catalogue they declare by `tests/q_symbols.rs` (`just q-symbols`), and `just test` fails when it or
+  the book's page is stale. A symbol that reads two ways is refused with what to write instead: its own lines, the
+  stem of a qualified symbol (`gal (US)`), and every split into a prefix and a unit (`cd` is also a cord and a
+  centi-day, `min` a milli-inch); readings with the same exact value fold (`km`). Prefixes only on the units the SI
+  lets take one. Every symbol resolves as the generator says, and the run-time text reader reads each the same or
+  not at all. Book: [The symbols of `q!`](docs/start/symbols.md).
 - 📋 **UNIT-6 More counted units** (was STD-69) · `v0.5` — Symbol (baud = Symbol/s), Packet, Pulse, Event, Tick, Chunk, Particle,
   each a dimension of its own; `AVOGADRO` bridges `Particle` and mol exactly.
 - 📋 **UNIT-7 The unit's identity and data form** · `foundations` — `UnitDef` per named unit with `UnitId { crate_name,

@@ -20,6 +20,12 @@
     clippy::arithmetic_side_effects,
     reason = "a test adds string offsets and small exponents, which fit"
 )]
+#![expect(
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "the generator's helpers fail the test by panicking, on source that isn't in the shape they read"
+)]
 
 #[path = "../macros/src/pure/entry.rs"]
 mod entry;
@@ -272,7 +278,7 @@ fn generate() -> Generated {
     };
     let prefixes = |line: &Line| {
         let Some(UnitExpr::Named { dim, scale, .. }) = units::by_name(&line.name) else {
-            unreachable!()
+            panic!("{} is no named unit", line.name);
         };
         if BINARY.contains(&line.name.as_str()) {
             Prefixes::SiBinary
@@ -512,6 +518,20 @@ fn table_rs(g: &Generated) -> String {
     out
 }
 
+/// `e` in superscript digits: `⁻²`.
+fn superscript(e: i8) -> String {
+    e.to_string()
+        .chars()
+        .map(|c| match c {
+            '-' => '⁻',
+            d => "⁰¹²³⁴⁵⁶⁷⁸⁹"
+                .chars()
+                .nth(usize::try_from(d.to_digit(10).unwrap()).unwrap())
+                .unwrap(),
+        })
+        .collect()
+}
+
 /// The tables of the book's page `docs/start/symbols.md`, by the name of their generated block.
 fn docs_blocks(g: &Generated) -> Vec<(&'static str, String)> {
     let mut units = String::from("| Symbol | Marker | Feature | Prefixes |\n|---|---|---|---|\n");
@@ -523,7 +543,7 @@ fn docs_blocks(g: &Generated) -> Vec<(&'static str, String)> {
         };
         let marker = match s.pow10 {
             0 => format!("`{}`", s.marker),
-            e => format!("`{}` · 10^{e}^", s.marker),
+            e => format!("`{}` · 10{}", s.marker, superscript(e)),
         };
         writeln!(
             units,
@@ -628,4 +648,147 @@ fn table_and_page_are_generated() {
             assert!(new == old, "{file} is stale: run `just q-symbols`");
         }
     }
+}
+
+/// `q!` reads every symbol of the generator as the generator says: a table symbol as its line, a prefixed form as the
+/// prefix and its line, an origin as the origin, a refused symbol never.
+#[test]
+fn resolve_agrees() {
+    use resolve::{Symbol, resolve};
+    let g = generate();
+    for (symbol, _) in &g.refused {
+        assert!(resolve(symbol).is_err(), "{symbol} is refused");
+    }
+    for (symbol, path, _) in &g.origins {
+        assert!(
+            matches!(resolve(symbol), Ok(Symbol::Origin(o)) if o.path == path),
+            "{symbol} is {path}"
+        );
+    }
+    let refused = |s: &str| g.refused.iter().any(|(r, _)| r == s);
+    for s in &g.units {
+        if !refused(&s.symbol) {
+            assert!(
+                matches!(resolve(&s.symbol), Ok(Symbol::Unit { entry, prefix: None }) if entry.symbol == s.symbol),
+                "{} is {}",
+                s.symbol,
+                s.marker
+            );
+        }
+        for p in PREFIXES.iter().filter(|p| takes(s.prefixes, p)) {
+            let form = format!("{}{}", p.text, s.symbol);
+            if refused(&form) {
+                continue;
+            }
+            assert!(
+                matches!(resolve(&form), Ok(Symbol::Unit { entry, prefix: Some(q) }) if entry.symbol == s.symbol && q == p),
+                "{form} is {} {}",
+                prefix_name(p),
+                s.marker
+            );
+        }
+    }
+    for (symbol, marker) in &g.folded {
+        assert!(
+            matches!(
+                resolve(symbol),
+                Ok(Symbol::Unit {
+                    prefix: Some(_),
+                    ..
+                })
+            ),
+            "{symbol} ({marker}) is a prefix and a unit"
+        );
+    }
+}
+
+/// What the run-time text reader makes of `1 {form}` for the marker `M`, against `10^pow10 · 2^pow2` of it.
+fn reads<M: exact_units::Unit>(form: &str, pow10: i32, pow2: u32) -> Result<(), String> {
+    use exact_units::Exact;
+    let ten = 10i128.pow(pow10.unsigned_abs());
+    let two = 2i128.pow(pow2);
+    let want = if pow10 >= 0 {
+        Exact::<M>::new(ten * two, 1)
+    } else {
+        Exact::<M>::new(two, ten.unsigned_abs())
+    };
+    match format!("1 {form}").parse::<Exact<M>>() {
+        Ok(v) if v == want => Ok(()),
+        Ok(v) => Err(format!("{form}: text reads {v}, q! {want}")),
+        Err(_) => Err(format!("{form}: text refuses it")),
+    }
+}
+
+/// Every spelling `q!` reads of a unit (its symbol, and with each prefix it takes) reads the same through the run-time
+/// text reader (`Exact::from_str`, the reader of `serde::with_unit`), or the text reader refuses it: never another
+/// value. The spellings only `q!` reads are listed, so a new one is a decision.
+#[test]
+fn text_reader_agrees() {
+    let g = generate();
+    let refused = |s: &str| g.refused.iter().any(|(r, _)| r == s);
+    let mut only_q = Vec::new();
+    let mut differ = Vec::new();
+    for s in &g.units {
+        let mut forms = vec![];
+        if !refused(&s.symbol) {
+            forms.push((s.symbol.clone(), i32::from(s.pow10), 0));
+        }
+        for p in PREFIXES.iter().filter(|p| takes(s.prefixes, p)) {
+            let form = format!("{}{}", p.text, s.symbol);
+            if !refused(&form) {
+                forms.push(match p.scale {
+                    prefix::Scale::Pow10(e) => (form, e + i32::from(s.pow10), 0),
+                    prefix::Scale::Pow1024(e) => (form, i32::from(s.pow10), e * 10),
+                });
+            }
+        }
+        for (form, pow10, pow2) in forms {
+            macro_rules! markers {
+                ($($m:ident),* $(,)?) => {
+                    match s.marker.as_str() {
+                        $(stringify!($m) => reads::<units::$m>(&form, pow10, pow2),)*
+                        m => panic!("add {m} to the markers of this test"),
+                    }
+                };
+            }
+            #[rustfmt::skip]
+            let r = markers!(
+                Absorbance, Ampere, Arcminute, Arcsecond, AtmosphereStandard, Baud, Becquerel, Bit, Block, BtuIt,
+                BtuMean, BtuTh, Byte, CalorieFoodIt, CalorieFoodTh, CalorieIt, CalorieMean, CalorieTh, Candela,
+                Cental, Char, Chunk, CircularMil, Code, Coulomb, Cycle, Day, Degree, Doubleword, ElectronVolt, Entry,
+                Farad, Frame, Gon, Grain, Gram, Gray, Halfword, Henry, Hertz, Hour, Inch, Item, Joule, Katal, Kelvin,
+                KilocalorieIt, KilocalorieTh, KilogramForce, Kip, Knot, Ksi, Line, Litre, Lumen, Lux, Meter,
+                Microinch, MilePerHour, Mole, Newton, Nibble, Nit, Ohm, OpticalDepth, OunceForce, Packet, Pascal,
+                Pennyweight, Poundal, PoundForce, Psf, Psi, Quad, Radian, Ratio, Record, Rood, Row, Sample, Second,
+                Sector, Siemens, Sievert, Slug, Steradian, Stone, StreckSwedish, Tesla, Thou, TonForceShort, Tonne,
+                TonOfRefrigeration, TonOfTnt, TonShort, Torr, Turn, Var, Volt, VoltAmpere, Watt, Weber, Week, Word,
+            );
+            match r {
+                Ok(()) => {}
+                Err(e) if e.ends_with("refuses it") => only_q.push(e),
+                Err(e) => differ.push(e),
+            }
+        }
+    }
+    assert!(
+        differ.is_empty(),
+        "q! and the text reader differ:\n{}",
+        differ.join("\n")
+    );
+    // what only q! reads: the ASCII spellings of ALIASES (a `q!` token can't be `Ω`), and the binary prefixes past
+    // tebi, which the text reader's `Prefix` doesn't have
+    let gap = |e: &String| {
+        let form = e.split_once(':').unwrap().0;
+        let base = PREFIXES
+            .iter()
+            .find_map(|p| {
+                form.strip_prefix(p.text)
+                    .filter(|b| ALIASES.iter().any(|a| a.0 == *b))
+            })
+            .unwrap_or(form);
+        ALIASES.iter().any(|a| a.0 == base && a.0.is_ascii())
+            || ["Pi", "Ei", "Zi", "Yi"].iter().any(|p| form.starts_with(p))
+    };
+    let other: Vec<&String> = only_q.iter().filter(|e| !gap(e)).collect();
+    assert!(other.is_empty(), "only q! reads these: {other:?}");
 }

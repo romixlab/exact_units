@@ -99,6 +99,10 @@ docs-prep:
 customary-docs:
     CUSTOMARY_DOCS=update cargo nextest run --all-features docs_page_tables
 
+# Regenerate q!'s symbol table (macros/src/pure/table.rs) and the book's docs/start/symbols.md from the unit! lines
+q-symbols:
+    Q_SYMBOLS=update cargo nextest run --all-features --test q_symbols table_and_page_are_generated
+
 # Collect coverage for the feature sets `just test` uses (shared by cov and cov-html)
 _cov-collect:
     cargo llvm-cov clean --workspace

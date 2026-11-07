@@ -23,6 +23,7 @@ nav = [
             "start/units.md",
             "start/display.md",
             "start/literals.md",
+            "start/symbols.md",
             "start/firmware.md",
         ]
     },

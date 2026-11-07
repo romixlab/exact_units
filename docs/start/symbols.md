@@ -4,11 +4,47 @@ level: basic
 
 # The symbols of `q!`
 
+`q!(100 m/s)` names its unit by symbol. Each symbol is one unit marker, and one that could mean two units doesn't compile: `min` is a minute, a US or imperial minim and a milli-inch, so `q!` asks which one.
+
+```rust
+use exact_units::{Fixed, q, prefix::Milli, units::{Minute, Volt}};
+
+let v = Fixed::<Volt, Milli, u16>::new(3300);
+assert!(v > q!(3 V));
+assert!(v == q!(3300 mV));
+assert!(v < q!(0.004 kV));
+
+let t = Fixed::<Minute, Milli, u32>::new(1500);
+assert!(t == q!(1.5 Minute)); // `min` reads more than one way: the marker says which
+```
+
+```rust,compile_fail
+use exact_units::q;
+
+let _ = q!(5 min); // a minute, a minim or a milli-inch?
+```
+
+## Where the table comes from
+
+The table is generated from the crate's `unit!` and `origin!` lines, so a new marker gets its symbol without a second list to keep. `just q-symbols` writes it (`macros/src/pure/table.rs`) and the tables of this page; `just test` fails when either is stale. The rules:
+
+- **One word.** A `unit!` symbol is a `q!` symbol when it has no `/`, `·`, space, parenthesis, digit or exponent. `m/s²` is written `m/s^2`, a product of symbols. A qualified symbol (`gal (US)`) is written as its marker, `GallonUs`.
+- **Prefixes where the SI allows them.** A coherent SI unit takes the SI prefixes, and so do g, L, eV and t. bit and B take the binary ones too (`KiB`). Nothing else does: no `kh`, `mdeg` or `kin`.
+- **Two readings, refused.** A symbol's readings are its own lines, the markers of the qualified symbols it is the stem of, and every split into a prefix and a unit of the table, whether that unit takes the prefix or not. `cd` is the candela, the cord and a centi-day, so it is refused. A prefixed form splits only into units that take its prefix, so `mcd` is a millicandela.
+- **The same value folds.** Readings of the same dimension, kind and exact scale are one: `km` is the marker `Kilometre` and kilo `Meter`, so it is read as kilo `Meter`.
+- **Every group counts.** The table is worked out with every feature on. Which symbols are refused never depends on the features a build turns on; a symbol whose group is off is an error that names the feature.
+
+Text a person types at run time (`Exact::from_str`, `serde::with_unit`) reads each of these symbols as `q!` does or refuses it, never as another value; a test checks every one. Only `q!` reads the ASCII spellings `ohm`, `deg` and `percent` and the binary prefixes past Ti.
+
+## Units
+
+The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`, `ppm` and `ppb` are a `Ratio` with a power of ten.
+
 <!-- generated: units -->
 
 | Symbol | Marker | Feature | Prefixes |
 |---|---|---|---|
-| `%` | `Ratio` · 10^-2^ | `dimensionless` | none |
+| `%` | `Ratio` · 10⁻² | `dimensionless` | none |
 | `A` | `Ampere` | `electrical` | SI |
 | `AU` | `Absorbance` | `levels` | none |
 | `B` | `Byte` | `information` | SI and binary |
@@ -86,9 +122,9 @@ level: basic
 | `ozf` | `OunceForce` | `customary` | none |
 | `packet` | `Packet` | `counting` | none |
 | `pdl` | `Poundal` | `customary` | none |
-| `percent` | `Ratio` · 10^-2^ | `dimensionless` | none |
-| `ppb` | `Ratio` · 10^-9^ | `dimensionless` | none |
-| `ppm` | `Ratio` · 10^-6^ | `dimensionless` | none |
+| `percent` | `Ratio` · 10⁻² | `dimensionless` | none |
+| `ppb` | `Ratio` · 10⁻⁹ | `dimensionless` | none |
+| `ppm` | `Ratio` · 10⁻⁶ | `dimensionless` | none |
 | `psf` | `Psf` | `customary` | none |
 | `psi` | `Psi` | `customary` | none |
 | `quad` | `Quad` | `customary` | none |
@@ -116,11 +152,15 @@ level: basic
 | `µin` | `Microinch` | `customary` | none |
 | `Ω` | `Ohm` | `electrical` | SI |
 | `τ` | `OpticalDepth` | `levels` | none |
-| `‰` | `Ratio` · 10^-3^ | `dimensionless` | none |
+| `‰` | `Ratio` · 10⁻³ | `dimensionless` | none |
 | `′` | `Arcminute` | `customary` | none |
 | `″` | `Arcsecond` | `customary` | none |
 
 <!-- end: units -->
+
+## Symbols that are a prefix and a unit
+
+A `unit!` line whose symbol is also a prefix on another unit of the same value is read as the prefix and that unit.
 
 <!-- generated: folded -->
 
@@ -129,6 +169,10 @@ level: basic
 | `km` | `Kilometre` | kilo `Meter` |
 
 <!-- end: folded -->
+
+## Refused symbols
+
+Each reads more than one way, so `q!` refuses it and names the readings. Write the marker you mean as a type: `q!(5 Candela)`, `q!(1 GallonUs)`.
 
 <!-- generated: refused -->
 
@@ -177,6 +221,10 @@ level: basic
 
 <!-- end: refused -->
 
+## Origins
+
+A temperature in °C, °F or °R is a point against its origin, and compares with a `Point` only.
+
 <!-- generated: origins -->
 
 | Symbol | Origin | Feature |
@@ -191,6 +239,10 @@ level: basic
 | `℉` | `origins::Fahrenheit` | `thermal` |
 
 <!-- end: origins -->
+
+## Written as a type
+
+These `unit!` symbols are no `q!` symbol: a compound one is written with operators (`V/m` as `V / m`), a qualified one as its marker.
 
 <!-- generated: types -->
 
