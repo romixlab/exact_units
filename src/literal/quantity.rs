@@ -12,8 +12,11 @@
 //!   so it is a compile error, never a silent `false`; `<` and `<=` say what was meant.
 //! - Units that don't convert are a compile error, as for `fixed!(x in S)`.
 //! - Float storages too: the literal folds to the largest float at or below it and whether it is that float, so
-//!   `t < q!(0.1 V)` on an `f32` is one float compare, `0.1_f32` (just above 0.1) is above it, and nothing in an
-//!   `f32` equals it. NaN compares false with every literal, and `partial_cmp` is `None`; ±∞ are past every literal.
+//!   `t < q!(0.1 V)` on an `f32` is one float compare, and `0.1_f32` (just above 0.1) is above it. NaN compares
+//!   false with every literal, and `partial_cmp` is `None`; ±∞ are past every literal.
+//! - On a float storage, `==` and `!=` compile only against a literal that is a float of the storage, in steps of
+//!   `P`: `q!(0.75 V)`, never `q!(0.1 V)`, which no `f32` is, nor one past the float's range. A scale with π in it
+//!   makes no literal a float, so `==` never compiles there; `<` and `<=` do.
 //!
 //! ```
 //! # #[cfg(feature = "mechanical")] {
@@ -31,11 +34,43 @@
 //! use exact_units::{Fixed, q, prefix::One, units::Volt};
 //! let v = |x: f32| Fixed::<Volt, One, f32>::new(x);
 //! assert!(v(0.1) > q!(0.1 V)); // 0.100000001490116.. as an f32
-//! assert!(v(0.1).ne(&q!(0.1 V)));
 //! assert!(v(0.1f32.next_down()) < q!(0.1 V));
 //! assert!(v(0.75) == q!(0.75 V)); // a float itself
+//! assert!(v(-0.0) == q!(0 V)); // −0.0 is 0
 //! assert!(v(f32::NAN).partial_cmp(&q!(0.1 V)).is_none());
 //! # }
+//! ```
+//!
+//! `==` against a literal no float is doesn't compile: `v(0.1) == q!(0.1 V)` would be `false` for every `f32`.
+//!
+//! ```compile_fail
+//! # #[cfg(feature = "electrical")] {
+//! use exact_units::{Fixed, q, prefix::One, units::Volt};
+//! let v = Fixed::<Volt, One, f32>::new(0.1);
+//! let _ = v == q!(0.1 V);
+//! # }
+//! # #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+//! ```
+//!
+//! Nor `!=` against one past the float's range (an `f32` ends a hair below 3.4028235 · 10³⁸), nor `==` where the
+//! scale has π in it (no number of radians in an `f32` is 90°):
+//!
+//! ```compile_fail
+//! # #[cfg(feature = "electrical")] {
+//! use exact_units::{Fixed, q, prefix::One, units::Volt};
+//! let v = Fixed::<Volt, One, f32>::new(0.1);
+//! let _ = v != q!(3.4028235e38 V); // f32::MAX is 3.40282346..e38
+//! # }
+//! # #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+//! ```
+//!
+//! ```compile_fail
+//! # #[cfg(feature = "angle")] {
+//! use exact_units::{Fixed, q, prefix::One, units::Radian};
+//! let a = Fixed::<Radian, One, f64>::new(1.5707963267948966);
+//! let _ = a == q!(90 deg);
+//! # }
+//! # #[cfg(not(feature = "angle"))] compile_error!("the case needs angle");
 //! ```
 //!
 //! `==` against a literal between two steps doesn't compile, as no stored value equals it:
@@ -341,7 +376,7 @@ literal_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
 /// A literal against a float storage: `down` is the largest float at or below it (−∞ below the float's range, the
 /// largest finite float above it), `exact` whether it is that float.
 #[derive(Copy, Clone)]
-struct Below<F> {
+pub(super) struct Below<F> {
     down: F,
     exact: bool,
 }
@@ -356,7 +391,7 @@ macro_rules! literal_cmp_float {
                 clippy::arithmetic_side_effects,
                 reason = "bits is at most the largest finite float's, so bits + 1 fits (it is +∞'s)"
             )]
-            const fn of<S: Unit, U: Unit, P: FixedScale>(x: Decimal) -> Self {
+            pub(super) const fn of<S: Unit, U: Unit, P: FixedScale>(x: Decimal) -> Self {
                 let Some(abs) = x.to_interval_any(scale_in::<S, U, P>()) else {
                     return Below { down: 0.0, exact: true };
                 };
@@ -392,6 +427,21 @@ macro_rules! literal_cmp_float {
                 self.exact && t == self.down
             }
 
+            /// The float an `==` with a `q!` literal compares with: a compile error where none equals `x`. Above the
+            /// largest finite float `down` is that float, below the least it is −∞, neither of them `x`.
+            #[expect(clippy::panic, reason = "a compile error in const code: no stored value equals the literal")]
+            #[expect(clippy::float_cmp, reason = "down is MAX or −∞ exactly where the literal is past the range")]
+            pub(super) const fn equal(self) -> $ty {
+                if !self.exact && (self.down == $ty::MAX || self.down == $ty::NEG_INFINITY) {
+                    panic!("this literal is past the float's range: no stored value equals it");
+                }
+                assert!(
+                    self.exact,
+                    "this literal is not a float of the storage: no stored value equals it"
+                );
+                self.down
+            }
+
             /// `t > x`, false for NaN as `!le` is not.
             #[inline(always)]
             fn gt(self, t: $ty) -> bool {
@@ -423,7 +473,7 @@ macro_rules! literal_cmp_float {
         {
             #[inline]
             fn eq(&self, _: &LiteralIn<N, E, S>) -> bool {
-                const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)) }.eq(self.get())
+                self.get() == const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)).equal() }
             }
         }
 
@@ -434,7 +484,7 @@ macro_rules! literal_cmp_float {
             fn partial_cmp(&self, x: &LiteralIn<N, E, S>) -> Option<Ordering> {
                 if self.lt(x) {
                     Some(Ordering::Less)
-                } else if self.eq(x) {
+                } else if self.le(x) {
                     Some(Ordering::Equal)
                 } else if self.gt(x) {
                     Some(Ordering::Greater)

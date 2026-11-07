@@ -230,9 +230,12 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   round: a `const` block folds the literal to the largest float at or below it and whether it is that float
   (`Interval::float_below`, subnormals included, the largest finite float past the range, −∞ below it), then one
   float compare. NaN compares false (`partial_cmp` `None`), ±∞ past every literal, a scale with π decided from the
-  interval or a compile error. Tests: `tests/props/q_float.rs` (the fold against `num-rational`, random and
-  next-to-the-literal floats; `q!` walked over every `f32` whose low 16 bits are 0 and their neighbours) and the unit
-  tests of `Num::float_floor` over every `f32` exponent.
+  interval or a compile error. `==` and `!=` compile only against a literal that is a float of the storage: one no
+  float is (0.1, any literal against a scale with π) or one past the float's range is a compile error, never a
+  silent `false`. Tests: `tests/props/q_float.rs` (the fold against `num-rational`, random and next-to-the-literal
+  floats; `q!` walked over every `f32` whose low 16 bits are 0 and their neighbours, `==` only on literals that are
+  floats), the unit tests of `Num::float_floor` over every `f32` exponent and of the `==` fold's refusals, and the
+  `tests/compile_fail/q_float.rs` snapshot.
 - ✅ **NUM-17 `fixed!(100 m/s)`** — the typed constant names its unit the way `q!` reads one, symbols and all, rather
   than the type path `fixed!(v in S)` already takes: `fixed!(100 m/s)` into a `Fixed<Speed, Centi, i16>` is the same
   `AtLiteral<LiteralIn<N, E, Unit>>` the `in` form reads, so a unit of another dimension or kind doesn't compile, a

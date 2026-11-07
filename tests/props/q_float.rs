@@ -164,8 +164,20 @@ mod tests {
         }
     }
 
-    /// Every operator of stored value `t` against a `q!` literal, both ways round, is order `ord`.
+    /// Every operator of stored value `t` against a `q!` literal that is a float, both ways round, is order `ord`.
     macro_rules! agrees {
+        ($t:expr, $lit:expr, $ord:expr) => {{
+            let (t, lit, ord): (_, _, Option<Ordering>) = ($t, $lit, $ord);
+            ordered!(t, lit, ord);
+            assert_eq!(t == lit, ord == Some(Ordering::Equal), "{t:?}");
+            assert_eq!(t != lit, ord != Some(Ordering::Equal), "{t:?}");
+            assert_eq!(lit == t, ord == Some(Ordering::Equal), "{t:?}");
+        }};
+    }
+
+    /// The order of stored value `t` against a `q!` literal, both ways round, is `ord`: every operator but `==` and
+    /// `!=`, which don't compile with a literal no float is.
+    macro_rules! ordered {
         ($t:expr, $lit:expr, $ord:expr) => {{
             let (t, lit, ord): (_, _, Option<Ordering>) = ($t, $lit, $ord);
             assert_eq!(t.partial_cmp(&lit), ord, "{t:?}");
@@ -173,14 +185,11 @@ mod tests {
             assert_eq!(t <= lit, ord.is_some_and(Ordering::is_le), "{t:?}");
             assert_eq!(t > lit, ord == Some(Ordering::Greater), "{t:?}");
             assert_eq!(t >= lit, ord.is_some_and(Ordering::is_ge), "{t:?}");
-            assert_eq!(t == lit, ord == Some(Ordering::Equal), "{t:?}");
-            assert_eq!(t != lit, ord != Some(Ordering::Equal), "{t:?}");
             assert_eq!(lit.partial_cmp(&t), ord.map(Ordering::reverse), "{t:?}");
             assert_eq!(lit < t, ord == Some(Ordering::Greater), "{t:?}");
             assert_eq!(lit <= t, ord.is_some_and(Ordering::is_ge), "{t:?}");
             assert_eq!(lit > t, ord == Some(Ordering::Less), "{t:?}");
             assert_eq!(lit >= t, ord.is_some_and(Ordering::is_le), "{t:?}");
-            assert_eq!(lit == t, ord == Some(Ordering::Equal), "{t:?}");
         }};
     }
 
@@ -235,23 +244,23 @@ mod tests {
         walk(|t| {
             let w = |num_s, den_s, num, exp| order(t.into(), num_s, den_s, num, exp);
             let v = Fixed::<Volt, One, f32>::new(t);
-            agrees!(v, q!(0.1 V), w(1, 1, 1, -1));
-            agrees!(v, q!(-3.3 V), w(1, 1, -33, -1));
+            ordered!(v, q!(0.1 V), w(1, 1, 1, -1));
+            ordered!(v, q!(-3.3 V), w(1, 1, -33, -1));
             agrees!(v, q!(0.75 V), w(1, 1, 75, -2));
             agrees!(v, q!(0 V), w(1, 1, 0, 0));
-            agrees!(v, q!(1e30 V), w(1, 1, 1, 30));
-            agrees!(v, q!(-1.5e-30 V), w(1, 1, -15, -31));
-            agrees!(v, q!(100 mV), w(1, 1, 1, -1));
+            ordered!(v, q!(1e30 V), w(1, 1, 1, 30));
+            ordered!(v, q!(-1.5e-30 V), w(1, 1, -15, -31));
+            ordered!(v, q!(100 mV), w(1, 1, 1, -1));
             let s = Fixed::<Speed, Centi, f32>::new(t);
             agrees!(s, q!(100 m/s), w(1, 100, 100, 0));
-            agrees!(s, q!(-0.155 m/s), w(1, 100, -155, -3));
-            agrees!(s, q!(359.9 km/h), w(36, 1000, 3599, -1));
+            ordered!(s, q!(-0.155 m/s), w(1, 100, -155, -3));
+            ordered!(s, q!(359.9 km/h), w(36, 1000, 3599, -1));
             // a centimetre in steps of 2^120 m is a subnormal f32
             let p = Fixed::<Meter, Pow2<63>, f32>::new(t);
-            agrees!(p, q!(1e-19 m), w(1 << 63, 1, 1, -19));
-            agrees!(p, q!(-1e-19 m), w(1 << 63, 1, -1, -19));
+            ordered!(p, q!(1e-19 m), w(1 << 63, 1, 1, -19));
+            ordered!(p, q!(-1e-19 m), w(1 << 63, 1, -1, -19));
             let d = Fixed::<Meter, One, f64>::new(t.into());
-            agrees!(d, q!(0.1 m), w(1, 1, 1, -1));
+            ordered!(d, q!(0.1 m), w(1, 1, 1, -1));
             agrees!(d, q!(-2.5 km), w(1, 1, -2500, 0));
         });
     }
@@ -261,10 +270,10 @@ mod tests {
     fn every_f32_against_degrees_in_radians() {
         walk(|t| {
             let r = Fixed::<Radian, One, f32>::new(t);
-            agrees!(r, q!(90 deg), against_degrees(t.into(), 90));
-            agrees!(r, q!(-45 deg), against_degrees(t.into(), -45));
+            ordered!(r, q!(90 deg), against_degrees(t.into(), 90));
+            ordered!(r, q!(-45 deg), against_degrees(t.into(), -45));
             let r = Fixed::<Radian, One, f64>::new(t.into());
-            agrees!(r, q!(180 deg), against_degrees(t.into(), 180));
+            ordered!(r, q!(180 deg), against_degrees(t.into(), 180));
             let a = Fixed::<Degree, One, f32>::new(t);
             agrees!(a, q!(90 deg), order(t.into(), 1, 1, 90, 0));
         });
@@ -277,7 +286,6 @@ mod tests {
         let v = |x: f32| Fixed::<Volt, One, f32>::new(x);
         assert!(v(0.1) > q!(0.1 V));
         assert!(v(0.1f32.next_down()) < q!(0.1 V));
-        assert!(v(0.1) != q!(0.1 V));
         assert_eq!(v(0.75), q!(0.75 V));
         assert!(v(0.75f32.next_down()) < q!(0.75 V));
         assert!(v(0.75f32.next_up()) > q!(0.75 V));

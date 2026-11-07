@@ -229,3 +229,39 @@ crate::scale! {
 fn a_scale_with_pi_panics_at_run_time() {
     let _ = Fixed::<Ratio, PiQ15, i16>::from_decimal(Decimal::new(1, 0));
 }
+
+/// `==` with a `q!` literal on a float storage folds to the float it is, or stops: a literal no float is (0.1, one
+/// between two subnormals, 0.1 in steps of 1/3), one past the float's range either side.
+#[cfg(all(feature = "q", feature = "electrical"))]
+#[test]
+fn float_equal_only_for_a_float() {
+    use super::quantity::Below;
+    use crate::units::Volt;
+    let equal32 = |num, exp| {
+        std::panic::catch_unwind(|| Below::<f32>::of::<Volt, Volt, One>(Decimal::new(num, exp)).equal())
+            .map_err(|e| e.downcast_ref::<&str>().map(|m| String::from(*m)))
+    };
+    assert_eq!(equal32(75, -2), Ok(0.75));
+    assert_eq!(equal32(-75, -2), Ok(-0.75));
+    assert_eq!(equal32(0, 0), Ok(0.0));
+    assert_eq!(equal32(16_777_216, 0), Ok(16_777_216.0));
+    let not_a_float = Err(Some(String::from(
+        "this literal is not a float of the storage: no stored value equals it",
+    )));
+    assert_eq!(equal32(1, -1), not_a_float);
+    assert_eq!(equal32(16_777_217, 0), not_a_float);
+    assert_eq!(equal32(1, -38), not_a_float); // between two subnormals
+    assert_eq!(equal32(-1, -38), not_a_float);
+    let past = Err(Some(String::from(
+        "this literal is past the float's range: no stored value equals it",
+    )));
+    assert_eq!(equal32(340_282_350, 30), past); // above f32::MAX, below 2^128
+    assert_eq!(equal32(-340_282_350, 30), past);
+    assert_eq!(equal32(34, 37), not_a_float); // below f32::MAX, between two floats
+    let equal64 = |num, exp| {
+        std::panic::catch_unwind(|| Below::<f64>::of::<Volt, Volt, Rational<1, 3>>(Decimal::new(num, exp)).equal())
+            .is_ok()
+    };
+    assert!(equal64(1, 0)); // 3 thirds
+    assert!(!equal64(1, -1)); // 0.3 thirds
+}

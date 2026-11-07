@@ -52,10 +52,10 @@ note: erroneous constant encountered
   = note: this note originates in the macro `literal_cmp_float` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 note: the above error was encountered while instantiating `fn quantity::<impl PartialOrd<LiteralIn<1, 2, Meter>> for Fixed<Speed, exact_units::prefix::Centi, f32>>::lt`
- --> tests/compile_fail/q_float.rs:7:13
-  |
-7 |     let _ = speed < q!(100 m);
-  |             ^^^^^^^^^^^^^^^^^
+  --> tests/compile_fail/q_float.rs:13:13
+   |
+13 |     let _ = speed < q!(100 m);
+   |             ^^^^^^^^^^^^^^^^^
 
 error[E0080]: evaluation panicked: a literal's unit converts only between units of the same dimension: Meter (m) is m, not Speed (m/s) which is m·s⁻¹; they differ by s
  --> src/literal/quantity.rs
@@ -99,7 +99,153 @@ note: erroneous constant encountered
   = note: this note originates in the macro `literal_cmp` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 note: the above error was encountered while instantiating `fn quantity::<impl PartialOrd<LiteralIn<0, 0, Meter>> for Fixed<Speed, exact_units::prefix::Centi, i16>>::lt`
- --> tests/compile_fail/q_float.rs:9:13
+  --> tests/compile_fail/q_float.rs:15:13
+   |
+15 |     let _ = speed < q!(0 m);
+   |             ^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: this literal is not a float of the storage: no stored value equals it
+ --> src/literal/quantity.rs
   |
-9 |     let _ = speed < q!(0 m);
-  |             ^^^^^^^^^^^^^^^
+  |                   self.get() == const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)).equal() }
+  |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::quantity::<impl std::cmp::PartialEq<exact_units::literal::LiteralIn<1, -1, exact_units::units::Volt>> for exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::One, f32>>::eq::{constant#0}` failed inside this call
+...
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+  |
+note: inside `quantity::Below::<f32>::equal`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/quantity.rs
+  |
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+  = note: this error originates in the macro `literal_cmp_float` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: erroneous constant encountered
+ --> src/literal/quantity.rs
+  |
+  |                   self.get() == const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)).equal() }
+  |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+  |
+  = note: this note originates in the macro `literal_cmp_float` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn quantity::<impl PartialEq<LiteralIn<1, -1, Volt>> for Fixed<Volt, One, f32>>::eq`
+  --> tests/compile_fail/q_float.rs:17:13
+   |
+17 |     let _ = v == q!(0.1 V);
+   |             ^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: this literal is past the float's range: no stored value equals it
+ --> src/literal/quantity.rs
+  |
+  |                   self.get() == const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)).equal() }
+  |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::quantity::<impl std::cmp::PartialEq<exact_units::literal::LiteralIn<34028235, 31, exact_units::units::Volt>> for exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::One, f32>>::eq::{constant#0}` failed inside this call
+...
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+  |
+note: inside `quantity::Below::<f32>::equal`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/quantity.rs
+  |
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+  = note: this error originates in the macro `literal_cmp_float` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn quantity::<impl PartialEq<LiteralIn<34028235, 31, Volt>> for Fixed<Volt, One, f32>>::eq`
+ --> $RUST/core/src/cmp.rs
+  |
+  |         !self.eq(other)
+  |          ^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: this literal is past the float's range: no stored value equals it
+ --> src/literal/quantity.rs
+  |
+  |                   self.get() == const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)).equal() }
+  |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::quantity::<impl std::cmp::PartialEq<exact_units::literal::LiteralIn<-34028235, 31, exact_units::units::Volt>> for exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::One, f32>>::eq::{constant#0}` failed inside this call
+...
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+  |
+note: inside `quantity::Below::<f32>::equal`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/quantity.rs
+  |
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+  = note: this error originates in the macro `literal_cmp_float` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn quantity::<impl PartialEq<LiteralIn<-34028235, 31, Volt>> for Fixed<Volt, One, f32>>::eq`
+ --> $RUST/core/src/cmp.rs
+  |
+  |             PartialEq::eq(*self, *other)
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: this literal is not a float of the storage: no stored value equals it
+ --> src/literal/quantity.rs
+  |
+  |                   self.get() == const { Below::<$ty>::of::<S, U, P>(Decimal::new(N, E)).equal() }
+  |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::literal::quantity::<impl std::cmp::PartialEq<exact_units::literal::LiteralIn<9, 1, exact_units::units::Degree>> for exact_units::Fixed<exact_units::units::Radian, exact_units::prefix::One, f64>>::eq::{constant#0}` failed inside this call
+...
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+  |
+note: inside `quantity::Below::<f64>::equal`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/quantity.rs
+  |
+  | / literal_cmp_float! {
+  | |     f32 u32 24 127;
+  | |     f64 u64 53 1023;
+  | | }
+  | |_- in this macro invocation
+  = note: this error originates in the macro `literal_cmp_float` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn quantity::<impl PartialEq<LiteralIn<9, 1, Degree>> for Fixed<Radian, One, f64>>::eq`
+  --> tests/compile_fail/q_float.rs:21:13
+   |
+21 |     let _ = a == q!(90 deg);
+   |             ^^^^^^^^^^^^^^^
