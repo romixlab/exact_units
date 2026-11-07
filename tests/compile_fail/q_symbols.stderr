@@ -1,35 +1,53 @@
-error: q!: `min` reads more than one way (Minute, MinimUs, MinimImperial, milli Inch): write the one you mean as a type, as in q!(5 Minute)
- --> tests/compile_fail/q_symbols.rs:7:22
+error: q!: `min` reads more than one way (Minute, MinimUs, MinimImperial): write the one you mean as a type, as in q!(5 Minute)
+ --> tests/compile_fail/q_symbols.rs:8:22
   |
-7 |     let _ = t < q!(5 min);
+8 |     let _ = t < q!(5 min);
   |                      ^^^
 
 error: q!: `gal` reads more than one way (GallonUs, GallonImperial): write the one you mean as a type, as in q!(5 GallonUs)
- --> tests/compile_fail/q_symbols.rs:8:22
+ --> tests/compile_fail/q_symbols.rs:9:22
   |
-8 |     let _ = t < q!(5 gal);
+9 |     let _ = t < q!(5 gal);
   |                      ^^^
 
 error: q!: `kmh` is no unit symbol q! knows: write a symbol (m/s, km/h, mV), its type (Speed, units::Volt), or a string for one Rust's lexer can't take ("°")
- --> tests/compile_fail/q_symbols.rs:9:22
-  |
-9 |     let _ = t < q!(5 kmh);
-  |                      ^^^
-
-error: q!: `kh`: `h` takes no prefix `k`
   --> tests/compile_fail/q_symbols.rs:10:22
    |
-10 |     let _ = t < q!(5 kh);
+10 |     let _ = t < q!(5 kmh);
+   |                      ^^^
+
+error: q!: `kh`: `h` takes no prefix `k`
+  --> tests/compile_fail/q_symbols.rs:11:22
+   |
+11 |     let _ = t < q!(5 kh);
    |                      ^^
 
 error: q!: `KiV`: `V` takes no prefix `Ki` (binary prefixes are for bit and B)
-  --> tests/compile_fail/q_symbols.rs:11:22
+  --> tests/compile_fail/q_symbols.rs:12:22
    |
-11 |     let _ = t < q!(5 KiV);
+12 |     let _ = t < q!(5 KiV);
    |                      ^^^
 
 error: q!: `furlong` is no unit symbol q! knows: write a symbol (m/s, km/h, mV), its type (Speed, units::Volt), or a string for one Rust's lexer can't take ("°")
-  --> tests/compile_fail/q_symbols.rs:12:22
+  --> tests/compile_fail/q_symbols.rs:13:22
    |
-12 |     let _ = t < q!(5 "furlong");
+13 |     let _ = t < q!(5 "furlong");
    |                      ^^^^^^^^^
+
+error: q!: `mt`: `t` takes no prefix `m` (it takes the prefixes from kilo up)
+  --> tests/compile_fail/q_symbols.rs:14:22
+   |
+14 |     let _ = t < q!(5 mt);
+   |                      ^^
+
+error: q!: `qt` reads more than one way (QuartUsLiquid, QuartUsDry, QuartImperial): write the one you mean as a type, as in q!(5 QuartUsLiquid)
+  --> tests/compile_fail/q_symbols.rs:15:22
+   |
+15 |     let _ = t < q!(5 qt);
+   |                      ^^
+
+error: q!: `cable` names a unit only with its qualifier, so no bare default is picked: write the type, as in q!(5 CableUs)
+  --> tests/compile_fail/q_symbols.rs:16:22
+   |
+16 |     let _ = t < q!(5 cable);
+   |                      ^^^^^

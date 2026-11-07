@@ -29,8 +29,9 @@ let _ = q!(5 min); // a minute, a minim or a milli-inch?
 The table is generated from the crate's `unit!` and `origin!` lines, so a new marker gets its symbol without a second list to keep. `just q-symbols` writes it (`macros/src/pure/table.rs`) and the tables of this page; `just test` fails when either is stale. The rules:
 
 - **One word.** A `unit!` symbol is a `q!` symbol when it has no `/`, `·`, space, parenthesis, digit or exponent. `m/s²` is written `m/s^2`, a product of symbols. A qualified symbol (`gal (US)`) is written as its marker, `GallonUs`.
-- **Prefixes where the SI allows them.** A coherent SI unit takes the SI prefixes, and so do g, L, eV and t. bit and B take the binary ones too (`KiB`). Nothing else does: no `kh`, `mdeg` or `kin`.
-- **Two readings, refused.** A symbol's readings are its own lines, the markers of the qualified symbols it is the stem of, and every split into a prefix and a unit of the table, whether that unit takes the prefix or not. `cd` is the candela, the cord and a centi-day, so it is refused. A prefixed form splits only into units that take its prefix, so `mcd` is a millicandela.
+- **Prefixes where the SI allows them.** A coherent SI unit takes the SI prefixes, and so do g, L and eV. The tonne takes them from kilo up (`kt`, `Mt`): a smaller mass is written in grams. bit and B take the binary ones too (`KiB`). Nothing else does: no `kh`, `mdeg` or `kin`.
+- **No bare default.** A qualified symbol never lets its stem be read as one of its units: `ft` is refused while `ft (US survey)` exists, although the international foot's own symbol is `ft`, and `qt` is refused for the US liquid, US dry and imperial quarts. Words qualify like a parenthesis: `liq` and `dry` before a symbol, `avdp`, `t` and `ap` after one (`oz t`, the troy ounce), where the stem is no unit's own symbol (`s ap`, the scruple, leaves `s` the second). A stem with one qualified unit is refused too (`cable`): write the marker.
+- **Two readings, refused.** A symbol's readings are its own lines, the markers of the qualified symbols it is the stem of, and every split into a prefix and a unit that takes that prefix. `cd` is the candela and the cord, so it is refused; it is no centi-day, as the day takes no prefix, and `yd` is the yard alone. `mcd` is a millicandela, never a millicord.
 - **The same value folds.** Readings of the same dimension, kind and exact scale are one: `km` is the marker `Kilometre` and kilo `Meter`, so it is read as kilo `Meter`.
 - **Every group counts.** The table is worked out with every feature on. Which symbols are refused never depends on the features a build turns on; a symbol whose group is off is an error that names the feature.
 
@@ -74,6 +75,7 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `VA` | `VoltAmpere` | `electrical` | SI |
 | `W` | `Watt` | `electrical` | SI |
 | `Wb` | `Weber` | `electrical` | SI |
+| `at` | `AtmosphereTechnical` | `customary` | none |
 | `atm` | `AtmosphereStandard` | `customary` | none |
 | `bit` | `Bit` | `information` | SI and binary |
 | `block` | `Block` | `counting` | none |
@@ -99,6 +101,7 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `gr` | `Grain` | `customary` | none |
 | `h` | `Hour` | `time` | none |
 | `halfword` | `Halfword` | `information` | none |
+| `hh` | `Hand` | `customary` | none |
 | `in` | `Inch` | `customary` | none |
 | `item` | `Item` | `counting` | none |
 | `kat` | `Katal` | `chemical` | SI |
@@ -140,7 +143,7 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `sr` | `Steradian` | `angle` | SI |
 | `st` | `Stone` | `customary` | none |
 | `streck` | `StreckSwedish` | `customary` | none |
-| `t` | `Tonne` | `customary` | SI |
+| `t` | `Tonne` | `customary` | SI from kilo up |
 | `tTNT` | `TonOfTnt` | `customary` | none |
 | `thou` | `Thou` | `customary` | none |
 | `tn` | `TonShort` | `customary` | none |
@@ -148,6 +151,7 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `var` | `Var` | `electrical` | SI |
 | `wk` | `Week` | `time` | none |
 | `word` | `Word` | `information` | none |
+| `yd` | `Yard` | `customary` | none |
 | `°` | `Degree` | `angle` | none |
 | `µin` | `Microinch` | `customary` | none |
 | `Ω` | `Ohm` | `electrical` | SI |
@@ -182,42 +186,42 @@ Each reads more than one way, so `q!` refuses it and names the readings. Write t
 | `PS` | `HorsepowerMetric`, peta `Siemens` | `q!(1 HorsepowerMetric)` |
 | `RT` | `TonRegister`, ronna `Tesla` | `q!(1 TonRegister)` |
 | `ac` | `AcreInternational`, `AcreUsSurvey` | `q!(1 AcreInternational)`, `q!(1 AcreUsSurvey)` |
-| `at` | `AtmosphereTechnical`, atto `Tonne` | `q!(1 AtmosphereTechnical)` |
 | `bbl` | `BarrelPetroleum`, `BarrelFermentedLiquor`, `BarrelLiquidState`, `BarrelCistern`, `BarrelProofSpirits`, `BarrelDry`, `BarrelCranberry` | `q!(1 BarrelPetroleum)`, `q!(1 BarrelFermentedLiquor)`, `q!(1 BarrelLiquidState)`, `q!(1 BarrelCistern)`, `q!(1 BarrelProofSpirits)`, `q!(1 BarrelDry)`, `q!(1 BarrelCranberry)` |
 | `bu` | `BushelUs`, `BushelImperial` | `q!(1 BushelUs)`, `q!(1 BushelImperial)` |
-| `cd` | `Candela`, `Cord`, centi `Day` | `q!(1 Candela)`, `q!(1 Cord)` |
-| `ch` | `ChainInternational`, `ChainUsSurvey`, centi `Hour` | `q!(1 ChainInternational)`, `q!(1 ChainUsSurvey)` |
+| `cable` | `CableUs` | `q!(1 CableUs)` |
+| `cd` | `Candela`, `Cord` | `q!(1 Candela)`, `q!(1 Cord)` |
+| `ch` | `ChainInternational`, `ChainUsSurvey` | `q!(1 ChainInternational)`, `q!(1 ChainUsSurvey)` |
 | `cup` | `CupUs`, `CupFda` | `q!(1 CupUs)`, `q!(1 CupFda)` |
 | `cwt` | `HundredweightShort`, `HundredweightLong` | `q!(1 HundredweightShort)`, `q!(1 HundredweightLong)` |
 | `dB` | `Decibel`, `DecibelLoss`, deci `Byte` | `q!(1 Decibel)`, `q!(1 DecibelLoss)` |
+| `dr` | `DramAvdp`, `DramApothecaries` | `q!(1 DramAvdp)`, `q!(1 DramApothecaries)` |
 | `fath` | `FathomInternational`, `FathomUsSurvey` | `q!(1 FathomInternational)`, `q!(1 FathomUsSurvey)` |
-| `ft` | `FootInternational`, `FootUsSurvey`, femto `Tonne` | `q!(1 FootInternational)`, `q!(1 FootUsSurvey)` |
+| `ft` | `FootInternational`, `FootUsSurvey` | `q!(1 FootInternational)`, `q!(1 FootUsSurvey)` |
+| `ftHg` | `FootOfMercuryConventional` | `q!(1 FootOfMercuryConventional)` |
 | `fur` | `FurlongInternational`, `FurlongUsSurvey` | `q!(1 FurlongInternational)`, `q!(1 FurlongUsSurvey)` |
 | `gal` | `GallonUs`, `GallonImperial` | `q!(1 GallonUs)`, `q!(1 GallonImperial)` |
 | `gi` | `GillUs`, `GillImperial` | `q!(1 GillUs)`, `q!(1 GillImperial)` |
-| `hh` | `Hand`, hecto `Hour` | `q!(1 Hand)` |
 | `hp` | `HorsepowerMechanical`, `HorsepowerElectric`, `HorsepowerBoiler`, `HorsepowerWater` | `q!(1 HorsepowerMechanical)`, `q!(1 HorsepowerElectric)`, `q!(1 HorsepowerBoiler)`, `q!(1 HorsepowerWater)` |
 | `inHg` | `InchOfMercuryConventional`, `InchOfMercury32f`, `InchOfMercury60f` | `q!(1 InchOfMercuryConventional)`, `q!(1 InchOfMercury32f)`, `q!(1 InchOfMercury60f)` |
-| `kat` | `Katal`, kilo `AtmosphereTechnical` | `q!(1 Katal)` |
+| `lb` | `PoundAvdp`, `PoundTroy` | `q!(1 PoundAvdp)`, `q!(1 PoundTroy)` |
 | `lea` | `LeagueInternational`, `LeagueUsSurvey` | `q!(1 LeagueInternational)`, `q!(1 LeagueUsSurvey)` |
 | `li` | `LinkInternational`, `LinkUsSurvey` | `q!(1 LinkInternational)`, `q!(1 LinkUsSurvey)` |
 | `mi` | `MileInternational`, `MileUsSurvey` | `q!(1 MileInternational)`, `q!(1 MileUsSurvey)` |
 | `mil` | `MilNato`, `MilWarsawPact` | `q!(1 MilNato)`, `q!(1 MilWarsawPact)` |
-| `min` | `Minute`, `MinimUs`, `MinimImperial`, milli `Inch` | `q!(1 Minute)`, `q!(1 MinimUs)`, `q!(1 MinimImperial)` |
+| `min` | `Minute`, `MinimUs`, `MinimImperial` | `q!(1 Minute)`, `q!(1 MinimUs)`, `q!(1 MinimImperial)` |
 | `mmHg` | `MillimetreOfMercuryConventional`, `MillimetreOfMercuryEu` | `q!(1 MillimetreOfMercuryConventional)`, `q!(1 MillimetreOfMercuryEu)` |
-| `nmi` | `NauticalMileInternational`, `NauticalMileUsPre1954`, `NauticalMileUkAdmiralty`, nano `MileInternational` | `q!(1 NauticalMileInternational)`, `q!(1 NauticalMileUsPre1954)`, `q!(1 NauticalMileUkAdmiralty)` |
-| `nt` | `Nit`, nano `Tonne` | `q!(1 Nit)` |
+| `nmi` | `NauticalMileInternational`, `NauticalMileUsPre1954`, `NauticalMileUkAdmiralty` | `q!(1 NauticalMileInternational)`, `q!(1 NauticalMileUsPre1954)`, `q!(1 NauticalMileUkAdmiralty)` |
+| `oz` | `OunceAvdp`, `OunceFda`, `OunceTroy` | `q!(1 OunceAvdp)`, `q!(1 OunceFda)`, `q!(1 OunceTroy)` |
 | `pc` | `PicaDtp`, `PicaPrinters` | `q!(1 PicaDtp)`, `q!(1 PicaPrinters)` |
 | `pk` | `PeckUs`, `PeckImperial` | `q!(1 PeckUs)`, `q!(1 PeckImperial)` |
-| `pt` | `PointDtp`, `PointPrinters`, `PintImperial`, pico `Tonne` | `q!(1 PointDtp)`, `q!(1 PointPrinters)`, `q!(1 PintImperial)` |
+| `pt` | `PointDtp`, `PointPrinters`, `PintUsLiquid`, `PintUsDry`, `PintImperial` | `q!(1 PointDtp)`, `q!(1 PointPrinters)`, `q!(1 PintUsLiquid)`, `q!(1 PintUsDry)`, `q!(1 PintImperial)` |
 | `qr` | `QuarterImperialVolume`, `QuarterMass` | `q!(1 QuarterImperialVolume)`, `q!(1 QuarterMass)` |
-| `qt` | `QuartImperial`, quecto `Tonne` | `q!(1 QuartImperial)` |
-| `rd` | `RodInternational`, `RodUsSurvey`, ronto `Day` | `q!(1 RodInternational)`, `q!(1 RodUsSurvey)` |
+| `qt` | `QuartUsLiquid`, `QuartUsDry`, `QuartImperial` | `q!(1 QuartUsLiquid)`, `q!(1 QuartUsDry)`, `q!(1 QuartImperial)` |
+| `rd` | `RodInternational`, `RodUsSurvey` | `q!(1 RodInternational)`, `q!(1 RodUsSurvey)` |
 | `tbsp` | `TablespoonUs`, `TablespoonFda` | `q!(1 TablespoonUs)`, `q!(1 TablespoonFda)` |
 | `thm` | `ThermEc`, `ThermUs` | `q!(1 ThermEc)`, `q!(1 ThermUs)` |
 | `ton` | `TonWater`, `TonLong` | `q!(1 TonWater)`, `q!(1 TonLong)` |
 | `tsp` | `TeaspoonUs`, `TeaspoonFda` | `q!(1 TeaspoonUs)`, `q!(1 TeaspoonFda)` |
-| `yd` | `Yard`, yocto `Day` | `q!(1 Yard)` |
 
 <!-- end: refused -->
 

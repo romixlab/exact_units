@@ -5,8 +5,10 @@
 pub(crate) enum Prefixes {
     /// None: `h`, `min`, `°`, every customary unit.
     None,
-    /// The SI prefixes: the coherent SI units and those the SI lets take one (g, L, eV, t).
+    /// The SI prefixes: the coherent SI units and those the SI lets take one (g, L, eV).
     Si,
+    /// The SI prefixes from kilo up: the tonne (`kt`, `Mt`), never a millitonne.
+    SiFromKilo,
     /// The SI and the binary prefixes: bit and B (`kB`, `KiB`).
     SiBinary,
 }

@@ -5,12 +5,13 @@
 //! The rules, so that a symbol never reads two ways (AGENTS.md, rule 5):
 //!
 //! - A symbol is a table symbol when it is one word: no `/`, `·`, space, parenthesis, digit or exponent. A
-//!   qualified one (`gal (US)`) gives its stem (`gal`) a reading, so the stem is refused next to the other gallon.
-//! - Prefixes go only on the units the SI lets take one: a coherent SI unit, and g, L, eV, t; bit and B take the
-//!   binary prefixes too. Never h, min, d, °, a customary unit or a counted one.
-//! - A table symbol's readings are its own lines, the stems, and every split into a prefix and a table symbol,
-//!   whether that unit takes the prefix or not (`cd` is the candela, the cord and a centi-day, `min` the minute and a
-//!   milli-inch). A prefixed form's are its splits into a prefix and a unit that takes it (`mcd` is a millicandela,
+//!   qualified one (`gal (US)`, `liq qt (US)`: `liq` and `dry` qualify like a parenthesis) gives its stem (`gal`,
+//!   `qt`) a reading, and a stem is always refused, even with one reading: no bare default (`ft` is never the
+//!   international foot while `ft (US survey)` exists).
+//! - Prefixes go only on the units the SI lets take one: a coherent SI unit, and g, L, eV; t from kilo up; bit and B
+//!   take the binary prefixes too. Never h, min, d, °, a customary unit or a counted one.
+//! - A symbol's readings are its own lines, the stems, and every split into a prefix and a unit that takes that
+//!   prefix (`cd` is the candela and the cord, but no centi-day, as the day takes no prefix; `mcd` is a millicandela,
 //!   never a millicord).
 //!   Readings of the same dimension, kind and exact scale fold (`km` is `Kilometre` and kilo `Meter`); a symbol left
 //!   with two is refused, with its readings as what to write instead.
@@ -68,8 +69,18 @@ const ORIGIN_SYMBOLS: &[(&str, &str)] = &[
     ("degR", "Rankine"),
 ];
 
-/// Scaled units the SI lets take a prefix (SI Brochure, 9th ed., tables 8 and 4.1): gram, litre, electronvolt, tonne.
-const SCALED_WITH_PREFIX: &[&str] = &["Gram", "Litre", "ElectronVolt", "Tonne"];
+/// Scaled units the SI lets take a prefix (SI Brochure, 9th ed., tables 8 and 4.1): gram, litre, electronvolt.
+const SCALED_WITH_PREFIX: &[&str] = &["Gram", "Litre", "ElectronVolt"];
+
+/// Units that take the SI prefixes from kilo up only: the tonne (`kt`, `Mt`), whose smaller multiples are grams.
+const FROM_KILO: &[&str] = &["Tonne"];
+
+/// Words before a symbol that qualify it like a parenthesis does: `liq qt (US)` and `dry qt (US)` share the stem
+/// `qt` with `qt (imp)`.
+const QUALIFIER_WORDS: &[&str] = &["liq", "dry"];
+
+/// Words after a symbol that name its system, as a parenthesis does: `oz avdp`, `lb t`, `dr ap`.
+const TRAILING_QUALIFIER_WORDS: &[&str] = &["avdp", "t", "ap"];
 
 /// The units that take the binary prefixes of IEC 80000-13 as well as the SI ones.
 const BINARY: &[&str] = &["Bit", "Byte"];
@@ -224,7 +235,7 @@ fn takes(prefixes: Prefixes, p: &Prefix) -> bool {
     matches!(
         (prefixes, p.scale),
         (Prefixes::Si, prefix::Scale::Pow10(_)) | (Prefixes::SiBinary, _)
-    )
+    ) || matches!((prefixes, p.scale), (Prefixes::SiFromKilo, prefix::Scale::Pow10(e)) if e >= 3)
 }
 
 /// The generated table, its refusals and the facts the book page lists.
@@ -282,6 +293,8 @@ fn generate() -> Generated {
         };
         if BINARY.contains(&line.name.as_str()) {
             Prefixes::SiBinary
+        } else if FROM_KILO.contains(&line.name.as_str()) {
+            Prefixes::SiFromKilo
         } else if SCALED_WITH_PREFIX.contains(&line.name.as_str())
             || (matches!(scale, Scale::Coherent)
                 && dim.counted_bases().next().is_none()
@@ -319,7 +332,26 @@ fn generate() -> Generated {
         if let Some((stem, _)) = line
             .symbol
             .split_once(" (")
+            .map(|(stem, q)| {
+                let words: Vec<&str> = stem.split(' ').collect();
+                match words.as_slice() {
+                    [w, rest] if QUALIFIER_WORDS.contains(w) => (*rest, q),
+                    _ => (stem, q),
+                }
+            })
             .filter(|(stem, q)| atomic(stem) && q.ends_with(')'))
+        {
+            stems.entry(stem.to_owned()).or_default().push(Reading {
+                text: line.name.clone(),
+                value: value(line, 0),
+            });
+        }
+        // `oz avdp`, `lb t`, `dr ap`: a trailing system word qualifies too, where the stem is no unit's own symbol
+        // (`s ap`, the scruple, leaves `s` the second)
+        if let Some((stem, word)) = line.symbol.split_once(' ')
+            && TRAILING_QUALIFIER_WORDS.contains(&word)
+            && atomic(stem)
+            && !lines.iter().any(|l| l.symbol == stem)
         {
             stems.entry(stem.to_owned()).or_default().push(Reading {
                 text: line.name.clone(),
@@ -375,15 +407,14 @@ fn generate() -> Generated {
             })
             .collect();
         readings.extend(stems.get(c).into_iter().flatten().cloned());
-        // a table symbol splits against every unit, a prefixed form only against those that take its prefix
-        let own = !readings.is_empty();
+        // a symbol splits only into a prefix and a unit that takes it: `yd` is no yocto-day, `mcd` no millicord
         for p in PREFIXES {
             let Some(rest) = c.strip_prefix(p.text) else {
                 continue;
             };
             for s in syms
                 .iter()
-                .filter(|s| s.symbol == rest && (own || takes(s.prefixes, p)))
+                .filter(|s| s.symbol == rest && takes(s.prefixes, p))
             {
                 readings.push(Reading {
                     text: format!("{} {}", prefix_name(p), s.marker),
@@ -408,7 +439,9 @@ fn generate() -> Generated {
                 distinct.push(r);
             }
         }
-        if distinct.len() > 1 {
+        // a stem of a qualified symbol is never read as one of its units, so no bare default is picked (`qt` is
+        // refused although only `qt (imp)` is atomic before its parenthesis)
+        if distinct.len() > 1 || stems.contains_key(c) {
             refused.push((c.clone(), distinct.into_iter().map(|r| r.text).collect()));
         }
     }
@@ -467,6 +500,7 @@ fn prefixes_text(p: Prefixes) -> &'static str {
         Prefixes::None => "None",
         Prefixes::Si => "Si",
         Prefixes::SiBinary => "SiBinary",
+        Prefixes::SiFromKilo => "SiFromKilo",
     }
 }
 
@@ -540,6 +574,7 @@ fn docs_blocks(g: &Generated) -> Vec<(&'static str, String)> {
             Prefixes::None => "none",
             Prefixes::Si => "SI",
             Prefixes::SiBinary => "SI and binary",
+            Prefixes::SiFromKilo => "SI from kilo up",
         };
         let marker = match s.pow10 {
             0 => format!("`{}`", s.marker),
@@ -652,6 +687,59 @@ fn table_and_page_are_generated() {
 
 /// `q!` reads every symbol of the generator as the generator says: a table symbol as its line, a prefixed form as the
 /// prefix and its line, an origin as the origin, a refused symbol never.
+/// No bare symbol reads as a unit whose own symbol is qualified (`qt` is never `qt (imp)`, `ft` never `ft (US survey)`
+/// nor the international foot beside it, `t` of `lb t` never the troy pound): every symbol `q!` reads is a unit whose
+/// own symbol is exactly one word, and every word of a qualified symbol either is refused or reads as a unit of its
+/// own one-word symbol.
+#[test]
+fn no_bare_symbol_reads_a_qualified_unit() {
+    use resolve::{Symbol, resolve};
+    let own = |marker: &str| match units::by_name(marker.trim_start_matches("units::")) {
+        Some(UnitExpr::Named { symbol, .. }) => *symbol,
+        _ => panic!("{marker} is no named unit"),
+    };
+    // qualified: a parenthesis or a qualifier word (`gal (US)`, `liq qt (US)`, `oz t`); `cd/m²` is a compound
+    let qualified = |s: &str| {
+        let words: Vec<&str> = s.split(' ').collect();
+        s.contains(" (")
+            || (words.len() > 1
+                && (words.first().is_some_and(|w| QUALIFIER_WORDS.contains(w))
+                    || words
+                        .iter()
+                        .skip(1)
+                        .any(|w| TRAILING_QUALIFIER_WORDS.contains(w))))
+    };
+    for e in table::UNITS {
+        assert!(
+            !qualified(own(e.marker)),
+            "{} reads as {}, whose own symbol {:?} is qualified",
+            e.symbol,
+            e.marker,
+            own(e.marker)
+        );
+    }
+    let g = generate();
+    for (symbol, marker) in &g.not_symbols {
+        for word in symbol.split([' ', '(', ')']).filter(|w| !w.is_empty()) {
+            if let Ok(Symbol::Unit { entry, .. }) = resolve(word) {
+                assert_ne!(
+                    entry.marker.trim_start_matches("units::"),
+                    marker,
+                    "`{word}` of `{symbol}` reads as {marker}"
+                );
+            }
+        }
+    }
+    for stem in [
+        "qt", "pt", "gal", "ft", "mi", "oz", "lb", "nmi", "bbl", "cup", "tbsp", "tsp",
+    ] {
+        assert!(
+            resolve(stem).is_err(),
+            "{stem} is the stem of qualified symbols and refused"
+        );
+    }
+}
+
 #[test]
 fn resolve_agrees() {
     use resolve::{Symbol, resolve};
@@ -753,15 +841,15 @@ fn text_reader_agrees() {
             }
             #[rustfmt::skip]
             let r = markers!(
-                Absorbance, Ampere, Arcminute, Arcsecond, AtmosphereStandard, Baud, Becquerel, Bit, Block, BtuIt,
+                Absorbance, Ampere, Arcminute, Arcsecond, AtmosphereStandard, AtmosphereTechnical, Baud, Becquerel, Bit, Block, BtuIt,
                 BtuMean, BtuTh, Byte, CalorieFoodIt, CalorieFoodTh, CalorieIt, CalorieMean, CalorieTh, Candela,
                 Cental, Char, Chunk, CircularMil, Code, Coulomb, Cycle, Day, Degree, Doubleword, ElectronVolt, Entry,
-                Farad, Frame, Gon, Grain, Gram, Gray, Halfword, Henry, Hertz, Hour, Inch, Item, Joule, Katal, Kelvin,
+                Farad, Frame, Gon, Grain, Gram, Gray, Halfword, Hand, Henry, Hertz, Hour, Inch, Item, Joule, Katal, Kelvin,
                 KilocalorieIt, KilocalorieTh, KilogramForce, Kip, Knot, Ksi, Line, Litre, Lumen, Lux, Meter,
                 Microinch, MilePerHour, Mole, Newton, Nibble, Nit, Ohm, OpticalDepth, OunceForce, Packet, Pascal,
                 Pennyweight, Poundal, PoundForce, Psf, Psi, Quad, Radian, Ratio, Record, Rood, Row, Sample, Second,
                 Sector, Siemens, Sievert, Slug, Steradian, Stone, StreckSwedish, Tesla, Thou, TonForceShort, Tonne,
-                TonOfRefrigeration, TonOfTnt, TonShort, Torr, Turn, Var, Volt, VoltAmpere, Watt, Weber, Week, Word,
+                TonOfRefrigeration, TonOfTnt, TonShort, Torr, Turn, Var, Volt, VoltAmpere, Watt, Weber, Week, Word, Yard,
             );
             match r {
                 Ok(()) => {}

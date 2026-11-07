@@ -31,7 +31,8 @@ pub(crate) fn unit(symbol: &str) -> Option<&'static Entry> {
 /// Whether `entry` takes `prefix`.
 fn takes(entry: &Entry, prefix: &Prefix) -> bool {
     match (entry.prefixes, prefix.scale) {
-        (Prefixes::None, _) | (Prefixes::Si, Scale::Pow1024(_)) => false,
+        (Prefixes::None, _) | (Prefixes::Si | Prefixes::SiFromKilo, Scale::Pow1024(_)) => false,
+        (Prefixes::SiFromKilo, Scale::Pow10(e)) => e >= 3,
         (Prefixes::Si | Prefixes::SiBinary, Scale::Pow10(_))
         | (Prefixes::SiBinary, Scale::Pow1024(_)) => true,
     }
@@ -40,6 +41,11 @@ fn takes(entry: &Entry, prefix: &Prefix) -> bool {
 /// What `symbol` reads as, or why it is refused: a symbol that reads two ways, a prefix on a unit that takes none.
 pub(crate) fn resolve(symbol: &str) -> Result<Symbol, String> {
     if let Some(r) = REFUSED.iter().find(|r| r.symbol == symbol) {
+        if let [only] = r.readings {
+            return Err(format!(
+                "`{symbol}` names a unit only with its qualifier, so no bare default is picked: write the type, as in q!(5 {only})"
+            ));
+        }
         return Err(format!(
             "`{symbol}` reads more than one way ({}): write the one you mean as a type, as in q!(5 {})",
             r.readings.join(", "),
@@ -87,8 +93,10 @@ pub(crate) fn resolve(symbol: &str) -> Result<Symbol, String> {
             entry.symbol,
             p.text,
             match p.scale {
-                Scale::Pow1024(_) if entry.prefixes == Prefixes::Si =>
+                Scale::Pow1024(_) if entry.prefixes != Prefixes::None =>
                     " (binary prefixes are for bit and B)",
+                Scale::Pow10(_) if entry.prefixes == Prefixes::SiFromKilo =>
+                    " (it takes the prefixes from kilo up)",
                 _ => "",
             }
         )),
