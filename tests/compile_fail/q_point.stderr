@@ -1,0 +1,17 @@
+error: q!: `degC` is a point at the origin origins::Celsius: it compares with a Point, which q! doesn't read yet
+ --> tests/compile_fail/q_point.rs:6:23
+  |
+6 |     let _ = t < q!(25 degC);
+  |                       ^^^^
+
+error: q!: `°C` is a point at the origin origins::Celsius: it compares with a Point, which q! doesn't read yet
+ --> tests/compile_fail/q_point.rs:7:23
+  |
+7 |     let _ = t < q!(25 "°C");
+  |                       ^^^^
+
+error: q!: a point at an origin (`@ Origin`) is not read yet: q! compares a Fixed here
+ --> tests/compile_fail/q_point.rs:8:26
+  |
+8 |     let _ = t < q!(300 K @ AbsoluteZero);
+  |                          ^

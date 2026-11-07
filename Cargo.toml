@@ -26,6 +26,68 @@ exclude = [
 [workspace]
 members = ["macros"]
 
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+unused_lifetimes = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+# `cargo kani` sets cfg(kani): the proofs in tests/props; `cargo fuzz` sets cfg(fuzzing): fuzz/ runs the properties
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)", "cfg(fuzzing)"] }
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+# pedantic, but for these: the house style writes names and formulas in prose (Q15, SIExpr, dB)
+doc_markdown = "allow"
+# #[inline(always)] on the small const fns a firmware calls in its loop is deliberate
+inline_always = "allow"
+# reference values are written digit for digit as their source prints them (NIST SP 811, libm)
+unreadable_literal = "allow"
+# the docs say when a function panics or errs in their first sentences, not under a heading
+missing_panics_doc = "allow"
+missing_errors_doc = "allow"
+# formulas name their terms as the source does (a, b, c, d; p, q; x, y)
+many_single_char_names = "allow"
+# a test or an example declares the type it needs where it first uses it
+items_after_statements = "allow"
+# fires in the code derive_shrink_wrap generates for Complex, out of reach of an #[expect]
+used_underscore_binding = "allow"
+# every cast that can lose, wrap or round says why it can't here, or is From/TryFrom
+cast_lossless = "warn"
+cast_possible_truncation = "warn"
+cast_possible_wrap = "warn"
+cast_precision_loss = "warn"
+cast_sign_loss = "warn"
+# a cast is `From`/`TryFrom`; `as` only where nothing else fits (const fn, float <-> int), with its reason
+as_conversions = "warn"
+absolute_paths = "warn"
+# every suppression is an #[expect(.., reason = "..")]
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+# no_std first: core, then alloc, before std
+std_instead_of_core = "warn"
+alloc_instead_of_core = "warn"
+# no panics a caller didn't ask for in library code (tests may, clippy.toml)
+unwrap_used = "warn"
+expect_used = "warn"
+unreachable = "warn"
+panic = "warn"
+# a slice or an array is read with get, split_at_checked or an iterator; an index only where a const fn needs it
+indexing_slicing = "warn"
+# every overflowable op says what it means: checked_, wrapping_, saturating_, or an #[expect] with its invariant
+arithmetic_side_effects = "warn"
+todo = "warn"
+unimplemented = "warn"
+undocumented_unsafe_blocks = "warn"
+dbg_macro = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+float_cmp = "warn"
+lossy_float_literal = "warn"
+
 [features]
 default = ["std"]
 # std enables every unit group but `customary`, like ww_si's; with `shrink_wrap` also the owned wire mirrors
@@ -98,9 +160,9 @@ counting = []
 levels = []
 
 [dependencies]
+defmt = { version = "1.1", optional = true }
 # q!, the unit literal: a proc-macro of this repository without dependencies of its own
 exact_units_macros = { version = "=0.1.0", path = "macros" }
-defmt = { version = "1.1", optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
 serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
 # WireWeaver's wire format; from its repository until shrink_wrap 0.2 is on crates.io. wire_weaver itself
@@ -224,68 +286,6 @@ split-debuginfo = "unpacked"
 [profile.deploy]
 inherits = "release"
 incremental = true
-
-[workspace.lints.rust]
-unsafe_code = "deny"
-missing_docs = "warn"
-missing_debug_implementations = "warn"
-unreachable_pub = "warn"
-unused_qualifications = "warn"
-unused_lifetimes = "warn"
-rust_2018_idioms = { level = "warn", priority = -1 }
-# `cargo kani` sets cfg(kani): the proofs in tests/props; `cargo fuzz` sets cfg(fuzzing): fuzz/ runs the properties
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)", "cfg(fuzzing)"] }
-
-[workspace.lints.clippy]
-pedantic = { level = "warn", priority = -1 }
-cargo = { level = "warn", priority = -1 }
-# pedantic, but for these: the house style writes names and formulas in prose (Q15, SIExpr, dB)
-doc_markdown = "allow"
-# #[inline(always)] on the small const fns a firmware calls in its loop is deliberate
-inline_always = "allow"
-# reference values are written digit for digit as their source prints them (NIST SP 811, libm)
-unreadable_literal = "allow"
-# the docs say when a function panics or errs in their first sentences, not under a heading
-missing_panics_doc = "allow"
-missing_errors_doc = "allow"
-# formulas name their terms as the source does (a, b, c, d; p, q; x, y)
-many_single_char_names = "allow"
-# a test or an example declares the type it needs where it first uses it
-items_after_statements = "allow"
-# fires in the code derive_shrink_wrap generates for Complex, out of reach of an #[expect]
-used_underscore_binding = "allow"
-# every cast that can lose, wrap or round says why it can't here, or is From/TryFrom
-cast_lossless = "warn"
-cast_possible_truncation = "warn"
-cast_possible_wrap = "warn"
-cast_precision_loss = "warn"
-cast_sign_loss = "warn"
-# a cast is `From`/`TryFrom`; `as` only where nothing else fits (const fn, float <-> int), with its reason
-as_conversions = "warn"
-absolute_paths = "warn"
-# every suppression is an #[expect(.., reason = "..")]
-allow_attributes = "warn"
-allow_attributes_without_reason = "warn"
-# no_std first: core, then alloc, before std
-std_instead_of_core = "warn"
-alloc_instead_of_core = "warn"
-# no panics a caller didn't ask for in library code (tests may, clippy.toml)
-unwrap_used = "warn"
-expect_used = "warn"
-unreachable = "warn"
-panic = "warn"
-# a slice or an array is read with get, split_at_checked or an iterator; an index only where a const fn needs it
-indexing_slicing = "warn"
-# every overflowable op says what it means: checked_, wrapping_, saturating_, or an #[expect] with its invariant
-arithmetic_side_effects = "warn"
-todo = "warn"
-unimplemented = "warn"
-undocumented_unsafe_blocks = "warn"
-dbg_macro = "warn"
-print_stdout = "warn"
-print_stderr = "warn"
-float_cmp = "warn"
-lossy_float_literal = "warn"
 
 [lints]
 workspace = true

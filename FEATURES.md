@@ -162,6 +162,22 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   side matching `low` and an output matching `high`, so an angle product `products.rs` gains or loses changes what
   the hint sees with nothing else to touch. A test walks `TABLE` and asserts every entry differing only by rad is
   a hit (checked non-vacuous by breaking `known_angle_step` on purpose and watching the test catch it).
+- ✅ **NUM-15 `q!`, a literal that names its unit** — `speed < q!(100 m/s)`: a decimal and its unit (symbols joined
+  by `*` and `/` left to right, powers `^2` and `^-1`, groups `( .. )`, a leading `/`; a type, `q!(100 Speed)`; or a
+  string for what Rust's lexer refuses, `q!(90 "°")`, `q!("9.81 m/s²")`), a zero-sized `LiteralIn<N, E, S>` whose
+  `PartialOrd`/`PartialEq` with a `Fixed` of integer storage, both ways round, fold the literal in a `const` block to
+  its integer part in steps of `P` of `U` and whether it is that integer: one `t <= c`, or a constant past `T`'s
+  range. Never rounded (0.155 m/s against cm/s steps equals no stored value), a scale with π through `Interval`, a
+  wrong dimension or kind a compile error. The macro is a proc-macro of this repository without dependencies,
+  `macros/` (`exact_units_macros`), which `q!` reaches with `$crate` in front; its reader is plain Rust
+  (`macros/src/pure`): SI and binary prefixes folded into the literal (`km²` is 10⁶, `KiB` 1024), a symbol table of
+  unit markers, refused symbols that read two ways (`min`, `gal`), each error at its token, a marker of a feature
+  group that is off named with the feature. Tests: `tests/props/q_literal.rs` (the fold against the `i128` reference
+  for i8 to i64 and u8 to u32, whole walks of `q!` over every i16, u16, i8 and u8 for prefixes, powers, strings,
+  degrees against mrad, bytes; a Kani proof over i16), `tests/props/q_text.rs` and the `q_text` fuzz target (any
+  text, never a panic), `tests/compile_fail/q_*.rs` snapshots for each refusal. The generated symbol table (UNIT-11),
+  float storages (NUM-16), points (PT-5), `fixed!(100 m/s)` (NUM-17), `Exact` and levels (NUM-18) and the thumbv6m
+  check that `q!` compiles to the typed-const compare follow.
 - 📋 **NUM-10 Measured constants as exact symbols** · `foundations` — μ₀ and G in `Magnitude` beside π, ln 2 and ln 10
   (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
   old 4π·10⁻⁷ only as the opt-in `Ampere1948`; a conversion that needs a symbol doesn't compile without a set, floats
@@ -191,6 +207,12 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   `ppb`, `percent`, `of` (±0.25 %), `EXACT`, both ends in. Feature `dimensionless`. Doctests on the methods, book
   page [Exact fractions](docs/maths/fractions.md#relative-error-and-tolerance). For the clock planner (RCC-6) and a
   UART BRR.
+- 📋 **NUM-16 `q!` against float storages** — `Fixed<U, P, f32 | f64>` against a `q!` literal, exactly: the largest
+  float at or below the literal, worked out in a `const` block, and whether it equals it; NaN compares false.
+- 📋 **NUM-17 `fixed!(100 m/s)`** — the typed constant names its unit through `q!`'s reader, checked against the
+  constant's type; `fixed!(v in S)` stays.
+- 📋 **NUM-18 `q!` against `Exact` and the level types** — the same exact order against an `Exact<U>` at run time and
+  against the level types where a compare means something.
 
 ## Units and markers (`UNIT`)
 
@@ -295,6 +317,9 @@ and clocks with a named epoch.
 - 📋 **PT-4 Time scales as references** · `foundations` — `ReferenceDef` (exact, run time, time scale); `TaiScale`,
   `PosixScale`, `DeviceMonotonic`; `UnixEpoch` moves off `UnitZero`; within a scale exact at compile time, across
   through a `LeapTable` at run time behind a cargo feature, `InLeap` inside a leap second. The foundation of PT-3.
+- 📋 **PT-5 Point literals** — `q!(25 °C)`, `q!(77 degF)`, `q!(300 K @ AbsoluteZero)`: a literal at an origin,
+  compared with a `Point` only, folded into its origin's frame in a `const` block; a plain literal against a `Point`
+  and a point literal against a `Fixed` don't compile.
 
 ## Levels (`LVL`)
 

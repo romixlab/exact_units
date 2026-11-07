@@ -1,0 +1,59 @@
+error: q!: a unit is missing after the number: q!(100 m/s), q!(5 %), q!(0.5 Ratio); fixed!(..) is a number in the unit of its context
+ --> tests/compile_fail/q_grammar.rs:7:20
+  |
+7 |     let _ = t < q!(100);
+  |                    ^^^
+
+error: q!: `100u8`: a literal of q! is a plain decimal, without a suffix; the storage comes from the compare
+ --> tests/compile_fail/q_grammar.rs:8:20
+  |
+8 |     let _ = t < q!(100u8 B);
+  |                    ^^^^^
+
+error: q!: `12345678901234567891` has more digits than an i64 holds: write fewer
+ --> tests/compile_fail/q_grammar.rs:9:20
+  |
+9 |     let _ = t < q!(12345678901234567891 B);
+  |                    ^^^^^^^^^^^^^^^^^^^^
+
+error: q!: a power is an integer from 1 to 9, or its negative
+  --> tests/compile_fail/q_grammar.rs:10:24
+   |
+10 |     let _ = t < q!(1 B^0);
+   |                        ^
+
+error: q!: a power is an integer from 1 to 9, or its negative
+  --> tests/compile_fail/q_grammar.rs:11:24
+   |
+11 |     let _ = t < q!(1 B^10);
+   |                        ^^
+
+error: q!: a unit is symbols joined by `*` and `/`, with powers `^2`, or a type
+  --> tests/compile_fail/q_grammar.rs:12:24
+   |
+12 |     let _ = t < q!(1 B B);
+   |                        ^
+
+error: q!: `B` followed by a digit: a power is `B^2` or `B²`
+  --> tests/compile_fail/q_grammar.rs:13:20
+   |
+13 |     let _ = t < q!("1 B2");
+   |                    ^^^^^^
+
+error: q!: a binary prefix in a denominator isn't exact as a decimal: write the unit as a type
+  --> tests/compile_fail/q_grammar.rs:14:24
+   |
+14 |     let _ = t < q!(1 B/KiB);
+   |                        ^^^
+
+error: q!: a literal starts with a decimal number: q!(100 m/s)
+  --> tests/compile_fail/q_grammar.rs:15:20
+   |
+15 |     let _ = t < q!(B);
+   |                    ^
+
+error: q!: the literal's power of ten is out of range
+  --> tests/compile_fail/q_grammar.rs:16:20
+   |
+16 |     let _ = t < q!(1e40000 B);
+   |                    ^^^^^^^

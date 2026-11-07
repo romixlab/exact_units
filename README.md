@@ -70,7 +70,7 @@ The API reference is on [docs.rs](https://docs.rs/exact_units).
 - **Points and offsets**: °C against K, gauge pressure, register formulas, angles that wrap.
 - **Kinds and counted dimensions**: a V/V gain is not a duty cycle, samples are not bytes.
 - **Fixed point and levels**: Q15, Q31, binary angles, `fixed!(0.1)` and `db!(-3)` as compile-time constants.
-- **`no_std`, no alloc**, no dependencies without features; WireWeaver's wire format with `shrink_wrap`.
+- **`no_std`, no alloc**, no third-party dependencies without features (`q!` comes from a proc-macro crate of this repository, itself without dependencies); WireWeaver's wire format with `shrink_wrap`.
 
 ## Features
 

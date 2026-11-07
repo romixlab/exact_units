@@ -1,0 +1,27 @@
+error: q!: `in` needs exact_units' feature `customary`
+ --> tests/compile_fail/q_feature_off.rs:6:17
+  |
+6 |     let _ = t < q!(5 in);
+  |                 ^^^^^^^^
+  |
+  = note: this error originates in the macro `$crate::__q_customary` which comes from the expansion of the macro `q` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `(): exact_units::Unit` is not satisfied
+ --> tests/compile_fail/q_feature_off.rs:6:15
+  |
+6 |     let _ = t < q!(5 in);
+  |             - ^ --------
+  |               |
+  |               the trait `exact_units::Unit` is not implemented for `()`
+  |
+  = help: the following other types implement trait `exact_units::Unit`:
+            Absorbance
+            AbsorbedDoseRate
+            Acceleration
+            Ampere
+            AngularAcceleration
+            AngularMomentum
+            AngularVelocity
+            Area
+          and $N others
+  = note: required for `Fixed<Meter, exact_units::prefix::Milli, i16>` to implement `PartialEq<LiteralIn<5, 0, ()>>`

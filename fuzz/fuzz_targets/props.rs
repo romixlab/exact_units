@@ -9,6 +9,8 @@
 pub mod exact_text;
 #[path = "../../tests/props/panics.rs"]
 pub mod panics;
+#[path = "../../tests/props/q_text.rs"]
+pub mod q_text;
 #[path = "../../tests/props/reference.rs"]
 pub mod reference;
 #[path = "../../tests/props/serde_input.rs"]

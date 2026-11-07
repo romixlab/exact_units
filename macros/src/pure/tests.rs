@@ -206,7 +206,7 @@ fn strings() {
 
 #[test]
 fn refusals() {
-    assert!(refused("100").contains("needs a unit"));
+    assert!(refused("100").contains("unit is missing"));
     assert!(refused("100 kmh").contains("no unit symbol"));
     assert!(refused("5 min").contains("more than one way"));
     assert!(refused("1 m ^ 0").contains("power"));

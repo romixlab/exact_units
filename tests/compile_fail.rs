@@ -12,5 +12,15 @@ fn compile_fail() {
     t.compile_fail("tests/compile_fail/kind_mismatch.rs");
     t.compile_fail("tests/compile_fail/literal_mismatch.rs");
     t.compile_fail("tests/compile_fail/q_dim_mismatch.rs");
-    t.compile_fail("tests/compile_fail/q_ambiguous.rs");
+    t.compile_fail("tests/compile_fail/q_symbols.rs");
+    t.compile_fail("tests/compile_fail/q_grammar.rs");
+    t.compile_fail("tests/compile_fail/q_point.rs");
+}
+
+/// A symbol of a unit group that is off: only where `customary` is (`just test`'s `std` run).
+#[cfg(not(feature = "customary"))]
+#[test]
+fn compile_fail_feature_off() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile_fail/q_feature_off.rs");
 }

@@ -1,4 +1,4 @@
-//! PROTOTYPE: `q!(100 m/s)`, a decimal literal that names its unit, compared exactly with a [Fixed].
+//! `q!(100 m/s)`, a decimal literal that names its unit, compared exactly with a [Fixed].
 //!
 //! `q!` is a [LiteralIn] value: zero-sized, its number and unit in the type. A compare with a `Fixed<U, P, T, B>`
 //! folds the literal in a `const` block to steps of `P` of `U`, as the integer part and whether it is exact, so
@@ -8,7 +8,7 @@
 //!   `16 > x`, and no stored value equals it.
 //! - A literal past `T`'s range compares as it is: every `i8` is below `q!(1000 m)`.
 //! - Units that don't convert are a compile error, as for `fixed!(x in S)`.
-//! - Integer storages only, in this prototype.
+//! - Integer storages.
 //!
 //! ```
 //! # #[cfg(feature = "mechanical")] {
@@ -17,8 +17,11 @@
 //! assert!(speed < q!(100 m/s));
 //! assert!(speed > q!(359.9 km/h)); // 99.97.. m/s
 //! assert!(speed == q!(99.99 Speed));
+//! assert!(q!(0.155 m/s) < Fixed::<Speed, Centi, i16>::new(16)); // 15.5 steps
 //! # }
 //! ```
+//!
+//! A unit of another dimension doesn't compile:
 //!
 //! ```compile_fail
 //! use exact_units::{Fixed, q, prefix::Centi, units::Speed};
@@ -26,7 +29,7 @@
 //! let _ = speed < q!(100 m); // a length isn't a speed
 //! ```
 //!
-//! A symbol that reads two ways doesn't compile: `min` (minute or minimum, arc minute), `gal` (US or imperial).
+//! Nor does a symbol that reads two ways: `min` (minute, US or imperial minim, milli-inch), `gal` (US or imperial):
 //!
 //! ```compile_fail
 //! use exact_units::{Fixed, q, prefix::One, units::Second};
@@ -60,21 +63,6 @@ impl<const N: i64, const E: i16, S> Clone for LiteralIn<N, E, S> {
 
 impl<const N: i64, const E: i16, S> Copy for LiteralIn<N, E, S> {}
 
-impl Decimal {
-    /// `self · 10^by`, the prefix of a unit symbol (`mV` is `-3` of `V`): a compile error past `i16`'s exponents.
-    #[must_use]
-    #[expect(
-        clippy::panic,
-        reason = "a compile error in const code (a panic at run time): an exponent past i16"
-    )]
-    pub const fn shifted(self, by: i16) -> Decimal {
-        match self.exp.checked_add(by) {
-            Some(exp) => Decimal::new(self.num, exp),
-            None => panic!("a literal's exponent is out of range"),
-        }
-    }
-}
-
 /// A literal in steps of a [Fixed]'s scale: `floor` is its integer part (toward −∞), `exact` whether it is that
 /// integer.
 #[derive(Copy, Clone)]
@@ -107,6 +95,7 @@ const fn cut<S: Unit, U: Unit, P: FixedScale>(x: Decimal) -> Cut {
     } else {
         match x.to_interval_any(scale) {
             Some(i) => (i.floor_int(), false),
+            // None only for 0, returned above
             None => (0, true),
         }
     };
@@ -186,6 +175,23 @@ macro_rules! literal_cmp {
                     AtMost::Never => false,
                     AtMost::Le(c) => t <= c,
                 }
+            }
+        }
+
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
+            /// `[self < x, self <= x, self == x]` for decimal `x` in units of `S`, at run time: the fold the compares
+            /// with a `q!` literal make in a `const` block, for the properties of `tests/props`. Panics for units
+            /// that don't convert.
+            #[doc(hidden)]
+            #[must_use]
+            pub fn literal_order<S: Unit>(&self, x: Decimal) -> [bool; 3] {
+                let c = cut::<S, U, P>(x);
+                let t = self.get();
+                [
+                    AtMost::<$ty>::lt(c).test(t),
+                    AtMost::<$ty>::le(c).test(t),
+                    AtMost::<$ty>::eq(c) == Some(t),
+                ]
             }
         }
 
@@ -304,208 +310,298 @@ crate::unit! {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_time {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "time"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_time {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `time`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `time`"
+        ))
+    };
 }
 
 #[cfg(feature = "electrical")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_electrical {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "electrical"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_electrical {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `electrical`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `electrical`"
+        ))
+    };
 }
 
 #[cfg(feature = "fields")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_fields {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "fields"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_fields {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `fields`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `fields`"
+        ))
+    };
 }
 
 #[cfg(feature = "mechanical")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_mechanical {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "mechanical"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_mechanical {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `mechanical`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `mechanical`"
+        ))
+    };
 }
 
 #[cfg(feature = "angle")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_angle {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "angle"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_angle {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `angle`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `angle`"
+        ))
+    };
 }
 
 #[cfg(feature = "thermal")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_thermal {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "thermal"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_thermal {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `thermal`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `thermal`"
+        ))
+    };
 }
 
 #[cfg(feature = "chemical")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_chemical {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "chemical"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_chemical {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `chemical`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `chemical`"
+        ))
+    };
 }
 
 #[cfg(feature = "photometric")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_photometric {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "photometric"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_photometric {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `photometric`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `photometric`"
+        ))
+    };
 }
 
 #[cfg(feature = "radiometric")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_radiometric {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "radiometric"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_radiometric {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `radiometric`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `radiometric`"
+        ))
+    };
 }
 
 #[cfg(feature = "radiation")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_radiation {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "radiation"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_radiation {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `radiation`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `radiation`"
+        ))
+    };
 }
 
 #[cfg(feature = "dimensionless")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_dimensionless {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "dimensionless"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_dimensionless {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `dimensionless`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `dimensionless`"
+        ))
+    };
 }
 
 #[cfg(feature = "information")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_information {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "information"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_information {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `information`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `information`"
+        ))
+    };
 }
 
 #[cfg(feature = "counting")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_counting {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "counting"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_counting {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `counting`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `counting`"
+        ))
+    };
 }
 
 #[cfg(feature = "levels")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_levels {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "levels"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_levels {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `levels`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `levels`"
+        ))
+    };
 }
 
 #[cfg(feature = "customary")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_customary {
-    ($($p:tt)*) => { $crate::$($p)* };
+    ($symbol:literal; $($p:tt)*) => { $crate::$($p)* };
 }
 
 #[cfg(not(feature = "customary"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __q_customary {
-    ($($p:tt)*) => { ::core::compile_error!(concat!("q!: `", stringify!($($p)*), "` needs exact_units' feature `customary`")) };
+    ($symbol:literal; $($p:tt)*) => {
+        ::core::compile_error!(concat!(
+            "q!: ",
+            $symbol,
+            " needs exact_units' feature `customary`"
+        ))
+    };
 }

@@ -1,0 +1,35 @@
+error: q!: `min` reads more than one way (Minute, customary::MinimUs, customary::MinimImperial, milli Inch): write the one you mean as a type, as in q!(5 Minute)
+ --> tests/compile_fail/q_symbols.rs:7:22
+  |
+7 |     let _ = t < q!(5 min);
+  |                      ^^^
+
+error: q!: `gal` reads more than one way (customary::GallonUs, customary::GallonImperial): write the one you mean as a type, as in q!(5 customary::GallonUs)
+ --> tests/compile_fail/q_symbols.rs:8:22
+  |
+8 |     let _ = t < q!(5 gal);
+  |                      ^^^
+
+error: q!: `kmh` is no unit symbol q! knows: write a symbol (m/s, km/h, mV), its type (Speed, units::Volt), or a string for one Rust's lexer can't take ("°")
+ --> tests/compile_fail/q_symbols.rs:9:22
+  |
+9 |     let _ = t < q!(5 kmh);
+  |                      ^^^
+
+error: q!: `kh`: `h` takes no prefix `k`
+  --> tests/compile_fail/q_symbols.rs:10:22
+   |
+10 |     let _ = t < q!(5 kh);
+   |                      ^^
+
+error: q!: `KiV`: `V` takes no prefix `Ki` (binary prefixes are for bit and B)
+  --> tests/compile_fail/q_symbols.rs:11:22
+   |
+11 |     let _ = t < q!(5 KiV);
+   |                      ^^^
+
+error: q!: `furlong` is no unit symbol q! knows: write a symbol (m/s, km/h, mV), its type (Speed, units::Volt), or a string for one Rust's lexer can't take ("°")
+  --> tests/compile_fail/q_symbols.rs:12:22
+   |
+12 |     let _ = t < q!(5 "furlong");
+   |                      ^^^^^^^^^

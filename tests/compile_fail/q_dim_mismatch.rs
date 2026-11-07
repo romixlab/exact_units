@@ -1,4 +1,4 @@
-// PROTOTYPE `q!`: a literal in a length doesn't compare with a speed.
+// `q!`: a literal in a length doesn't compare with a speed.
 use exact_units::{Fixed, prefix::Centi, q, units::Speed};
 
 fn main() {

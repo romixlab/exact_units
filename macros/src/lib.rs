@@ -47,6 +47,14 @@ impl Side {
         self.trees.len().saturating_sub(1)
     }
 
+    /// The source text of token `id`: the symbol a marker was read from (`in`, `"°"`).
+    fn text(&self, id: usize) -> String {
+        match self.trees.get(id) {
+            Some(Some(t)) => t.to_string(),
+            _ => String::new(),
+        }
+    }
+
     fn span(&self, id: usize) -> Span {
         match self.trees.get(id) {
             Some(Some(t)) => t.span(),
@@ -175,6 +183,12 @@ impl<'a> Out<'a> {
                 let span = side.span(*id);
                 self.krate(&format!("::__q_{group}!"));
                 let mut inner = TokenStream::new();
+                let mut symbol = Literal::string(&format!("`{}`", side.text(*id)));
+                symbol.set_span(span);
+                inner.extend([
+                    TokenTree::Literal(symbol),
+                    TokenTree::Punct(alone(';', span)),
+                ]);
                 if let Ok(ts) = path.parse::<TokenStream>() {
                     inner.extend(ts.into_iter().map(|mut t| {
                         t.set_span(span);
@@ -185,6 +199,7 @@ impl<'a> Out<'a> {
                 g.set_span(span);
                 self.ts.extend([TokenTree::Group(g)]);
             }
+            Unit::One => self.krate("::literal::Unitless"),
             Unit::Type(ids) => {
                 for id in ids {
                     if let Some(Some(t)) = side.trees.get(*id) {
@@ -194,13 +209,13 @@ impl<'a> Out<'a> {
             }
             Unit::Mul(a, b) => match b.as_ref() {
                 Unit::Pow(x, n) if *n < 0 => {
-                    self.pair("Per", a, &Unit::Pow(x.clone(), n.saturating_neg()), side)
+                    self.pair("Per", a, &Unit::Pow(x.clone(), n.saturating_neg()), side);
                 }
                 _ => self.pair("Times", a, b, side),
             },
             Unit::Div(a, b) => match b.as_ref() {
                 Unit::Pow(x, n) if *n < 0 => {
-                    self.pair("Times", a, &Unit::Pow(x.clone(), n.saturating_neg()), side)
+                    self.pair("Times", a, &Unit::Pow(x.clone(), n.saturating_neg()), side);
                 }
                 _ => self.pair("Per", a, b, side),
             },

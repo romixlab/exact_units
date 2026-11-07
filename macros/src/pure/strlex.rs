@@ -60,6 +60,40 @@ fn number_len(b: &[u8]) -> usize {
     n
 }
 
+/// A power in superscripts, `²` or `⁻¹`, from its first character `c` on: `^`, `-` for a `⁻`, the digits.
+fn power(
+    c: char,
+    chars: &mut core::iter::Peekable<core::str::CharIndices<'_>>,
+    out: &mut Vec<Tok>,
+    id: usize,
+) -> Result<(), Error> {
+    let mut text: String = superscript(c)
+        .and_then(|d| char::from_digit(d, 10))
+        .into_iter()
+        .collect();
+    while let Some(d) = chars.peek().and_then(|(_, n)| superscript(*n)) {
+        text.push(char::from_digit(d, 10).unwrap_or('0'));
+        chars.next();
+    }
+    if text.is_empty() {
+        return Err(Error::at(id, "`⁻` without a superscript power after it"));
+    }
+    out.push(Tok::Punct {
+        ch: '^',
+        joint: false,
+        id,
+    });
+    if c == '⁻' {
+        out.push(Tok::Punct {
+            ch: '-',
+            joint: false,
+            id,
+        });
+    }
+    out.push(Tok::Lit { text, id });
+    Ok(())
+}
+
 /// The tokens of string `s`, each with id `id` (the string literal's own): numbers as literals, symbols as
 /// identifiers, `·` `⋅` `×` as `*`, superscripts as `^` and the power, parentheses as groups.
 pub(crate) fn lex(s: &str, id: usize) -> Result<Vec<Tok>, Error> {
@@ -89,40 +123,8 @@ pub(crate) fn lex(s: &str, id: usize) -> Result<Vec<Tok>, Error> {
             });
             continue;
         }
-        if let Some(d) = superscript(c) {
-            let mut text = String::from(char::from_digit(d, 10).unwrap_or('0'));
-            while let Some(d) = chars.peek().and_then(|(_, n)| superscript(*n)) {
-                text.push(char::from_digit(d, 10).unwrap_or('0'));
-                chars.next();
-            }
-            out.push(Tok::Punct {
-                ch: '^',
-                joint: false,
-                id,
-            });
-            out.push(Tok::Lit { text, id });
-            continue;
-        }
-        if c == '⁻' {
-            out.push(Tok::Punct {
-                ch: '^',
-                joint: false,
-                id,
-            });
-            out.push(Tok::Punct {
-                ch: '-',
-                joint: false,
-                id,
-            });
-            let mut text = String::new();
-            while let Some(d) = chars.peek().and_then(|(_, n)| superscript(*n)) {
-                text.push(char::from_digit(d, 10).unwrap_or('0'));
-                chars.next();
-            }
-            if text.is_empty() {
-                return Err(err("`⁻` without a superscript power after it".to_owned()));
-            }
-            out.push(Tok::Lit { text, id });
+        if c == '⁻' || superscript(c).is_some() {
+            power(c, &mut chars, out, id)?;
             continue;
         }
         match c {

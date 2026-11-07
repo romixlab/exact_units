@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! literal := '-'? NUMBER unit | STRING            (the whole literal in a string)
-//! unit    := term (('*' | '/') term)*            (left to right: m/s/s is (m/s)/s)
+//! unit    := (term | '/' term) (('*' | '/') term)*   (left to right: m/s/s is (m/s)/s; /ms is 1/ms)
 //! term    := atom ('^' '-'? INTEGER)?
 //! atom    := SYMBOL | TYPE | '(' unit ')' | '%' | STRING   (a unit in a string)
 //! ```
@@ -41,6 +41,8 @@ pub(crate) enum Unit {
     Div(Box<Unit>, Box<Unit>),
     /// `a ^ n`, `n` not 0.
     Pow(Box<Unit>, i32),
+    /// The unit 1, before a leading `/`: `q!(5 /ms)`.
+    One,
 }
 
 /// A literal: `num · 10^exp` of `unit`, its prefixes folded into `num` and `exp`.
@@ -92,28 +94,29 @@ fn number_and_unit(toks: &[Tok], whole: usize, in_string: bool) -> Result<Litera
         Some((t, rest)) if t.punct() == Some('-') => (true, rest),
         _ => (false, toks),
     };
-    let (num, rest) = match rest.split_first() {
+    let (num, num_id, rest) = match rest.split_first() {
         Some((Tok::Lit { text, id }, rest)) if strlex::content(text).is_none() => (
             number::parse(text, negative).map_err(|m| Error::at(*id, m))?,
+            *id,
             rest,
         ),
         Some((t, _)) => {
             return Err(Error::at(
                 t.id(),
-                "q! starts with a decimal number: q!(100 m/s)",
+                "a literal starts with a decimal number: q!(100 m/s)",
             ));
         }
         None => {
             return Err(Error::at(
                 whole,
-                "q! takes a number and its unit: q!(100 m/s)",
+                "a literal is a number and its unit: q!(100 m/s)",
             ));
         }
     };
     if rest.is_empty() {
         return Err(Error::at(
             toks.last().map_or(whole, Tok::id),
-            "q! needs a unit after the number: q!(100 m/s), q!(5 %), q!(0.5 Ratio); fixed!(..) is a number in the unit of its context",
+            "a unit is missing after the number: q!(100 m/s), q!(5 %), q!(0.5 Ratio); fixed!(..) is a number in the unit of its context",
         ));
     }
     if let Some(at) = rest.iter().find(|t| t.punct() == Some('@')) {
@@ -134,15 +137,15 @@ fn number_and_unit(toks: &[Tok], whole: usize, in_string: bool) -> Result<Litera
             "a unit is symbols joined by `*` and `/`, with powers `^2`, or a type",
         ));
     }
-    fold(num, unit, whole)
+    fold(num, unit, num_id)
 }
 
 /// The prefixes of `unit` folded into the number: `num · 10^exp` with each decimal prefix and the symbol's own power
 /// of ten times its power in the unit, and `num` times 1024 per binary prefix.
-fn fold(num: Decimal, unit: Unit, whole: usize) -> Result<Literal, Error> {
+fn fold(num: Decimal, unit: Unit, num_id: usize) -> Result<Literal, Error> {
     let mut pow10 = i64::from(num.exp);
     let mut pow1024 = 0_i64;
-    let mut first = whole;
+    let mut first = num_id;
     walk(&unit, 1, &mut |id, p10, p1024, times| {
         pow10 = pow10.saturating_add(p10.saturating_mul(times));
         pow1024 = pow1024.saturating_add(p1024.saturating_mul(times));
@@ -151,7 +154,7 @@ fn fold(num: Decimal, unit: Unit, whole: usize) -> Result<Literal, Error> {
         }
     });
     let mut n = num.num;
-    let exponent = || Error::at(whole, "the literal's power of ten is out of range");
+    let exponent = || Error::at(num_id, "the literal's power of ten is out of range");
     let exp = i16::try_from(pow10).map_err(|_| exponent())?;
     if pow1024 < 0 {
         return Err(Error::at(
@@ -173,7 +176,7 @@ fn walk(unit: &Unit, times: i64, f: &mut impl FnMut(usize, i64, i64, i64)) {
         Unit::Marker {
             id, pow10, pow1024, ..
         } => f(*id, *pow10, *pow1024, times),
-        Unit::Type(_) => {}
+        Unit::Type(_) | Unit::One => {}
         Unit::Mul(a, b) => {
             walk(a, times, f);
             walk(b, times, f);
@@ -209,7 +212,11 @@ impl<'a> Parser<'a> {
     }
 
     fn unit(&mut self) -> Result<Unit, Error> {
-        let mut u = self.term()?;
+        let mut u = if self.peek().and_then(Tok::punct) == Some('/') {
+            Unit::One
+        } else {
+            self.term()?
+        };
         while let Some(op) = self.peek().and_then(Tok::punct) {
             match op {
                 '*' => {

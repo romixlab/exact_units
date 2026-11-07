@@ -78,3 +78,10 @@ path = "fuzz_targets/exact_text.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "q_text"
+path = "fuzz_targets/q_text.rs"
+test = false
+doc = false
+bench = false
