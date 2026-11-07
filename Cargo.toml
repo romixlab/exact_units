@@ -89,10 +89,13 @@ float_cmp = "warn"
 lossy_float_literal = "warn"
 
 [features]
-default = ["std"]
+default = ["std", "q"]
 # std enables every unit group but `customary`, like ww_si's; with `shrink_wrap` also the owned wire mirrors
 std = ["shrink_wrap?/std", "serde?/std", "quantities"]
 defmt = ["dep:defmt", "shrink_wrap?/defmt"]
+# q!, the literal that names its unit (`speed < q!(100 m/s)`): a proc-macro of this repository, exact_units_macros,
+# without dependencies of its own
+q = ["dep:exact_units_macros"]
 # the wire format: SerializeShrinkWrap / DeserializeShrinkWrap for every type, SIExpr, Fixed over UNib32, UVlq*, Nibble
 shrink_wrap = ["dep:shrink_wrap"]
 # log10 and 10^x from libm (pure Rust) for `Fixed::to_db` / `from_db` and their f32 forms without std; with std
@@ -162,7 +165,7 @@ levels = []
 [dependencies]
 defmt = { version = "1.1", optional = true }
 # q!, the unit literal: a proc-macro of this repository without dependencies of its own
-exact_units_macros = { version = "=0.1.0", path = "macros" }
+exact_units_macros = { version = "=0.1.0", path = "macros", optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
 serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
 # WireWeaver's wire format; from its repository until shrink_wrap 0.2 is on crates.io. wire_weaver itself

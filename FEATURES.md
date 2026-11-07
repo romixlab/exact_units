@@ -162,7 +162,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   side matching `low` and an output matching `high`, so an angle product `products.rs` gains or loses changes what
   the hint sees with nothing else to touch. A test walks `TABLE` and asserts every entry differing only by rad is
   a hit (checked non-vacuous by breaking `known_angle_step` on purpose and watching the test catch it).
-- ✅ **NUM-15 `q!`, a literal that names its unit** — `speed < q!(100 m/s)`: a decimal and its unit (symbols joined
+- ✅ **NUM-15 `q!`, a literal that names its unit** — the cargo feature `q`, on by default; `speed < q!(100 m/s)`: a decimal and its unit (symbols joined
   by `*` and `/` left to right, powers `^2` and `^-1`, groups `( .. )`, a leading `/`; a type, `q!(100 Speed)`; or a
   string for what Rust's lexer refuses, `q!(90 "°")`, `q!("9.81 m/s²")`), a zero-sized `LiteralIn<N, E, S>` whose
   `PartialOrd`/`PartialEq` with a `Fixed` of integer storage, both ways round, fold the literal in a `const` block to

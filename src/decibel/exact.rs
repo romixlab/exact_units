@@ -136,8 +136,8 @@ impl Num {
         acc
     }
 
-    /// The nearest integer, ties to even; `None` above `u128`.
     /// The integer part, `None` from 2¹²⁷ on.
+    #[cfg(feature = "q")]
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
@@ -163,6 +163,7 @@ impl Num {
         Some(self.m >> s)
     }
 
+    /// The nearest integer, ties to even; `None` above `u128`.
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
@@ -467,6 +468,7 @@ impl Interval {
     }
 
     /// The integer part, the same for both ends, or a compile error: what `q!` compares against.
+    #[cfg(feature = "q")]
     #[expect(
         clippy::panic,
         reason = "a compile error in const code (a panic at run time): a value past u128 or too close to an integer to decide"

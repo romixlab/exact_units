@@ -16,7 +16,12 @@
 //!   Readings of the same dimension, kind and exact scale fold (`km` is `Kilometre` and kilo `Meter`); a symbol left
 //!   with two is refused, with its readings as what to write instead.
 //! - Every unit group is on, so which symbols are refused never depends on the features a build turns on.
-#![cfg(all(feature = "std", feature = "quantities", feature = "customary"))]
+#![cfg(all(
+    feature = "q",
+    feature = "std",
+    feature = "quantities",
+    feature = "customary"
+))]
 #![expect(
     clippy::arithmetic_side_effects,
     reason = "a test adds string offsets and small exponents, which fit"

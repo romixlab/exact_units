@@ -551,7 +551,9 @@ macro_rules! complex_literal {
 
 complex_literal!(i8 i16 i32 i64 f32 f64);
 
+#[cfg(feature = "q")]
 pub mod quantity;
+#[cfg(feature = "q")]
 #[doc(hidden)]
 pub use quantity::Unitless;
 

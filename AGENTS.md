@@ -6,9 +6,10 @@ Guidance for AI code assistants working in this repository.
 
 `exact_units`: units of measure fixed at compile time, exact. A number with its unit, scale, storage and bounds in the
 type (`Fixed<U, P, T, B>`), unit markers with their dimension (`Dim`) and exact scale (`Magnitude`), points against
-origins, indices and sequence numbers. `no_std`, no alloc, no third-party dependencies without features (`q!` is a
-proc-macro of this repository, `macros/` (`exact_units_macros`), without dependencies of its own; the repository root
-is a workspace of the two). `README.md` lists the features; the unit groups are cargo features a firmware picks.
+origins, indices and sequence numbers. `no_std`, no alloc, no dependencies without features (`q!`, the default feature
+`q`, is a proc-macro of this repository, `macros/` (`exact_units_macros`), without dependencies of its own; the
+repository root is a workspace of the two). `README.md` lists the features; the unit groups are cargo features a
+firmware picks.
 
 The optional `shrink_wrap` feature adds WireWeaver's wire format (`#[derive_shrink_wrap]` on the types, `SIExpr`,
 `Fixed` over `UNib32`). shrink_wrap comes from the wire_weaver repository by git until its 0.2 is on crates.io;

@@ -70,7 +70,7 @@ The API reference is on [docs.rs](https://docs.rs/exact_units).
 - **Points and offsets**: °C against K, gauge pressure, register formulas, angles that wrap.
 - **Kinds and counted dimensions**: a V/V gain is not a duty cycle, samples are not bytes.
 - **Fixed point and levels**: Q15, Q31, binary angles, `fixed!(0.1)` and `db!(-3)` as compile-time constants.
-- **`no_std`, no alloc**, no third-party dependencies without features (`q!` comes from a proc-macro crate of this repository, itself without dependencies); WireWeaver's wire format with `shrink_wrap`.
+- **`no_std`, no alloc**, no dependencies without features (`q!`, on by default, is a proc-macro crate of this repository, itself without dependencies); WireWeaver's wire format with `shrink_wrap`.
 
 ## Features
 
@@ -78,6 +78,7 @@ The API reference is on [docs.rs](https://docs.rs/exact_units).
 |---------------|------------------------------------------------------------------------------------------------------|
 | none          | `Dim`, `Magnitude`, `Fixed`, `Point`, `Exact` and their ops as plain Rust types, no dependencies     |
 | unit groups   | `time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`, `radiometric`, `radiation`, `fields`, `dimensionless`, `information`, `counting`, `levels`; `quantities` for all |
+| `q`           | `q!(100 m/s)`, the literal that names its unit, compared exactly with a `Fixed`; a proc-macro of this repository without dependencies (default) |
 | `customary`   | imperial, US customary and other units outside the SI (opt-in only)                                  |
 | `std`         | every unit group but `customary`; with `shrink_wrap` the owned wire mirrors                          |
 | `shrink_wrap` | the wire format of [WireWeaver](https://github.com/vhrdtech/wire_weaver); exact-width bit fields `U1`..`U64` / `I2`..`I64` (opt-in, not a default) |
@@ -85,10 +86,10 @@ The API reference is on [docs.rs](https://docs.rs/exact_units).
 | `defmt`       | `defmt::Format`                                                                                      |
 | `libm`        | `to_db` / `from_db` without `std`, from the pure-Rust `libm`                                         |
 
-Default: `std`. A client that needs the wire format enables `shrink_wrap` too; a firmware turns the defaults off and picks its unit groups:
+Default: `std` and `q`. A client that needs the wire format enables `shrink_wrap` too; a firmware turns the defaults off and picks its unit groups:
 
 ```toml
-exact_units = { version = "0.1", default-features = false, features = ["time", "electrical", "defmt"] }
+exact_units = { version = "0.1", default-features = false, features = ["q", "time", "electrical", "defmt"] }
 ```
 
 ## Examples

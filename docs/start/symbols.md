@@ -4,7 +4,7 @@ level: basic
 
 # The symbols of `q!`
 
-`q!(100 m/s)` names its unit by symbol. Each symbol is one unit marker, and one that could mean two units doesn't compile: `min` is a minute, a US or imperial minim and a milli-inch, so `q!` asks which one.
+`q!(100 m/s)` names its unit by symbol. Each symbol is one unit marker, and one that could mean two units doesn't compile: `min` is a minute and a US or imperial minim, so `q!` asks which one.
 
 ```rust
 use exact_units::{Fixed, q, prefix::Milli, units::{Minute, Volt}};
@@ -21,7 +21,7 @@ assert!(t == q!(1.5 Minute)); // `min` reads more than one way: the marker says 
 ```rust,compile_fail
 use exact_units::q;
 
-let _ = q!(5 min); // a minute, a minim or a milli-inch?
+let _ = q!(5 min); // a minute or a minim?
 ```
 
 ## Where the table comes from
