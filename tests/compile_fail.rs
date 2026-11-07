@@ -27,6 +27,7 @@ fn compile_fail_q() {
     t.compile_fail("tests/compile_fail/q_point.rs");
     t.compile_fail("tests/compile_fail/fixed_dim_mismatch.rs");
     t.compile_fail("tests/compile_fail/fixed_grammar.rs");
+    t.compile_fail("tests/compile_fail/fixed_point.rs");
 }
 
 /// A symbol of a unit group that is off: only where `customary` is (`just test`'s `std` run).

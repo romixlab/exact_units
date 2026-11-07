@@ -56,11 +56,27 @@ pub fn fixed(input: TokenStream) -> TokenStream {
     let mut side = Side { trees: vec![None] };
     let toks = side.convert(trees.collect());
     match grammar::literal(&toks, 0) {
-        Ok(lit) => {
-            let mut out = Out::new(&krate);
-            out.literal_type(&lit, &side);
-            out.ts
-        }
+        Ok(lit) => match &lit.at {
+            None => {
+                let mut out = Out::new(&krate);
+                out.literal_type(&lit, &side);
+                out.ts
+            }
+            Some(at) => {
+                let id = match at {
+                    At::Symbol { id, .. } => *id,
+                    At::Type(ids) => ids.first().copied().unwrap_or(0),
+                };
+                let e = Error::at(
+                    id,
+                    format!(
+                        "`{}` names an origin, and fixed! is an amount, a Fixed: write the point's number with Point::from_raw, or compare a Point with q!(..)",
+                        side.text(id)
+                    ),
+                );
+                error(&e, &side, "fixed!")
+            }
+        },
         Err(e) => error(&e, &side, "fixed!"),
     }
 }

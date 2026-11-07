@@ -1,0 +1,71 @@
+error: fixed!: `degC` names an origin, and fixed! is an amount, a Fixed: write the point's number with Point::from_raw, or compare a Point with q!(..)
+ --> tests/compile_fail/fixed_point.rs:6:48
+  |
+6 |     let _: Fixed<Kelvin, One, i16> = fixed!(25 degC);
+  |                                                ^^^^
+
+error: fixed!: `AbsoluteZero` names an origin, and fixed! is an amount, a Fixed: write the point's number with Point::from_raw, or compare a Point with q!(..)
+ --> tests/compile_fail/fixed_point.rs:7:53
+  |
+7 |     let _: Fixed<Kelvin, One, i16> = fixed!(300 K @ AbsoluteZero);
+  |                                                     ^^^^^^^^^^^^
+
+error: fixed!: `"°C"` names an origin, and fixed! is an amount, a Fixed: write the point's number with Point::from_raw, or compare a Point with q!(..)
+ --> tests/compile_fail/fixed_point.rs:8:48
+  |
+8 |     let _: Fixed<Kelvin, One, i16> = fixed!(25 "°C");
+  |                                                ^^^^
+
+error[E0277]: the trait bound `Fixed<Kelvin, One, i16>: AtLiteral<()>` is not satisfied
+ --> tests/compile_fail/fixed_point.rs:6:38
+  |
+6 |     let _: Fixed<Kelvin, One, i16> = fixed!(25 degC);
+  |                                      ^^^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Kelvin, One, i16>`
+  |
+  = help: the following other types implement trait `AtLiteral<L>`:
+            `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+          and $N others
+  = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Fixed<Kelvin, One, i16>: AtLiteral<()>` is not satisfied
+ --> tests/compile_fail/fixed_point.rs:7:38
+  |
+7 |     let _: Fixed<Kelvin, One, i16> = fixed!(300 K @ AbsoluteZero);
+  |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Kelvin, One, i16>`
+  |
+  = help: the following other types implement trait `AtLiteral<L>`:
+            `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+          and $N others
+  = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Fixed<Kelvin, One, i16>: AtLiteral<()>` is not satisfied
+ --> tests/compile_fail/fixed_point.rs:8:38
+  |
+8 |     let _: Fixed<Kelvin, One, i16> = fixed!(25 "°C");
+  |                                      ^^^^^^^^^^^^^^^ the trait `AtLiteral<()>` is not implemented for `Fixed<Kelvin, One, i16>`
+  |
+  = help: the following other types implement trait `AtLiteral<L>`:
+            `Fixed<U, P, f32, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, f32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, f64, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, f64, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, i16, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, i16, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+            `Fixed<U, P, i32, B>` implements `AtLiteral<Literal<N, E>>`
+            `Fixed<U, P, i32, B>` implements `AtLiteral<LiteralIn<N, E, S>>`
+          and $N others
+  = note: this error originates in the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
