@@ -10,6 +10,7 @@ use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 use core::ops::{Add, Div, Mul, Neg, Sub};
 
+mod compare;
 mod decimal;
 mod fraction;
 mod text;
@@ -285,7 +286,8 @@ const fn scale_of<P: FixedScale>() -> Fraction {
     match Fraction::from_magnitude(&P::SCALE) {
         Some(f) => f,
         None => panic!(
-            "an Exact goes to a Fixed of a scale that is a fraction of u128s only (not π, a root): round through f64"
+            "an Exact goes to and compares with a Fixed of a scale that is a fraction of u128s only (not π, a root, \
+             nothing past u128): round through f64"
         ),
     }
 }
@@ -567,17 +569,42 @@ impl<U> Hash for Exact<U> {
     }
 }
 
-/// Equal when the [Fixed] has an exact value ([Exact::from_fixed]) and it is this one.
+/// Equal where the order is ([PartialOrd]): exactly the same value. A NaN is equal to none.
 impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> PartialEq<Fixed<U, P, T, B>> for Exact<U> {
     fn eq(&self, other: &Fixed<U, P, T, B>) -> bool {
-        Exact::from_fixed(*other).is_some_and(|o| o == *self)
+        self.partial_cmp(other) == Some(Ordering::Equal)
     }
 }
 
-/// Exactly, across scales: `None` only where the [Fixed] has no exact value ([Exact::from_fixed]).
+/// Exactly, across scales, for every value: a float of any size, ±∞ past every `Exact`; `None` only for NaN. A
+/// scale that isn't a fraction of `u128`s (π, a root, past `u128`) doesn't compile, as for [to](Exact::to): an
+/// `Exact` is a fraction, and a number of π steps is never one.
+///
+/// ```
+/// # #[cfg(feature = "time")] {
+/// use exact_units::{Exact, Fixed, prefix::{One, Quetta}, units::Hertz};
+///
+/// let max = Exact::<Hertz>::int(i128::MAX);
+/// assert!(Fixed::<Hertz, One, f64>::new(1e300) > max);
+/// assert!(Fixed::<Hertz, One, f64>::new(1e-300) < Exact::new(1, u128::MAX));
+/// assert!(Fixed::<Hertz, One, f64>::new(f64::NEG_INFINITY) < -max);
+/// assert!(Fixed::<Hertz, Quetta, i64>::new(i64::MAX) > max);
+/// assert_eq!(Fixed::<Hertz, One, f64>::new(f64::NAN).partial_cmp(&max), None);
+/// # }
+/// ```
+///
+/// ```compile_fail
+/// # #[cfg(feature = "time")] {
+/// use exact_units::{Exact, Fixed, units::Hertz};
+///
+/// exact_units::scale! { struct PiSteps = "", Exact(1 / 1, pi 1); }
+/// let _ = Exact::<Hertz>::int(3) < Fixed::<Hertz, PiSteps, i32>::new(1);
+/// # }
+/// ```
 impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> PartialOrd<Fixed<U, P, T, B>> for Exact<U> {
     fn partial_cmp(&self, other: &Fixed<U, P, T, B>) -> Option<Ordering> {
-        Some(self.cmp(&Exact::from_fixed(*other)?))
+        compare::order(other.get().to_repr(), const { scale_of::<P>() }, self.value)
+            .map(Ordering::reverse)
     }
 }
 
@@ -591,7 +618,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> PartialEq<Exact<U>> for F
 /// See `PartialOrd<Fixed> for Exact`.
 impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> PartialOrd<Exact<U>> for Fixed<U, P, T, B> {
     fn partial_cmp(&self, other: &Exact<U>) -> Option<Ordering> {
-        other.partial_cmp(self).map(Ordering::reverse)
+        compare::order(self.get().to_repr(), const { scale_of::<P>() }, other.value)
     }
 }
 

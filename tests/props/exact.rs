@@ -2,7 +2,8 @@
 //! difference, product or quotient is the exact value in lowest terms (a zero `+0/1`), refused exactly where that
 //! doesn't fit (a sum whose cross terms pass 2¹²⁸ too, with a strategy aimed at that window), and the order is the
 //! exact one. Rounding to an integer is the reference's, `to_f64` is the nearest float (a tie to even),
-//! `from_f64` the float's exact value. An `Exact` and a `Fixed` convert and compare as the integers they are. On
+//! `from_f64` the float's exact value. An `Exact` and a `Fixed` convert and compare as the integers they are, and order as their exact values do
+//! for every value of the `Fixed` (floats of any size, ±∞, NaN without an order, products with the scale past `u128`). On
 //! `u8` (`Fraction8`, the same code) against `i64` arithmetic: drawn, and walked whole over every pair of `u8`
 //! numerators with denominators at both ends. The pieces (widening multiply, add, divide, gcd) are Kani proofs on
 //! `u8` limbs in `src/exact/fraction.rs`; the whole operations on `u128` are too large a SAT problem for Kani.
@@ -90,9 +91,10 @@ pub(crate) fn ops8(a: Parts8, b: Parts8) {
 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
 pub(crate) mod big {
     use super::super::reference;
-    use exact_units::prefix::{Kilo, Mega};
+    use core::cmp::Ordering;
+    use exact_units::prefix::{Kilo, Mega, One, Pow10, Quecto, Quetta, Rational};
     use exact_units::units::Hertz;
-    use exact_units::{Exact, Fixed, Fraction, Rounding};
+    use exact_units::{Exact, Fixed, FixedScale, Fraction, Repr, Rounding, Storage};
     use num_rational::BigRational;
 
     pub(crate) fn big(x: Fraction) -> BigRational {
@@ -225,6 +227,69 @@ pub(crate) mod big {
             "{khz} kHz in MHz"
         );
     }
+
+    /// `f`'s exact value at a scale of `num/den` hertz a step, `None` for NaN, and ±∞ as `Err` of its sign.
+    fn value<P: FixedScale, T: Storage>(
+        f: Fixed<Hertz, P, T>,
+        (num, den): (u128, u128),
+    ) -> Option<Result<BigRational, Ordering>> {
+        let x = match f.get().to_repr() {
+            Repr::Int(i) => BigRational::from_integer(i.into()),
+            Repr::Float(x) if x.is_nan() => return None,
+            Repr::Float(x) if x.is_infinite() => {
+                return Some(Err(if x > 0.0 {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }));
+            }
+            Repr::Float(x) => BigRational::from_float(x).expect("a finite float"),
+        };
+        Some(Ok(x * reference::rational(false, num, den)))
+    }
+
+    /// A `Fixed` of `num/den` hertz a step and an `Exact` order as their exact values do, both ways: NaN alone has
+    /// no order, ±∞ is past every `Exact`. `==` is exactly where the order is `Equal`.
+    pub(crate) fn order<P: FixedScale, T: Storage>(
+        f: Fixed<Hertz, P, T>,
+        scale: (u128, u128),
+        e: Exact<Hertz>,
+    ) {
+        let want = value(f, scale).map(|v| v.map_or_else(|o| o, |x| x.cmp(&big(e.get()))));
+        assert_eq!(f.partial_cmp(&e), want, "{f:?} against {e:?}");
+        assert_eq!(
+            e.partial_cmp(&f),
+            want.map(Ordering::reverse),
+            "{e:?} against {f:?}"
+        );
+        assert_eq!(f == e, want == Some(Ordering::Equal), "{f:?} == {e:?}");
+        assert_eq!(e == f, want == Some(Ordering::Equal), "{e:?} == {f:?}");
+    }
+
+    /// [order] at the scales that pass `u128` with a big storage (`10^±30`, `10^20`), at 1 and 1/3, on every storage
+    /// kind: `x` as an `f64` and an `f32`, `i` as an `i64` and a `u64`.
+    pub(crate) fn orders(x: f64, i: i64, e: Exact<Hertz>) {
+        const Q: u128 = 10u128.pow(30);
+        order(Fixed::<Hertz, One, f64>::new(x), (1, 1), e);
+        order(Fixed::<Hertz, Quetta, f64>::new(x), (Q, 1), e);
+        order(Fixed::<Hertz, Quecto, f64>::new(x), (1, Q), e);
+        order(Fixed::<Hertz, Rational<1, 3>, f64>::new(x), (1, 3), e);
+        #[expect(clippy::cast_possible_truncation, reason = "any f32 will do")]
+        order(Fixed::<Hertz, Kilo, f32>::new(x as f32), (1000, 1), e);
+        order(Fixed::<Hertz, One, i64>::new(i), (1, 1), e);
+        order(Fixed::<Hertz, Quetta, i64>::new(i), (Q, 1), e);
+        order(Fixed::<Hertz, Quecto, i64>::new(i), (1, Q), e);
+        order(
+            Fixed::<Hertz, Pow10<20>, i64>::new(i),
+            (10u128.pow(20), 1),
+            e,
+        );
+        order(
+            Fixed::<Hertz, Quetta, u64>::new(i.unsigned_abs()),
+            (Q, 1),
+            e,
+        );
+    }
 }
 
 #[cfg(not(any(kani, fuzzing)))]
@@ -277,6 +342,69 @@ mod tests {
         #[test]
         fn with_a_fixed(khz in strategy::i32(), mhz in strategy::i16(), r in strategy::mode()) {
             big::with_fixed(khz, mhz, r);
+        }
+    }
+
+    /// Floats weighted to where an `Exact` ends: anything, the ends of `f64` and ±∞, NaN, powers of 2 across the whole
+    /// range (subnormals to `2^1023`), and numbers near `2^±128`.
+    fn floats() -> impl Strategy<Value = f64> {
+        prop_oneof![
+            3 => any::<u64>().prop_map(f64::from_bits),
+            1 => proptest::sample::select(&[
+                f64::INFINITY, f64::NEG_INFINITY, f64::NAN, 0.0, -0.0, f64::MAX, f64::MIN,
+                f64::MIN_POSITIVE, 5e-324, -5e-324,
+            ][..]),
+            2 => (any::<bool>(), -1074i32..=1023).prop_map(|(neg, k)| {
+                let x = 2f64.powi(k);
+                if neg { -x } else { x }
+            }),
+            2 => (any::<i32>(), -160i32..=160).prop_map(|(m, k)| f64::from(m) * 2f64.powi(k)),
+        ]
+    }
+
+    /// An `Exact` whose value is a float's: the orders that are `Equal`.
+    fn as_exact(x: f64) -> exact_units::Exact<exact_units::units::Hertz> {
+        exact_units::Exact::of(exact_units::Fraction::from_f64(x).unwrap_or_default())
+    }
+
+    proptest! {
+        #[test]
+        fn orders_with_a_fixed(x in floats(), i in strategy::i64(), e in strategy::fraction()) {
+            big::orders(x, i, exact_units::Exact::of(e));
+        }
+
+        #[test]
+        fn orders_with_its_own_value(x in floats(), i in strategy::i64()) {
+            big::orders(x, i, as_exact(x));
+            #[expect(clippy::cast_precision_loss, reason = "any float near i will do")]
+            big::orders(i as f64, i, as_exact(i as f64));
+        }
+    }
+
+    /// Orders that `from_fixed` couldn't give (its value past `u128`): huge and tiny floats, ±∞, and an `i64` at a
+    /// scale whose product passes `u128`, against `Exact`s near `i128::MAX` and below `1/u128::MAX`.
+    #[test]
+    fn known_orders() {
+        use exact_units::{Exact, Fraction};
+        let max = Exact::of(Fraction::int(i128::MAX));
+        let min = Exact::of(Fraction::int(i128::MIN));
+        let tiny = Exact::of(Fraction::from_parts(false, 1, u128::MAX).unwrap());
+        for e in [max, min, tiny, -tiny, Exact::ZERO, Exact::int(1)] {
+            for x in [
+                f64::MAX,
+                f64::MIN,
+                1e300,
+                -1e300,
+                1e-300,
+                -1e-300,
+                5e-324,
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+            ] {
+                for i in [i64::MAX, i64::MIN, 1, -1, 0] {
+                    big::orders(x, i, e);
+                }
+            }
         }
     }
 

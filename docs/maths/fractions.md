@@ -104,6 +104,8 @@ assert_eq!(f.to_rounded::<One, u32>(Rounding::Floor), Some(Fixed::new(26_666_666
 assert!(f > Fixed::<Hertz, Kilo, u16>::new(26_666));
 ```
 
+The order is exact for every value of the `Fixed`: a float of any size, `1e300` or `1e-300`, and an integer whose product with its scale passes `u128`. ±∞ is past every `Exact`. A NaN has no order and equals nothing. A scale that isn't a fraction of `u128`s (π, a root, `Pow10<-40>`) doesn't compile, as for `to`: an `Exact` is a fraction, and a number of π steps never is one.
+
 This is how a planner hands its results to firmware: as `Fixed` constants, rounded where a register needs a whole number, with the rounding named.
 
 ## Printing
