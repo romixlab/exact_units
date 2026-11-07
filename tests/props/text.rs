@@ -18,10 +18,11 @@ use exact_units::units::{self, Per, Volt, Watt};
 use exact_units::{Fixed, Prefix, UnitExpr};
 
 /// Every message `Decimal::parse` refuses a literal with.
-const DECIMAL_REFUSALS: [&str; 3] = [
+const DECIMAL_REFUSALS: [&str; 4] = [
     "a literal is a decimal number: 0.1, -3, 2.5e-3",
     "a literal of more than 18 digits",
     "a literal's exponent is out of range",
+    "a literal of -0 reads two ways for a float storage, -0.0 or +0.0: write 0",
 ];
 
 /// Every message `Decibels::parse` refuses a level with.
@@ -349,6 +350,12 @@ mod tests {
         #[test]
         fn decimals(s in literal()) {
             super::decimal(&s);
+        }
+
+        /// Zero written every way, with and without a sign: `-0` is refused, the others are 0.
+        #[test]
+        fn zeros(sign in prop_oneof![Just(""), Just("-"), Just("+"), Just("- ")], zeros in "0{1,3}(\\.0{0,3})?(e-?[0-9]{1,2})?") {
+            super::decimal(&format!("{sign}{zeros}"));
         }
 
         #[test]

@@ -101,7 +101,7 @@ pub(crate) fn range(bits: u32, signed: bool) -> (i128, i128) {
 
 /// A decimal literal as `Decimal::parse` documents it, read without the crate: an optional sign, spaces, digits with
 /// `_` between them and at most one `.`, then an optional `e` or `E` with a signed exponent of digits and `_`. The
-/// digits as one integer and the power of ten, each in a wide integer; `None` for anything else.
+/// digits as one integer and the power of ten, each in a wide integer; `None` for anything else, and for -0.
 pub(crate) fn decimal(s: &str) -> Option<(i128, i128)> {
     let (neg, rest) = sign(s);
     let rest = rest.trim_start_matches(' ');
@@ -120,6 +120,10 @@ pub(crate) fn decimal(s: &str) -> Option<(i128, i128)> {
             if eneg { -e } else { e }
         }
     };
+    // -0 is refused: a decimal has no negative zero
+    if neg && num == 0 {
+        return None;
+    }
     Some((if neg { -num } else { num }, e - frac_digits))
 }
 

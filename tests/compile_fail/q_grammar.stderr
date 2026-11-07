@@ -57,3 +57,9 @@ error: q!: the literal's power of ten is out of range
    |
 16 |     let _ = t < q!(1e40000 B);
    |                    ^^^^^^^
+
+error: q!: `-0` reads two ways for a float storage, -0.0 or +0.0: write 0
+  --> tests/compile_fail/q_grammar.rs:17:21
+   |
+17 |     let _ = t < q!(-0 B);
+   |                     ^

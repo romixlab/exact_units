@@ -80,6 +80,8 @@ fn numbers() {
     assert_eq!(parse("1e-3", false), Ok(Decimal { num: 1, exp: -3 }));
     assert_eq!(parse("2.5E+3", false), Ok(Decimal { num: 25, exp: 2 }));
     assert_eq!(parse("0.000", false), Ok(Decimal { num: 0, exp: 0 }));
+    assert!(parse("0", true).is_err_and(|m| m.contains("-0.0 or +0.0")));
+    assert!(parse("0.0e5", true).is_err_and(|m| m.contains("-0.0 or +0.0")));
     assert_eq!(
         parse("9223372036854775807", false),
         Ok(Decimal {

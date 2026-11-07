@@ -11,7 +11,8 @@ pub(crate) struct Decimal {
 }
 
 /// The decimal a literal's text writes (`100`, `3.3`, `1_000`, `1e-3`, `2.5E+3`), negated for a `-` before it.
-/// `Err` says why the text is no such number: a suffix (`100u8`, `1.0f32`), a radix (`0x10`), digits past `i64`.
+/// `Err` says why the text is no such number: a suffix (`100u8`, `1.0f32`), a radix (`0x10`), digits past `i64`, a
+/// negative zero (`-0`, which a float storage would take as +0.0).
 pub(crate) fn parse(text: &str, negative: bool) -> Result<Decimal, String> {
     let (mantissa, e) = match text.find(['e', 'E']) {
         Some(at) => match (text.get(..at), text.get(at.saturating_add(1)..)) {
@@ -81,6 +82,11 @@ pub(crate) fn parse(text: &str, negative: bool) -> Result<Decimal, String> {
         .ok_or_else(|| exponent(text))?;
     }
     if num == 0 {
+        if negative {
+            return Err(format!(
+                "`-{text}` reads two ways for a float storage, -0.0 or +0.0: write 0"
+            ));
+        }
         return Ok(Decimal { num: 0, exp: 0 });
     }
     while num % 10 == 0 {

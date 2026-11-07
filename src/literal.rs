@@ -54,7 +54,8 @@ impl Decimal {
     }
 
     /// A decimal number as written: `"0.1"`, `"-3"`, `"+2.5e-3"`, `"1_000"`. Panics (a compile error in `const`
-    /// code) on anything else, a type suffix (`0.1f32`) included: the storage comes from the context.
+    /// code) on anything else, a type suffix (`0.1f32`) included: the storage comes from the context. `"-0"` (and
+    /// `"-0.0"`) is refused too: a decimal has no negative zero, and a float storage would take it as +0.0.
     #[must_use]
     #[expect(
         clippy::as_conversions,
@@ -148,6 +149,10 @@ impl Decimal {
             reason = "exp is checked to be in i16's range just above"
         )]
         let exp = exp as i16;
+        assert!(
+            !(neg && num == 0),
+            "a literal of -0 reads two ways for a float storage, -0.0 or +0.0: write 0"
+        );
         Decimal::new(if neg { -num } else { num }, exp)
     }
 
@@ -428,6 +433,24 @@ macro_rules! __fixed_unit {
 /// ```compile_fail
 /// use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
 /// const X: Fixed<Ratio, One, f32> = fixed!(0.5f32); // the storage comes from the context
+/// ```
+///
+/// A float storage refuses a literal past its range or below its normal numbers, and `-0`, which it would take as
+/// +0.0:
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
+/// const X: Fixed<Ratio, One, f32> = fixed!(3.4028236e38); // rounds past f32::MAX
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
+/// const X: Fixed<Ratio, One, f32> = fixed!(1e-38); // a subnormal f32
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
+/// const X: Fixed<Ratio, One, f64> = fixed!(-0.0);
 /// ```
 ///
 /// ```compile_fail

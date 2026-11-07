@@ -55,6 +55,12 @@ fn refuses_an_empty_exponent() {
 }
 
 #[test]
+#[should_panic(expected = "-0.0 or +0.0")]
+fn refuses_a_negative_zero() {
+    let _ = Decimal::parse("-0.0");
+}
+
+#[test]
 fn macro_in_const() {
     const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1);
     assert_eq!(BUSY.get(), 107_374_182);
@@ -217,6 +223,25 @@ fn too_large_panics_at_run_time() {
 #[should_panic(expected = "above its bound")]
 fn outside_bounds_panics_at_run_time() {
     let _ = Fixed::<Ratio, One, i8, Range<0, 10>>::from_decimal(Decimal::new(11, 0));
+}
+
+/// A float storage takes only normal numbers: 3.4028236 · 10³⁸ rounds past `f32::MAX`, 10⁻³⁸ is a subnormal `f32`;
+/// the largest one is in, and so is 2 · 10⁻³⁸, a normal number.
+#[test]
+fn a_float_outside_its_normal_range_panics_at_run_time() {
+    let f32_of = |num, exp| {
+        std::panic::catch_unwind(|| Fixed::<Ratio, One, f32>::from_decimal(Decimal::new(num, exp)).get())
+            .map_err(|e| e.downcast_ref::<&str>().map(|m| String::from(*m)))
+    };
+    let outside = Err(Some(String::from(
+        "this value is outside the normal range of its float storage",
+    )));
+    assert_eq!(f32_of(34_028_236, 31), outside);
+    assert_eq!(f32_of(-34_028_236, 31), outside);
+    assert_eq!(f32_of(1, -38), outside);
+    assert_eq!(f32_of(-1, -38), outside);
+    assert_eq!(f32_of(34_028_234, 31), Ok(f32::MAX));
+    assert_eq!(f32_of(2, -38), Ok(2e-38));
 }
 
 crate::scale! {

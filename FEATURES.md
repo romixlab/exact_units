@@ -99,7 +99,8 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
 - ✅ **NUM-7 Decimal literals as exact constants** (was STD-93) — `exact_units` d4b5b1a, fce4739, 790d6f0: `fixed!(0.1)` is the
   `Fixed` (or, of two literals, the `Complex`) its context names, holding the stored value nearest to the literal,
   worked out at compile time (`fixed!(0.1)` in Q30 is `107_374_182`); a scale with π, a value past the storage or
-  its bounds doesn't compile; `Fixed::from_decimal` as a `const fn`. `Mac::mean_at_least(threshold, n)`: a mean
+  its bounds, a value outside a float's normal range, and `-0` (a float storage would take it as +0.0, so both
+  literal readers refuse it) don't compile; `Fixed::from_decimal` as a `const fn`. `Mac::mean_at_least(threshold, n)`: a mean
   power against a typed threshold (`db!(norm_sqr -10)`) in one exact integer compare.
 - ✅ **NUM-8 Niche codes next to `Bounds`** (was STD-66) — `exact_units` d7266c7, module `niche`: `Niched<V, N>` is a value
   `V` (`Fixed` or `Point`) or one of the codes of `N`, stored as the raw number alone, so `size_of` and the wire
