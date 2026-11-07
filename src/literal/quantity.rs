@@ -429,8 +429,6 @@ macro_rules! literal_cmp_float {
 
             /// The float an `==` with a `q!` literal compares with: a compile error where none equals `x`. Above the
             /// largest finite float `down` is that float, below the least it is −∞, neither of them `x`.
-            #[expect(clippy::panic, reason = "a compile error in const code: no stored value equals the literal")]
-            #[expect(clippy::float_cmp, reason = "down is MAX or −∞ exactly where the literal is past the range")]
             pub(super) const fn equal(self) -> $ty {
                 if !self.exact && (self.down == $ty::MAX || self.down == $ty::NEG_INFINITY) {
                     panic!("this literal is past the float's range: no stored value equals it");

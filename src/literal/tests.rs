@@ -230,8 +230,10 @@ fn outside_bounds_panics_at_run_time() {
 #[test]
 fn a_float_outside_its_normal_range_panics_at_run_time() {
     let f32_of = |num, exp| {
-        std::panic::catch_unwind(|| Fixed::<Ratio, One, f32>::from_decimal(Decimal::new(num, exp)).get())
-            .map_err(|e| e.downcast_ref::<&str>().map(|m| String::from(*m)))
+        std::panic::catch_unwind(|| {
+            Fixed::<Ratio, One, f32>::from_decimal(Decimal::new(num, exp)).get()
+        })
+        .map_err(|e| e.downcast_ref::<&str>().map(|m| String::from(*m)))
     };
     let outside = Err(Some(String::from(
         "this value is outside the normal range of its float storage",
@@ -263,8 +265,10 @@ fn float_equal_only_for_a_float() {
     use super::quantity::Below;
     use crate::units::Volt;
     let equal32 = |num, exp| {
-        std::panic::catch_unwind(|| Below::<f32>::of::<Volt, Volt, One>(Decimal::new(num, exp)).equal())
-            .map_err(|e| e.downcast_ref::<&str>().map(|m| String::from(*m)))
+        std::panic::catch_unwind(|| {
+            Below::<f32>::of::<Volt, Volt, One>(Decimal::new(num, exp)).equal()
+        })
+        .map_err(|e| e.downcast_ref::<&str>().map(|m| String::from(*m)))
     };
     assert_eq!(equal32(75, -2), Ok(0.75));
     assert_eq!(equal32(-75, -2), Ok(-0.75));
@@ -284,8 +288,10 @@ fn float_equal_only_for_a_float() {
     assert_eq!(equal32(-340_282_350, 30), past);
     assert_eq!(equal32(34, 37), not_a_float); // below f32::MAX, between two floats
     let equal64 = |num, exp| {
-        std::panic::catch_unwind(|| Below::<f64>::of::<Volt, Volt, Rational<1, 3>>(Decimal::new(num, exp)).equal())
-            .is_ok()
+        std::panic::catch_unwind(|| {
+            Below::<f64>::of::<Volt, Volt, Rational<1, 3>>(Decimal::new(num, exp)).equal()
+        })
+        .is_ok()
     };
     assert!(equal64(1, 0)); // 3 thirds
     assert!(!equal64(1, -1)); // 0.3 thirds
