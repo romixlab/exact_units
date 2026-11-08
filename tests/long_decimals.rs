@@ -9,8 +9,7 @@
 )]
 #![expect(
     clippy::unwrap_used,
-    clippy::panic,
-    reason = "the test fails by panicking, on a file it can't read or a decimal it doesn't allow"
+    reason = "the test fails by panicking, on a file it can't read"
 )]
 
 use std::fs;
@@ -93,7 +92,7 @@ fn long_decimals(line: &str) -> Vec<&str> {
         while b.get(i).is_some_and(u8::is_ascii_digit) {
             i += 1;
         }
-        if i - point - 1 >= LONG {
+        if i - point > LONG {
             found.push(line.get(start..i).unwrap());
         }
     }
@@ -110,7 +109,11 @@ fn finds_long_decimals() {
         long_decimals("-6.0205999132 and 1.602176634"),
         ["6.0205999132"]
     );
-    assert!(long_decimals("v0.1.0, 1..2, 9.54242509.., 12345678901").is_empty());
+    let none: [&str; 0] = [];
+    assert_eq!(
+        long_decimals("v0.1.0, 1..2, 9.54242509.., 12345678901"),
+        none
+    );
 }
 
 #[test]
