@@ -1,7 +1,7 @@
 //! `neper_cable.svg`: a wave dying along a coax cable, marked where its amplitude has fallen by 1, 2 and 3 Np, and
 //! under it the one level 1 Np is for an amplitude and for a power. Every number comes from the datasheet's own
 //! 5.4 dB/100 ft, typed as `Per<Loss<Decibel>, Feet100>` and `convert`ed, through the crate's `to_db` and
-//! `from_db_const`; the `assert!`s fail `just docs-build` if a number on the figure stops matching the formula or
+//! `from_db_const_rounded`; the `assert!`s fail `just docs-build` if a number on the figure stops matching the formula or
 //! the page.
 
 use core::f64::consts::{E, TAU};
@@ -18,7 +18,7 @@ use crate::svg::{Panel, Svg};
 
 type VoltGain = Fixed<Per<Volt, Volt>, One, f64>;
 type PowerGain = Fixed<Per<Watt, Watt>, One, f64>;
-/// The stored ratios: `from_db_const` rounds them correctly, in integers.
+/// The stored ratios: `from_db_const_rounded` rounds them to nearest, in integers.
 type VoltMicro = Fixed<Per<Volt, Volt>, Micro, u32>;
 type PowerMicro = Fixed<Per<Watt, Watt>, Micro, u32>;
 
@@ -53,7 +53,7 @@ fn alpha() -> f64 {
     let np_per_m: Fixed<Per<Loss<Neper>, Meter>, One, f64> = per_100ft.convert().unwrap();
     let alpha = np_per_m.get();
     // back through the crate: the loss over one "100 ft" span is the datasheet's own number
-    let span = Fixed::<Feet100, One, f64>::new(1.0);
+    let span = Fixed::<Feet100, One, f64>::bounded(1.0);
     let loss: Fixed<Loss<Decibel>, One, f64> = per_100ft.over(span, NearestEven).unwrap();
     assert!(
         (loss.get() - 5.4).abs() < 1e-9,
@@ -74,8 +74,8 @@ struct Mark {
 /// What `n` Np is: `to_db` of e⁻ⁿ V/V and of e⁻²ⁿ W/W are one level, and that level as `Decibels` gives the two ratios
 /// back, correctly rounded by the crate.
 fn mark(n: i32, db_in_np: f64) -> Mark {
-    let db = VoltGain::new(E.powi(-n)).to_db();
-    let of_power = PowerGain::new(E.powi(-2 * n)).to_db();
+    let db = VoltGain::bounded(E.powi(-n)).to_db();
+    let of_power = PowerGain::bounded(E.powi(-2 * n)).to_db();
     assert!((db - of_power).abs() < 1e-9, "{n} Np, V/V against W/W");
     assert!((db * db_in_np + f64::from(n)).abs() < 1e-12, "{n} Np");
     #[expect(
@@ -83,8 +83,8 @@ fn mark(n: i32, db_in_np: f64) -> Mark {
         reason = "a few tens of dB in nanobels fit an i64"
     )]
     let level = Decibels::new((db * 1e9).round() as i64, 9);
-    let amplitude = VoltMicro::from_db_const(level).get();
-    let power = PowerMicro::from_db_const(level).get();
+    let amplitude = VoltMicro::from_db_const_rounded(level, NearestEven).get();
+    let power = PowerMicro::from_db_const_rounded(level, NearestEven).get();
     assert!(
         (f64::from(amplitude) / 1e6 - E.powi(-n)).abs() < 1e-6,
         "{n} Np, V/V"
@@ -260,7 +260,7 @@ fn levels(s: &mut Svg, db_in_np: f64) {
 
 pub fn neper_cable() -> String {
     // 1 dB in Np, through the crate's own conversion: the page's own numbers can't drift from it
-    let db_in_np = Fixed::<Decibel, One, f64>::new(1.0)
+    let db_in_np = Fixed::<Decibel, One, f64>::bounded(1.0)
         .convert::<Neper, One, f64>()
         .unwrap()
         .get();

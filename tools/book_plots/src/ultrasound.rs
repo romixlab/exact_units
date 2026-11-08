@@ -33,8 +33,8 @@ fn alpha_per_metre(mhz: i32) -> Fixed<Per<Loss<Decibel>, Meter>, One, i32> {
 /// The one-way loss at `depth_cm` for the given frequency, in dB, through `Fixed::over`.
 fn loss_db(mhz: i32, depth_cm: f64) -> f64 {
     let alpha: Fixed<Per<Loss<Decibel>, Meter>, One, f64> =
-        Fixed::new(f64::from(alpha_per_metre(mhz).get()));
-    let depth = Fixed::<Meter, Centi, f64>::new(depth_cm);
+        Fixed::<_, _, f64>::bounded(f64::from(alpha_per_metre(mhz).get()));
+    let depth = Fixed::<Meter, Centi, f64>::bounded(depth_cm);
     let loss: Fixed<Loss<Decibel>, One, f64> = alpha.over(depth, NearestEven).unwrap();
     loss.get()
 }

@@ -4,7 +4,9 @@
 //! figure stops matching the formula or the page.
 
 use exact_units::{
-    Fixed, Q15, db,
+    Fixed, Q15,
+    Rounding::NearestEven,
+    db,
     decibel::Decibels,
     prefix::{Micro, Milli, One},
     units::{Per, Volt, Watt},
@@ -14,7 +16,7 @@ use crate::svg::Svg;
 
 type VoltGain = Fixed<Per<Volt, Volt>, One, f64>;
 type PowerGain = Fixed<Per<Watt, Watt>, One, f64>;
-/// The stored ratios: `from_db_const` rounds them correctly, in integers.
+/// The stored ratios: `from_db_const_rounded` rounds them to nearest, in integers.
 type VoltMicro = Fixed<Per<Volt, Volt>, Micro, u32>;
 type PowerMicro = Fixed<Per<Watt, Watt>, Micro, u32>;
 type Level = Fixed<Per<Volt, Volt>, Milli, u16>;
@@ -83,12 +85,12 @@ fn landmarks(s: &mut Svg) {
     let rows = spread(&levels);
     for (&level, &row) in levels.iter().zip(&rows) {
         let exact = Decibels::new(i64::from(level), 0);
-        let amplitude = VoltMicro::from_db_const(exact).get();
-        let power = PowerMicro::from_db_const(exact).get();
+        let amplitude = VoltMicro::from_db_const_rounded(exact, NearestEven).get();
+        let power = PowerMicro::from_db_const_rounded(exact, NearestEven).get();
         // the stored ratios are the level again, within what a rounded micro can hold
-        let back = VoltGain::new(f64::from(amplitude) / 1e6).to_db();
+        let back = VoltGain::bounded(f64::from(amplitude) / 1e6).to_db();
         assert!((back - f64::from(level)).abs() < 1e-4, "{level} dB, V/V");
-        let back = PowerGain::new(f64::from(power) / 1e6).to_db();
+        let back = PowerGain::bounded(f64::from(power) / 1e6).to_db();
         assert!((back - f64::from(level)).abs() < 1e-4, "{level} dB, W/W");
 
         if level.abs() == 6 {
@@ -125,11 +127,11 @@ fn decades(s: &mut Svg) {
     for level in (DB_MIN..=-30).step_by(10) {
         let row = y(f64::from(level));
         let exponent = level / 10;
-        let back = PowerGain::new(10f64.powi(exponent)).to_db();
+        let back = PowerGain::bounded(10f64.powi(exponent)).to_db();
         assert!((back - f64::from(level)).abs() < 1e-9, "{level} dB, W/W");
         s.text(POWER, row + 5.0, "end", "mono lg", &power_of_ten(exponent));
         if level % 20 == 0 {
-            let back = VoltGain::new(10f64.powi(level / 20)).to_db();
+            let back = VoltGain::bounded(10f64.powi(level / 20)).to_db();
             assert!((back - f64::from(level)).abs() < 1e-9, "{level} dB, V/V");
             s.text(
                 AMPLITUDE,
@@ -185,7 +187,7 @@ struct Anchor {
 fn adc_floor(bits: i32) -> Anchor {
     // a full-scale sine over quantisation noise: (A²/2) / (q²/12) with q = 2A/2ᴺ
     let snr = 1.5 * 4f64.powi(bits);
-    let level = PowerGain::new(1.0 / snr).to_db();
+    let level = PowerGain::bounded(1.0 / snr).to_db();
     let rule_of_thumb = 6.02 * f64::from(bits) + 1.76;
     assert!((level + rule_of_thumb).abs() < 0.02, "{bits} bits");
     Anchor {
@@ -207,7 +209,7 @@ fn dbfs(level: f64) -> String {
 
 fn anchors(s: &mut Svg) {
     let q15_step = Q15::<Per<Volt, Volt>>::of(1).to_db();
-    assert!((q15_step + 15.0 * VoltGain::new(2.0).to_db()).abs() < 1e-9);
+    assert!((q15_step + 15.0 * VoltGain::bounded(2.0).to_db()).abs() < 1e-9);
     let level_step = Level::new(1).to_db();
     assert!((level_step + 60.0).abs() < 1e-9);
 
@@ -267,9 +269,9 @@ fn anchors(s: &mut Svg) {
 /// The error of the rule of thumb, tinted as the rows it is about.
 fn thumb_note(s: &mut Svg) {
     let x = BARS;
-    let power_of_2 = PowerGain::new(2.0).to_db();
-    let amplitude_of_2 = VoltGain::new(2.0).to_db();
-    let plus_3 = PowerMicro::from_db_const(Decibels::new(3, 0)).get();
+    let power_of_2 = PowerGain::bounded(2.0).to_db();
+    let amplitude_of_2 = VoltGain::bounded(2.0).to_db();
+    let plus_3 = PowerMicro::from_db_const_rounded(Decibels::new(3, 0), NearestEven).get();
     let short = (1.0 - f64::from(plus_3) / 2e6) * 100.0;
     s.text(
         x,

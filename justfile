@@ -15,6 +15,9 @@ test *flags:
     CARGO_BUILD_WARNINGS=deny cargo test --doc --features shrink_wrap,customary,serde
     # the book site's Markdown extensions (docs_ext: the `bits` fence, `rust,compile_fail` blocks)
     uv run --group dev pytest -q docs_ext
+    # the book, strict as CI's docs job builds it: its plots run the crate (tools/book_plots), so a const assert or
+    # a changed number there fails here; clippy alone never instantiates them
+    just docs-build
 
 # Hunt tests/props for failures a fixed seed can't reach: proptest's own random seed, many more cases than the gate
 # (CASES, default 10000) - a spare PC overnight, not `just test`. A case it finds persists to
