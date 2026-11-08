@@ -319,12 +319,13 @@ pub(crate) mod range {
         })
     }
 
-    /// A `q!` range as the reference reads it: ends `num · 10^exp`, the upper one out for `open`, `fit` 0 (an end off
-    /// the steps refused), 1 (`Inside`) or 2 (`Outside`).
+    /// A `q!` range as the reference reads it: ends `num · 10^exp`, the lower one out for `lo_open`, the upper one
+    /// for `open`, `fit` 0 (an end off the steps refused), 1 (`Inside`) or 2 (`Outside`).
     #[derive(Copy, Clone, Debug)]
     pub(crate) struct RangeCase {
         pub(crate) lo: (i64, i16),
         pub(crate) hi: (i64, i16),
+        pub(crate) lo_open: bool,
         pub(crate) open: bool,
         pub(crate) fit: u8,
     }
@@ -339,8 +340,11 @@ pub(crate) mod range {
     /// Whether `t` passes the lower end of `c`, as [range_member] reads it.
     fn above_lower(t: i128, num_s: i128, den_s: i128, c: RangeCase) -> Option<bool> {
         use core::cmp::Ordering::{Greater, Less};
-        Some(if c.fit == 2 && !on_step(num_s, den_s, c.lo.0, c.lo.1)? {
+        let on = on_step(num_s, den_s, c.lo.0, c.lo.1)?;
+        Some(if c.fit == 2 && !on {
             steps_order(t + 1, num_s, den_s, c.lo.0, c.lo.1)? == Greater
+        } else if on && c.lo_open {
+            steps_order(t, num_s, den_s, c.lo.0, c.lo.1)? == Greater
         } else {
             steps_order(t, num_s, den_s, c.lo.0, c.lo.1)? != Less
         })
@@ -384,6 +388,26 @@ pub(crate) mod range {
         let any = first < past;
         let all = first == min && past == max + 1;
         Some(off || !any || all)
+    }
+
+    /// Whether the decimal of stored value `t` (steps of `num_s / den_s`, both above 0) starts with `digits`, `places`
+    /// of them after the point, and the sign `-` for `negative`: `|x| · 10^places` cut to an integer is `digits`, `x`
+    /// at least 0 or below 0 as the sign says. `None` where the products don't fit `i128`.
+    pub(crate) fn prefix_member(
+        t: i128,
+        num_s: i128,
+        den_s: i128,
+        digits: i64,
+        places: u32,
+        negative: bool,
+    ) -> Option<bool> {
+        let x = t.checked_mul(num_s)?;
+        if negative != (x < 0) {
+            return Some(false);
+        }
+        let scaled = x.checked_abs()?.checked_mul(10i128.checked_pow(places)?)?;
+        let d = i128::from(digits);
+        Some(d.checked_mul(den_s)? <= scaled && scaled < d.checked_add(1)?.checked_mul(den_s)?)
     }
 
     /// The least `t` of `min ..= max` where `p` holds, for a `p` false then true; `max + 1` where it never holds.

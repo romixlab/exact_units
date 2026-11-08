@@ -15,4 +15,12 @@ fn main() {
     let _ = q!(5 V, Inside);
     let _ = q!(4.9 V ..= 5.1 V, Middle);
     let _ = q!(20 degC ..= 25 K);
+    let _ = q!(9... V);
+    let _ = q!(...5 V);
+    let _ = q!(9.5e3... V);
+    let _ = q!(9.5... V, Inside);
+    let _ = q!(-0.0... V);
+    let _ = q!(4.9 ... 5.1 V);
+    let _ = q!(9.5... V ..= 10 V);
+    let _ = q!("9.5... V ± 1 %");
 }

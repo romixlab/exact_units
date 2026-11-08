@@ -12,18 +12,18 @@ A tuner measures an antenna's impedance at a few frequencies against a 50 Ω lin
 
 ```rust
 # #[cfg(all(feature = "electrical", any(feature = "std", feature = "libm")))] {
-use exact_units::{Admittance, Impedance, Z0, prefix::{Milli, One}};
+use exact_units::{Admittance, Impedance, Z0, prefix::{Milli, One}, q};
 
 let z0 = Z0::<One, f64>::bounded(50.0, 0.0);
 let z = Impedance::<One, f64>::bounded(100.0, 0.0);
 let gamma = z.reflection(z0).finite().unwrap();
 assert!((gamma.vswr().get() - 2.0).abs() < 1e-12);
 assert!((gamma.return_loss_db() - 9.542425094393248).abs() < 1e-12);
-assert!((gamma.mismatch_loss().to_db() + 0.5115252244738129).abs() < 1e-12);
+assert!(gamma.mismatch_loss().is_in(q!(0.888... W/W))); // 8/9 of the power, -0.51 dB as its to_db()
 
 // at 440 MHz the antenna looks inductive, 82 + 35j Ω: a shunt element is chosen in admittance
 let y: Admittance<Milli, f64> = Impedance::<One, f64>::bounded(82.0, 35.0).to_admittance().finite().unwrap();
-assert!((-y.im().get() - 4.403069568499182).abs() < 1e-9); // mS of shunt capacitor that cancels the susceptance
+assert!(y.im().is_in(q!(-4.403069... mS))); // the susceptance a shunt capacitor cancels
 # }
 ```
 

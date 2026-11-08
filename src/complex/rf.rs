@@ -12,14 +12,14 @@
 //!
 //! ```
 //! # #[cfg(all(feature = "electrical", any(feature = "std", feature = "libm")))] {
-//! use exact_units::{Complex, Fixed, Impedance, Z0, prefix::One};
+//! use exact_units::{Complex, Fixed, Impedance, Z0, prefix::One, q};
 //!
 //! let z0 = Z0::<One, f64>::bounded(50.0, 0.0);
 //! let gamma = Impedance::<One, f64>::bounded(100.0, 0.0).reflection(z0).finite().unwrap();
 //! assert_eq!(gamma, Complex::<_, _, f64>::bounded(1.0 / 3.0, 0.0));
 //! assert!((gamma.vswr().get() - 2.0).abs() < 1e-12);
 //! assert!((gamma.return_loss_db() - 9.542425094393248).abs() < 1e-12);
-//! assert!((gamma.mismatch_loss().to_db() + 0.5115252244738129).abs() < 1e-12);
+//! assert!(gamma.mismatch_loss().is_in(q!(0.888... W/W))); // 8/9 of the power, -0.51 dB as its to_db()
 //! # }
 //! ```
 //!

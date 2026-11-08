@@ -101,7 +101,7 @@ fn power(
 }
 
 /// The punctuation of a range or a tolerance in a string, from its first character `c`: `±` as the `+-` written
-/// outside one, `+`, and `..` or `..=`. `false` for a `.` that starts no `..`.
+/// outside one, `+`, `..` or `..=`, and a prefix's `...` (or `…`). `false` for a `.` that starts no `..`.
 fn range_punct(
     c: char,
     chars: &mut core::iter::Peekable<core::str::CharIndices<'_>>,
@@ -115,8 +115,20 @@ fn range_punct(
             punct('-', false);
         }
         '+' => punct('+', chars.peek().is_some_and(|(_, n)| *n == '-')),
+        '…' => {
+            punct('.', true);
+            punct('.', true);
+            punct('.', false);
+        }
         '.' if chars.peek().is_some_and(|(_, n)| *n == '.') => {
             chars.next();
+            if chars.peek().is_some_and(|(_, n)| *n == '.') {
+                chars.next();
+                punct('.', true);
+                punct('.', true);
+                punct('.', false);
+                return true;
+            }
             let incl = chars.peek().is_some_and(|(_, n)| *n == '=');
             punct('.', true);
             punct('.', incl);
@@ -185,7 +197,7 @@ pub(crate) fn lex(s: &str, id: usize) -> Result<Vec<Tok>, Error> {
                 joint: false,
                 id,
             }),
-            '±' | '+' | '.' if range_punct(c, &mut chars, out, id) => {}
+            '±' | '+' | '.' | '…' if range_punct(c, &mut chars, out, id) => {}
             '/' | '^' | '-' | '@' => out.push(Tok::Punct {
                 ch: c,
                 joint: false,

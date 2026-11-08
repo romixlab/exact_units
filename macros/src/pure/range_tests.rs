@@ -18,7 +18,9 @@ fn refused(s: &str) -> String {
 /// The ends of a range as `(num, exp)` pairs, whether the upper end is out, and the fit.
 fn ends(s: &str) -> ((i64, i16), (i64, i16), bool, Fit) {
     match read(s) {
-        Input::Range { lo, hi, open, fit } => ((lo.num, lo.exp), (hi.num, hi.exp), open, fit),
+        Input::Range {
+            lo, hi, open, fit, ..
+        } => ((lo.num, lo.exp), (hi.num, hi.exp), open, fit),
         i => panic!("{s} gave {i:?}"),
     }
 }
@@ -233,5 +235,86 @@ fn one_literal_still_reads() {
     match read("- 3 dB") {
         Input::One(l) => assert!(matches!(l.unit, Unit::Level { .. })),
         i => panic!("{i:?}"),
+    }
+}
+
+/// The ends of a prefix as `(num, exp)` pairs, which end is out, and the fit.
+fn prefix(s: &str) -> ((i64, i16), (i64, i16), bool, bool, Fit) {
+    match read(s) {
+        Input::Range {
+            lo,
+            hi,
+            lo_open,
+            open,
+            fit,
+        } => ((lo.num, lo.exp), (hi.num, hi.exp), lo_open, open, fit),
+        i => panic!("{s} gave {i:?}"),
+    }
+}
+
+#[test]
+fn prefixes() {
+    assert_eq!(
+        prefix("9.542425 ... dB"),
+        ((9_542_425, -6), (9_542_426, -6), false, true, Fit::Inside)
+    );
+    assert_eq!(
+        prefix("- 9.54 ... dB"),
+        ((-955, -2), (-954, -2), true, false, Fit::Inside)
+    );
+    // the digits count, trailing zeros too: 9.540... is 9.540 ..< 9.541
+    assert_eq!(
+        prefix("9.540 ... V"),
+        ((954, -2), (9541, -3), false, true, Fit::Inside)
+    );
+    assert_eq!(
+        prefix("9.99 ... V"),
+        ((999, -2), (1, 1), false, true, Fit::Inside)
+    );
+    assert_eq!(
+        prefix("0.0 ... V"),
+        ((0, 0), (1, -1), false, true, Fit::Inside)
+    );
+    assert_eq!(
+        prefix("1_000.5 ... V"),
+        ((10005, -1), (10006, -1), false, true, Fit::Inside)
+    );
+    // the unit's prefix scales the step: 1.2... mV is 1.2 mV ..< 1.3 mV
+    assert_eq!(
+        prefix("1.2 ... mV"),
+        ((12, -4), (13, -4), false, true, Fit::Inside)
+    );
+    assert_eq!(
+        prefix("\"9.54... dB\""),
+        ((954, -2), (955, -2), false, true, Fit::Inside)
+    );
+    assert_eq!(
+        prefix("\"-9.54… dB\""),
+        ((-955, -2), (-954, -2), true, false, Fit::Inside)
+    );
+    let (lo, hi) = range("25.3 ... degC");
+    assert!(lo.at.is_some() && hi.at.is_some());
+    let (lo, _) = range("- 3.01 ... dB");
+    assert!(matches!(lo.unit, Unit::Level { .. }));
+}
+
+#[test]
+fn prefix_refusals() {
+    for (s, want) in [
+        ("9 ... V", "digits after its point"),
+        ("... 5 V", "comes after the digits"),
+        ("9.5e3 ... V", "exponent"),
+        ("9.5 ... V , Inside", "nothing to move"),
+        ("9.5 ... V , Outside", "nothing to move"),
+        ("- 0.0 ... V", "reads two ways"),
+        ("4.9 ... 5.1 V", "`..=` or `..`"),
+        ("9.5 V ... ", "`...` follows the digits"),
+        ("9.5 ... V ..= 10 V", "a range on its own"),
+        ("9.5 ... V +- 1 %", "a range on its own"),
+        ("9.5f32 ... V", "suffix"),
+        ("9.5 ...", "unit"),
+    ] {
+        let got = refused(s);
+        assert!(got.contains(want), "{s}: {got}");
     }
 }

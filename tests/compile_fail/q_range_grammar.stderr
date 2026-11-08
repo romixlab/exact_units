@@ -69,3 +69,51 @@ error: q!: a range has two amounts or two points at one origin, not one of each:
    |
 17 |     let _ = q!(20 degC ..= 25 K);
    |                        ^
+
+error: q!: `9...`: a prefix has digits after its point, q!(9.5... V); a whole number before `...` reads two ways (9 up to the next whole number, or 9, 90, 900, ..)
+  --> tests/compile_fail/q_range_grammar.rs:18:16
+   |
+18 |     let _ = q!(9... V);
+   |                ^
+
+error: q!: `...` comes after the digits it continues: q!(9.542425... dB)
+  --> tests/compile_fail/q_range_grammar.rs:19:16
+   |
+19 |     let _ = q!(...5 V);
+   |                ^
+
+error: q!: `9.5e3...`: a prefix is plain digits, its exponent reads two ways (of the digits or of the value): write them out, q!(9542.4... V)
+  --> tests/compile_fail/q_range_grammar.rs:20:16
+   |
+20 |     let _ = q!(9.5e3... V);
+   |                ^^^^^
+
+error: q!: a prefix holds exactly the stored values whose digits start so, nothing to move: drop the `, Inside` or `, Outside`
+  --> tests/compile_fail/q_range_grammar.rs:21:26
+   |
+21 |     let _ = q!(9.5... V, Inside);
+   |                          ^^^^^^
+
+error: q!: `-0.0...` reads two ways (is 0 in it?): write the range's ends, q!(-0.1 V ..= 0 V) or q!(-0.1 V .. 0 V)
+  --> tests/compile_fail/q_range_grammar.rs:22:17
+   |
+22 |     let _ = q!(-0.0... V);
+   |                 ^^^
+
+error: q!: `...` ends a prefix of digits, q!(9.54... V); a range between two numbers is `..=` or `..`, q!(4.9 V ..= 5.1 V)
+  --> tests/compile_fail/q_range_grammar.rs:23:20
+   |
+23 |     let _ = q!(4.9 ... 5.1 V);
+   |                    ^
+
+error: q!: a prefix is a range on its own: no `..`, `..=` or `+-` beside it, q!(9.54... V)
+  --> tests/compile_fail/q_range_grammar.rs:24:19
+   |
+24 |     let _ = q!(9.5... V ..= 10 V);
+   |                   ^
+
+error: q!: a prefix is a range on its own: no `..`, `..=` or `+-` beside it, q!(9.54... V)
+  --> tests/compile_fail/q_range_grammar.rs:25:16
+   |
+25 |     let _ = q!("9.5... V ± 1 %");
+   |                ^^^^^^^^^^^^^^^^

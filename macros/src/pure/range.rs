@@ -3,7 +3,9 @@
 //!
 //! ```text
 //! input     := body (',' FIT)?            (FIT: Inside or Outside)
-//! body      := part | part ('..=' | '..') part | part '+-' part | part '+' part '-' part | '+-' part | STRING
+//! body      := part | part ('..=' | '..') part | part '+-' part | part '+' part '-' part | '+-' part | prefix
+//!            | STRING
+//! prefix    := '-'? NUMBER '...' unit     (known leading digits, `digits`)
 //! part      := a literal of `literal`, or a number alone that takes the unit written last
 //! ```
 //!
@@ -14,6 +16,7 @@
 //! in `%`, `‰`, `ppm` or `ppb` is of the nominal (of its magnitude); any other amount is in the nominal's unit, up to
 //! its prefixes (`5 V +- 50 mV`).
 
+use super::digits;
 use super::grammar::{At, Literal, Unit, flatten, number_and_unit};
 use super::model::{Error, Tok};
 use super::strlex;
@@ -51,7 +54,9 @@ pub(crate) enum Input {
         lo: Literal,
         /// The upper end.
         hi: Literal,
-        /// Whether the upper end is out: `..` rather than `..=`.
+        /// Whether the lower end is out: a negative prefix, `-9.54...`.
+        lo_open: bool,
+        /// Whether the upper end is out: `..` rather than `..=`, or a positive prefix.
         open: bool,
         /// What an end that is no stored value does.
         fit: Fit,
@@ -86,6 +91,9 @@ pub(crate) fn input(toks: &[Tok], whole: usize) -> Result<Input, Error> {
         fit,
         texts: &texts,
     };
+    if let Some(k) = digits::dots(body) {
+        return digits::prefix(body, k, fit, fit_id, whole_id, in_string);
+    }
     if let Some((k, open, len)) = range_op(body) {
         return read.range(k, open, len);
     }
@@ -161,6 +169,7 @@ impl Read<'_> {
         Ok(Input::Range {
             lo,
             hi,
+            lo_open: false,
             open,
             fit: self.fit,
         })
@@ -255,6 +264,7 @@ impl Read<'_> {
         Ok(Input::Range {
             lo,
             hi,
+            lo_open: false,
             open: false,
             fit: self.fit,
         })

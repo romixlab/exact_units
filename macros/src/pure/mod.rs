@@ -3,6 +3,7 @@
 //! this crate, exact_units' `tests/props` and its fuzz targets include these files by `#[path]` and call them
 //! directly.
 
+pub(crate) mod digits;
 pub(crate) mod entry;
 pub(crate) mod grammar;
 pub(crate) mod model;

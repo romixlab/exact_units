@@ -435,6 +435,39 @@ The macro refuses what reads two ways. `q!(5 % +- 1 %)` could be 1 % of 5 % or o
 
 NaN is in no range. "Not in it" is the safe answer whichever way a check branches, so a float that may be NaN has `is_in` too, and it gives `false` for NaN.
 
+### Known leading digits
+
+A result such as a return loss is often a long decimal, 9.542425094393248 dB, and an example that spells it out is hard to read. A decimal followed by `...` is the range of the values whose decimal starts with those digits:
+
+```rust
+# #[cfg(feature = "electrical")] {
+use exact_units::{Fixed, q, prefix::One, units::Volt};
+
+let v = Fixed::<Volt, One, f64>::bounded(9.542425094393248);
+assert!(v.is_in(q!(9.542425... V)));   // 9.542425 V ..< 9.542426 V
+assert!(v.is_in(q!(9.54... V)));       // fewer digits, a wider range
+assert!(!v.is_in(q!(9.542426... V)));  // the digits are cut, never rounded
+let n = Fixed::<Volt, One, f64>::bounded(-9.542425094393248);
+assert!(n.is_in(q!(-9.54... V)));      // -9.55 V <.. -9.54 V
+assert!(n.is_in(q!("-9.54… V")));      // in a string, `…` works too
+# }
+```
+
+- **The digits are cut.** `9.54...` holds 9.54 and everything up to, not including, 9.55. A rounded prefix that doesn't hold (`9.542426...` for 9.5424250…) is false, as a wrong range is. So copy the digits, don't round them.
+- **A negative prefix mirrors it.** `-9.54...` holds -9.54 and everything down to, not including, -9.55: its lower end is the one left out.
+- **No `Inside` or `Outside`.** The ends are decimals, and against a storage the range holds exactly the stored values whose digits start so, which is what `Inside` gives. `Outside` would take in values with other digits, so neither word is written.
+- **A prefix that no stored value has doesn't compile.** No whole number of mV starts with 4.9505, so `q!(4.9505... V)` against a storage in mV is refused, the same as any range that holds nothing.
+- **What reads two ways is refused.** A prefix has a digit after its point: `9...` could be 9 up to 10, or 9, 90, 900. It has no exponent: in `9.5e3...` the digits could be of the mantissa or of the value. `...` stands alone and is never part of a range with `..=` or `+-`.
+- **It stays in `q!`.** Plain Rust has no `9.54...`, so a prefix can't end up in arithmetic.
+
+```rust,compile_fail
+# #[cfg(feature = "electrical")] {
+use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+let _ = Fixed::<Volt, Milli, i16>::new(5_000).is_in(q!(5... V)); // 5 to 6, or 5, 50, 500?
+# }
+# #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+```
+
 ### Refused symbols
 
 A symbol that reads two ways doesn't compile, and names both readings so the fix is one copy-paste away: see

@@ -23,6 +23,12 @@
 //!   [MaybeNan](crate::MaybeNan) float has `is_in` too.
 //! - An [Exact] compares exactly at run time, two fraction compares; every decimal is a fraction of it, so its ends
 //!   are always exact and `Inside` or `Outside` changes nothing.
+//! - Known leading digits, `q!(9.542425... V)`: the values whose decimal starts with those digits, `9.542425 V ..<
+//!   9.542426 V`; `q!(-9.54... V)` is `-9.55 V <.. -9.54 V`, its lower end out. The digits are cut, never rounded:
+//!   a value of 9.5424250943 V is in `9.542425...` and not in `9.542426...`. Against a storage it holds exactly the
+//!   stored values with those digits, as `Inside` would, so no fit is written; one no stored value has is a compile
+//!   error as for any range. A prefix has a digit after its point (`9...` reads as 9 to 10 or as 9, 90, 900, ..) and
+//!   no exponent.
 //!
 //! ```
 //! # #[cfg(feature = "electrical")] {
@@ -39,6 +45,62 @@
 //! assert!(!v(4900).is_in(q!(4.9005 V ..= 5 V, Inside)));
 //! assert!(v(4900).is_in(q!(4.9005 V ..= 5 V, Outside)));
 //! # }
+//! ```
+//!
+//! A prefix of digits, for a result that is a long decimal:
+//!
+//! ```
+//! # #[cfg(feature = "electrical")] {
+//! use exact_units::{Fixed, q, prefix::One, units::Volt};
+//! let v = Fixed::<Volt, One, f64>::bounded(9.542425094393248);
+//! assert!(v.is_in(q!(9.542425... V)));
+//! assert!(!v.is_in(q!(9.542426... V))); // a rounded prefix is no prefix
+//! assert!(Fixed::<Volt, One, f64>::bounded(-9.542425).is_in(q!(-9.5424... V)));
+//! # }
+//! ```
+//!
+//! A prefix needs a digit after its point, and has no exponent and no `Inside` or `Outside`:
+//!
+//! ```compile_fail
+//! # #[cfg(feature = "electrical")] {
+//! use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+//! let _ = Fixed::<Volt, Milli, i16>::new(5000).is_in(q!(5... V));
+//! # }
+//! # #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+//! ```
+//!
+//! ```compile_fail
+//! # #[cfg(feature = "electrical")] {
+//! use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+//! let _ = Fixed::<Volt, Milli, i16>::new(5000).is_in(q!(...5 V));
+//! # }
+//! # #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+//! ```
+//!
+//! ```compile_fail
+//! # #[cfg(feature = "electrical")] {
+//! use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+//! let _ = Fixed::<Volt, Milli, i16>::new(5000).is_in(q!(5.0e0... V));
+//! # }
+//! # #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+//! ```
+//!
+//! ```compile_fail
+//! # #[cfg(feature = "electrical")] {
+//! use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+//! let _ = Fixed::<Volt, Milli, i16>::new(5000).is_in(q!(5.0... V, Outside));
+//! # }
+//! # #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+//! ```
+//!
+//! Nor one no stored value has: no whole number of mV starts with 4.9505.
+//!
+//! ```compile_fail
+//! # #[cfg(feature = "electrical")] {
+//! use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+//! let _ = Fixed::<Volt, Milli, i16>::new(4950).is_in(q!(4.9505... V));
+//! # }
+//! # #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
 //! ```
 //!
 //! An end that is no stored value doesn't compile without `Inside` or `Outside`:
@@ -86,13 +148,17 @@ const INSIDE: u8 = 1;
 /// `Outside`: each end that is no stored value moves outward.
 const OUTSIDE: u8 = 2;
 
-/// A range of a unit, `q!(4.9 V ..= 5.1 V)`: its ends `Lo` and `Hi` are `q!` literals as types, `OPEN` whether the
-/// upper end is out (`..`), `FIT` what an end that is no stored value does (0: refused, 1: `Inside`, 2: `Outside`).
+/// A range of a unit, `q!(4.9 V ..= 5.1 V)`: its ends `Lo` and `Hi` are `q!` literals as types, `LO_OPEN` and
+/// `HI_OPEN` whether each end is out (the upper one for `..`, the lower one for a negative prefix, `q!(-9.54... V)`), `FIT` what an end that is no stored value does (0: refused, 1: `Inside`, 2: `Outside`).
 /// See the [module](crate::literal::range).
 #[derive(Debug)]
-pub struct LiteralRange<Lo, Hi, const OPEN: bool, const FIT: u8>(PhantomData<(Lo, Hi)>);
+pub struct LiteralRange<Lo, Hi, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8>(
+    PhantomData<(Lo, Hi)>,
+);
 
-impl<Lo, Hi, const OPEN: bool, const FIT: u8> LiteralRange<Lo, Hi, OPEN, FIT> {
+impl<Lo, Hi, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8>
+    LiteralRange<Lo, Hi, LO_OPEN, HI_OPEN, FIT>
+{
     /// The range; `q!` writes it.
     pub const NEW: Self = LiteralRange(PhantomData);
 
@@ -107,13 +173,18 @@ impl<Lo, Hi, const OPEN: bool, const FIT: u8> LiteralRange<Lo, Hi, OPEN, FIT> {
     }
 }
 
-impl<Lo, Hi, const OPEN: bool, const FIT: u8> Clone for LiteralRange<Lo, Hi, OPEN, FIT> {
+impl<Lo, Hi, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8> Clone
+    for LiteralRange<Lo, Hi, LO_OPEN, HI_OPEN, FIT>
+{
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<Lo, Hi, const OPEN: bool, const FIT: u8> Copy for LiteralRange<Lo, Hi, OPEN, FIT> {}
+impl<Lo, Hi, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8> Copy
+    for LiteralRange<Lo, Hi, LO_OPEN, HI_OPEN, FIT>
+{
+}
 
 /// A tolerance alone, `q!(+- 50 mV)`, `q!(+- 1 %)`: its amount `A` a `q!` literal as a type, `FIT` as for
 /// [LiteralRange]. What takes one is NUM-24's (a window or a compare around a target chosen at run time).
@@ -158,7 +229,7 @@ impl<const N: i64, const E: i16, S: Unit> Amount for LiteralIn<N, E, S> {
 )]
 const fn fold_int(
     ends: &[(Cut, Magnitude, &str); 2],
-    open: bool,
+    open: [bool; 2],
     fit: u8,
     min: i128,
     max: i128,
@@ -171,8 +242,9 @@ const fn fold_int(
     } else {
         fit
     };
+    let [lo_open, hi_open] = open;
     let lo_c = if lo.exact {
-        lo.floor
+        if lo_open { lo.floor + 1 } else { lo.floor }
     } else {
         match lo_fit {
             INSIDE => lo.floor + 1,
@@ -186,7 +258,7 @@ const fn fold_int(
         fit
     };
     let hi_c = if hi.exact {
-        if open { hi.floor - 1 } else { hi.floor }
+        if hi_open { hi.floor - 1 } else { hi.floor }
     } else {
         match hi_fit {
             INSIDE => hi.floor,
@@ -219,13 +291,13 @@ macro_rules! range_int {
             /// `tests/props`. Panics where that is a compile error.
             #[doc(hidden)]
             #[must_use]
-            pub fn literal_range<Lo: Unit, Hi: Unit>(lo: Decimal, hi: Decimal, open: bool, fit: u8) -> ($ty, $ty) {
+            pub fn literal_range<Lo: Unit, Hi: Unit>(lo: Decimal, hi: Decimal, open: [bool; 2], fit: u8) -> ($ty, $ty) {
                 Self::fold_range::<Lo, Hi>(lo, hi, open, fit)
             }
 
             #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
             #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
-            const fn fold_range<Lo: Unit, Hi: Unit>(lo: Decimal, hi: Decimal, open: bool, fit: u8) -> ($ty, $ty) {
+            const fn fold_range<Lo: Unit, Hi: Unit>(lo: Decimal, hi: Decimal, open: [bool; 2], fit: u8) -> ($ty, $ty) {
                 let min = match B::MIN {
                     Some(m) => m as i128,
                     None => $ty::MIN as i128,
@@ -253,13 +325,13 @@ macro_rules! range_int {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, Lo: Amount, Hi: Amount, const OPEN: bool, const FIT: u8>
-            Contains<Fixed<U, P, $ty, B>> for LiteralRange<Lo, Hi, OPEN, FIT>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, Lo: Amount, Hi: Amount, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8>
+            Contains<Fixed<U, P, $ty, B>> for LiteralRange<Lo, Hi, LO_OPEN, HI_OPEN, FIT>
         {
             #[inline]
             fn contains(&self, v: &Fixed<U, P, $ty, B>) -> bool {
                 let (lo, hi) = const {
-                    Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, OPEN, FIT)
+                    Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT)
                 };
                 let t = v.get();
                 lo <= t && t <= hi
@@ -278,11 +350,11 @@ macro_rules! range_float {
             /// `tests/props`. Panics where that is a compile error.
             #[doc(hidden)]
             #[must_use]
-            pub fn literal_range<Lo: Unit, Hi: Unit>(lo: Decimal, hi: Decimal, open: bool, fit: u8) -> ($ty, $ty) {
+            pub fn literal_range<Lo: Unit, Hi: Unit>(lo: Decimal, hi: Decimal, open: [bool; 2], fit: u8) -> ($ty, $ty) {
                 Self::fold_range::<Lo, Hi>(lo, hi, open, fit)
             }
 
-            const fn fold_range<Lo: Unit, Hi: Unit>(lo: Decimal, hi: Decimal, open: bool, fit: u8) -> ($ty, $ty) {
+            const fn fold_range<Lo: Unit, Hi: Unit>(lo: Decimal, hi: Decimal, open: [bool; 2], fit: u8) -> ($ty, $ty) {
                 let min = match B::MIN {
                     Some(m) => m,
                     None => $ty::NEG_INFINITY,
@@ -292,8 +364,9 @@ macro_rules! range_float {
                     None => $ty::INFINITY,
                 };
                 let (l, h) = (Below::<$ty>::of::<Lo, U, P>(lo), Below::<$ty>::of::<Hi, U, P>(hi));
+                let [lo_open, hi_open] = open;
                 let lo_f = if l.exact {
-                    l.down
+                    if lo_open { l.down.next_up() } else { l.down }
                 } else {
                     match fit {
                         INSIDE => l.down.next_up(),
@@ -305,7 +378,7 @@ macro_rules! range_float {
                     }
                 };
                 let hi_f = if h.exact {
-                    if open { h.down.next_down() } else { h.down }
+                    if hi_open { h.down.next_down() } else { h.down }
                 } else {
                     match fit {
                         INSIDE => h.down,
@@ -330,14 +403,14 @@ macro_rules! range_float {
             }
         }
 
-        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, Lo: Amount, Hi: Amount, const OPEN: bool, const FIT: u8>
-            Contains<Fixed<U, P, $ty, B>> for LiteralRange<Lo, Hi, OPEN, FIT>
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, Lo: Amount, Hi: Amount, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8>
+            Contains<Fixed<U, P, $ty, B>> for LiteralRange<Lo, Hi, LO_OPEN, HI_OPEN, FIT>
         {
             /// `false` for NaN.
             #[inline]
             fn contains(&self, v: &Fixed<U, P, $ty, B>) -> bool {
                 let (lo, hi) = const {
-                    Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, OPEN, FIT)
+                    Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT)
                 };
                 let t = v.get();
                 lo <= t && t <= hi
@@ -390,8 +463,8 @@ range_float! {
     f64 float_end_f64;
 }
 
-impl<U: Unit, Lo: Amount, Hi: Amount, const OPEN: bool, const FIT: u8> Contains<Exact<U>>
-    for LiteralRange<Lo, Hi, OPEN, FIT>
+impl<U: Unit, Lo: Amount, Hi: Amount, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8>
+    Contains<Exact<U>> for LiteralRange<Lo, Hi, LO_OPEN, HI_OPEN, FIT>
 {
     /// Two fraction compares, exact. A range no value is in is a compile error.
     #[inline]
@@ -403,7 +476,7 @@ impl<U: Unit, Lo: Amount, Hi: Amount, const OPEN: bool, const FIT: u8> Contains<
             );
             let empty = match lo.compare(hi) {
                 core::cmp::Ordering::Greater => true,
-                core::cmp::Ordering::Equal => OPEN,
+                core::cmp::Ordering::Equal => LO_OPEN || HI_OPEN,
                 core::cmp::Ordering::Less => false,
             };
             assert!(
@@ -413,11 +486,14 @@ impl<U: Unit, Lo: Amount, Hi: Amount, const OPEN: bool, const FIT: u8> Contains<
             (lo, hi)
         };
         let t = v.get();
-        !t.compare(lo).is_lt()
-            && if OPEN {
-                t.compare(hi).is_lt()
-            } else {
-                !t.compare(hi).is_gt()
-            }
+        (if LO_OPEN {
+            t.compare(lo).is_gt()
+        } else {
+            !t.compare(lo).is_lt()
+        }) && if HI_OPEN {
+            t.compare(hi).is_lt()
+        } else {
+            !t.compare(hi).is_gt()
+        }
     }
 }
