@@ -36,7 +36,7 @@ fn main() {
     println!("limit at -6 dBFS = {LIMIT}, warn at -1 dBFS = {WARN}");
     assert_eq!((LIMIT.get(), WARN.get()), (501, 891));
     // the same -6 dB as a power ratio is a quarter, not a half: the kind of the unit chose the form
-    let as_power: Fixed<Per<Watt, Watt>, Milli, u16> = db!(-6);
+    let as_power: Fixed<Per<Watt, Watt>, Milli, u16> = db!(-6, NearestEven);
     println!(
         "-6 dB as a power ratio: {as_power} (10^(-6/10)); as an amplitude ratio: {LIMIT} (10^(-6/20))"
     );
