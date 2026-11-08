@@ -9,6 +9,11 @@ copyright = "Copyright &copy; 2026 Roman Isaikin, MIT licensed"
 repo_url = "https://github.com/romixlab/exact_units"
 repo_name = "romixlab/exact_units"
 edit_uri = "edit/main/docs/"
+# Pages that moved whole (their content lives at the linked page now) and are kept only so an old link still
+# resolves: left out of the nav on purpose, not an oversight.
+not_in_nav = """
+complex/iq.md
+"""
 
 nav = [
     { "Home" = [
@@ -75,8 +80,19 @@ nav = [
     { "Complex" = [
             { "Advanced" = [
                     "complex/complex.md",
-                    "complex/iq.md",
                     "complex/cordic.md",
+                ]
+            },
+        ]
+    },
+    { "RF" = [
+            { "Advanced" = [
+                    "rf/impedance.md",
+                    "rf/reflection.md",
+                    "rf/power.md",
+                    "rf/levels.md",
+                    "rf/iq.md",
+                    "rf/matching.md",
                 ]
             },
         ]

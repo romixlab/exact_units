@@ -65,4 +65,4 @@ Every result is within 0.51 of a step of the exact value: half a step from the o
 - The axes and the multiples of an eighth of a turn are exact.
 - 1 is not a Q15 value, so $\cos 0$ is $1 - 2^{-15}$. −1 is exact.
 
-The [polar form](complex.md#polar-form) of a complex number and the [NCO](iq.md#an-nco-and-a-mixer) are built on these.
+The [polar form](complex.md#polar-form) of a complex number and the [NCO](../rf/iq.md#an-nco-and-a-mixer) are built on these.

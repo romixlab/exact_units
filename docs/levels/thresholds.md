@@ -62,22 +62,4 @@ assert_eq!(MINUS_6_DBFS.get(), 16423); // 0.501 · 2¹⁵
 
 ## Power of a complex value
 
-For an IQ sample or a reflection coefficient the level is of $|z|^2$, and the square root is never needed: `db!(norm_sqr x, Floor)` (or another rounding) is the threshold on $|z|^2$.
-
-$$
-|z| \le 10^{-15/20} \iff |z|^2 \le 10^{-15/10}
-$$
-
-```rust
-use exact_units::{CQ15, Complex, Fixed, db, prefix::{Pow2, Product}, units::{Per, Times, Volt}};
-
-type FullScale = Per<Volt, Volt>;
-type PowerLevel = Fixed<Times<FullScale, FullScale>, Product<Pow2<-15>, Pow2<-15>>, u32>;
-
-const BUSY: PowerLevel = db!(norm_sqr -10, NearestEven); // −10 dBFS as |z|² in Q30
-
-let x: CQ15<FullScale> = Complex::of(16384, 0); // 0.5: −6 dBFS
-assert!(x.norm_sqr() >= BUSY);
-```
-
-The firmware compares two integers. See [IQ samples](../complex/iq.md) for a block's mean power.
+An IQ sample's or a reflection coefficient's level by the same `db!(norm_sqr ..)` threshold, no root and no log: [Levels, dBm and cable loss](../rf/levels.md#power-of-a-complex-value), in the RF part.

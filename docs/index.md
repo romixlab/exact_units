@@ -39,10 +39,11 @@ The book goes from easy to deep. Each page has a badge with its [reading level](
 5. [Fixed point](fixed_point/q_formats.md): Q15, Q31 and binary angles for DSP and motor control.
 6. [Points](points/points.md): temperatures, angles that wrap, sensor register formulas, indices.
 7. [Levels](levels/decibels.md): dB and neper, thresholds as integer compares.
-8. [Complex](complex/complex.md): impedances, IQ samples, CORDIC.
-9. [Your units](customary.md): customary units, and units of your own.
-10. [The wire](wire/shrink_wrap.md): the same bytes on the wire, the unit in the API, and how it looks in your editor.
-11. [Nomicon](nomicon/magnitude.md): exact magnitudes, how conversions are chosen, how the crate is tested.
+8. [Complex](complex/complex.md): complex numbers, products, polar form, CORDIC.
+9. [RF](rf/impedance.md): impedance and admittance, reflection and VSWR, power, dBm and cable loss, IQ and mixing.
+10. [Your units](customary.md): customary units, and units of your own.
+11. [The wire](wire/shrink_wrap.md): the same bytes on the wire, the unit in the API, and how it looks in your editor.
+12. [Nomicon](nomicon/magnitude.md): exact magnitudes, how conversions are chosen, how the crate is tested.
 
 The [recipes](recipes/sensors.md) are short answers to common tasks.
 

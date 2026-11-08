@@ -479,10 +479,12 @@ angles, complex power.
 - ✅ **CPX-4 Complex power with its kinds** (was STD-92) — `exact_units` 4df3d43: `units::VoltAmpere` (`VA`, kind apparent power)
   and `units::Var` (`var`, kind reactive power), the watt's dimension under a kind of their own, `Watt` staying
   plain; S = V·I* as a `Complex<VoltAmpere>`. `power_factor` is `Err(Undefined::NoApparentPower)` for S = 0.
+  `docs/rf/power.md`.
 - ✅ **CPX-5 IQ fixed-point DSP** (was STD-91) — `exact_units` 87f2e18, 041b72e: `CQ15<U = Ratio>` and `CQ31<U = Ratio>`, saturating
   Q15 and Q31 IQ samples; complex multiplies rounded once into their own scale (`mul_round`, `mul_conj_round`, `mix`),
   `Mac` summing products exactly in `i64` / `i128`, interleaved `[re, im, ..]` buffers without `unsafe`, `Nco` (a
   `Bam32` phase accumulator with a CORDIC phasor), `cordic::sin_cos_32_q15`; example `14_iq_downconvert`.
+  `docs/rf/iq.md`.
 - ✅ **CPX-6 Polar form and levels of a `Complex`** (was STD-90) — `exact_units` efc885e, c5349ab: `Polar<U, P, T, A>`, a magnitude
   `Fixed` and a phase angle, with `Complex::to_polar` / `from_polar` and `Polar::to_complex`. Floats through `hypot`,
   `atan2` and `sin`/`cos` (feature `std` or `libm`); integers without a float: `abs` the correctly rounded root of
@@ -491,6 +493,7 @@ angles, complex power.
   threshold; RF helpers on an impedance (Γ, VSWR, return loss), example `13_impedance_match`. Γ and Z ↔ Y are on
   the extended plane, `Extended<T>`: a short's Y and an open's Z are `Extended::Infinity` (`Admittance::SHORT`,
   `Impedance::OPEN`), Z = −Z₀ is Γ = ∞, and `reflection` takes a `Z0`, finite and not 0 by its type.
+  `docs/rf/impedance.md`, `docs/rf/reflection.md`, `docs/rf/matching.md`.
 
 ## Numbers and units at the edges (`IO`)
 
