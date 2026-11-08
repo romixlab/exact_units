@@ -976,6 +976,11 @@ mod power;
 #[cfg(feature = "electrical")]
 pub mod rf;
 
+#[cfg(feature = "electrical")]
+mod undefined;
+#[cfg(feature = "electrical")]
+pub use undefined::Undefined;
+
 #[cfg(test)]
 mod tests;
 

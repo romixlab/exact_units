@@ -478,7 +478,7 @@ angles, complex power.
   `Week` (8584aad) took the id a second time; it ends the double under its own number.
 - ✅ **CPX-4 Complex power with its kinds** (was STD-92) — `exact_units` 4df3d43: `units::VoltAmpere` (`VA`, kind apparent power)
   and `units::Var` (`var`, kind reactive power), the watt's dimension under a kind of their own, `Watt` staying
-  plain; S = V·I* as a `Complex<VoltAmpere>`.
+  plain; S = V·I* as a `Complex<VoltAmpere>`. `power_factor` is `Err(Undefined::NoApparentPower)` for S = 0.
 - ✅ **CPX-5 IQ fixed-point DSP** (was STD-91) — `exact_units` 87f2e18, 041b72e: `CQ15<U = Ratio>` and `CQ31<U = Ratio>`, saturating
   Q15 and Q31 IQ samples; complex multiplies rounded once into their own scale (`mul_round`, `mul_conj_round`, `mix`),
   `Mac` summing products exactly in `i64` / `i128`, interleaved `[re, im, ..]` buffers without `unsafe`, `Nco` (a
@@ -488,7 +488,8 @@ angles, complex power.
   `atan2` and `sin`/`cos` (feature `std` or `libm`); integers without a float: `abs` the correctly rounded root of
   the exact `norm_sqr` in the unsigned twin, `arg` by CORDIC into a `PhaseBam16` / `PhaseBam32` within 0.51 of a
   step, `from_polar` by Q31 sin/cos. `to_db` from |z|², `norm_sqr_at_rounded(Decibels, Rounding)` and `db!(norm_sqr -15, Floor)` as a typed
-  threshold; RF helpers on an impedance (Γ, VSWR, return loss), example `13_impedance_match`.
+  threshold; RF helpers on an impedance (Γ, VSWR, return loss), example `13_impedance_match`. Γ and Z ↔ Y return
+  `Result<_, Undefined>`, the cause named for the physics (`LoadIsMinusZ0`, `Short`, `Open`).
 
 ## Numbers and units at the edges (`IO`)
 

@@ -32,7 +32,7 @@
 //! let _ = Fixed::<VoltAmpere, One, f64>::bounded(2300.0).convert::<Watt, One, f64>();
 //! ```
 
-use super::{Complex, ComplexStorage, NormStorage, Policy};
+use super::{Complex, ComplexStorage, NormStorage, Policy, Undefined};
 use crate::prefix::{One, Product};
 use crate::units::{Ampere, Ratio, Var, Volt, VoltAmpere, Watt};
 use crate::{Fixed, FixedScale, Repr, Storage, Unit, Unlimited};
@@ -117,13 +117,64 @@ impl<P, T: NormStorage, B: Unlimited<T>> Complex<VoltAmpere, P, T, B> {
         Fixed::from_number(T::from_float(magnitude_f64(self.re, self.im))?)
     }
 
-    /// The power factor, `cos φ = P / S` (ISO 80000-6's `λ`), a plain [Ratio]: 1 for a resistive load, 0 for a
-    /// purely reactive one. `None` where `S` is zero (0 / 0) or infinite.
-    pub fn power_factor(self) -> Option<Fixed<Ratio, One, f64>> {
-        let apparent = magnitude_f64(self.re, self.im);
-        Fixed::from_number(to_f64(self.re) / apparent)
+    /// The power factor, `cos φ = P / |S|` (ISO 80000-6's `λ`), a plain [Ratio]: 1 for a resistive load, 0 for a
+    /// purely reactive one, −1 for a source (a load that delivers power). [Undefined::NoApparentPower] where `S`
+    /// is 0 (0 / 0). An infinite part of a float `S` gives ±1 (active) or 0 (reactive), both infinite
+    /// [Undefined::InfinitePower]; a finite `S` too large for `|S|²` in the float is scaled by a power of two
+    /// first, which doesn't change the ratio.
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "electrical", feature = "dimensionless"))] {
+    /// use exact_units::{Complex, Undefined, prefix::One, units::VoltAmpere};
+    /// let idle = Complex::<VoltAmpere, One, i32>::new(0, 0);
+    /// assert_eq!(idle.power_factor(), Err(Undefined::NoApparentPower));
+    /// let huge = Complex::<VoltAmpere, One, f64>::bounded(3e300, 4e300);
+    /// assert!((huge.power_factor().unwrap().get() - 0.6).abs() < 1e-15);
+    /// # }
+    /// ```
+    pub fn power_factor(self) -> Result<Fixed<Ratio, One, f64>, Undefined> {
+        let (p, q) = (to_f64(self.re), to_f64(self.im));
+        if p == 0.0 && q == 0.0 {
+            return Err(Undefined::NoApparentPower);
+        }
+        let lambda = if T::IS_FLOAT {
+            float_power_factor(p, q)?
+        } else {
+            // the exact |S|², rounded once to an f64: nonzero, as S is
+            p / magnitude_f64(self.re, self.im)
+        };
+        Ok(Fixed::from_nan_free(lambda))
     }
 }
+
+/// `p / |p + j·q|` of two floats, not both zero, in `f64`: the parts of an `f32` square without overflow there, an
+/// `f64`'s are scaled by an exact power of two first where `p² + q²` would overflow or lose its digits.
+fn float_power_factor(p: f64, q: f64) -> Result<f64, Undefined> {
+    match (p.is_infinite(), q.is_infinite()) {
+        (true, true) => Err(Undefined::InfinitePower),
+        (true, false) => Ok(if p > 0.0 { 1.0 } else { -1.0 }),
+        (false, true) => Ok(0.0),
+        (false, false) => {
+            let m = p.abs().max(q.abs());
+            // 2^±600: the larger part lands within 2^±510 of 1 as only its exponent moves, its square in range
+            let s = if m > TWO_POW_510 {
+                1.0 / TWO_POW_600
+            } else if m < 1.0 / TWO_POW_510 {
+                TWO_POW_600
+            } else {
+                1.0
+            };
+            let (p, q) = (p * s, q * s);
+            Ok(p / crate::num::sqrt_f64(p * p + q * q))
+        }
+    }
+}
+
+/// 2^510, exactly.
+const TWO_POW_510: f64 = f64::from_bits((1023 + 510) << 52);
+
+/// 2^600, exactly.
+const TWO_POW_600: f64 = f64::from_bits((1023 + 600) << 52);
 
 #[cfg(test)]
 mod tests {
@@ -179,5 +230,46 @@ mod tests {
         assert_eq!(s.active().get(), 0.0);
         assert_eq!(s.reactive().get(), 460.0);
         assert_eq!(s.power_factor().unwrap().get(), 0.0);
+    }
+
+    #[test]
+    fn power_factor_of_no_power_is_undefined() {
+        assert_eq!(
+            Complex::<VoltAmpere, One, i16>::new(0, 0).power_factor(),
+            Err(Undefined::NoApparentPower)
+        );
+        let zero = Complex::<VoltAmpere, One, f32>::bounded(-0.0, 0.0);
+        assert_eq!(zero.power_factor(), Err(Undefined::NoApparentPower));
+        // the smallest power there is still has a power factor
+        let tiny = Complex::<VoltAmpere, One, f64>::bounded(0.0, 5e-324);
+        assert_eq!(tiny.power_factor().unwrap().get(), 0.0);
+        let tiny = Complex::<VoltAmpere, One, f64>::bounded(-5e-324, 0.0);
+        assert_eq!(tiny.power_factor().unwrap().get(), -1.0);
+    }
+
+    #[test]
+    fn power_factor_of_infinite_power() {
+        let s = |p: f64, q: f64| Complex::<VoltAmpere, One, f64>::bounded(p, q).power_factor();
+        let inf = f64::INFINITY;
+        assert_eq!(s(inf, 1e300).unwrap().get(), 1.0);
+        assert_eq!(s(-inf, 0.0).unwrap().get(), -1.0);
+        assert_eq!(s(1.0, -inf).unwrap().get(), 0.0);
+        assert_eq!(s(inf, inf), Err(Undefined::InfinitePower));
+        assert_eq!(s(-inf, -inf), Err(Undefined::InfinitePower));
+    }
+
+    #[test]
+    fn power_factor_where_the_square_overflows() {
+        // 3 + 4j at every size is λ = 3/5, where |S|² passes the float's range (f32's too, before the f64 widening)
+        for k in [1e300, f64::MAX / 5.0, 1e-300, 1e-320] {
+            let s = Complex::<VoltAmpere, One, f64>::bounded(3.0 * k, 4.0 * k);
+            assert!((s.power_factor().unwrap().get() - 0.6).abs() < 1e-12, "{k}");
+        }
+        for k in [1e37f32, f32::MAX / 5.0, 1e-44] {
+            let s = Complex::<VoltAmpere, One, f32>::bounded(3.0 * k, 4.0 * k);
+            assert!((s.power_factor().unwrap().get() - 0.6).abs() < 0.1, "{k}");
+        }
+        let s = Complex::<VoltAmpere, One, f32>::bounded(3e30, 4e30);
+        assert!((s.power_factor().unwrap().get() - 0.6).abs() < 1e-7);
     }
 }

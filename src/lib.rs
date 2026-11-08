@@ -89,7 +89,7 @@ pub mod units;
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
 pub use complex::Nco;
 #[cfg(feature = "electrical")]
-pub use complex::{Admittance, Impedance};
+pub use complex::{Admittance, Impedance, Undefined};
 #[cfg(feature = "dimensionless")]
 pub use complex::{CQ15, CQ31};
 pub use complex::{Complex, ComplexStorage, Interleaved, IqStorage, Mac, NormStorage, Polar};

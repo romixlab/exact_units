@@ -70,10 +70,45 @@ On a float impedance: the reflection coefficient $\Gamma = \frac{Z - Z_0}{Z + Z_
 use exact_units::{Impedance, prefix::One};
 
 let z0 = Impedance::<One, f64>::bounded(50.0, 0.0);
-// None for Z = −Z₀, where Γ is 0 / 0
 let gamma = Impedance::<One, f64>::bounded(100.0, 0.0).reflection(z0).unwrap();
 assert!((gamma.vswr().get() - 2.0).abs() < 1e-12);
 assert!((gamma.return_loss_db() - 9.542425094393248).abs() < 1e-12);
 ```
 
 A firmware tests $|\Gamma| \le -15$ dB as one integer compare of $|\Gamma|^2$: [Thresholds](../levels/thresholds.md#power-of-a-complex-value).
+
+## Where there is no value
+
+A few complex quantities have inputs where no value exists: 0 / 0 or ∞ / ∞, not a value too large for the storage. There they return `Err(Undefined)`, which says which case it is and why, so a log line is useful. `None` stays for a value that exists but doesn't fit, as everywhere else in the crate.
+
+| Call | `Err` | Where |
+|---|---|---|
+| `z.reflection(z0)` | `LoadIsMinusZ0` | $Z = -Z_0$: the denominator of $\Gamma$ is 0 (a negative resistance can get there) |
+| `z.reflection(z0)` | `BothInfinite` | $Z$ and $Z_0$ both infinite |
+| `z.to_admittance()` | `Short` | $Z = 0$: $Y = 1 / 0$ |
+| `y.to_impedance()` | `Open` | $Y = 0$: $Z = 1 / 0$ |
+| `s.power_factor()` | `NoApparentPower` | $S = 0$: $P / \lvert S \rvert$ is 0 / 0 |
+| `s.power_factor()` | `InfinitePower` | $P$ and $Q$ both infinite |
+
+Everywhere else these give a number. An open on a finite line is $\Gamma = 1$, an infinite impedance has admittance 0, and a power factor with one infinite part is ±1 or 0. No step squares a part, or a part is scaled by a power of two first, so a finite input whose square would overflow or underflow the float still gives its value.
+
+```rust
+use exact_units::{Complex, Impedance, Undefined, prefix::One, units::VoltAmpere};
+
+let z0 = Impedance::<One, f64>::bounded(50.0, 0.0);
+let oscillator = Impedance::<One, f64>::bounded(-50.0, 0.0);
+assert_eq!(oscillator.reflection(z0), Err(Undefined::LoadIsMinusZ0));
+let open = Impedance::<One, f64>::bounded(f64::INFINITY, 0.0);
+assert_eq!(open.reflection(z0), Ok(Complex::<_, _, f64>::bounded(1.0, 0.0)));
+
+let short = Impedance::<One, f64>::bounded(0.0, 0.0);
+let err = short.to_admittance::<One>().unwrap_err();
+assert_eq!(err, Undefined::Short);
+assert_eq!(err.to_string(), "a short (Z = 0) has no admittance");
+
+let idle = Complex::<VoltAmpere, One, i32>::new(0, 0);
+assert_eq!(idle.power_factor(), Err(Undefined::NoApparentPower));
+// |S|² is past f64 here, the power factor isn't
+let s = Complex::<VoltAmpere, One, f64>::bounded(3e300, 4e300);
+assert!((s.power_factor().unwrap().get() - 0.6).abs() < 1e-15);
+```

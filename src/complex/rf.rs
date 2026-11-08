@@ -22,8 +22,25 @@
 //! assert!((gamma.mismatch_loss().to_db() + 0.5115252244738129).abs() < 1e-12);
 //! # }
 //! ```
+//!
+//! [Undefined] names an input with no value (Z = −Z₀, a short, an open). A factor between the scales of Z and Y
+//! that the float can't hold is a compile error: 1 qΩ in qS is 10⁶⁰, past `f32`.
+//!
+//! ```compile_fail
+//! use exact_units::{Admittance, Impedance, prefix::Quecto};
+//! let z = Impedance::<Quecto, f32>::bounded(3.0, 4.0);
+//! let _: Admittance<Quecto, f32> = z.to_admittance().unwrap();
+//! ```
+//!
+//! ```
+//! # #[cfg(feature = "electrical")] {
+//! use exact_units::{Admittance, Impedance, prefix::Quecto};
+//! let z = Impedance::<Quecto, f64>::bounded(3.0, 4.0);
+//! let _: Admittance<Quecto, f64> = z.to_admittance().unwrap();
+//! # }
+//! ```
 
-use super::Complex;
+use super::{Complex, Undefined};
 use crate::prefix::One;
 use crate::units::{Ohm, Per, Siemens, Volt, Watt};
 use crate::{Fixed, FixedScale};
@@ -31,17 +48,49 @@ use crate::{Fixed, FixedScale};
 /// The reflection coefficient Γ, a complex voltage ratio.
 type Gamma<F> = Complex<Per<Volt, Volt>, One, F>;
 
-/// `1 / (re + j·im)` from scale `P` to scale `P2` of the reciprocal unit: `(re − j·im) / (re² + im²) / (P · P2)`.
+/// `k / (re + j·im)` by Smith's method, with `k` the exact factor from scale `P` to the reciprocal unit's `P2`:
+/// no `re² + im²`, so a part past the square root of the storage's largest value doesn't overflow and a small one
+/// doesn't underflow to a division by 0. `zero` for 0 + 0j, `0` for an infinite part (1 / ∞); otherwise never
+/// NaN: of the two parts the larger is nonzero, the ratio `r` of them is at most 1, and `d` has the larger part's
+/// sign.
 macro_rules! invert {
-    ($z:expr, $p:ty, $p2:ty, $ty:ident) => {{
+    ($z:expr, $p:ty, $p2:ty, $ty:ident, $zero:expr) => {{
         #[allow(
             clippy::as_conversions,
             clippy::cast_possible_truncation,
             reason = "the scale factor rounded to the storage's float (no From)"
         )]
-        let k = const { (1.0 / (<$p>::SCALE.to_f64() * <$p2>::SCALE.to_f64())) as $ty };
-        let n = $z.re * $z.re + $z.im * $z.im;
-        Complex::try_new($z.re * k / n, -($z.im * k / n)).ok()
+        let k = const {
+            let k = (1.0 / (<$p>::SCALE.to_f64() * <$p2>::SCALE.to_f64())) as $ty;
+            assert!(
+                k.is_finite() && k != 0.0,
+                "the factor between the two scales doesn't fit the float storage"
+            );
+            k
+        };
+        let (a, b) = ($z.re, $z.im);
+        if a == 0.0 && b == 0.0 {
+            Err($zero)
+        } else if a.is_infinite() || b.is_infinite() {
+            Ok(Complex::from_parts(
+                Fixed::from_nan_free(0.0),
+                Fixed::from_nan_free(0.0),
+            ))
+        } else {
+            let (re, im) = if a.abs() >= b.abs() {
+                let r = b / a;
+                let d = a + b * r;
+                (k / d, -(k * r / d))
+            } else {
+                let r = a / b;
+                let d = a * r + b;
+                (k * r / d, -(k / d))
+            };
+            Ok(Complex::from_parts(
+                Fixed::from_nan_free(re),
+                Fixed::from_nan_free(im),
+            ))
+        }
     }};
 }
 
@@ -49,42 +98,86 @@ macro_rules! float_rf {
     ($($ty:ident)*) => {$(
         impl<P: FixedScale> Complex<Ohm, P, $ty> {
             /// Γ = (Z − Z₀) / (Z + Z₀) against a reference impedance `z0` in the same scale, as a voltage ratio:
-            /// 0 when matched, −1 for a short, 1 for an open. `None` for Z = −Z₀ (0 / 0). See the
+            /// 0 when matched, −1 for a short, 1 for an open (an infinite part of Z on a finite Z₀). See the
             /// [module](crate::complex::rf).
-            #[inline(always)]
-            pub fn reflection(self, z0: Self) -> Option<Gamma<$ty>> {
-                let (a, b) = (self.re - z0.re, self.im - z0.im);
-                let (c, d) = (self.re + z0.re, self.im + z0.im);
-                let n = c * c + d * d;
-                Complex::try_new((a * c + b * d) / n, (b * c - a * d) / n).ok()
-            }
-
-            /// Y = 1 / Z in siemens, in the scale `P2`: `conj(Z) / |Z|²` times the exact factor of the two scales.
-            /// `None` for Z = 0 (0 / 0), and where a part is too large for an infinite one beside a finite one.
+            ///
+            /// [Undefined::LoadIsMinusZ0] for Z = −Z₀, where the denominator is 0, and [Undefined::BothInfinite]
+            /// where Z and Z₀ both have an infinite part. Otherwise Γ is a number, by Smith's division: no part
+            /// is squared, so no part overflows or underflows on the way to a Γ the storage holds.
             ///
             /// ```
             /// # #[cfg(feature = "electrical")] {
-            /// use exact_units::{Admittance, Impedance, Complex, prefix::{Milli, One}};
+            /// use exact_units::{Complex, Impedance, Undefined, prefix::One};
+            /// let z0 = Impedance::<One, f64>::bounded(50.0, 0.0);
+            /// let open = Impedance::<One, f64>::bounded(f64::INFINITY, 0.0);
+            /// assert_eq!(open.reflection(z0), Ok(Complex::<_, _, f64>::bounded(1.0, 0.0)));
+            /// // a negative resistance of −50 Ω on 50 Ω
+            /// let z = Impedance::<One, f64>::bounded(-50.0, 0.0);
+            /// assert_eq!(z.reflection(z0), Err(Undefined::LoadIsMinusZ0));
+            /// # }
+            /// ```
+            #[inline(always)]
+            pub fn reflection(self, z0: Self) -> Result<Gamma<$ty>, Undefined> {
+                let infinite = |z: Self| z.re.is_infinite() || z.im.is_infinite();
+                let (re, im) = match (infinite(self), infinite(z0)) {
+                    (true, true) => return Err(Undefined::BothInfinite),
+                    (true, false) => (1.0, 0.0),
+                    (false, true) => (-1.0, 0.0),
+                    (false, false) => {
+                        // Γ doesn't change when Z and Z₀ are scaled together: by 1/8 (exact) where a sum below
+                        // could pass the storage's largest value.
+                        let m = self.re.abs().max(self.im.abs()).max(z0.re.abs()).max(z0.im.abs());
+                        let s = if m > $ty::MAX / 8.0 { 0.125 } else { 1.0 };
+                        let (a, b) = (self.re * s - z0.re * s, self.im * s - z0.im * s);
+                        let (c, d) = (self.re * s + z0.re * s, self.im * s + z0.im * s);
+                        if c == 0.0 && d == 0.0 {
+                            return Err(Undefined::LoadIsMinusZ0);
+                        }
+                        // Smith: the larger of c and d is nonzero, |r| ≤ 1, and n has its sign, so never NaN
+                        if c.abs() >= d.abs() {
+                            let r = d / c;
+                            let n = c + d * r;
+                            ((a + b * r) / n, (b - a * r) / n)
+                        } else {
+                            let r = c / d;
+                            let n = c * r + d;
+                            ((a * r + b) / n, (b * r - a) / n)
+                        }
+                    }
+                };
+                Ok(Complex::from_parts(Fixed::from_nan_free(re), Fixed::from_nan_free(im)))
+            }
+
+            /// Y = 1 / Z in siemens, in the scale `P2`: `conj(Z) / |Z|²` times the exact factor of the two scales,
+            /// by Smith's division (no `|Z|²`, which could overflow or underflow where Y fits). 0 for an infinite
+            /// part of Z (an open), [Undefined::Short] for Z = 0. A factor between the scales that the float
+            /// can't hold is a compile error.
+            ///
+            /// ```
+            /// # #[cfg(feature = "electrical")] {
+            /// use exact_units::{Admittance, Impedance, Complex, Undefined, prefix::{Milli, One}};
             /// let y: Admittance<Milli, f64> = Impedance::<One, f64>::bounded(30.0, 40.0).to_admittance().unwrap();
             /// assert_eq!(y, Complex::<_, _, f64>::bounded(12.0, -16.0)); // 12 − 16j mS
-            /// assert_eq!(y.to_impedance::<One>(), Some(Complex::<_, _, f64>::bounded(30.0, 40.0)));
+            /// assert_eq!(y.to_impedance::<One>(), Ok(Complex::<_, _, f64>::bounded(30.0, 40.0)));
             /// // a short has no admittance of one direction
-            /// assert_eq!(Impedance::<One, f64>::bounded(0.0, 0.0).to_admittance::<Milli>(), None);
+            /// let short = Impedance::<One, f64>::bounded(0.0, 0.0);
+            /// assert_eq!(short.to_admittance::<Milli>(), Err(Undefined::Short));
             /// # }
             /// ```
             #[inline(always)]
             #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
-            pub fn to_admittance<P2: FixedScale>(self) -> Option<Complex<Siemens, P2, $ty>> {
-                invert!(self, P, P2, $ty)
+            pub fn to_admittance<P2: FixedScale>(self) -> Result<Complex<Siemens, P2, $ty>, Undefined> {
+                invert!(self, P, P2, $ty, Undefined::Short)
             }
         }
 
         impl<P: FixedScale> Complex<Siemens, P, $ty> {
-            /// Z = 1 / Y in ohms, in the scale `P2`, as [to_admittance](Complex::to_admittance) the other way.
+            /// Z = 1 / Y in ohms, in the scale `P2`, as [to_admittance](Complex::to_admittance) the other way: 0
+            /// for an infinite part of Y (a short), [Undefined::Open] for Y = 0.
             #[inline(always)]
             #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
-            pub fn to_impedance<P2: FixedScale>(self) -> Option<Complex<Ohm, P2, $ty>> {
-                invert!(self, P, P2, $ty)
+            pub fn to_impedance<P2: FixedScale>(self) -> Result<Complex<Ohm, P2, $ty>, Undefined> {
+                invert!(self, P, P2, $ty, Undefined::Open)
             }
         }
 
@@ -124,3 +217,146 @@ macro_rules! float_rf {
 }
 
 float_rf!(f32 f64);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prefix::Milli;
+    use crate::{Admittance, Impedance};
+
+    fn z(re: f64, im: f64) -> Impedance<One, f64> {
+        Complex::try_new(re, im).unwrap()
+    }
+
+    fn z32(re: f32, im: f32) -> Impedance<One, f32> {
+        Complex::try_new(re, im).unwrap()
+    }
+
+    fn y(re: f64, im: f64) -> Admittance<One, f64> {
+        Complex::try_new(re, im).unwrap()
+    }
+
+    fn y32(re: f32, im: f32) -> Admittance<One, f32> {
+        Complex::try_new(re, im).unwrap()
+    }
+
+    fn gamma(re: f64, im: f64) -> Gamma<f64> {
+        Complex::try_new(re, im).unwrap()
+    }
+
+    #[test]
+    fn reflection_of_minus_z0_is_undefined() {
+        let z0 = z(50.0, 10.0);
+        assert_eq!(
+            z(-50.0, -10.0).reflection(z0),
+            Err(Undefined::LoadIsMinusZ0)
+        );
+        assert_eq!(
+            z32(0.0, 0.0).reflection(z32(0.0, 0.0)),
+            Err(Undefined::LoadIsMinusZ0)
+        );
+        // one step of the float away from −Z₀, Γ is a large number, not an error
+        let near = z(-50.0f64.next_up(), -10.0).reflection(z0).unwrap();
+        assert!(near.re().get().abs() > 1e14);
+    }
+
+    #[test]
+    fn reflection_of_infinities() {
+        let z0 = z(50.0, 0.0);
+        let inf = f64::INFINITY;
+        for open in [z(inf, 0.0), z(-inf, 3.0), z(1.0, inf), z(inf, -inf)] {
+            assert_eq!(open.reflection(z0), Ok(gamma(1.0, 0.0)), "{open:?}");
+        }
+        assert_eq!(z(10.0, 0.0).reflection(z(inf, 0.0)), Ok(gamma(-1.0, 0.0)));
+        assert_eq!(
+            z(inf, 0.0).reflection(z(inf, 0.0)),
+            Err(Undefined::BothInfinite)
+        );
+        assert_eq!(
+            z(0.0, -inf).reflection(z(inf, 1.0)),
+            Err(Undefined::BothInfinite)
+        );
+    }
+
+    #[test]
+    fn reflection_of_extreme_finite_values() {
+        // Z = 3·Z₀ is Γ = 1/2 at every size, where (Z + Z₀)² overflows or underflows the float
+        for s in [f64::MAX / 4.0, 1e300, 1e-300, f64::MIN_POSITIVE, 5e-324] {
+            let g = z(3.0 * s, 0.0).reflection(z(s, 0.0)).unwrap();
+            assert!(
+                (g.re().get() - 0.5).abs() < 1e-15 && g.im().get() == 0.0,
+                "{s}"
+            );
+        }
+        for s in [f32::MAX / 4.0, 1e30, 1e-30, f32::MIN_POSITIVE] {
+            let g = z32(0.0, 3.0 * s).reflection(z32(0.0, s)).unwrap();
+            assert!(
+                (g.re().get() - 0.5).abs() < 1e-6 && g.im().get() == 0.0,
+                "{s}"
+            );
+        }
+    }
+
+    #[test]
+    fn admittance_of_a_short_and_an_open() {
+        assert_eq!(z(0.0, 0.0).to_admittance::<One>(), Err(Undefined::Short));
+        assert_eq!(
+            z32(-0.0, 0.0).to_admittance::<Milli>(),
+            Err(Undefined::Short)
+        );
+        assert_eq!(y(0.0, -0.0).to_impedance::<One>(), Err(Undefined::Open));
+        assert_eq!(y32(0.0, 0.0).to_impedance::<Milli>(), Err(Undefined::Open));
+        // the other way round they are numbers: an open conducts nothing, a short has no impedance
+        assert_eq!(
+            z(f64::INFINITY, 1.0).to_admittance::<One>(),
+            Ok(y(0.0, 0.0))
+        );
+        assert_eq!(
+            y(1.0, f64::NEG_INFINITY).to_impedance::<One>(),
+            Ok(z(0.0, 0.0))
+        );
+    }
+
+    #[test]
+    fn admittance_of_extreme_finite_values() {
+        // |Z|² overflows or underflows where 1 / Z still fits: 3 + 4j at every size is (3 − 4j) / 25 of its reciprocal
+        for s in [1e300, 1e-300, 1e-305] {
+            let got = z(3.0 * s, 4.0 * s).to_admittance::<One>().unwrap();
+            let (re, im) = (got.re().get() * s, got.im().get() * s);
+            assert!(
+                (re - 0.12).abs() < 1e-15 && (im + 0.16).abs() < 1e-15,
+                "{s}: {got:?}"
+            );
+        }
+        // past the float, 1 / Z is infinite, never NaN
+        let got = z(5e-324, 0.0).to_admittance::<One>().unwrap();
+        assert_eq!(got.re().get(), f64::INFINITY);
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn display_says_what_happened() {
+        for (cause, text) in [
+            (
+                Undefined::LoadIsMinusZ0,
+                "the load is minus the reference impedance (Z = −Z₀): Γ has a zero denominator",
+            ),
+            (
+                Undefined::BothInfinite,
+                "the load and the reference impedance are both infinite: Γ is ∞ / ∞",
+            ),
+            (Undefined::Short, "a short (Z = 0) has no admittance"),
+            (Undefined::Open, "an open (Y = 0) has no impedance"),
+            (
+                Undefined::NoApparentPower,
+                "no apparent power (S = 0): the power factor is 0 / 0",
+            ),
+            (
+                Undefined::InfinitePower,
+                "active and reactive power are both infinite: the power factor is ∞ / ∞",
+            ),
+        ] {
+            assert_eq!(cause.to_string(), text);
+        }
+    }
+}
