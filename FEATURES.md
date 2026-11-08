@@ -363,11 +363,15 @@ counted units, and the kinds that keep look-alike quantities apart.
   not at all. Book: [The symbols of `q!`](docs/start/symbols.md).
 - 📋 **UNIT-6 More counted units** (was STD-69) · `v0.5` — Symbol (baud = Symbol/s), Packet, Pulse, Event, Tick, Chunk, Particle,
   each a dimension of its own; `AVOGADRO` bridges `Particle` and mol exactly.
-- 📋 **UNIT-7 The unit's identity and data form** · `foundations` — `UnitDef` per named unit with `UnitId { crate_name,
-  name }`; `Scale` becomes `Magnitude` alone (no `Affine`, no `DegreeCelsius`); every type-level concept has a const
-  data form with a (crate, name) identity and the same rules at run time (napier, `ww`). Identity is stated once in the
-  API schema or in a header; `SIExpr` stays as the run-time description a device sends once when a unit changes, never
-  per sample.
+- ✅ **UNIT-7 The unit's identity and data form** · `foundations` — a named unit is a `UnitDef` (`id: MarkerId {
+  crate_name, name }`, names, dim, quantity, `scale: Magnitude`, provenance), built by `unit!` with the crate from
+  `CARGO_CRATE_NAME`: two crates' `Rpm` are two units that print the same. `Scale` is gone (no `Affine`, no
+  `DegreeCelsius`; °C is `origins::Celsius`); origins, references and scale markers carry `MarkerId`s too. `SIExpr`'s
+  leaves are `Def(UnitDef)` or `Ref(MarkerId)`, resolved through a `UnitTable` (`units::TABLE`, an API model's bundle),
+  never a global; `compact` turns listed definitions into references. Tests: `tests/units.rs`
+  (`identity_is_crate_and_name`, `one_marker_per_name`), `tests/two_crates.rs` (fixtures `rpm_a`, `rpm_b`),
+  `tests/dynamic.rs`; in wire_weaver, `tests/quantities` (two crates' `Rpm` by reference, a ww_tape file decoded from
+  its bundle alone).
 - 📋 **UNIT-8 Quantity specs: the ISQ hierarchy** · `foundations` — `QuantitySpec` / `QuantityDef` (system, parent, kind
   root, character), `quantity!`, `Of<Q, U>` in the unit slot, `QuantityExpr` replacing `Kind`: up the tree implicit,
   down by a named step, siblings and other kinds refused, `+` to the nearest common ancestor, products `Derived`. The
