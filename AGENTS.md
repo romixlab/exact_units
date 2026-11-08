@@ -72,7 +72,7 @@ page under "Where the crate falls short today", never hidden.
 ## Commands
 
 ```sh
-just test            # cargo nextest with all features, without the wire format, without std; doctests
+just test            # cargo nextest with all features, without the wire format, without std; every example built; doctests
 just lint            # fmt, cargo sort, typos, no long decimals in docs/ and examples/, clippy and rustdoc with -D warnings
 just check           # cargo check of the feature sets firmware uses
 just cov             # test coverage as CI computes it, lcov.info plus a printed summary
