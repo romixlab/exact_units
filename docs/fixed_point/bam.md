@@ -30,6 +30,24 @@ assert_eq!(format!("{:#}", Bam16::of(16384)), "0.25 rev");
 
 `Bam32` is the same over a `u32`, $2^{-32}$ turn a step.
 
+## Compared with a literal
+
+`Bam16` stores turns, and `Degree` and `Turn` both carry π in their own scale against the radian
+([Literals](../start/literals.md#angles-pick-a-unit-that-carries)): converting between them cancels it, so
+`q!(180 deg)` against a `Bam16` is a plain rational compare, the same shape as any other `q!` against an
+integer storage — never the `π/2 is no f64` refusal a radian literal meets.
+
+```rust
+use exact_units::{Bam16, q};
+
+let phase = Bam16::of(32_768); // half a turn
+assert!(phase == q!(180 deg));
+assert!(phase == q!(0.5 rev));
+```
+
+A radian literal has no such shortcut: `Radian`'s own scale carries no π, so it stays inexact against a
+`Bam16` step unless rounded by name, or compared with `<`/`<=`.
+
 ## The quadrant is in the top bits
 
 The two top bits say which quarter of the turn an angle is in. A sine table indexed by the top bits needs no division. 135°, three eighths of a turn, is `0x6000`:

@@ -69,6 +69,8 @@ let a: Q15<Ratio> = fixed!(0.5);
 let _ = a + Fixed::<Ratio, Pow2<-15>, i16, Wrapping>::of(1);
 ```
 
+Instead: put both sides on one policy first, with `with_overflow` as above.
+
 ## In conversions
 
 The rounding conversions name their policy too: `to_rounded` (checked), `to_saturating`, `to_wrapping`.

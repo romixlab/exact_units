@@ -106,6 +106,40 @@ assert!(f > Fixed::<Hertz, Kilo, u16>::new(26_666));
 
 The order is exact for every value of the `Fixed`: a float of any size, `1e300` or `1e-300`, and an integer whose product with its scale passes `u128`. ±∞ is past every `Exact`. A NaN has no order and equals nothing. A scale that isn't a fraction of `u128`s (π, a root, `Pow10<-40>`) doesn't compile, as for `to`: an `Exact` is a fraction, and a number of π steps never is one.
 
+```rust,compile_fail
+# #[cfg(feature = "angle")] {
+use exact_units::{Exact, Fixed, units::Radian};
+
+exact_units::scale! {
+    /// A thousandth of a degree, as a step of the radian: π / 180 000.
+    pub struct MilliDegree = "m°", Exact(1 / 180000, pi 1);
+}
+
+let a = Exact::<Radian>::new(1, 2);
+let b = Fixed::<Radian, MilliDegree, i32>::new(5);
+let _ = a < b; // MilliDegree carries π: no fraction of u128s is its step
+# }
+# #[cfg(not(feature = "angle"))] compile_error!("the case needs angle");
+```
+
+Instead: round through `f64`, as the error itself says — convert the `Fixed` to a float storage first, which
+takes any factor including π ([Floats](conversions.md#floats)), and `Exact::to_f64()` the other side:
+
+```rust
+# #[cfg(feature = "angle")] {
+use exact_units::{Exact, Fixed, prefix::One, units::Radian};
+
+exact_units::scale! {
+    pub struct MilliDegree = "m°", Exact(1 / 180000, pi 1);
+}
+
+let a = Exact::<Radian>::new(1, 2); // ½ rad
+let b = Fixed::<Radian, MilliDegree, i32>::new(5); // 5 m°, in radians
+let b_rad: f64 = b.convert::<Radian, One, f64>().unwrap().get();
+assert!(a.to_f64() > b_rad);
+# }
+```
+
 This is how a planner hands its results to firmware: as `Fixed` constants, rounded where a register needs a whole number, with the rounding named.
 
 ## Printing

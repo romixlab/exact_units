@@ -86,6 +86,18 @@ const NEGATIVE: Fixed<Volt, Milli, u16> = fixed!(-0.5);
 
 A scale with π or a root in it has no decimal stored values, so `fixed!` refuses it too.
 
+Instead: write the literal in a unit whose own scale carries the factor, so none is left to convert — for an
+angle, [pick a unit that carries π](#angles-pick-a-unit-that-carries) below:
+
+```rust
+# #[cfg(feature = "angle")] {
+use exact_units::{Fixed, fixed, prefix::Deci, units::Degree};
+
+const RIGHT_ANGLE: Fixed<Degree, Deci, i16> = fixed!(90.0);
+assert_eq!(RIGHT_ANGLE.get(), 900); // 90.0°, exactly: no π anywhere
+# }
+```
+
 A float storage refuses a literal past its range or below its normal numbers, with or without a rounding, rather than storing ±∞, a subnormal or 0:
 
 ```rust,compile_fail
@@ -111,6 +123,15 @@ const ZERO: Fixed<Ratio, One, f64> = fixed!(-0.0);
 ### A literal in another unit
 
 `fixed!(value in S)` takes the literal in another unit `S` of the same dimension and kind, through `Fixed::from_decimal_in`: a datasheet's dB into a storage of µNp, degrees into radians. A factor with π or ln 10 in it makes the value irrational, never a stored value, so such a call always names a rounding: `fixed!(90 in Degree, NearestEven)`. The error of one that doesn't names the stored values around it in the storage's own unit, to write as a plain `fixed!(1.570796)`.
+
+```rust
+# #[cfg(feature = "angle")] {
+use exact_units::{Fixed, fixed, prefix::Micro, units::{Degree, Radian}};
+
+const RIGHT_ANGLE: Fixed<Radian, Micro, i32> = fixed!(90 in Degree, NearestEven);
+assert_eq!(RIGHT_ANGLE.get(), 1_570_796); // π/2 rad in µrad, to the nearest
+# }
+```
 
 `S` can also be named the way [`q!`](#q) reads one, symbols and all, instead of a type path:
 
@@ -247,6 +268,19 @@ let _ = a == q!(90 deg); // π/2 is no f64
 # #[cfg(not(feature = "angle"))] compile_error!("the case needs angle");
 ```
 
+`<` and `<=` compile here, as they do for every float above; so does `==` once the angle is stored in a unit
+whose own scale carries the π, which [Angles: pick a unit that carries π](#angles-pick-a-unit-that-carries)
+below has in full:
+
+```rust
+# #[cfg(feature = "angle")] {
+use exact_units::{Fixed, q, prefix::Rational, units::Degree};
+
+let a = Fixed::<Degree, Rational<1, 10>, i16>::new(450); // 45.0°
+assert!(a == q!(45 deg));
+# }
+```
+
 What no compile error can catch are the run-time values: NaN compares false with every literal and orders with
 none, and ±∞ are past every literal.
 
@@ -303,6 +337,19 @@ let _ = Exact::<Radian>::new(3, 2) < q!(90 deg); // π/2 rad is no fraction
 # #[cfg(not(feature = "angle"))] compile_error!("the case needs angle");
 ```
 
+Instead: keep the `Exact` in a unit that converts to the literal's by a plain fraction — `Degree` or `Turn`
+against `deg` or `rev`, never `Radian` — as [Angles: pick a unit that carries π](#angles-pick-a-unit-that-carries)
+below:
+
+```rust
+# #[cfg(feature = "angle")] {
+use exact_units::{Exact, q, units::Degree};
+
+let a = Exact::<Degree>::new(3, 2); // 1.5°
+assert!(a < q!(90 deg));
+# }
+```
+
 ### The string form
 
 `°`, `²`, `Ω` and the rest of a unit's own signs are not tokens Rust's lexer accepts bare in source. A string
@@ -346,6 +393,33 @@ let _ = Fixed::<GallonUs, One, i16>::new(1) < q!(5 gal); // the US gallon, or th
 # }
 # #[cfg(not(feature = "customary"))] compile_error!("the gal case needs customary");
 ```
+
+## Angles: pick a unit that carries π
+
+`Radian` is the angle dimension's own unit, with no π in its scale: a plane angle *is* a ratio of arc to
+radius. `Degree` (π/180 rad) and `Turn` (2π rad) are different units of the same dimension, each with π baked
+into its own scale against the radian. Comparing or storing an angle in degrees or turns never has to multiply
+that π away: wherever both sides already carry it, it cancels.
+
+- `q!(90 deg)` against a `Fixed<Degree, ..>` is a plain rational compare: no radian, and no π, in sight.
+- `q!(90 deg)` against a `Fixed<Turn, ..>` is the same: 90° is exactly ¼ turn, a plain fraction.
+- [`Bam16`](../fixed_point/bam.md) (`Fixed<Turn, Pow2<-16>, u16, Wrapping>`) is the extreme case: every degree,
+  minute and turn fraction with a power-of-two denominator is some whole number of its 65536 steps, exactly.
+
+```rust
+# #[cfg(feature = "angle")] {
+use exact_units::{Bam16, q};
+
+let phase = Bam16::of(16_384); // a quarter turn
+assert!(phase == q!(90 deg));
+assert!(phase == q!(0.25 rev));
+# }
+```
+
+What never gets exact this way is a *radian* literal or storage: `Radian`'s own scale has no π to cancel
+against degrees or turns, so a value genuinely in radians (a sensor's raw output, an `f64` from `atan2`) stays
+inexact unless rounded by name — [a literal in another unit](#a-literal-in-another-unit) above — or compared
+with `<` and `<=`, which are always exact.
 
 ## Where they belong
 
