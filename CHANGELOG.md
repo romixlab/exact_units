@@ -687,6 +687,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
   emoji rather than the apothecaries' minim sign it actually is.
 * `requantize` / `Requantizer::apply` by a factor whose denominator is above `i128::MAX` (a ratio of primes like `1/(3⁴⁰·4·7²²)`) rounded a quotient near a half or a whole wrongly for an `x` of 2⁹⁰ and up: the denominator was clamped to `i128::MAX`, so `i128::MAX` truncated to 1 (not 0) and 9·10³⁷ rounded to nearest to 1 (not 0). The quotient is now compared with a half exactly. The typed conversions are unchanged (they don't compile for such a factor). Found by the mutation tests.
 * An inexact literal's compile error (P2401#8nov-0413) named only `NearestEven` as the call to paste, as if it were the sole choice: `fixed!(0.1, NearestEven)` read as the fix rather than one of five. It now lists all of them, `fixed!(0.1, Floor | Ceil | Truncate | NearestEven | NearestAway)`, the same for `db!`, `np!` and a `const fn`'s `_rounded` twin. The book's [Literals](docs/start/literals.md) page says a threshold usually wants `Floor` or `Ceil`, the safe side, not a nearest one.
+- Book: the site no longer shows rustdoc's hidden lines (`# #[cfg(..)] {`, `# }`) verbatim; `eu_docs_ext.rustdoc` now strips them from Rust fences the way rustdoc itself does, and `just docs-build` fails if one leaks through.
 
 ### ⚠️ Breaking
 
