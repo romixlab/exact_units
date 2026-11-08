@@ -91,4 +91,14 @@ When the product doesn't fit the storage, or should land in another scale, the m
 
 ## Comparing
 
-`==`, `<` and `sort` compare the stored numbers of one type. Values with different [bounds](bounds.md) but the same unit, scale and storage compare too: `PartialEq` and `PartialOrd` reach across bounds. `Eq`, `Ord` and `Hash` are stricter and stay within one exact type, bounds included, since a `HashMap` key or a sort needs a total, consistent order.
+`==`, `<` and `sort` compare the stored numbers of one type. Values with different [bounds](bounds.md) but the same unit, scale and storage compare too: `PartialEq` and `PartialOrd` reach across bounds. `Eq`, `Ord` and `Hash` are stricter and stay within one exact type, bounds included, since a `HashMap` key or a sort needs a total, consistent order. A float storage has them too, where its bound refuses NaN: without NaN a float is a total order, −0 equal to +0 and hashed the same, so `Fixed<Volt, One, f32>` sorts, keys a `BTreeMap` and has `iter().max()`. A `MaybeNan` has no order at all.
+
+```rust
+use exact_units::{Fixed, prefix::One, units::Volt};
+
+type V = Fixed<Volt, One, f32>;
+let mut readings = [V::bounded(3.3), V::bounded(-0.0), V::bounded(1.8), V::bounded(0.0)];
+readings.sort();
+assert_eq!(readings.map(V::get), [-0.0, 0.0, 1.8, 3.3]);
+assert_eq!(readings.iter().max(), Some(&V::bounded(3.3)));
+```

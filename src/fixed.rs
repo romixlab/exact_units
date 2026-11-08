@@ -16,7 +16,7 @@ pub use bounds::{
 };
 pub use prefix::{DecimalPrefix, FixedScale};
 pub use rounding::{Overflow, Requantizer, Rounding, StorageKind, requantize};
-pub use storage::{Repr, Storage, UnsignedStorage};
+pub use storage::{Repr, Storage, StorageOrd, UnsignedStorage};
 
 mod bounds;
 pub mod prefix;
@@ -846,7 +846,30 @@ impl<U, P, T: Storage, B: Bounds<T> + NanFree, B2: Bounds<T> + NanFree>
     }
 }
 
-impl<U, P, T: Storage + Eq, B: Bounds<T> + NanFree> Eq for Fixed<U, P, T, B> {}
+/// `Eq`, `Ord` and `Hash` within one type, float storages included: a NaN-free float is a total order, −0 equal to +0
+/// (and hashed the same), so values sort, key a `BTreeMap` or a `HashMap`, and `max` works. A [MaybeNan] has none of
+/// them.
+///
+/// ```
+/// use exact_units::{Fixed, prefix::One, units::Volt};
+/// use std::collections::BTreeMap;
+///
+/// type V = Fixed<Volt, One, f32>;
+/// let mut v = [V::bounded(2.5), V::bounded(f32::NEG_INFINITY), V::bounded(-0.0), V::bounded(1.0)];
+/// v.sort();
+/// assert_eq!(v.map(V::get), [f32::NEG_INFINITY, -0.0, 1.0, 2.5]);
+/// assert_eq!(v.iter().max(), Some(&V::bounded(2.5)));
+/// let names = BTreeMap::from([(V::bounded(0.0), "zero")]);
+/// assert_eq!(names.get(&V::bounded(-0.0)), Some(&"zero"));
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, MaybeNan, prefix::One, units::Volt};
+///
+/// let mut v = [Fixed::<Volt, One, f32, MaybeNan>::of(1.0)];
+/// v.sort(); // may be NaN: no order
+/// ```
+impl<U, P, T: StorageOrd, B: Bounds<T> + NanFree> Eq for Fixed<U, P, T, B> {}
 
 impl<U, P, T: Storage, B: Bounds<T> + NanFree, B2: Bounds<T> + NanFree>
     PartialOrd<Fixed<U, P, T, B2>> for Fixed<U, P, T, B>
@@ -857,16 +880,16 @@ impl<U, P, T: Storage, B: Bounds<T> + NanFree, B2: Bounds<T> + NanFree>
     }
 }
 
-impl<U, P, T: Storage + Ord, B: Bounds<T> + NanFree> Ord for Fixed<U, P, T, B> {
+impl<U, P, T: StorageOrd, B: Bounds<T> + NanFree> Ord for Fixed<U, P, T, B> {
     #[inline(always)]
     fn cmp(&self, other: &Self) -> Ordering {
-        self.value.cmp(&other.value)
+        self.value.cmp_numbers(&other.value)
     }
 }
 
-impl<U, P, T: Storage + Hash, B: Bounds<T>> Hash for Fixed<U, P, T, B> {
+impl<U, P, T: StorageOrd, B: Bounds<T> + NanFree> Hash for Fixed<U, P, T, B> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.value.hash(state);
+        self.value.hash_number(state);
     }
 }
 

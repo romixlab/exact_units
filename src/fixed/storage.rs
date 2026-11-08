@@ -24,6 +24,38 @@ pub enum Repr {
     Float(f64),
 }
 
+/// The order and hash of a storage's numbers, for `Eq`, `Ord` and `Hash` of a NaN-free
+/// [Fixed](super::Fixed): an integer's own, and a float's as its numbers order, −0 equal to +0. A float has no `Ord`
+/// because of NaN, which no NaN-free value holds. The crate's own trait, since `Ord` for floats next to `T: Ord`
+/// would overlap.
+///
+/// For a float the order is defined only where neither side is NaN (two NaNs and a NaN against a number are equal):
+/// [Fixed](super::Fixed) uses it only for bounds that refuse NaN ([NanFree](super::NanFree)).
+pub trait StorageOrd: Storage {
+    /// The order of `self` and `other`: `<` and `>` of the numbers, else equal.
+    fn cmp_numbers(&self, other: &Self) -> core::cmp::Ordering;
+
+    /// Feeds `self` into `state`, the same for numbers [cmp_numbers](Self::cmp_numbers) finds equal (+0 and −0).
+    fn hash_number<H: core::hash::Hasher>(&self, state: &mut H);
+}
+
+/// [StorageOrd] by the type's own `Ord` and `Hash`: an integer storage.
+macro_rules! ord_of_ord {
+    ($($ty:ident)*) => {$(
+        impl StorageOrd for $ty {
+            #[inline(always)]
+            fn cmp_numbers(&self, other: &Self) -> core::cmp::Ordering {
+                Ord::cmp(self, other)
+            }
+
+            #[inline(always)]
+            fn hash_number<H: core::hash::Hasher>(&self, state: &mut H) {
+                core::hash::Hash::hash(self, state);
+            }
+        }
+    )*};
+}
+
 /// A number type a [Fixed](super::Fixed) is stored as: `u8`..`u64`, `i8`..`i64`, `f32`, `f64`, `UNib32`, `UVlq32`,
 /// `UVlq64`, `Nibble`. Arithmetic is that of the number inside (`UNib32` wraps like `u32`, `Nibble` at 16); for floats,
 /// `checked_*` is `None` for a result that isn't finite, the plain operation, `wrapping_*` and `saturating_*` are IEEE
@@ -437,6 +469,8 @@ macro_rules! int {
 
 int!(u8 div_u8 u16 div_u16 u32 div_u32 u64 div_u64 i8 div_i8 i16 div_i16 i32 div_i32 i64 div_i64);
 
+ord_of_ord!(u8 u16 u32 u64 i8 i16 i32 i64);
+
 macro_rules! unsigned {
     ($($ty:ident)*) => {$(
         impl UnsignedStorage for $ty {
@@ -613,6 +647,9 @@ macro_rules! newtype {
 
 #[cfg(feature = "shrink_wrap")]
 newtype!(UNib32(u32) UVlq32(u32) UVlq64(u64));
+
+#[cfg(feature = "shrink_wrap")]
+ord_of_ord!(UNib32 UVlq32 UVlq64 Nibble);
 
 /// 0..=15, wrapping at 16.
 #[cfg(feature = "shrink_wrap")]
@@ -1092,6 +1129,13 @@ unsigned_exact!(
     U57 57 u64 U58 58 u64 U59 59 u64 U60 60 u64 U61 61 u64 U62 62 u64 U63 63 u64 U64 64 u64
 );
 
+#[cfg(feature = "shrink_wrap")]
+ord_of_ord!(
+    U1 U2 U3 U4 U5 U6 U7 U8 U9 U10 U11 U12 U13 U14 U15 U16 U17 U18 U19 U20 U21 U22 U23 U24 U25 U26 U27 U28 U29 U30
+    U31 U32 U33 U34 U35 U36 U37 U38 U39 U40 U41 U42 U43 U44 U45 U46 U47 U48 U49 U50 U51 U52 U53 U54 U55 U56 U57
+    U58 U59 U60 U61 U62 U63 U64
+);
+
 /// shrink_wrap's exact-width signed integers (`I2`..`I64`, SW-45): `BITS` is the type's own width, not its backing
 /// `i8`/`i16`/`i32`/`i64`; arithmetic wraps or saturates at that width (two's complement), not the backing
 /// integer's.
@@ -1321,6 +1365,13 @@ signed_exact!(
     I57 57 i64 I58 58 i64 I59 59 i64 I60 60 i64 I61 61 i64 I62 62 i64 I63 63 i64 I64 64 i64
 );
 
+#[cfg(feature = "shrink_wrap")]
+ord_of_ord!(
+    I2 I3 I4 I5 I6 I7 I8 I9 I10 I11 I12 I13 I14 I15 I16 I17 I18 I19 I20 I21 I22 I23 I24 I25 I26 I27 I28 I29 I30
+    I31 I32 I33 I34 I35 I36 I37 I38 I39 I40 I41 I42 I43 I44 I45 I46 I47 I48 I49 I50 I51 I52 I53 I54 I55 I56 I57
+    I58 I59 I60 I61 I62 I63 I64
+);
+
 macro_rules! float {
     ($($ty:ident)*) => {$(
         #[expect(
@@ -1447,6 +1498,32 @@ macro_rules! float {
 }
 
 float!(f32 f64);
+
+/// [StorageOrd] of a float: the numbers' order, −0 equal to +0, and the hash of the bits with −0 as +0.
+macro_rules! float_ord {
+    ($($ty:ident)*) => {$(
+        impl StorageOrd for $ty {
+            #[inline(always)]
+            fn cmp_numbers(&self, other: &Self) -> core::cmp::Ordering {
+                if self < other {
+                    core::cmp::Ordering::Less
+                } else if self > other {
+                    core::cmp::Ordering::Greater
+                } else {
+                    core::cmp::Ordering::Equal
+                }
+            }
+
+            #[inline(always)]
+            fn hash_number<H: core::hash::Hasher>(&self, state: &mut H) {
+                // +0 and −0 are one number: `self + 0.0` is +0 for both and leaves every other float as it is
+                core::hash::Hash::hash(&(self + 0.0).to_bits(), state);
+            }
+        }
+    )*};
+}
+
+float_ord!(f32 f64);
 
 #[cfg(test)]
 #[expect(

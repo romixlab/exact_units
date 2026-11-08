@@ -112,7 +112,7 @@ pub use fixed::{Bam16, Bam32, PhaseBam16, PhaseBam32};
 pub use fixed::{
     Bounds, Count, DecimalPrefix, Finite, Fixed, FixedScale, MaybeNan, NanFree, OutOfBounds,
     Overflow, Range, RangeDec, RangeU64, Repr, Requantizer, Rounding, Saturating, Storage,
-    StorageKind, Unbounded, Unlimited, UnsignedStorage, Wrapping, prefix, requantize,
+    StorageKind, StorageOrd, Unbounded, Unlimited, UnsignedStorage, Wrapping, prefix, requantize,
 };
 #[cfg(feature = "information")]
 pub use fixed::{Bytes, Gibibytes, Kibibytes, Mebibytes};

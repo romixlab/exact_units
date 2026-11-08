@@ -190,6 +190,48 @@ pub(crate) fn wire(x: f32) {
     assert!(M::from_ww_bytes(&bytes).is_ok_and(|m| same(m.get(), x)));
 }
 
+/// The hash of `v` by the std hasher.
+fn hash_of<T: core::hash::Hash>(v: &T) -> u64 {
+    use core::hash::Hasher;
+    let mut h = std::hash::DefaultHasher::new();
+    v.hash(&mut h);
+    h.finish()
+}
+
+/// `Ord` of two NaN-free values is `partial_cmp`'s answer (−0 equal to +0), `Eq` is `==`, and values that are equal
+/// hash the same; for [Finite] too, and for `f64`.
+pub(crate) fn orders(a: f32, b: f32) {
+    use core::cmp::Ordering;
+    let (Ok(x), Ok(y)) = (V::try_new(a), V::try_new(b)) else {
+        return;
+    };
+    assert_eq!(Some(x.cmp(&y)), a.partial_cmp(&b), "{a:e} cmp {b:e}");
+    assert_eq!(Some(x.cmp(&y)), x.partial_cmp(&y), "{a:e} cmp {b:e}");
+    assert_eq!(x.cmp(&y) == Ordering::Equal, x == y, "{a:e} == {b:e}");
+    assert_eq!(x.max(y).get().partial_cmp(&a.max(b)), Some(Ordering::Equal));
+    if x == y {
+        assert_eq!(hash_of(&x), hash_of(&y), "{a:e} and {b:e} hash apart");
+    }
+    if let (Ok(fx), Ok(fy)) = (F::try_new(a), F::try_new(b)) {
+        assert_eq!(
+            Some(fx.cmp(&fy)),
+            a.partial_cmp(&b),
+            "Finite {a:e} cmp {b:e}"
+        );
+    }
+    let (wa, wb) = (f64::from(a), f64::from(b));
+    let (Ok(wx), Ok(wy)) = (
+        Fixed::<Volt, One, f64>::try_new(wa),
+        Fixed::<Volt, One, f64>::try_new(wb),
+    ) else {
+        return;
+    };
+    assert_eq!(Some(wx.cmp(&wy)), wa.partial_cmp(&wb), "{wa:e} cmp {wb:e}");
+    if wx == wy {
+        assert_eq!(hash_of(&wx), hash_of(&wy), "{wa:e} and {wb:e} hash apart");
+    }
+}
+
 /// Bytes from outside, read as a float `Fixed` of every NaN-free bound and of [MaybeNan]: through the wire, through
 /// JSON and as text with its unit (`with_unit`), in `V` and `mV`. A NaN-free type never holds NaN (a [Finite] one
 /// never ±∞, a `RangeDec` one nothing outside), and what it holds writes and reads back to the same bits. A
@@ -342,8 +384,42 @@ mod tests {
             for b in SPECIAL {
                 operates(a, b);
                 finite_operates(a, b);
+                orders(a, b);
             }
         }
+    }
+
+    /// Every f32 whose low 16 bits are 0, NaN-free: sorted by `Ord` it is sorted by `<`, each against its neighbour
+    /// and against every special value in [orders], and against itself (Eq, Hash). `-0` and `+0` hash the same.
+    #[test]
+    fn every_f32_orders() {
+        let mut all: Vec<V> = (0..=u16::MAX)
+            .filter_map(|hi| V::try_new(f32::from_bits(u32::from(hi) << 16)).ok())
+            .collect();
+        assert_eq!(all.len(), 65536 - 2 * 127, "the 254 NaNs refused");
+        all.sort();
+        for w in all.windows(2) {
+            if let [a, b] = *w {
+                assert!(
+                    a.get() <= b.get(),
+                    "{:e} sorted before {:e}",
+                    a.get(),
+                    b.get()
+                );
+                orders(a.get(), b.get());
+            }
+        }
+        for v in &all {
+            assert!(v == v && hash_of(v) == hash_of(v));
+            for s in SPECIAL {
+                orders(v.get(), s);
+                orders(s, v.get());
+            }
+        }
+        assert_eq!(hash_of(&V::bounded(0.0)), hash_of(&V::bounded(-0.0)));
+        assert_eq!(V::bounded(0.0), V::bounded(-0.0));
+        let key = std::collections::BTreeMap::from([(V::bounded(-0.0), "zero")]);
+        assert_eq!(key.get(&V::bounded(0.0)), Some(&"zero"));
     }
 
     /// Every f32 whose low 16 bits are 0 against [Finite], ±∞ and the NaNs among them.
@@ -439,6 +515,12 @@ mod tests {
         #[test]
         fn drawn_finite_floats_operate(a in any::<f32>(), b in any::<f32>()) {
             finite_operates(a, b);
+        }
+
+        #[test]
+        fn drawn_floats_order(a in any::<f32>(), b in any::<f32>()) {
+            orders(a, b);
+            orders(a, -a);
         }
     }
 }
