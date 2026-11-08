@@ -84,6 +84,7 @@ fn trunc(x: f32) -> f32 {
 /// decimals: `MIN` at or above `MIN · 10^EXP` and the float below it under it, `MAX` at or below `MAX · 10^EXP` and
 /// the float above it over it. So a float compare against them is the exact compare against the decimals.
 #[cfg(not(any(kani, fuzzing)))]
+#[expect(clippy::expect_used, reason = "a property fails by panicking")]
 pub(crate) fn range_dec_f32<B: Bounds<f32>>(min: i64, max: i64, exp: i8) {
     let (lo, hi) = (B::MIN.expect("a bound"), B::MAX.expect("a bound"));
     range_dec_check(f64::from(lo), f64::from(lo.next_down()), min, exp, true);
@@ -92,6 +93,7 @@ pub(crate) fn range_dec_f32<B: Bounds<f32>>(min: i64, max: i64, exp: i8) {
 
 /// As [range_dec_f32], for `f64` bounds.
 #[cfg(not(any(kani, fuzzing)))]
+#[expect(clippy::expect_used, reason = "a property fails by panicking")]
 pub(crate) fn range_dec_f64<B: Bounds<f64>>(min: i64, max: i64, exp: i8) {
     let (lo, hi) = (B::MIN.expect("a bound"), B::MAX.expect("a bound"));
     range_dec_check(lo, lo.next_down(), min, exp, true);
@@ -101,6 +103,7 @@ pub(crate) fn range_dec_f64<B: Bounds<f64>>(min: i64, max: i64, exp: i8) {
 /// `bound` on the inner side of `m · 10^exp` (at or above it for a lower bound) and `beyond`, the next float out, on
 /// the outer side, exactly.
 #[cfg(not(any(kani, fuzzing)))]
+#[expect(clippy::expect_used, reason = "a property fails by panicking")]
 fn range_dec_check(bound: f64, beyond: f64, m: i64, exp: i8, lower: bool) {
     use num_rational::BigRational;
     let ten = num_bigint::BigInt::from(10).pow(u32::from(exp.unsigned_abs()));

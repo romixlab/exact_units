@@ -44,6 +44,19 @@ assert_eq!(t.to::<Milli, u16>(), None);                        // 1.5 ms: refuse
 assert_eq!((t * 2).to::<Milli, u16>(), Some(Fixed::new(3)));   // 3 ms
 ```
 
+A float storage is no way around it. `to` into an `f32` or `f64` gives the value only where it is a float exactly, and `None` past the float's range, never infinity. 0.0015 s has no float, so the rounding is named:
+
+```rust
+use exact_units::{Fixed, Micros, Rounding, prefix::One, units::Second};
+
+let t: Micros<u32> = Fixed::new(1500);
+assert_eq!(t.to::<One, f64>(), None);                          // 0.0015 is no f64
+let s = t.to_rounded::<One, f64>(Rounding::NearestEven).unwrap();
+assert_eq!(s.get(), 0.0015);                                   // the nearest, by name
+let big = Fixed::<Second, One, f64>::bounded(1e39);
+assert_eq!(big.to::<One, f32>(), None);                        // past an f32: not infinity
+```
+
 Where the compiler can tell, the refusal is a compile error. A factor with $\pi$ in it is never a whole number, so `to` across it doesn't build:
 
 ```rust,compile_fail
@@ -235,7 +248,8 @@ The crate's own properties are checked three ways: drawn inputs, Kani proofs ove
 These places break a rule above. Each is known and tracked, and until it is fixed you should know about it:
 
 - **`Scale::Affine` holds floats.** `units::DegreeCelsius` uses it. Use `origins::Celsius`, whose offset is exact.
-- **A float storage rounds.** `to` into an `f32` or `f64` storage rounds to the nearest float, and an `f32` that overflows becomes infinity.
+- **A `Point` of a float storage converts through `f64`.** `Point::to` between origins (°C to °F in an `f32`) works `(x · num + offset) / den` in `f64`, so it rounds twice, and a modulo origin reduces a float in `f64` too. `Fixed`'s own `to` and `convert` are exact for floats.
+- **A product into a float storage rounds in `f64`.** `times_into` and `per_into` with a float on either side multiply in `f64` and scale the product there; the `Rounding` they take is not applied to a float result.
 - **Integer `/` truncates**, as the storage's own `/` does: 3 V / 2 A is 1 V/A. `per_into` and `times_into` name a rounding.
 - **`+` without bounds is the storage's own `+`**: a panic on overflow in a debug build, a wrap in a release build. Bounds `Saturating`, `Wrapping` or `checked_add` say what you mean.
 - **`to_rounded` across $\pi$, $\ln 2$ or $\ln 10$** works with a 64-bit approximation of the factor, so within $|x| \cdot 2^{-64}$ of a rounding step it can be one step off.

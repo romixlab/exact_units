@@ -446,8 +446,8 @@ impl<const MIN: u64, const MAX: u64> Bounds<UVlq64> for RangeU64<MIN, MAX> {
 /// is no float is narrowed to the floats inside it, so a float compare against it is the exact compare. A compile
 /// error for a bound past the float's range or below its normal range (0 aside).
 #[expect(
-    clippy::arithmetic_side_effects,
-    reason = "hi() is at most the largest finite float's bits, checked in float_parts"
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable; an i8 widens into an i16 exactly"
 )]
 const fn dec_bound(n: i64, exp: i8, up: bool, format: FloatFormat) -> (bool, u128) {
     let v = Value::of_literal(
@@ -456,10 +456,10 @@ const fn dec_bound(n: i64, exp: i8, up: bool, format: FloatFormat) -> (bool, u12
     );
     let parts = float_parts(&v, format);
     // |x| is in [lo, hi]: rounding up a negative value is rounding its magnitude down
-    let bits = if up != parts.neg {
-        parts.hi()
-    } else {
+    let bits = if up == parts.neg {
         parts.lo
+    } else {
+        parts.hi()
     };
     (parts.neg && bits != 0, bits)
 }

@@ -62,6 +62,10 @@ enum Rounded<T> {
     reason = "products of 64-bit halves fit u128; mid is at most 3 · (2⁶⁴ − 1); hi is the exact high half of a \
               product that fits 256 bits"
 )]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable; u64::MAX widens into u128 exactly"
+)]
 const fn mul_wide(a: u128, b: u128) -> (u128, u128) {
     const MASK: u128 = u64::MAX as u128;
     let (a1, a0) = (a >> 64, a & MASK);
@@ -192,7 +196,8 @@ impl Quotient {
     )]
     #[expect(
         clippy::cast_sign_loss,
-        reason = "s and -s are taken where non-negative"
+        clippy::cast_possible_truncation,
+        reason = "s and -s are taken where non-negative, and are at most 256"
     )]
     #[expect(
         clippy::as_conversions,
@@ -310,7 +315,7 @@ impl Quotient {
         clippy::as_conversions,
         reason = "the biased exponent field is checked to be in 0..=2 · max_exp"
     )]
-    fn to_float(&self, f: Format, r: Rounding) -> (Rounded<u64>, bool) {
+    fn to_float(self, f: Format, r: Rounding) -> (Rounded<u64>, bool) {
         let sign = if self.neg { 1u64 << f.sign } else { 0 };
         if self.m == 0 {
             return (Rounded::Value(sign), true);
@@ -344,7 +349,7 @@ impl Quotient {
         clippy::arithmetic_side_effects,
         reason = "m < 2¹²⁸ cut by at least 1 bit is below 2¹²⁷, so kept + 1 fits"
     )]
-    fn to_int(&self, r: Rounding) -> (Rounded<i128>, bool) {
+    fn to_int(self, r: Rounding) -> (Rounded<i128>, bool) {
         if self.m == 0 {
             return (Rounded::Value(0), true);
         }
@@ -496,7 +501,11 @@ mod tests {
     fn f64_to_f32_rounds_by_mode() {
         let x = 0.1f64;
         let near = f32_of(Repr::Float(x), ONE, Rounding::NearestEven).unwrap();
-        #[expect(clippy::cast_possible_truncation, reason = "the reference rounding")]
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            reason = "the reference rounding"
+        )]
         let nearest = x as f32;
         assert_eq!(near, (nearest, false));
         let down = f32_of(Repr::Float(x), ONE, Rounding::Floor).unwrap().0;

@@ -471,7 +471,9 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
 
 impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// The same value in scale `P2` and storage `T2`, if that is exact: `None` when it is not a whole number of
-    /// `P2` for an integer `T2`, or doesn't fit `T2`. Floats are scaled.
+    /// `P2` for an integer `T2`, not a float of a float `T2` (1 ms is 0.001 s, and 0.001 is no `f64`), or doesn't fit
+    /// `T2` (past a float's range too: never infinity). A float on either side is worked exactly from its bits, never
+    /// by a float multiply; [to_rounded](Self::to_rounded) takes the nearest float, or the one a [Rounding] names.
     ///
     /// The factor `P / P2` is worked out at compile time, so a conversion costs what the same multiply and divide
     /// by constants written by hand cost (nothing between equal scales: `Milli` to `Pow10<-3>`). Between integer
@@ -491,7 +493,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     ///     /// Steps of π rad.
     ///     struct PiSteps = "", Exact(1 / 1, pi 1);
     /// }
-    /// // π is not a fraction of integers: in an integer storage that is a compile error, in a float it scales
+    /// // π is not a fraction of integers: no value but 0 converts exactly, in any storage (round with to_rounded)
     /// let _ = Fixed::<Radian, PiSteps, i32>::new(1).to::<One, i32>();
     /// ```
     #[inline(always)]
@@ -522,13 +524,26 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// radians and degrees, ln 2, ln 10, a half exponent) is allowed here, unlike in `to`: it is multiplied as its
     /// 64-bit fixed point ([Magnitude::fixed_point]), within 2⁻⁶⁴ of the factor, so the result is the correctly
     /// rounded one except where the true value lies within `|x| · 2⁻⁶⁴` of a rounding step, and then one step off.
-    /// With a float on either side the float result is rounded.
+    ///
+    /// Into a float storage the same: the exact value rounded once by `r` to a float (subnormals included), the
+    /// float's own bits worked exactly where it is the source. `None` past the float's largest finite value, as past
+    /// an integer's end, whatever the mode.
+    ///
+    /// ```
+    /// use exact_units::{Fixed, Rounding, prefix::{Milli, One}, units::Volt};
+    ///
+    /// let mv: Fixed<Volt, Milli, i32> = Fixed::new(1);
+    /// let v = |r| mv.to_rounded::<One, f64>(r).map(Fixed::get);
+    /// assert_eq!(v(Rounding::NearestEven), Some(0.001));
+    /// assert_eq!(v(Rounding::Floor), Some(0.001f64.next_down())); // 0.001 is no f64: the one below
+    /// ```
     #[inline(always)]
     pub fn to_rounded<P2: FixedScale, T2: Storage>(self, r: Rounding) -> Option<Fixed<U, P2, T2>> {
         self.requantize(r, Overflow::Checked)
     }
 
-    /// As [to_rounded](Self::to_rounded), at the nearest end of `T2` where it doesn't fit (a `NaN` float is 0).
+    /// As [to_rounded](Self::to_rounded), at the nearest end of `T2` where it doesn't fit (a float's largest finite
+    /// value; a `NaN` float into an integer is 0).
     #[inline(always)]
     pub fn to_saturating<P2: FixedScale, T2: Storage>(self, r: Rounding) -> Fixed<U, P2, T2> {
         let c = const { Conversion::of::<P, P2, T, T2>(true) };
@@ -539,7 +554,8 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     }
 
     /// As [to_rounded](Self::to_rounded), modulo 2^bits of `T2` where it doesn't fit (two's complement for a signed
-    /// `T2`; a `NaN` or infinite float is 0).
+    /// `T2`; a `NaN` or infinite float, and a value past ±2¹²⁷, is 0). A float `T2` has no modulo: past its range it is
+    /// ±∞.
     #[inline(always)]
     pub fn to_wrapping<P2: FixedScale, T2: Storage>(self, r: Rounding) -> Fixed<U, P2, T2> {
         let c = const { Conversion::of::<P, P2, T, T2>(true) };

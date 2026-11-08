@@ -635,10 +635,6 @@ impl Requantizer {
     }
 
     /// `x` converted, as [requantize] does.
-    #[expect(
-        clippy::float_cmp,
-        reason = "a float is whole when it equals its integer exactly"
-    )]
     pub fn apply(&self, x: Repr) -> Option<Repr> {
         if !self.to_valid {
             return None;

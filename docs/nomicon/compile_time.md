@@ -38,9 +38,9 @@ A division by a constant compiles to a multiply by its inverse on most targets.
 The decisions sit in `const { .. }` blocks inside generic functions. A panic there stops the build at the place the conversion is written, for that pair of types only:
 
 ```text
-error[E0080]: evaluation panicked: an integer Fixed converts by a fraction of integers only: this factor has a
-              power of π, ln 2 or ln 10 or a half exponent (convert through a float storage, or round with
-              to_rounded)
+error[E0080]: evaluation panicked: an exact conversion is by a fraction of integers only: this factor has a
+              power of π, ln 2 or ln 10 or a half exponent, so no value but 0 converts exactly (round with
+              to_rounded or convert_rounded)
 note: the above error was encountered while instantiating
       `fn Fixed::<Degree, Centi, i32>::convert::<Radian, Micro, i32>`
 ```

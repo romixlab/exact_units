@@ -16,6 +16,8 @@ mod damping;
 mod exact;
 #[cfg(not(kani))]
 mod exact_text;
+#[cfg(not(any(kani, fuzzing)))]
+mod float_conv;
 mod format;
 #[cfg(feature = "levels")]
 mod level;
