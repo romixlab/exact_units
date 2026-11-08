@@ -15,9 +15,9 @@ use exact_units::origins::Celsius;
 use exact_units::prefix::{Centi, Milli, One};
 use exact_units::units::{Kelvin, Ratio, Sample, Volt};
 use exact_units::{
-    Complex, Counted, Dim, Fixed, FullScaleBits, Index, IndexFrom1, Irrational, Magnitude, Offset,
-    Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, SIExpr, SIExprOwned, Seq, UnitDef,
-    UnitDefOwned, tree,
+    CompactError, Complex, Counted, Dim, Fixed, FullScaleBits, Index, IndexFrom1, Irrational,
+    Magnitude, Offset, Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, SIExpr, SIExprOwned,
+    Seq, UnitDef, UnitDefOwned, UnitTable, tree,
 };
 use shrink_wrap::max_size::MaxSize;
 use shrink_wrap::prelude::*;
@@ -250,6 +250,10 @@ pub(crate) enum Expr {
     Known(u16),
     /// A named unit of its own: a name, a symbol, its exponents of s, m and kg, and a power of ten.
     Own(String, String, [i8; 3], i8),
+    /// A reference to one of the crate's named units, by its place in `units::ALL`.
+    KnownRef(u16),
+    /// A reference no table lists: a crate and a name.
+    Ref(String, String),
     /// A product.
     Mul(Box<Expr>, Box<Expr>),
     /// A quotient.
@@ -264,7 +268,7 @@ impl Expr {
     /// The nodes on the longest path from the root to a named unit.
     fn depth(&self) -> usize {
         match self {
-            Expr::Known(_) | Expr::Own(..) => 1,
+            Expr::Known(_) | Expr::Own(..) | Expr::KnownRef(_) | Expr::Ref(..) => 1,
             Expr::Mul(a, b) | Expr::Div(a, b) => 1 + a.depth().max(b.depth()),
             Expr::Pow(a, _) | Expr::Sqrt(a) => 1 + a.depth(),
         }
@@ -272,15 +276,21 @@ impl Expr {
 
     /// The unit as an owned `SIExpr`.
     fn build(&self) -> SIExprOwned {
+        let known = |i: u16| {
+            let all = exact_units::units::ALL;
+            let Some(exact_units::UnitExpr::Named(def)) = all.get(usize::from(i) % all.len())
+            else {
+                panic!("ALL holds named units")
+            };
+            **def
+        };
         match self {
-            Expr::Known(i) => {
-                let all = exact_units::units::ALL;
-                let Some(exact_units::UnitExpr::Named(def)) = all.get(usize::from(*i) % all.len())
-                else {
-                    panic!("ALL holds named units")
-                };
-                SIExprOwned::Def((**def).into())
-            }
+            Expr::Known(i) => SIExprOwned::Def(known(*i).into()),
+            Expr::KnownRef(i) => SIExprOwned::Ref(known(*i).id.into()),
+            Expr::Ref(crate_name, name) => SIExprOwned::Ref(exact_units::MarkerIdOwned {
+                crate_name: crate_name.clone(),
+                name: name.clone(),
+            }),
             Expr::Own(name, symbol, [s, m, kg], p10) => SIExprOwned::Def(UnitDefOwned {
                 id: exact_units::MarkerIdOwned {
                     crate_name: "props".into(),
@@ -331,13 +341,74 @@ pub(crate) fn si_expr(e: &Expr) {
     let borrowed = SIExpr::from_ww_bytes(&bytes).expect("decodes");
     walk(&borrowed);
     walk_owned(&owned);
+    compact(&owned, &borrowed, e.depth());
+}
+
+/// The nodes of a tree.
+fn nodes(e: &SIExprOwned) -> usize {
+    match e {
+        SIExprOwned::Ref(_) | SIExprOwned::Def(_) => 1,
+        SIExprOwned::Mul(a, b) | SIExprOwned::Div(a, b) => 1 + nodes(a) + nodes(b),
+        SIExprOwned::Pow(a, _) | SIExprOwned::Sqrt(a) => 1 + nodes(a),
+    }
+}
+
+/// A tree compacted against `units::TABLE` is the same unit: the same dimension, magnitude and symbol through the
+/// table, and the same tree once resolved again; owned and borrowed alike. Nothing conflicts (the crate's own
+/// definitions, and units of the crate `props`), so only a tree deeper than `MAX_UNIT_DEPTH` is refused.
+#[expect(clippy::expect_used, reason = "a property fails by panicking")]
+fn compact(owned: &SIExprOwned, borrowed: &SIExpr<'_>, depth: usize) {
+    let table = &exact_units::units::TABLE;
+    let within = depth <= exact_units::MAX_UNIT_DEPTH;
+    let compacted = match owned.compact(table) {
+        Ok(c) => c,
+        Err(err) => {
+            assert!(
+                !within && err == CompactError::TooDeep,
+                "{depth} deep: {err:?}"
+            );
+            return;
+        }
+    };
+    assert!(within, "{depth} deep, compacts");
+    assert_eq!(compacted.dim(table), owned.dim(table));
+    assert_eq!(compacted.magnitude(table), owned.magnitude(table));
+    assert_eq!(compacted.to_string(), owned.to_string());
+    assert!(compacted.same(owned, table));
+    assert_eq!(
+        compacted.resolve(table).expect("resolves"),
+        owned.resolve(table).expect("resolves")
+    );
+    // nothing left to compact
+    assert_eq!(compacted.compact(table).expect("compacts"), compacted);
+
+    let mut arena = vec![None; nodes(owned)];
+    let small = borrowed.compact_in(table, &mut arena).expect("compacts");
+    assert_eq!(SIExprOwned::from(&small), compacted);
+    assert_eq!(small.dim(table), compacted.dim(table));
+    let mut again = vec![None; nodes(owned)];
+    let resolved = small.resolve_in(table, &mut again).expect("resolves");
+    assert_eq!(
+        SIExprOwned::from(&resolved),
+        owned.resolve(table).expect("resolves")
+    );
 }
 
 /// Every walk of a decoded unit; its owned form is cut at `MAX_UNIT_DEPTH` levels however deep the bytes.
 fn walk(e: &SIExpr<'_>) {
-    let _ = (e.to_string(), e.name().to_string(), e.symbol().to_string());
-    let _ = (e.dim(), e.factor(), e.magnitude(), e.known());
+    let table = &exact_units::units::TABLE;
+    let _ = (
+        e.to_string(),
+        e.name().to_string(),
+        e.symbol(table).to_string(),
+    );
+    let _ = (e.dim(table), e.factor(table), e.magnitude(table), e.known());
+    let _ = (e.dim(&()), e.symbol(&()).to_string(), e.same(e, table));
     let _ = (tree::is_ratio(e), tree::same(e, e));
+    let mut arena = [const { None }; 8];
+    let _ = e.compact_in(table, &mut arena).map(|c| c.to_string());
+    let mut arena = [const { None }; 8];
+    let _ = e.resolve_in(table, &mut arena).map(|c| c.to_string());
     let owned = SIExprOwned::from(e);
     let _ = owned.to_string();
     let depth = owned_depth(&owned);
@@ -350,7 +421,7 @@ fn walk(e: &SIExpr<'_>) {
 /// The nodes on the longest path from the root of an owned tree to a named unit.
 fn owned_depth(e: &SIExprOwned) -> usize {
     match e {
-        SIExprOwned::Def(_) => 1,
+        SIExprOwned::Ref(_) | SIExprOwned::Def(_) => 1,
         SIExprOwned::Mul(a, b) | SIExprOwned::Div(a, b) => 1 + owned_depth(a).max(owned_depth(b)),
         SIExprOwned::Pow(a, _) | SIExprOwned::Sqrt(a) => 1 + owned_depth(a),
     }
@@ -358,8 +429,40 @@ fn owned_depth(e: &SIExprOwned) -> usize {
 
 /// Every walk of an owned unit.
 fn walk_owned(e: &SIExprOwned) {
-    let _ = e.to_string();
+    let table = &exact_units::units::TABLE;
+    let _ = (e.to_string(), e.symbol(table).to_string());
     let _ = (tree::dim(&e), tree::factor(&e), tree::magnitude(&e));
+    let _ = (e.dim(table), e.factor(table), e.magnitude(table), e.known());
+    let _ = (e.compact(table), e.resolve(table));
+}
+
+/// Bytes from outside as a definition and a unit tree: the tree walks against a table that lists the definition
+/// before the crate's units, and compacts and resolves through it without a panic; what compacts is the same unit
+/// through that table (dimension, magnitude, `same`), and resolves back to what the tree resolves to.
+pub(crate) fn tree_against_table(def_bytes: &[u8], expr_bytes: &[u8]) {
+    let (Ok(def), Ok(e)) = (
+        UnitDef::from_ww_bytes(def_bytes),
+        SIExpr::from_ww_bytes(expr_bytes),
+    ) else {
+        return;
+    };
+    let tables: [&dyn UnitTable; 2] = [&def, &exact_units::units::TABLE];
+    let _ = (e.symbol(&tables).to_string(), e.factor(&tables));
+    let _ = (tables.unit(def.id), e.same(&e, &tables));
+    let mut arena = [const { None }; 16];
+    let Ok(compact) = e.compact_in(&tables, &mut arena) else {
+        return;
+    };
+    assert_eq!(compact.dim(&tables), e.dim(&tables), "{e:?}");
+    assert_eq!(compact.magnitude(&tables), e.magnitude(&tables), "{e:?}");
+    assert!(compact.same(&e, &tables), "{e:?}");
+    let (mut a, mut b) = ([const { None }; 16], [const { None }; 16]);
+    if let (Ok(x), Ok(y)) = (
+        compact.resolve_in(&tables, &mut a),
+        e.resolve_in(&tables, &mut b),
+    ) {
+        assert_eq!(SIExprOwned::from(&x), SIExprOwned::from(&y), "{e:?}");
+    }
 }
 
 /// Bytes from outside, as the type `which` picks: an error or a value that round-trips, and a decoded unit walks.
@@ -448,21 +551,13 @@ pub(crate) fn any_bytes(which: u8, bytes: &[u8]) {
 mod tests {
     use super::Expr;
     use crate::strategy;
+    use exact_units::SIExprOwned;
     use proptest::collection::vec;
     use proptest::prelude::*;
+    use shrink_wrap::prelude::*;
 
     fn expr() -> impl Strategy<Value = Expr> {
-        let leaf = prop_oneof![
-            any::<u16>().prop_map(Expr::Known),
-            (
-                "[A-Za-zµ°Ω]{0,8}",
-                "[A-Za-zµ°Ω/]{0,4}",
-                any::<[i8; 3]>(),
-                any::<i8>()
-            )
-                .prop_map(|(n, s, d, p)| Expr::Own(n, s, d, p)),
-        ];
-        leaf.prop_recursive(8, 64, 2, |inner| {
+        expr_leaf().prop_recursive(8, 64, 2, |inner| {
             prop_oneof![
                 (inner.clone(), inner.clone())
                     .prop_map(|(a, b)| Expr::Mul(Box::new(a), Box::new(b))),
@@ -472,6 +567,22 @@ mod tests {
                 inner.prop_map(|a| Expr::Sqrt(Box::new(a))),
             ]
         })
+    }
+
+    /// A named unit: one of the crate's, of its own, or a reference.
+    fn expr_leaf() -> impl Strategy<Value = Expr> {
+        prop_oneof![
+            any::<u16>().prop_map(Expr::Known),
+            any::<u16>().prop_map(Expr::KnownRef),
+            ("[a-z_]{0,6}", "[A-Za-z]{0,6}").prop_map(|(k, n)| Expr::Ref(k, n)),
+            (
+                "[A-Za-zµ°Ω]{0,8}",
+                "[A-Za-zµ°Ω/]{0,4}",
+                any::<[i8; 3]>(),
+                any::<i8>()
+            )
+                .prop_map(|(n, s, d, p)| Expr::Own(n, s, d, p)),
+        ]
     }
 
     /// Counted bases from a few names, so equal and sorted ones come up.
@@ -490,6 +601,7 @@ mod tests {
         for depth in [32, 33, 124, 125, 126, 127, 128, 129, 200] {
             for leaf in [
                 Expr::Known(0),
+                Expr::KnownRef(3),
                 Expr::Own("Rpm".into(), "rpm".into(), [1, -2, 3], -3),
             ] {
                 let mut e = leaf.clone();
@@ -547,6 +659,23 @@ mod tests {
         #[test]
         fn bytes(which: u8, bytes in vec(any::<u8>(), 0..64)) {
             super::any_bytes(which, &bytes);
+        }
+
+        /// A definition of its own or one of the crate's under a changed symbol, against a tree of such units.
+        #[test]
+        fn tables(def in expr_leaf(), symbol in "[a-z]{0,2}", e in expr()) {
+            let def = match def.build() {
+                SIExprOwned::Def(mut d) => {
+                    if !symbol.is_empty() {
+                        d.names.symbol = symbol;
+                    }
+                    d
+                }
+                _ => return Ok(()),
+            };
+            let def_bytes = def.to_ww_bytes_owned().expect("encodes");
+            let expr_bytes = e.build().to_ww_bytes_owned().expect("encodes");
+            super::tree_against_table(&def_bytes, &expr_bytes);
         }
     }
 }

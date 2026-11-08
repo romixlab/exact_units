@@ -61,6 +61,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "unit_table"
+path = "fuzz_targets/unit_table.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "wire_values"
 path = "fuzz_targets/wire_values.rs"
 test = false

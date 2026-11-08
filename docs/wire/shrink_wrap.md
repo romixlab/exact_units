@@ -99,8 +99,36 @@ A configurable sensor channel has a unit chosen at run time. It travels as an `S
 use exact_units::{SIExpr, units::Volt};
 
 let unit = SIExpr::of::<Volt>();
-assert_eq!(unit.symbol().to_string(), "V");
+assert_eq!(unit.to_string(), "V");
 ```
+
+A named unit in the tree is a leaf of one of two kinds:
+
+- `Def`: the whole `UnitDef` (identity, symbol, dimension, scale). It reads alone, on any device. `SIExpr::of` gives these.
+- `Ref`: the unit's identity alone, a `MarkerId { crate_name, name }`. It reads through a `UnitTable` that lists the unit: this crate's `units::TABLE`, a crate's `unit! { @table .. }` list, or the API model a client already has.
+
+The identity is the crate and the marker's name, so two crates' `Rpm` are two units that print the same. A reference names a unit by that identity and not by its place in a table, so it means the same unit in every table that lists it.
+
+`compact_in` turns each `Def` a table lists into a `Ref`, the short form a value sent beside its API carries; `resolve_in` turns them back. Without alloc, the nodes they rebuild go into an arena the caller gives; the owned form has `compact` and `resolve`. A `Def` whose identity the table lists with another definition is refused: two units under one name.
+
+```rust
+# #[cfg(all(feature = "time", feature = "mechanical"))] {
+use exact_units::{SIExpr, units::{self, Meter, Per, Second}};
+
+let speed = SIExpr::of::<Per<Meter, Second>>();
+let mut arena = [const { None }; 2];
+let short = speed.compact_in(&units::TABLE, &mut arena).unwrap();
+// the same unit through the table, written the same
+assert!(short.same(&speed, &units::TABLE));
+assert_eq!(short.dim(&units::TABLE), speed.dim(&()));
+assert_eq!(short.symbol(&units::TABLE).to_string(), "m/s");
+// without a table that lists them, references have no dimension: a conversion over them refuses
+assert_eq!(short.dim(&()), None);
+assert_eq!(short.symbol(&()).to_string(), "Meter/Second");
+# }
+```
+
+Every walk takes the table: `dim`, `factor`, `magnitude`, `symbol` and `same`. `Display` reads through `units::TABLE`, so this crate's units print by their symbols anywhere.
 
 ## Bit fields
 

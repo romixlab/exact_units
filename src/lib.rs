@@ -131,17 +131,17 @@ pub use point::{
     AmbientPressure, Linear, Modulo, Modulus, Offset, Origin, OriginDef, Point, PointArith,
     PointDiff, Reference, UnitZero, origins,
 };
-#[cfg(feature = "shrink_wrap")]
-pub use si_expr::SIExpr;
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use si_expr::SIExprOwned;
+#[cfg(feature = "shrink_wrap")]
+pub use si_expr::{CompactError, SIExpr};
 pub use si_prefix::{FullScaleBits, Pow2Exp, Pow10Exp, Prefix, PrefixDecimal, PrefixRatio};
 pub use tree::MAX_UNIT_DEPTH;
 #[doc(hidden)]
 pub use unit::exp as __dim_exp;
 pub use unit::{
     Counted, Dim, MAX_COUNTED, MarkerId, Provenance, Unit, UnitDef, UnitDiv, UnitExpr, UnitMul,
-    UnitNames,
+    UnitNames, UnitTable,
 };
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use unit::{

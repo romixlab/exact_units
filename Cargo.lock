@@ -115,6 +115,8 @@ dependencies = [
  "num-rational",
  "postcard",
  "proptest",
+ "rpm_a",
+ "rpm_b",
  "serde",
  "serde_json",
  "shrink_wrap",
@@ -317,6 +319,20 @@ name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
+
+[[package]]
+name = "rpm_a"
+version = "0.0.0"
+dependencies = [
+ "exact_units",
+]
+
+[[package]]
+name = "rpm_b"
+version = "0.0.0"
+dependencies = [
+ "exact_units",
+]
 
 [[package]]
 name = "serde"

@@ -11,7 +11,7 @@
 
 #[cfg(feature = "shrink_wrap")]
 use crate::SIExpr;
-use crate::unit::{Dim, Unit, UnitExpr};
+use crate::unit::{Dim, Unit, UnitDef, UnitExpr, UnitTable};
 use crate::{Kind, MAX_UNIT_DEPTH};
 use core::marker::PhantomData;
 #[cfg(feature = "shrink_wrap")]
@@ -843,6 +843,20 @@ pub fn by_id(id: crate::MarkerId<'_>) -> Option<&'static UnitExpr> {
         return None;
     }
     by_name(id.name)
+}
+
+/// This crate's named units that are enabled, as a [UnitTable]: what [by_id] finds, [ALL] and with `customary` its
+/// units too.
+#[derive(Copy, Clone, Debug)]
+pub struct Table;
+
+/// This crate's own units, the table a run-time `SIExpr` resolves built-in units through.
+pub const TABLE: Table = Table;
+
+impl UnitTable for Table {
+    fn unit(&self, id: crate::MarkerId<'_>) -> Option<UnitDef<'_>> {
+        by_id(id).and_then(UnitExpr::def).copied()
+    }
 }
 
 /// Other spellings text input takes for the named unit `name` (the marker's name, `"Nit"`), next to the symbol it is

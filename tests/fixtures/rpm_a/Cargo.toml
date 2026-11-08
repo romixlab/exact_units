@@ -1,0 +1,13 @@
+[package]
+name = "rpm_a"
+version = "0.0.0"
+description = "A test fixture of exact_units: a crate with a unit Rpm of its own, beside another crate's Rpm"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+exact_units = { path = "../../..", default-features = false }
+
+[lints]
+workspace = true

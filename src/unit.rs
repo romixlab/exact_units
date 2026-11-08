@@ -962,6 +962,93 @@ impl UnitDef<'_> {
     }
 }
 
+/// Where the definition of a unit named by its [MarkerId] is found: a run-time [SIExpr](crate::SIExpr)'s `Ref` leaf
+/// resolves through one, and [compact](crate::SIExpr::compact_in) turns a definition a table lists into a `Ref`.
+///
+/// A table is never a global: each walk is given the one it reads. This crate's own units are
+/// [units::TABLE](crate::units::TABLE), a crate's `unit! { @table static UNITS; .. }` list is one (`[&UnitExpr]`), an
+/// API model is one (WireWeaver's schema bundle), and a slice of tables chains them, the first that lists an id
+/// answering:
+///
+/// ```
+/// # #[cfg(feature = "electrical")] {
+/// use exact_units::units::{self, Volt};
+/// use exact_units::{MarkerId, Unit, UnitTable};
+///
+/// exact_units::unit! {
+///     @table
+///     static MINE;
+///     /// Shaft speed in revolutions per minute.
+///     pub struct Rpm = "rpm", [rad 1, s -1], Exact(1 / 30, pi 1);
+/// }
+///
+/// let tables: [&dyn UnitTable; 2] = [&units::TABLE, &MINE];
+/// let volt = tables.unit(MarkerId { crate_name: "exact_units", name: "Volt" });
+/// assert_eq!(volt.as_ref(), Volt::EXPR.def());
+/// let rpm = tables.unit(MarkerId { crate_name: env!("CARGO_CRATE_NAME"), name: "Rpm" });
+/// assert_eq!(rpm.map(|d| d.names.symbol), Some("rpm"));
+/// assert_eq!(tables.unit(MarkerId { crate_name: "other", name: "Rpm" }), None);
+/// # }
+/// ```
+pub trait UnitTable {
+    /// The definition of the unit `id`, `None` when the table doesn't list it.
+    fn unit(&self, id: MarkerId<'_>) -> Option<UnitDef<'_>>;
+}
+
+/// The table that lists nothing: a walk over [SIExpr](crate::SIExpr) whose `Ref` leaves stay unresolved.
+impl UnitTable for () {
+    fn unit(&self, _: MarkerId<'_>) -> Option<UnitDef<'_>> {
+        None
+    }
+}
+
+impl<T: UnitTable + ?Sized> UnitTable for &T {
+    fn unit(&self, id: MarkerId<'_>) -> Option<UnitDef<'_>> {
+        (**self).unit(id)
+    }
+}
+
+/// Tables chained: the first that lists `id` answers.
+impl<T: UnitTable> UnitTable for [T] {
+    fn unit(&self, id: MarkerId<'_>) -> Option<UnitDef<'_>> {
+        self.iter().find_map(|t| t.unit(id))
+    }
+}
+
+/// Tables chained, like the slice.
+impl<T: UnitTable, const N: usize> UnitTable for [T; N] {
+    fn unit(&self, id: MarkerId<'_>) -> Option<UnitDef<'_>> {
+        self.as_slice().unit(id)
+    }
+}
+
+/// A definition is the table of its own unit.
+impl UnitTable for UnitDef<'_> {
+    fn unit(&self, id: MarkerId<'_>) -> Option<UnitDef<'_>> {
+        (self.id == id).then_some(*self)
+    }
+}
+
+/// The named units of the tree: `Per<Rpm, Second>` lists `Rpm` and `Second`.
+impl UnitTable for UnitExpr {
+    fn unit(&self, id: MarkerId<'_>) -> Option<UnitDef<'_>> {
+        // a UnitExpr of a type is at most MAX_UNIT_DEPTH deep (Unit::DEPTH); one built by hand is followed as far
+        fn find(e: &UnitExpr, id: MarkerId<'_>, depth: usize) -> Option<UnitDef<'static>> {
+            let d = depth
+                .checked_add(1)
+                .filter(|d| *d <= crate::MAX_UNIT_DEPTH)?;
+            match *e {
+                UnitExpr::Named(def) => (def.id == id).then_some(*def),
+                UnitExpr::Mul(a, b) | UnitExpr::Div(a, b) => {
+                    find(a, id, d).or_else(|| find(b, id, d))
+                }
+                UnitExpr::Pow(a, _) | UnitExpr::Sqrt(a) => find(a, id, d),
+            }
+        }
+        find(self, id, 0)
+    }
+}
+
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 mod owned_defs {
     use super::{

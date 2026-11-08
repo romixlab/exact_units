@@ -29,8 +29,8 @@
 //! assert_eq!(tree::dim(&&u), None);
 //! ```
 
-use crate::Magnitude;
 use crate::unit::{Dim, write_superscript};
+use crate::{Magnitude, MarkerId, UnitTable};
 use crate::{Prefix, UnitExpr};
 use core::fmt;
 
@@ -69,9 +69,10 @@ pub const MAX_UNIT_DEPTH: usize = 32;
 #[derive(Debug)]
 pub enum Node<'a, E> {
     /// A named unit. `dim` and `scale` are `None` for a unit known by its name only (a user's marker that a client
-    /// sees in introspection data): it is shown by name, without a dimension or a conversion to SI.
+    /// sees in introspection data, an [SIExpr](crate::SIExpr)'s `Ref` leaf): it is shown by name, without a dimension
+    /// or a conversion to SI. With its crate it is a reference by [MarkerId], which [Resolved] looks up in a table.
     Named {
-        /// The crate that declares the marker ([MarkerId](crate::MarkerId)), `None` for a unit a client knows by
+        /// The crate that declares the marker ([MarkerId]), `None` for a unit a client knows by
         /// name only.
         crate_name: Option<&'a str>,
         /// The marker's name: `Volt`.
@@ -141,6 +142,12 @@ pub(crate) fn name_of<'t, E: Tree<'t>>(e: E) -> impl fmt::Display {
     Show(e, write_name)
 }
 
+/// [symbol] of a tree held by value, for an `impl Display` that outlives the call.
+#[cfg(feature = "shrink_wrap")]
+pub(crate) fn symbol_of<'t, E: Tree<'t>>(e: E) -> impl fmt::Display {
+    Show(e, |e, f, depth| write_symbol(e, f, depth))
+}
+
 /// SI exponents of the whole tree; `None` when an exponent leaves -8..=7, a part is known by name only or doesn't
 /// decode, or the tree is deeper than [MAX_UNIT_DEPTH].
 pub fn dim<'t, E: Tree<'t>>(e: &E) -> Option<Dim<'t>> {
@@ -172,6 +179,70 @@ impl Tree<'static> for &UnitExpr {
             UnitExpr::Pow(a, n) => Node::Pow(a, n),
             UnitExpr::Sqrt(a) => Node::Sqrt(a),
         })
+    }
+}
+
+/// A tree whose leaves known by name only are looked up in a table: a leaf with its crate and no dimension (an
+/// [SIExpr](crate::SIExpr)'s `Ref`) that the table lists walks as the table's definition, one it doesn't list stays
+/// known by name only. Every walk here reads it like any other tree.
+///
+/// ```
+/// # #[cfg(all(feature = "shrink_wrap", feature = "electrical"))] {
+/// use exact_units::tree::{self, Resolved};
+/// use exact_units::units::{self, Volt};
+/// use exact_units::{SIExpr, Unit};
+///
+/// let id = Volt::EXPR.def().unwrap().id;
+/// let r = SIExpr::Ref(id);
+/// assert_eq!(tree::dim(&r), None);
+/// assert_eq!(tree::symbol(&r).to_string(), "Volt");
+/// assert_eq!(tree::dim(&Resolved::new(r.clone(), &units::TABLE)), Some(Volt::DIM));
+/// assert_eq!(tree::symbol(&Resolved::new(r, &units::TABLE)).to_string(), "V");
+/// # }
+/// ```
+#[derive(Debug)]
+pub struct Resolved<'a, E, T: ?Sized> {
+    tree: E,
+    table: &'a T,
+}
+
+impl<'a, E, T: ?Sized> Resolved<'a, E, T> {
+    /// `tree` with its references looked up in `table`.
+    pub const fn new(tree: E, table: &'a T) -> Self {
+        Resolved { tree, table }
+    }
+}
+
+impl<E: Clone, T: ?Sized> Clone for Resolved<'_, E, T> {
+    fn clone(&self) -> Self {
+        Resolved {
+            tree: self.tree.clone(),
+            table: self.table,
+        }
+    }
+}
+
+impl<'a, E: Tree<'a>, T: UnitTable + ?Sized> Tree<'a> for Resolved<'a, E, T> {
+    fn node(&self) -> Option<Node<'a, Self>> {
+        let table = self.table;
+        let node = self.tree.node()?;
+        if let Node::Named {
+            crate_name: Some(crate_name),
+            name,
+            dim: None,
+            ..
+        } = node
+            && let Some(def) = table.unit(MarkerId { crate_name, name })
+        {
+            return Some(Node::Named {
+                crate_name: Some(def.id.crate_name),
+                name: def.id.name,
+                symbol: def.names.symbol,
+                dim: Some(def.dim),
+                scale: Some(def.scale),
+            });
+        }
+        Some(node.map(|tree| Resolved { tree, table }))
     }
 }
 

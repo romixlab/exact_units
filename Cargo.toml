@@ -24,7 +24,8 @@ exclude = [
 ]
 
 [workspace]
-members = ["macros"]
+# the fixtures are crates of their own for tests/two_crates.rs, not published
+members = ["macros", "tests/fixtures/rpm_a", "tests/fixtures/rpm_b"]
 
 [workspace.lints.rust]
 unsafe_code = "deny"
@@ -181,6 +182,9 @@ num-rational = { version = "0.4.2", default-features = false, features = ["num-b
 # serde round trips (tests/serde.rs, tests/props) and arbitrary text into the serde impls (tests/props/serde_input.rs):
 # a binary format without alloc and JSON
 postcard = { version = "1.1", default-features = false }
+# two crates with a unit `Rpm` each: one name, two units (tests/two_crates.rs)
+rpm_a = { path = "tests/fixtures/rpm_a" }
+rpm_b = { path = "tests/fixtures/rpm_b" }
 serde_json = { version = "1.0", default-features = false, features = ["float_roundtrip", "std"] }
 trybuild = "1.0.122"
 
@@ -192,6 +196,11 @@ proptest = { version = "1.12", default-features = false, features = ["std"] }
 [[test]]
 name = "dynamic"
 required-features = ["shrink_wrap"]
+
+# two crates' Rpm: references by identity, resolved through a table that lists both
+[[test]]
+name = "two_crates"
+required-features = ["shrink_wrap", "std"]
 
 [[test]]
 name = "series"

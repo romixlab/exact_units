@@ -181,7 +181,7 @@ fn named_bytes() {
     assert_eq!(back.known(), Some(<units::Volt as Unit>::EXPR));
     assert_eq!(back.to_string(), "V");
     assert_eq!(back.name().to_string(), "Volt");
-    assert_eq!(back.dim(), Some(<units::Volt as Unit>::DIM));
+    assert_eq!(back.dim(&()), Some(<units::Volt as Unit>::DIM));
 }
 
 #[test]
@@ -190,7 +190,7 @@ fn compound_round_trip() {
     let si = <Viscous as Unit>::SI_EXPR;
     let bytes = si.to_ww_bytes(&mut buf).unwrap().to_vec();
     assert_eq!(bytes.len(), 85);
-    assert_eq!(&bytes[..2], [0x20, 0x00]);
+    assert_eq!(&bytes[..2], [0x30, 0x00]);
     let back = SIExpr::from_ww_bytes(&bytes).unwrap();
     assert_eq!(&back, si);
     assert_eq!(back, *<Viscous as Unit>::EXPR);
@@ -199,14 +199,14 @@ fn compound_round_trip() {
     assert_eq!(back.to_string(), <Viscous as Unit>::EXPR.to_string());
     assert_eq!(back.to_string(), "N·m/(rad/s)");
     assert_eq!(back.name().to_string(), "Per<Torque, AngularVelocity>");
-    assert_eq!(back.dim(), Some(<Viscous as Unit>::DIM));
-    assert_eq!(back.factor(), Some(1.0));
+    assert_eq!(back.dim(&()), Some(<Viscous as Unit>::DIM));
+    assert_eq!(back.factor(&()), Some(1.0));
 
     type Fan = Per<Torque, Times<AngularVelocity, AngularVelocity>>;
     let fan = SIExpr::from_ww_bytes(<Fan as Unit>::SI_EXPR.to_ww_bytes(&mut buf).unwrap()).unwrap();
     assert_eq!(fan.to_string(), "N·m/((rad/s)·(rad/s))");
     assert_eq!(fan.to_string(), <Fan as Unit>::EXPR.to_string());
-    assert_eq!(fan.dim().unwrap().to_string(), "kg·m²·rad⁻³");
+    assert_eq!(fan.dim(&()).unwrap().to_string(), "kg·m²·rad⁻³");
 
     // a different tree of the same dimension is not the same unit
     assert_ne!(back, *<Fan as Unit>::EXPR);
@@ -250,11 +250,11 @@ fn pow() {
     let back = SIExpr::from_ww_bytes(&bytes).unwrap();
     assert_eq!(back, SPEED_SQ);
     assert_eq!(back.to_string(), "(m/s)²");
-    assert_eq!(back.dim(), Some(SPEED_SQ.dim()));
+    assert_eq!(back.dim(&()), Some(SPEED_SQ.dim()));
     // out of -8..=7 at run time: no dimension, no panic
     let too_big = SIExprOwned::Pow(Box::new(owned), 4);
     let back = too_big.to_ww_bytes_owned().unwrap();
-    assert_eq!(SIExpr::from_ww_bytes(&back).unwrap().dim(), None);
+    assert_eq!(SIExpr::from_ww_bytes(&back).unwrap().dim(&()), None);
 }
 
 #[test]
@@ -265,8 +265,8 @@ fn depth_limit() {
     }
     let bytes = e.to_ww_bytes_owned().unwrap();
     let back = SIExpr::from_ww_bytes(&bytes).unwrap();
-    assert_eq!(back.dim(), None);
-    assert_eq!(back.factor(), None);
+    assert_eq!(back.dim(&()), None);
+    assert_eq!(back.factor(&()), None);
     assert!(back.to_string().contains('…'));
     assert!(back.name().to_string().contains('…'));
     // `==` stops at the depth limit instead of recursing
@@ -292,7 +292,7 @@ fn typed_depth_up_to_the_limit() {
 
     let si = <L32 as Unit>::SI_EXPR;
     assert!(!si.to_string().contains('…'), "{si}");
-    assert_eq!(si.dim(), Some(<L32 as Unit>::DIM));
+    assert_eq!(si.dim(&()), Some(<L32 as Unit>::DIM));
     assert_eq!(*si, *<L32 as Unit>::EXPR);
     let owned = SIExprOwned::from(si);
     let bytes = owned.to_ww_bytes_owned().unwrap();
@@ -307,14 +307,14 @@ fn bad_bytes() {
     let mut bytes = si.to_ww_bytes(&mut buf).unwrap().to_vec();
     bytes[2] = 0xf0; // a Named child's tag turned into an unknown variant
     if let Ok(back) = SIExpr::from_ww_bytes(&bytes) {
-        assert_eq!(back.dim(), None);
+        assert_eq!(back.dim(&()), None);
         let _ = back.to_string();
     }
     for len in 0..bytes.len() {
         if let Ok(back) = SIExpr::from_ww_bytes(&bytes[..len]) {
             let _ = (
-                back.dim(),
-                back.factor(),
+                back.dim(&()),
+                back.factor(&()),
                 back.to_string(),
                 back.name().to_string(),
             );
@@ -408,16 +408,16 @@ fn sqrt_marker() {
     assert!(matches!(back, SIExpr::Div(..)));
     assert_eq!(back, *expr);
     assert_eq!(back.to_string(), "V/√Hz");
-    assert_eq!(back.dim(), Some(dim));
+    assert_eq!(back.dim(&()), Some(dim));
     let owned = SIExprOwned::from(expr);
     assert_eq!(owned.to_ww_bytes_owned().unwrap(), bytes);
     assert_eq!(SIExprOwned::from(&back), owned);
-    // the Sqrt node itself: variant 4 in the first nibble
+    // the Sqrt node itself: variant 5 in the first nibble
     let sqrt = <Sqrt<Hertz> as Unit>::SI_EXPR
         .to_ww_bytes(&mut buf)
         .unwrap()
         .to_vec();
-    assert_eq!(sqrt[0] >> 4, 4, "{sqrt:02x?}");
+    assert_eq!(sqrt[0] >> 4, 5, "{sqrt:02x?}");
 }
 
 /// `prefix` and `unit` as written after a number.
@@ -640,11 +640,15 @@ fn depth_limit_every_node() {
             assert_eq!(owned == *typed, within, "{levels}: {owned}");
             assert_eq!(decoded == *typed, within, "{levels}: {decoded}");
             assert_eq!(tree::same(&decoded, &&owned), within, "{levels}: {decoded}");
-            assert_eq!(decoded.magnitude().is_some(), within, "{levels}: {decoded}");
-            assert_eq!(owned.magnitude().is_some(), within, "{levels}: {owned}");
+            assert_eq!(
+                decoded.magnitude(&()).is_some(),
+                within,
+                "{levels}: {decoded}"
+            );
+            assert_eq!(owned.magnitude(&()).is_some(), within, "{levels}: {owned}");
             assert_eq!(tree::is_ratio(&decoded), within, "{levels}: {decoded}");
-            assert_eq!(decoded.factor().is_some(), within, "{levels}: {decoded}");
-            assert_eq!(decoded.dim().is_some(), within, "{levels}: {decoded}");
+            assert_eq!(decoded.factor(&()).is_some(), within, "{levels}: {decoded}");
+            assert_eq!(decoded.dim(&()).is_some(), within, "{levels}: {decoded}");
             let shown = (decoded.to_string(), decoded.name().to_string());
             assert_eq!(!shown.0.contains('…'), within, "{levels}: {shown:?}");
             assert_eq!(!shown.1.contains('…'), within, "{levels}: {shown:?}");
@@ -737,4 +741,23 @@ fn validate_refuses() {
     let mut buf = [0u8; 128];
     let bytes = counted.to_ww_bytes(&mut buf).unwrap().to_vec();
     assert_eq!(DimOwned::from_ww_bytes_owned(&bytes), Ok(counted.into()));
+}
+
+/// A `Ref` on the wire: the variant, then the identity alone, two strings.
+#[test]
+fn ref_bytes() {
+    let mut buf = [0u8; 64];
+    let id = <units::Volt as Unit>::EXPR.def().unwrap().id;
+    let bytes = SIExpr::Ref(id).to_ww_bytes(&mut buf).unwrap().to_vec();
+    assert_eq!(bytes.first().map(|b| b >> 4), Some(1), "{bytes:02x?}");
+    assert_eq!((bytes.len(), VOLT_BYTES.len()), (18, 31));
+    let back = SIExpr::from_ww_bytes(&bytes).unwrap();
+    assert_eq!(back, SIExpr::Ref(id));
+    assert_eq!(back.known(), Some(<units::Volt as Unit>::EXPR));
+    assert_eq!(back.dim(&units::TABLE), Some(<units::Volt as Unit>::DIM));
+    assert_eq!(back.dim(&()), None);
+    assert_eq!(back.to_string(), "V");
+    let owned = SIExprOwned::from(&back);
+    assert_eq!(owned.to_ww_bytes_owned().unwrap(), bytes);
+    assert_eq!(SIExprOwned::from_ww_bytes_owned(&bytes).unwrap(), owned);
 }
