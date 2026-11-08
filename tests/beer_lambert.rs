@@ -95,7 +95,10 @@ fn coefficient_over_a_path() {
     assert_eq!(tau.convert::<Loss<Neper>, Milli, u32>(), Some(np));
     // 2 AU/cm in AU/m and into μ
     let per_cm = Fixed::<DecadicAttenuation, Hecto, f64>::bounded(2.0);
-    let mu = per_cm.convert::<LinearAttenuation, One, f64>().unwrap();
+    // ln 10 is no fraction: the f64 is a rounding, named
+    let mu = per_cm
+        .convert_rounded::<LinearAttenuation, One, f64>(Rounding::NearestEven)
+        .unwrap();
     assert!((mu.get() - 200.0 * LN_10).abs() < 1e-11);
 }
 

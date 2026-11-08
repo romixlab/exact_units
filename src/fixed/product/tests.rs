@@ -74,7 +74,11 @@ fn powers_of_pi_multiply_exactly() {
     let b = Fixed::<Ratio, PiSteps, i32>::new(3);
     let p = a * b; // 6 π² rad
     assert_eq!(p.get(), 6);
-    let f = p.convert::<Radian, One, f64>().unwrap().get();
+    // no value but 0 of steps of π² is a float: the f64 is a rounding, named
+    let f = p
+        .convert_rounded::<Radian, One, f64>(Rounding::NearestEven)
+        .unwrap()
+        .get();
     assert!((f - 6.0 * PI * PI).abs() < 1e-12);
     // in a float storage the rounding forms scale
     let x: Fixed<_, One, f64> = a.times_into(b, Rounding::Floor).unwrap();

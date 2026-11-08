@@ -84,12 +84,21 @@ assert_eq!(k.convert::<Bit, One, u32>(), Some(Fixed::new(32_768)));
 
 ## Floats
 
-A float storage converts by its factor and rounds as floats do. `f32` and `f64` take every factor, π included:
+A float storage converts by the same rule as an integer one: `to` and `convert` give the value only where it is a float exactly, and `None` otherwise, past the float's range included (never infinity). Most decimal steps are no float: 1 mV is 0.001 V, and 0.001 has no `f64`. The rounding forms take any value into a float: the exact value, worked out from the float's bits and the factor, rounded once by the `Rounding` you name. A factor with π, ln 2 or ln 10 in it has no exact result, so `to` and `convert` across it don't compile; the rounding forms take it as its 64-bit fixed point, as between integers:
 
 ```rust
-use exact_units::{Fixed, prefix::One, units::{Degree, Radian}};
+use exact_units::{Fixed, Rounding, prefix::{Milli, One}, units::{Degree, Radian, Volt}};
+
+let mv = Fixed::<Volt, Milli, i32>::new(1500);
+assert_eq!(mv.to::<One, f64>(), Some(Fixed::<_, _, f64>::bounded(1.5)));
+let one = Fixed::<Volt, Milli, i32>::new(1);
+assert_eq!(one.to::<One, f64>(), None); // 0.001 is no f64
+let down = one.to_rounded::<One, f64>(Rounding::Floor).unwrap();
+assert!(down.get() < 0.001); // the f64 below 0.001, as named
 
 let a: Fixed<Degree, One, f64> = Fixed::<_, _, f64>::bounded(180.0);
-let r = a.convert::<Radian, One, f64>().unwrap();
-assert!((r.get() - core::f64::consts::PI).abs() < 1e-15);
+let r = a.convert_rounded::<Radian, One, f64>(Rounding::NearestEven).unwrap();
+assert_eq!(r.get(), core::f64::consts::PI);
 ```
+
+Past the float's range `to_saturating` gives its largest finite float, `to_wrapping` ±∞ (a float has no modulo). Arithmetic within one float storage is the float's own: `+`, `*` and `/` round as floats do.

@@ -26,7 +26,7 @@
 
 use exact_units::prefix::{Micro, Nano, One};
 use exact_units::units::{Hertz, Per, Sqrt, Volt};
-use exact_units::{Fixed, Unit};
+use exact_units::{Fixed, Rounding, Unit};
 
 exact_units::unit! {
     /// A kilohertz as a unit of its own, so that its square root is one too: √kHz is √1000 · √Hz.
@@ -41,8 +41,11 @@ fn main() {
 
     // the root of a bandwidth is a value in √Hz; the root itself is the float's, the unit is the type's
     let root_bw = Fixed::<Sqrt<Hertz>, One, f32>::bounded(bandwidth.get().sqrt());
-    // nV/√Hz · √Hz is nV: the root cancels like any other exponent, and `convert` checks it does
-    let noise: Fixed<Volt, Micro, f32> = (density * root_bw).convert().unwrap();
+    // nV/√Hz · √Hz is nV: the root cancels like any other exponent, and `convert` checks it does; nV to µV in an
+    // f32 is a division by 1000 that a float holds only now and then, so the rounding is named
+    let noise: Fixed<Volt, Micro, f32> = (density * root_bw)
+        .convert_rounded(Rounding::NearestEven)
+        .unwrap();
     println!("{density} over {bandwidth}: {noise} rms at the input");
     println!(
         "density times the bandwidth itself, as a plain f32: {} µV",
@@ -51,7 +54,9 @@ fn main() {
 
     // the bandwidth written in kHz: its root is in √kHz, and the conversion to √Hz multiplies by √1000
     let root_khz = Fixed::<Sqrt<KiloHertz>, One, f32>::bounded(100.0_f32.sqrt());
-    let same: Fixed<Volt, Micro, f32> = (density * root_khz).convert().unwrap();
+    let same: Fixed<Volt, Micro, f32> = (density * root_khz)
+        .convert_rounded(Rounding::NearestEven)
+        .unwrap();
     println!("the same from √(100 kHz) = {root_khz}: {same}");
     println!(
         "the plain f32 `15 * sqrt(100.0)`: {} nV",

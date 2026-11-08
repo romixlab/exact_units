@@ -80,12 +80,42 @@ fn trunc(x: f32) -> f32 {
     }
 }
 
-/// The f32 bounds of `RangeDec<MIN, MAX, EXP>` are the decimal bounds rounded once to the nearest f32, as Rust's
-/// parser rounds `"{MAX}e{EXP}"`.
+/// The f32 bounds of `RangeDec<MIN, MAX, EXP>` are the floats just inside the decimal bounds, against the exact
+/// decimals: `MIN` at or above `MIN · 10^EXP` and the float below it under it, `MAX` at or below `MAX · 10^EXP` and
+/// the float above it over it. So a float compare against them is the exact compare against the decimals.
+#[cfg(not(any(kani, fuzzing)))]
 pub(crate) fn range_dec_f32<B: Bounds<f32>>(min: i64, max: i64, exp: i8) {
-    let nearest = |m: i64| format!("{m}e{exp}").parse::<f32>().ok();
-    assert_eq!(B::MIN, nearest(min), "MIN {min}e{exp}");
-    assert_eq!(B::MAX, nearest(max), "MAX {max}e{exp}");
+    let (lo, hi) = (B::MIN.expect("a bound"), B::MAX.expect("a bound"));
+    range_dec_check(f64::from(lo), f64::from(lo.next_down()), min, exp, true);
+    range_dec_check(f64::from(hi), f64::from(hi.next_up()), max, exp, false);
+}
+
+/// As [range_dec_f32], for `f64` bounds.
+#[cfg(not(any(kani, fuzzing)))]
+pub(crate) fn range_dec_f64<B: Bounds<f64>>(min: i64, max: i64, exp: i8) {
+    let (lo, hi) = (B::MIN.expect("a bound"), B::MAX.expect("a bound"));
+    range_dec_check(lo, lo.next_down(), min, exp, true);
+    range_dec_check(hi, hi.next_up(), max, exp, false);
+}
+
+/// `bound` on the inner side of `m · 10^exp` (at or above it for a lower bound) and `beyond`, the next float out, on
+/// the outer side, exactly.
+#[cfg(not(any(kani, fuzzing)))]
+fn range_dec_check(bound: f64, beyond: f64, m: i64, exp: i8, lower: bool) {
+    use num_rational::BigRational;
+    let ten = num_bigint::BigInt::from(10).pow(u32::from(exp.unsigned_abs()));
+    let d = if exp >= 0 {
+        BigRational::from_integer(num_bigint::BigInt::from(m) * ten)
+    } else {
+        BigRational::new(m.into(), ten)
+    };
+    let b = BigRational::from_float(bound).expect("a finite bound");
+    let o = BigRational::from_float(beyond).expect("a finite float");
+    if lower {
+        assert!(b >= d && o < d, "MIN {m}e{exp}: {bound}");
+    } else {
+        assert!(b <= d && o > d, "MAX {m}e{exp}: {bound}");
+    }
 }
 
 /// `x` of a scale `P` far below one step of `P2` (`|x| · P / P2 < 1/2` for every `x` of `T`), whatever the factor's
@@ -318,6 +348,12 @@ mod tests {
             #[test]
             fn range_dec_f32_bounds() {
                 $($(super::range_dec_f32::<RangeDec<$min, $max, $exp>>($min, $max, $exp);)*)*
+            }
+
+            /// The same in f64.
+            #[test]
+            fn range_dec_f64_bounds() {
+                $($(super::range_dec_f64::<RangeDec<$min, $max, $exp>>($min, $max, $exp);)*)*
             }
         };
     }

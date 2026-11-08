@@ -22,11 +22,12 @@ mod bounds;
 pub mod prefix;
 mod product;
 pub(crate) use product::{Requant, check as check_product};
+mod exact_float;
 mod rounding;
 mod runtime;
-pub(crate) use rounding::{
-    div_i128 as round_div_i128, round_f64, settle as settle_i128, settle_f64,
-};
+pub(crate) use rounding::{div_i128 as round_div_i128, settle as settle_i128};
+#[cfg(feature = "levels")]
+pub(crate) use rounding::{round_f64, settle_f64};
 pub(crate) mod format;
 mod storage;
 pub(crate) use format::Number;
@@ -598,7 +599,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     ///
     /// ```
     /// # #[cfg(all(feature = "customary", feature = "q"))] {
-    /// use exact_units::{Fixed, q, prefix::{One, Pico}, units::{Newton, PoundForce, Second, Times}};
+    /// use exact_units::{Fixed, Rounding, q, prefix::{One, Pico}, units::{Newton, PoundForce, Second, Times}};
     ///
     /// // 1 lbf·s is 4.4482216152605 N·s exactly
     /// let impulse = Fixed::<Times<PoundForce, Second>, One, i64>::new(2);
@@ -608,8 +609,9 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// );
     /// // 8.896443230521 N·s is not a whole number of N·s
     /// assert_eq!(impulse.convert::<Times<Newton, Second>, One, i64>(), None);
-    /// // in a float it scales
-    /// let f = impulse.convert::<Times<Newton, Second>, One, f64>().unwrap();
+    /// // nor a float: exact refuses it, and a float takes it by a named rounding
+    /// assert_eq!(impulse.convert::<Times<Newton, Second>, One, f64>(), None);
+    /// let f = impulse.convert_rounded::<Times<Newton, Second>, One, f64>(Rounding::NearestEven).unwrap();
     /// assert!(f.is_in(q!(8.8964432305... N*s)));
     /// # }
     /// ```
@@ -654,7 +656,8 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
 
     /// The value `x · scale` (in the unit `U` itself) in this prefix and storage, if it is exact (as [to](Self::to))
     /// and within `B`: how a number with a run-time scale becomes a `Fixed`, `Repr::Int(3)` with `Pow10(-3)` is
-    /// 3000 of `Micro`.
+    /// 3000 of `Micro`. Into a float storage too the value must be a float exactly: `Repr::Int(1)` with `Pow10(-3)`
+    /// into an `f64` of `One` is `None`, 0.001 is no float.
     #[must_use]
     pub fn from_scaled(x: Repr, scale: Magnitude) -> Option<Self> {
         Self::try_new(rescale(x, scale.div(P::SCALE))?).ok()
@@ -1185,15 +1188,10 @@ struct Conversion {
     num128: i128,
     /// The widened multiply in 128 bits (a storage of 64 bits), else in 64.
     wide: bool,
-    /// A float storage on either side: scaled by `num_f / den_f`, or by `factor` when that isn't a fraction of
-    /// integers both floats hold exactly.
+    /// A float storage on either side: worked exactly by [exact_float], never by a float multiply.
     float: bool,
-    exact_f: bool,
-    num_f: f64,
-    den_f: f64,
-    factor: f64,
-    /// Between integer storages, a factor that isn't a fraction of integers as `m · 2^shift`
-    /// ([Magnitude::fixed_point]): only for a rounding conversion.
+    /// A factor that isn't a fraction of integers as `m · 2^shift` ([Magnitude::fixed_point]): only for a rounding
+    /// conversion.
     fixed_point: Option<(u64, i32)>,
 }
 
@@ -1240,17 +1238,17 @@ impl Conversion {
     const fn by<T: Storage, T2: Storage>(m: Magnitude, rounding: bool) -> Self {
         let ratio = m.to_ratio();
         let float = T::IS_FLOAT || T2::IS_FLOAT;
-        let fixed_point = if ratio.is_none() && !float && rounding {
+        let fixed_point = if ratio.is_none() && rounding {
             Some(m.fixed_point())
         } else {
             None
         };
         let (num, den) = match ratio {
             Some(r) => r,
-            None if float || rounding => (1, 1),
+            None if rounding => (1, 1),
             None => panic!(
-                "an integer Fixed converts by a fraction of integers only: this factor has a power of π, ln 2 or \
-                 ln 10 or a half exponent (convert through a float storage, or round with to_rounded)"
+                "an exact conversion is by a fraction of integers only: this factor has a power of π, ln 2 or ln 10 \
+                 or a half exponent, so no value but 0 converts exactly (round with to_rounded or convert_rounded)"
             ),
         };
         // a den past i64 divides only in 128 bits
@@ -1276,7 +1274,6 @@ impl Conversion {
             !rounding || den <= i128::MAX as u128,
             "the factor between these scales is below 2⁻¹²⁷"
         );
-        let exact_f = ratio.is_some() && num <= 1 << 53 && den <= 1 << 53;
         #[expect(
             clippy::cast_possible_truncation,
             clippy::cast_possible_wrap,
@@ -1292,18 +1289,6 @@ impl Conversion {
             num128,
             wide,
             float,
-            exact_f,
-            #[expect(
-                clippy::cast_precision_loss,
-                reason = "used only where exact_f, both at most 2⁵³ and floats exactly"
-            )]
-            num_f: num as f64,
-            #[expect(
-                clippy::cast_precision_loss,
-                reason = "used only where exact_f, both at most 2⁵³ and floats exactly"
-            )]
-            den_f: den as f64,
-            factor: m.to_f64(),
             fixed_point,
         }
     }
@@ -1367,22 +1352,20 @@ impl Conversion {
         c
     }
 
-    /// `x` as a float scaled by the factor.
+    /// The factor for [exact_float]: the fraction, or the fixed point where it isn't one.
     #[inline(always)]
-    fn scale_f64<T: Storage>(self, x: T) -> f64 {
-        #[expect(
-            clippy::as_conversions,
-            clippy::cast_precision_loss,
-            reason = "the nearest f64 is the float conversion's semantics (no From)"
-        )]
-        let x = match x.to_repr() {
-            Repr::Int(i) => i as f64,
-            Repr::Float(f) => f,
-        };
-        if self.exact_f {
-            x * self.num_f / self.den_f
-        } else {
-            x * self.factor
+    fn factor(self) -> exact_float::Factor {
+        match self.fixed_point {
+            Some((m, shift)) => exact_float::Factor {
+                num: u128::from(m),
+                den: 1,
+                shift,
+            },
+            None => exact_float::Factor {
+                num: self.num,
+                den: self.den,
+                shift: 0,
+            },
         }
     }
 
@@ -1390,12 +1373,7 @@ impl Conversion {
     #[inline(always)]
     fn apply_rounded<T: Storage, T2: Storage>(self, x: T, r: Rounding, o: Overflow) -> Option<T2> {
         if self.float {
-            let y = self.scale_f64(x);
-            return if T2::IS_FLOAT {
-                T2::from_float(y)
-            } else {
-                settle_f64(round_f64(y, r), o)
-            };
+            return exact_float::convert(x.to_repr(), self.factor(), Some(r), o);
         }
         if let Some((m, shift)) = self.fixed_point {
             if !self.wide {
@@ -1458,7 +1436,7 @@ impl Conversion {
     )]
     fn apply<T: Storage, T2: Storage>(self, x: T) -> Option<T2> {
         if self.float {
-            return T2::from_float(self.scale_f64(x));
+            return exact_float::convert(x.to_repr(), self.factor(), None, Overflow::Checked);
         }
         if self.num == 1 {
             // a division only: in T's own width
@@ -1497,18 +1475,16 @@ impl Conversion {
     }
 }
 
-/// `x · scale` in `T`: exact for an integer `T` (`None` when not whole, out of range or with a power of π), scaled for
-/// a float.
+/// `x · scale` in `T`, if it is exact: `None` when not whole for an integer `T` or not a float of a float `T`, out of
+/// range, or with a power of π (no value but 0 has an exact one, and that is refused too).
 fn rescale<T: Storage>(x: Repr, scale: Magnitude) -> Option<T> {
     match x {
         Repr::Int(x) if !T::IS_FLOAT => T::from_int(scale.apply_int(x)?),
-        #[expect(
-            clippy::as_conversions,
-            clippy::cast_precision_loss,
-            reason = "a float target: the nearest f64 is the float conversion"
-        )]
-        Repr::Int(x) => T::from_float(scale.apply_f64(x as f64)),
-        Repr::Float(x) => T::from_float(scale.apply_f64(x)),
+        x => {
+            let (num, den) = scale.to_ratio()?;
+            let f = exact_float::Factor { num, den, shift: 0 };
+            exact_float::convert(x, f, None, Overflow::Checked)
+        }
     }
 }
 
@@ -1737,8 +1713,13 @@ mod tests {
             Fixed::<Psi, One, u32>::new(1).convert::<Pascal, Micro, u64>(),
             None
         );
+        // nor a float: exact refuses it, a named rounding takes the nearest
+        assert_eq!(
+            Fixed::<Psi, One, u32>::new(1).convert::<Pascal, One, f64>(),
+            None
+        );
         let pa = Fixed::<Psi, One, u32>::new(1)
-            .convert::<Pascal, One, f64>()
+            .convert_rounded::<Pascal, One, f64>(Rounding::NearestEven)
             .unwrap();
         assert!((pa.get() - 6894.757293168361).abs() < 1e-9);
         // compound units: lbf·s to N·s, and m/s to Per<Meter, Second> (the same unit)
@@ -1785,9 +1766,39 @@ mod tests {
             Some(Fixed::new(-3))
         );
         assert_eq!(Micros::new(-3000i32).to::<Milli, u8>(), None);
+        // 0.0015 is no float: exact refuses it, a named rounding gives the nearest, or the one below
+        assert_eq!(t.to::<One, f32>(), None);
         assert_eq!(
-            t.to::<One, f32>(),
+            t.to_rounded::<One, f32>(Rounding::NearestEven),
             Some(Fixed::<_, _, f32>::bounded(0.0015))
+        );
+        assert_eq!(
+            t.to_rounded::<One, f32>(Rounding::Truncate),
+            Some(Fixed::<_, _, f32>::bounded(0.0015f32.next_down()))
+        );
+        assert_eq!(
+            Micros::new(500_000u32).to::<One, f32>(),
+            Some(Fixed::<_, _, f32>::bounded(0.5))
+        );
+        // past an f32: None, never infinity
+        assert_eq!(
+            Fixed::<Second, One, f64>::bounded(1e39).to::<One, f32>(),
+            None
+        );
+        assert_eq!(
+            Fixed::<Second, One, f64>::bounded(1e39).to_rounded::<One, f32>(Rounding::Truncate),
+            None
+        );
+        assert_eq!(
+            Fixed::<Second, One, f64>::bounded(1e39)
+                .to_saturating::<One, f32>(Rounding::Truncate)
+                .get(),
+            f32::MAX
+        );
+        // 0.1 as an f64 is not 0.1: ten of them in deci is not 1
+        assert_eq!(
+            Fixed::<Second, One, f64>::bounded(0.1).to::<Deci, u8>(),
+            None
         );
         assert_eq!(
             Fixed::<Second, One, f32>::bounded(0.5).to::<Milli, u16>(),
@@ -2002,11 +2013,19 @@ mod tests {
         assert_eq!(Duty16::new(65535).to::<One, u8>(), Some(Fixed::new(1)));
         assert_eq!(half.to::<Centi, u8>(), None);
         assert_eq!(Duty16::new(13107).to::<Centi, u8>(), Some(Fixed::new(20)));
-        assert!((half.to::<One, f32>().unwrap().get() - 0.5).abs() < 1e-4);
+        // 32767/65535 is no float: exact refuses it, a named rounding takes the nearest
+        assert_eq!(half.to::<One, f32>(), None);
+        let near = half.to_rounded::<One, f32>(Rounding::NearestEven).unwrap();
+        assert!((near.get() - 0.5).abs() < 1e-4);
+        assert_eq!(
+            Duty16::new(65535).to::<One, f32>(),
+            Some(Fixed::<_, _, f32>::bounded(1.0))
+        );
         // a binary angle: 65536 is a turn
         let a = Fixed::<crate::units::Turn, Rational<1, 65536>, u16>::new(16384);
         assert_eq!(format!("{a:#}"), "0.25 rev");
         assert_eq!(a.to::<Rational<1, 4>, u8>(), Some(Fixed::new(1)));
+        assert_eq!(a.to::<One, f32>(), Some(Fixed::<_, _, f32>::bounded(0.25)));
     }
 
     #[test]

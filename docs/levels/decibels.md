@@ -199,7 +199,7 @@ assert_eq!(watts.get(), 135_335); // 1/e² = 0.135335..
 At run time `to_np` and `from_np` (`f64`; `to_np_f32` and `from_np_f32` for the `f32` of a Cortex-M4F) take the same forms, with feature `std` or `libm`, and `1 Np = 20/ln 10 dB` holds for both:
 
 ```rust
-use exact_units::{Fixed, q, prefix::One, units::{Decibel, Neper, Per, Volt, Watt}};
+use exact_units::{Fixed, Rounding, q, prefix::One, units::{Decibel, Neper, Per, Volt, Watt}};
 
 let e = core::f64::consts::E;
 let volts = Fixed::<Per<Volt, Volt>, One, f64>::bounded(1.0 / e);
@@ -208,8 +208,8 @@ let one_np_down = q!(-1.001 Neper ..= -0.999 Neper, Inside);
 assert!(volts.to_np().unwrap().is_in(one_np_down));
 assert!(watts.to_np().unwrap().is_in(one_np_down));
 
-// 1 Np is 20/ln 10 dB: the level converts by the units' exact scales
-let in_db = volts.to_np().unwrap().convert::<Decibel, One, f64>().unwrap();
+// 1 Np is 20/ln 10 dB: the level converts by the units' exact scales, rounded once by name (ln 10 is no fraction)
+let in_db = volts.to_np().unwrap().convert_rounded::<Decibel, One, f64>(Rounding::NearestEven).unwrap();
 assert!(in_db.is_in(q!(-8.685889... Decibel)));
 assert!(volts.to_db().unwrap().is_in(q!(-8.685889... Decibel)));
 assert!(watts.to_db().unwrap().is_in(q!(-8.685889... Decibel)));
@@ -287,8 +287,8 @@ assert!(t.is_in(q!(0.2387... W/W)));
 
 // a fibre's 0.2 dB/km is 23 µNp/m of field, and μ is twice that
 let fibre = Fixed::<Per<Loss<Decibel>, Meter>, Milli, f64>::bounded(0.2);
-let alpha = fibre.convert::<Per<Loss<Neper>, Meter>, Micro, f64>().unwrap();
-let mu = fibre.convert::<LinearAttenuation, Micro, f64>().unwrap();
+let alpha = fibre.convert_rounded::<Per<Loss<Neper>, Meter>, Micro, f64>(Rounding::NearestEven).unwrap();
+let mu = fibre.convert_rounded::<LinearAttenuation, Micro, f64>(Rounding::NearestEven).unwrap();
 assert!((mu.get() / alpha.get() - 2.0).abs() < 1e-12);
 ```
 

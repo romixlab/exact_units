@@ -1,11 +1,12 @@
 //! Named rounding and overflow policies for conversions that aren't exact (NUM-4): [Rounding], [Overflow], and
 //! [requantize], the same conversion with the storage known only at run time (what a dynamic client does).
 
+use super::exact_float::{Factor, convert, round_to_int};
 use super::storage::{Repr, Storage};
 use crate::Magnitude;
 
-/// How a conversion rounds a value that isn't a whole number of the target's steps. Every mode is exact: the
-/// conversion works out the true quotient and rounds once (no float in between for integer storages).
+/// How a conversion rounds a value that isn't a whole number of the target's steps, a float's included. Every mode is
+/// exact: the conversion works out the true quotient and rounds once, no float in between.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Rounding {
@@ -582,7 +583,6 @@ pub fn requantize(
 /// [requantize] with the factor worked out once, for a series of values.
 #[derive(Copy, Clone, Debug)]
 pub struct Requantizer {
-    factor: Magnitude,
     exact: Exact,
     to: StorageKind,
     r: Rounding,
@@ -626,7 +626,6 @@ impl Requantizer {
             Exact::FixedPoint { m, shift }
         };
         Requantizer {
-            factor: *factor,
             exact,
             to,
             r,
@@ -644,48 +643,39 @@ impl Requantizer {
         if !self.to_valid {
             return None;
         }
-        let (r, o, factor) = (self.r, self.o, &self.factor);
-        #[expect(
-            clippy::as_conversions,
-            clippy::cast_precision_loss,
-            clippy::cast_possible_truncation,
-            reason = "a float target: the nearest f64, then the nearest f32, is the float conversion (no From)"
-        )]
-        let (bits, signed) = match (self.to, x) {
-            (StorageKind::F64, Repr::Int(i)) => {
-                return Some(Repr::Float(factor.apply_f64(i as f64)));
+        let (r, o) = (self.r, self.o);
+        let f = match self.exact {
+            Exact::Ratio { num_low, den, .. } => Factor {
+                num: num_low.cast_unsigned(),
+                den,
+                shift: 0,
+            },
+            Exact::FixedPoint { m, shift } => Factor {
+                num: u128::from(m),
+                den: 1,
+                shift,
+            },
+        };
+        let (bits, signed) = match self.to {
+            StorageKind::F64 => return convert::<f64>(x, f, Some(r), o).map(Repr::Float),
+            StorageKind::F32 => {
+                return convert::<f32>(x, f, Some(r), o).map(|y| Repr::Float(f64::from(y)));
             }
-            (StorageKind::F64, Repr::Float(f)) => return Some(Repr::Float(factor.apply_f64(f))),
-            (StorageKind::F32, Repr::Int(i)) => {
-                return Some(Repr::Float(f64::from(factor.apply_f64(i as f64) as f32)));
-            }
-            (StorageKind::F32, Repr::Float(f)) => {
-                return Some(Repr::Float(f64::from(factor.apply_f64(f) as f32)));
-            }
-            (StorageKind::Int { bits, signed }, _) => (bits, signed),
+            StorageKind::Int { bits, signed } => (bits, signed),
         };
         let x = match x {
-            Repr::Float(f) => {
-                let y = round_f64(factor.apply_f64(f), r);
-                let (min, max) = StorageKind::range(bits, signed);
-                return match o {
-                    #[expect(
-                        clippy::as_conversions,
-                        clippy::cast_possible_truncation,
-                        clippy::cast_precision_loss,
-                        reason = "float <-> int has no From: the saturating cast and the way back check that y is \
-                                  that integer exactly"
-                    )]
-                    Overflow::Checked => {
-                        let i = y as i128;
-                        (y == i as f64 && (min..=max).contains(&i)).then_some(Repr::Int(i))
-                    }
-                    Overflow::Saturate => Some(Repr::Int(saturate_f64(y, min, max))),
-                    Overflow::Wrap => {
-                        StorageKind::settle_int(bits, signed, None, wrap_f64(y), false, o)
-                            .map(Repr::Int)
-                    }
+            Repr::Float(y) => {
+                let Some((v, neg)) = round_to_int(x, f, r) else {
+                    // NaN and ±∞
+                    let (min, max) = StorageKind::range(bits, signed);
+                    return match o {
+                        Overflow::Checked => None,
+                        Overflow::Saturate => Some(Repr::Int(saturate_f64(y, min, max))),
+                        Overflow::Wrap => Some(Repr::Int(0)),
+                    };
                 };
+                return StorageKind::settle_int(bits, signed, v, v.unwrap_or(0), neg, o)
+                    .map(Repr::Int);
             }
             Repr::Int(0) => return Some(Repr::Int(0)),
             Repr::Int(x) => x,

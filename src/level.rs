@@ -66,8 +66,8 @@
 //!
 //! // a fibre's 0.2 dB/km: μ is twice α
 //! let fibre = Fixed::<Per<Loss<Decibel>, Meter>, Milli, f64>::bounded(0.2);
-//! let alpha = fibre.convert::<Per<Loss<Neper>, Meter>, Micro, f64>().unwrap();
-//! let mu = fibre.convert::<LinearAttenuation, Micro, f64>().unwrap();
+//! let alpha = fibre.convert_rounded::<Per<Loss<Neper>, Meter>, Micro, f64>(Rounding::NearestEven).unwrap();
+//! let mu = fibre.convert_rounded::<LinearAttenuation, Micro, f64>(Rounding::NearestEven).unwrap();
 //! assert!((alpha.get() - 23.03).abs() < 0.01);
 //! assert!((mu.get() - 2.0 * alpha.get()).abs() < 1e-9);
 //! # }

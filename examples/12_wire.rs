@@ -23,7 +23,7 @@
 use core::time::Duration;
 use exact_units::prefix::{Milli, One};
 use exact_units::units::Volt;
-use exact_units::{Fixed, Micros, Unit};
+use exact_units::{Fixed, Micros, Rounding, Unit};
 use shrink_wrap::prelude::*;
 
 /// What the node sends, from the crate the node and the PC tool share.
@@ -71,7 +71,7 @@ fn main() {
     // the PC tool, typed: the same bytes come back as the typed value, and the conversions are the type's
     let back = Reading::from_ww_bytes(bytes).unwrap();
     assert_eq!(back, reading);
-    let cell: Fixed<Volt, One, f32> = back.cell.to().unwrap();
+    let cell: Fixed<Volt, One, f32> = back.cell.to_rounded(Rounding::NearestEven).unwrap();
     println!(
         "typed: {:?} after boot, cell at {cell}",
         Duration::from(back.t)

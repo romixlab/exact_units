@@ -25,12 +25,12 @@ use exact_units::units::{
     CubicInch, GallonImperial, GallonUs, Inch, InchOfMercury32f, InchOfMercuryConventional, Litre,
     MileInternational, Newton, Pascal, PoundForce, Psi, Second, Times,
 };
-use exact_units::{Fixed, Provenance, Unit, UnitExpr};
+use exact_units::{Fixed, Provenance, Rounding, Unit, UnitExpr};
 
 fn main() {
-    // the cut-out pressure: 125 psi, converted once, by the exact factor
+    // the cut-out pressure: 125 psi, converted once, from the exact factor, rounded once into the f32 by name
     let cut_out = Fixed::<Psi, One, u16>::new(125);
-    let kpa: Fixed<Pascal, Kilo, f32> = cut_out.convert().unwrap();
+    let kpa: Fixed<Pascal, Kilo, f32> = cut_out.convert_rounded(Rounding::NearestEven).unwrap();
     println!(
         "{cut_out} is {kpa}; with a typed 6.89: {} kPa",
         125.0 * 6.89
@@ -40,9 +40,9 @@ fn main() {
 
     // the tank: 60 gallons, and which gallon is part of the type
     let tank = Fixed::<GallonUs, One, u16>::new(60);
-    let litres: Fixed<Litre, One, f32> = tank.convert().unwrap();
+    let litres: Fixed<Litre, One, f32> = tank.convert_rounded(Rounding::NearestEven).unwrap();
     let british: Fixed<Litre, One, f32> = Fixed::<GallonImperial, One, u16>::new(60)
-        .convert()
+        .convert_rounded(Rounding::NearestEven)
         .unwrap();
     println!("{tank} is {litres}; 60 imperial gallons would be {british}");
     // a US gallon is 231 in³ by definition, so this is exact even in integers; an imperial one is not
@@ -62,16 +62,17 @@ fn main() {
 
     // the orbiter's impulse: lbf·s and N·s are the same dimension, so they convert, by 4.448…, never by 1
     let impulse = Fixed::<Times<PoundForce, Second>, One, f64>::bounded(1.0);
-    let si: Fixed<Times<Newton, Second>, One, f64> = impulse.convert().unwrap();
+    let si: Fixed<Times<Newton, Second>, One, f64> =
+        impulse.convert_rounded(Rounding::NearestEven).unwrap();
     println!("{impulse} is {si}");
 
     // the weather service reports the air pressure in inHg: conventional (a defined density) or at 32 °F (a
     // measured one) are a quarter of a pascal apart here, and the type says which; the measured one names its source
     let baro = Fixed::<InchOfMercuryConventional, One, f32>::bounded(29.92)
-        .convert::<Pascal, One, f32>()
+        .convert_rounded::<Pascal, One, f32>(Rounding::NearestEven)
         .unwrap();
     let baro_32f = Fixed::<InchOfMercury32f, One, f32>::bounded(29.92)
-        .convert::<Pascal, One, f32>()
+        .convert_rounded::<Pascal, One, f32>(Rounding::NearestEven)
         .unwrap();
     println!("29.92 inHg is {baro} (conventional), {baro_32f} (at 32 °F)");
     if let UnitExpr::Named {

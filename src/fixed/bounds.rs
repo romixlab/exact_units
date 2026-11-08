@@ -1,7 +1,9 @@
 //! Bounds of a [Fixed](super::Fixed): [Unbounded] by default, or a range checked on construction and on every read.
 
 use super::storage::Storage;
-use crate::num::pow10_f64;
+use crate::literal::Decimal;
+use crate::literal::big::BigDecimal;
+use crate::literal::steps::{FloatFormat, Value, float_parts};
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::un::{
     I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14, I15, I16, I17, I18, I19, I20, I21,
@@ -178,7 +180,10 @@ pub struct Range<const MIN: i64, const MAX: i64>;
 pub struct RangeU64<const MIN: u64, const MAX: u64>;
 
 /// `MIN · 10^EXP ..= MAX · 10^EXP` for a float storage: `-0.5 ..= 2.5` is `RangeDec<-5, 25, -1>`. Only floats can't be
-/// const parameters, so the bounds are decimal.
+/// const parameters, so the bounds are decimal. The check is exact: a float is within the bounds when its value is
+/// within the decimals, so a bound that is no float ([Bounds::MIN] and [Bounds::MAX]) is the float just inside it
+/// (`RangeDec<0, 1, -1>` keeps the `f64` nearest 0.1 out, as it is above 0.1). A bound past the float's range or
+/// below its normal range (0 aside) doesn't compile.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct RangeDec<const MIN: i64, const MAX: i64, const EXP: i8>;
 
@@ -437,54 +442,73 @@ impl<const MIN: u64, const MAX: u64> Bounds<UVlq64> for RangeU64<MIN, MAX> {
     const INT_RANGE: Option<(i128, i128)> = Some((MIN as i128, MAX as i128));
 }
 
+/// The float of `format` (its bits widened to `u128`) at or above `n · 10^exp` (`up`), or at or below it: a bound that
+/// is no float is narrowed to the floats inside it, so a float compare against it is the exact compare. A compile
+/// error for a bound past the float's range or below its normal range (0 aside).
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "hi() is at most the largest finite float's bits, checked in float_parts"
+)]
+const fn dec_bound(n: i64, exp: i8, up: bool, format: FloatFormat) -> (bool, u128) {
+    let v = Value::of_literal(
+        &BigDecimal::of(Decimal::new(n, exp as i16)),
+        crate::Magnitude::ONE,
+    );
+    let parts = float_parts(&v, format);
+    // |x| is in [lo, hi]: rounding up a negative value is rounding its magnitude down
+    let bits = if up != parts.neg {
+        parts.hi()
+    } else {
+        parts.lo
+    };
+    (parts.neg && bits != 0, bits)
+}
+
 impl<const MIN: i64, const MAX: i64, const EXP: i8> Bounds<f64> for RangeDec<MIN, MAX, EXP> {
     #[expect(
-        clippy::cast_precision_loss,
-        reason = "a decimal bound of a float storage, rounded to the nearest f64"
-    )]
-    #[expect(
         clippy::as_conversions,
-        reason = "a const item: From is not const on stable"
+        clippy::cast_possible_truncation,
+        reason = "a const item: From is not const on stable; dec_bound gives the bits of an f64"
     )]
     const MIN: Option<f64> = {
         ordered::<MIN, MAX>();
-        Some(MIN as f64 * pow10_f64(EXP))
+        let (neg, bits) = dec_bound(MIN, EXP, true, FloatFormat::F64);
+        let x = f64::from_bits(bits as u64);
+        Some(if neg { -x } else { x })
     };
     #[expect(
-        clippy::cast_precision_loss,
-        reason = "a decimal bound of a float storage, rounded to the nearest f64"
-    )]
-    #[expect(
         clippy::as_conversions,
-        reason = "a const item: From is not const on stable"
+        clippy::cast_possible_truncation,
+        reason = "a const item: From is not const on stable; dec_bound gives the bits of an f64"
     )]
-    const MAX: Option<f64> = Some(MAX as f64 * pow10_f64(EXP));
+    const MAX: Option<f64> = {
+        let (neg, bits) = dec_bound(MAX, EXP, false, FloatFormat::F64);
+        let x = f64::from_bits(bits as u64);
+        Some(if neg { -x } else { x })
+    };
 }
 
 impl<const MIN: i64, const MAX: i64, const EXP: i8> Bounds<f32> for RangeDec<MIN, MAX, EXP> {
     #[expect(
-        clippy::cast_possible_truncation,
-        reason = "the f64 bound rounded to the nearest f32"
-    )]
-    #[expect(
         clippy::as_conversions,
-        reason = "a const item: From is not const on stable"
+        clippy::cast_possible_truncation,
+        reason = "a const item: From is not const on stable; dec_bound gives the bits of an f32"
     )]
-    const MIN: Option<f32> = match <Self as Bounds<f64>>::MIN {
-        Some(x) => Some(x as f32),
-        None => None,
+    const MIN: Option<f32> = {
+        ordered::<MIN, MAX>();
+        let (neg, bits) = dec_bound(MIN, EXP, true, FloatFormat::F32);
+        let x = f32::from_bits(bits as u32);
+        Some(if neg { -x } else { x })
     };
     #[expect(
-        clippy::cast_possible_truncation,
-        reason = "the f64 bound rounded to the nearest f32"
-    )]
-    #[expect(
         clippy::as_conversions,
-        reason = "a const item: From is not const on stable"
+        clippy::cast_possible_truncation,
+        reason = "a const item: From is not const on stable; dec_bound gives the bits of an f32"
     )]
-    const MAX: Option<f32> = match <Self as Bounds<f64>>::MAX {
-        Some(x) => Some(x as f32),
-        None => None,
+    const MAX: Option<f32> = {
+        let (neg, bits) = dec_bound(MAX, EXP, false, FloatFormat::F32);
+        let x = f32::from_bits(bits as u32);
+        Some(if neg { -x } else { x })
     };
 }
 
@@ -697,12 +721,33 @@ mod tests {
     use super::{Bounds, RangeDec};
 
     #[test]
-    fn range_dec_f32_bounds_are_the_nearest_f32() {
-        // MAX used to round twice (5 and 10^-4 each to f32, then their product): 4.9999997e-4
+    fn range_dec_bounds_are_the_floats_just_inside() {
+        // 5e-4 is no float, and the f32 nearest it is above it: the bounds are the one below and its negation
         type B = RangeDec<-5, 5, -4>;
-        assert_eq!(<B as Bounds<f32>>::MIN, Some(-5e-4));
-        assert_eq!(<B as Bounds<f32>>::MAX, Some(5e-4));
-        assert_eq!(<RangeDec<-7, 13, -3> as Bounds<f32>>::MAX, Some(0.013));
+        assert!(f64::from(5e-4f32) > 5e-4);
+        assert_eq!(<B as Bounds<f32>>::MIN, Some(-(5e-4f32.next_down())));
+        assert_eq!(<B as Bounds<f32>>::MAX, Some(5e-4f32.next_down()));
+        // 0.013 as an f32 is above 0.013: the bound is the one below
+        assert!(f64::from(0.013f32) > 0.013);
+        assert_eq!(
+            <RangeDec<-7, 13, -3> as Bounds<f32>>::MAX,
+            Some(0.013f32.next_down())
+        );
         assert_eq!(<RangeDec<0, 25, -1> as Bounds<f32>>::MAX, Some(2.5));
+        // 0.1 as an f64 is above 0.1
+        assert_eq!(
+            <RangeDec<0, 1, -1> as Bounds<f64>>::MAX,
+            Some(0.1f64.next_down())
+        );
+        assert_eq!(
+            <RangeDec<-1, 0, -1> as Bounds<f64>>::MIN,
+            Some(-(0.1f64.next_down()))
+        );
+        assert_eq!(<RangeDec<1, 2, -1> as Bounds<f64>>::MIN, Some(0.1));
+        assert_eq!(<RangeDec<0, 0, 0> as Bounds<f64>>::MIN, Some(0.0));
+        assert!(<RangeDec<0, 1, -1> as Bounds<f64>>::contains(
+            0.1f64.next_down()
+        ));
+        assert!(!<RangeDec<0, 1, -1> as Bounds<f64>>::contains(0.1));
     }
 }

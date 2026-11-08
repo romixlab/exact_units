@@ -50,7 +50,8 @@ const LEVELS_TOP: f64 = 438.0;
 /// The attenuation constant in Np/m, the datasheet's dB/100 ft converted through the crate's own types.
 fn alpha() -> f64 {
     let per_100ft = datasheet_loss();
-    let np_per_m: Fixed<Per<Loss<Neper>, Meter>, One, f64> = per_100ft.convert().unwrap();
+    let np_per_m: Fixed<Per<Loss<Neper>, Meter>, One, f64> =
+        per_100ft.convert_rounded(NearestEven).unwrap();
     let alpha = np_per_m.get();
     // back through the crate: the loss over one "100 ft" span is the datasheet's own number
     let span = Fixed::<Feet100, One, f64>::bounded(1.0);
@@ -153,7 +154,7 @@ fn wave(s: &mut Svg, p: &Panel, np_per_m: f64) {
 /// The heading: the datasheet's number, the same in dB per 100 m, and in Np/m.
 fn heading(s: &mut Svg, np_per_m: f64) {
     let per_100m: Fixed<Per<Loss<Decibel>, Metres100>, One, f64> =
-        datasheet_loss().convert().unwrap();
+        datasheet_loss().convert_rounded(NearestEven).unwrap();
     s.text(LEFT, 22.0, "start", "lg strong", "RG-58 at 100 MHz");
     let loss = format!("5.4 dB/100 ft = {:.1} dB/100 m", per_100m.get());
     s.text(LEFT, 44.0, "start", "mono lg", &loss);
@@ -261,7 +262,7 @@ fn levels(s: &mut Svg, db_in_np: f64) {
 pub fn neper_cable() -> String {
     // 1 dB in Np, through the crate's own conversion: the page's own numbers can't drift from it
     let db_in_np = Fixed::<Decibel, One, f64>::bounded(1.0)
-        .convert::<Neper, One, f64>()
+        .convert_rounded::<Neper, One, f64>(NearestEven)
         .unwrap()
         .get();
     assert!((db_in_np - core::f64::consts::LN_10 / 20.0).abs() < 1e-15);

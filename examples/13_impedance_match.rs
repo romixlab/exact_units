@@ -21,7 +21,7 @@
 
 use exact_units::prefix::{Milli, One, Pow2, Product};
 use exact_units::units::{Decibel, Degree, Loss, Per, Phase, Times, Volt};
-use exact_units::{Admittance, Complex, Fixed, Impedance, Saturating, Z0, db, q};
+use exact_units::{Admittance, Complex, Fixed, Impedance, Rounding, Saturating, Z0, db, q};
 
 /// Γ from the reflectometer: b/a in Q15, saturating at the ends.
 type GammaQ15 = Complex<Per<Volt, Volt>, Pow2<-15>, i16, Saturating>;
@@ -47,7 +47,10 @@ fn main() {
         let z = Impedance::<One, f64>::bounded(z.0, z.1);
         let gamma = z.reflection(z0).finite().unwrap();
         let p = gamma.to_polar();
-        let deg = p.arg().convert::<Phase<Degree>, One, f64>().unwrap();
+        let deg = p
+            .arg()
+            .convert_rounded::<Phase<Degree>, One, f64>(Rounding::NearestEven)
+            .unwrap();
         println!(
             "  {mhz} MHz  Z = {z:#}  Γ = {:.3} ∠ {:6.1}°  VSWR {:.2}  RL {:.2}  ML {:.2}",
             p.abs().get(),

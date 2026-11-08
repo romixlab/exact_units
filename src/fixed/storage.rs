@@ -65,7 +65,9 @@ pub trait Storage: Copy + PartialOrd + 'static {
     /// `x` if it fits; a float storage takes the nearest float.
     fn from_int(x: i128) -> Option<Self>;
 
-    /// `x` if it is a whole number that fits (an integer storage), or `x` rounded to the storage (a float one).
+    /// `x` if it is a whole number that fits (an integer storage), or `x` rounded to the nearest float of the storage
+    /// (a float one), `None` where a finite `x` is past its largest finite float. A conversion between scales doesn't
+    /// come here: it rounds once from the exact value, or refuses.
     fn from_float(x: f64) -> Option<Self>;
 
     /// The value as an `f32`, without an `f64` on the way where the type has its own conversion (integers and `f32`):
@@ -1387,7 +1389,9 @@ macro_rules! float {
             #[inline]
             #[allow(clippy::cast_possible_truncation, reason = "x rounded to the storage, as documented")]
             fn from_float(x: f64) -> Option<Self> {
-                Some(x as $ty)
+                // past the largest finite float is None, never infinity
+                let y = x as $ty;
+                (y.is_finite() || !x.is_finite()).then_some(y)
             }
 
             #[inline(always)]
@@ -1480,6 +1484,19 @@ mod tests {
         reason = "powers of two and the ends of the integer types, exact in f64 or compared as the nearest"
     )]
     fn from_float_at_the_ends() {
+        // a float storage: past its largest finite float is None, never infinity; infinity itself stays
+        assert_eq!(<f32 as Storage>::from_float(1e39), None);
+        assert_eq!(<f32 as Storage>::from_float(-1e39), None);
+        assert_eq!(
+            <f32 as Storage>::from_float(f64::INFINITY),
+            Some(f32::INFINITY)
+        );
+        assert_eq!(
+            <f32 as Storage>::from_float(f64::from(f32::MAX)),
+            Some(f32::MAX)
+        );
+        assert!(<f32 as Storage>::from_float(f64::NAN).is_some_and(f32::is_nan));
+        assert_eq!(<f64 as Storage>::from_float(f64::MAX), Some(f64::MAX));
         // not whole: refused, not truncated
         assert_eq!(<i32 as Storage>::from_float(1.5), None);
         assert_eq!(<i32 as Storage>::from_float(-1.5), None);

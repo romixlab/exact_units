@@ -247,12 +247,18 @@ fn floats_round_once() {
         top.to_saturating::<One, u64>(Rounding::Truncate).get(),
         u64::MAX
     );
-    // integers into a float aren't rounded: the float's own rounding
+    // into a float the named rounding too: 0.001 is no f64, Floor gives the one below it, NearestEven the nearest
     let n: Fixed<Volt, Milli, i32> = Fixed::new(1);
     assert_eq!(
         n.to_rounded::<One, f64>(Rounding::Floor).map(Fixed::get),
+        Some(0.001f64.next_down())
+    );
+    assert_eq!(
+        n.to_rounded::<One, f64>(Rounding::NearestEven)
+            .map(Fixed::get),
         Some(0.001)
     );
+    assert_eq!(n.to::<One, f64>(), None);
 }
 
 #[test]

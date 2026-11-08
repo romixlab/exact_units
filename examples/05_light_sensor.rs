@@ -47,7 +47,10 @@ fn main() {
     let photo = Fixed::<Ampere, Micro, f32>::bounded(0.3);
     let at_tia: Fixed<Volt, One, f32> = (tia * photo).convert().unwrap();
     let stage = Gain::bounded(4.0);
-    let at_adc: Fixed<Volt, Milli, f32> = (stage * at_tia).convert().unwrap();
+    // V to mV multiplies by 1000, which an f32 holds exactly only now and then: the rounding is named
+    let at_adc: Fixed<Volt, Milli, f32> = (stage * at_tia)
+        .convert_rounded(Rounding::NearestEven)
+        .unwrap();
     println!("{photo} through {tia} and {stage}: {at_adc} at the ADC");
 
     // two gains in a row are still a gain (V/V · V/V), not a duty cycle

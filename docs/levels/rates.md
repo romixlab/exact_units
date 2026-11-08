@@ -136,17 +136,17 @@ let _: Option<Fixed<Per<Loss<Decibel>, Meter>, One, i32>> = product.convert();
 [Decibels](decibels.md#absorbance-and-optical-depth) has the full cuvette example, ε·l·c to an `Absorbance` and on
 to a transmittance. The one identity worth isolating here is the factor of 2 between the natural attenuation
 coefficient of a beam's power, μ, and the α of a loss per length in nepers: μ is defined without the level's own
-½, so `convert` doubles it, exactly, every time:
+½, so the conversion doubles it, exactly, every time:
 
 ```rust
 # #[cfg(all(feature = "levels", feature = "mechanical"))] {
-use exact_units::{Fixed, prefix::{Micro, One}};
+use exact_units::{Fixed, Rounding, prefix::{Micro, One}};
 use exact_units::units::{Decibel, LinearAttenuation, Loss, Meter, Neper, Per};
 
-// a turbid medium's 10 dB/m of power loss
+// a turbid medium's 10 dB/m of power loss; dB to Np is ln 10/20, no fraction, so the float is a named rounding
 let per_metre = Fixed::<Per<Loss<Decibel>, Meter>, One, f64>::bounded(10.0);
-let alpha = per_metre.convert::<Per<Loss<Neper>, Meter>, Micro, f64>().unwrap();
-let mu = per_metre.convert::<LinearAttenuation, Micro, f64>().unwrap();
+let alpha = per_metre.convert_rounded::<Per<Loss<Neper>, Meter>, Micro, f64>(Rounding::NearestEven).unwrap();
+let mu = per_metre.convert_rounded::<LinearAttenuation, Micro, f64>(Rounding::NearestEven).unwrap();
 assert!((mu.get() - 2.0 * alpha.get()).abs() < 1e-9);
 # }
 ```

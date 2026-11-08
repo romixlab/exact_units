@@ -275,12 +275,12 @@ struct KindsInConversions;
 ///
 /// ```
 /// # #[cfg(feature = "angle")] {
-/// use exact_units::{Bam16, Fixed, PhaseBam16, prefix::{Milli, One}, units::{Degree, Phase, Radian, Turn}};
+/// use exact_units::{Bam16, Fixed, PhaseBam16, Rounding, prefix::{Milli, One}, units::{Degree, Phase, Radian, Turn}};
 ///
 /// // a phase in turns is a phase in degrees or radians
 /// let p = Fixed::<Phase<Turn>, Milli, u32>::new(250);
 /// assert_eq!(p.convert::<Phase<Degree>, One, u32>(), Some(Fixed::new(90)));
-/// let _: Option<Fixed<Phase<Radian>, One, f64>> = p.convert();
+/// let _: Option<Fixed<Phase<Radian>, One, f64>> = p.convert_rounded(Rounding::NearestEven);
 /// // the named steps, the same number
 /// let mechanical: Bam16 = exact_units::fixed!(0.25); // a quarter turn
 /// let phase: PhaseBam16 = mechanical.as_phase();

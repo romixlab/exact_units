@@ -122,12 +122,11 @@ let _ = a < b; // MilliDegree carries π: no fraction of u128s is its step
 # #[cfg(not(feature = "angle"))] compile_error!("the case needs angle");
 ```
 
-Instead: round through `f64`, as the error itself says — convert the `Fixed` to a float storage first, which
-takes any factor including π ([Floats](conversions.md#floats)), and `Exact::to_f64()` the other side:
+Instead: round through `f64`, as the error itself says — convert the `Fixed` into a float storage with a named rounding, which takes any factor including π ([Floats](conversions.md#floats)), and `Exact::to_f64()` the other side:
 
 ```rust
 # #[cfg(feature = "angle")] {
-use exact_units::{Exact, Fixed, prefix::One, units::Radian};
+use exact_units::{Exact, Fixed, Rounding, prefix::One, units::Radian};
 
 exact_units::scale! {
     pub struct MilliDegree = "m°", Exact(1 / 180000, pi 1);
@@ -135,7 +134,7 @@ exact_units::scale! {
 
 let a = Exact::<Radian>::new(1, 2); // ½ rad
 let b = Fixed::<Radian, MilliDegree, i32>::new(5); // 5 m°, in radians
-let b_rad: f64 = b.convert::<Radian, One, f64>().unwrap().get();
+let b_rad: f64 = b.convert_rounded::<Radian, One, f64>(Rounding::NearestEven).unwrap().get();
 assert!(a.to_f64() > b_rad);
 # }
 ```
