@@ -190,6 +190,139 @@ pub(crate) fn wire(x: f32) {
     assert!(M::from_ww_bytes(&bytes).is_ok_and(|m| same(m.get(), x)));
 }
 
+/// Bytes from outside, read as a float `Fixed` of every NaN-free bound and of [MaybeNan]: through the wire, through
+/// JSON and as text with its unit (`with_unit`), in `V` and `mV`. A NaN-free type never holds NaN (a [Finite] one
+/// never ±∞, a `RangeDec` one nothing outside), and what it holds writes and reads back to the same bits. A
+/// [MaybeNan] reads every bit pattern of the wire and writes it back unchanged. Never a panic. `fuzz/` runs it as
+/// the target `nan_free`.
+#[cfg(any(feature = "shrink_wrap", all(feature = "serde", feature = "std")))]
+pub(crate) fn input(data: &[u8]) {
+    #[cfg(feature = "shrink_wrap")]
+    {
+        use exact_units::RangeDec;
+        wire_input::<One, f32, exact_units::Unbounded>(data);
+        wire_input::<One, f32, Finite>(data);
+        wire_input::<One, f32, RangeDec<-5, 25, -1>>(data);
+        wire_input::<One, f64, exact_units::Unbounded>(data);
+        wire_input::<One, f64, Finite>(data);
+        wire_input::<One, f64, RangeDec<-5, 25, -1>>(data);
+        wire_maybe_nan(data);
+    }
+    #[cfg(all(feature = "serde", feature = "std"))]
+    if let Ok(s) = core::str::from_utf8(data) {
+        use exact_units::RangeDec;
+        use exact_units::prefix::Milli;
+        text_input::<One, f32, exact_units::Unbounded>(s);
+        text_input::<Milli, f32, exact_units::Unbounded>(s);
+        text_input::<One, f32, Finite>(s);
+        text_input::<Milli, f32, RangeDec<-5, 25, -1>>(s);
+        text_input::<One, f64, exact_units::Unbounded>(s);
+        text_input::<Milli, f64, Finite>(s);
+        text_input::<One, f32, MaybeNan>(s);
+        text_input::<Milli, f64, MaybeNan>(s);
+    }
+}
+
+/// `v` as a NaN-free bound `B` must hold it: not NaN, within `B`.
+#[cfg(any(feature = "shrink_wrap", all(feature = "serde", feature = "std")))]
+fn holds<T: exact_units::Storage + core::fmt::Debug, B: exact_units::Bounds<T>>(v: T, how: &str) {
+    assert!(!v.is_nan() || B::ALLOWS_NAN, "{how}: NaN read");
+    assert!(
+        B::contains(v),
+        "{how}: {v:?} outside {}",
+        core::any::type_name::<B>()
+    );
+}
+
+#[cfg(feature = "shrink_wrap")]
+#[expect(clippy::expect_used, reason = "a property fails by panicking")]
+fn wire_input<P, T, B>(data: &[u8])
+where
+    P: 'static,
+    T: exact_units::Storage + core::fmt::Debug,
+    B: exact_units::Bounds<T>,
+    Fixed<Volt, P, T, B>: shrink_wrap::prelude::SerializeShrinkWrap
+        + for<'i> shrink_wrap::prelude::DeserializeShrinkWrap<'i>,
+{
+    use shrink_wrap::prelude::*;
+    let Ok(v) = Fixed::<Volt, P, T, B>::from_ww_bytes(data) else {
+        return;
+    };
+    holds::<T, B>(v.get(), "wire");
+    let mut buf = [0u8; 16];
+    let bytes = v.to_ww_bytes(&mut buf).expect("encodes").to_vec();
+    let back = Fixed::<Volt, P, T, B>::from_ww_bytes(&bytes).expect("reads back");
+    assert!(back.get() == v.get(), "{bytes:02x?}");
+}
+
+/// A [MaybeNan] `f32` and `f64` read their bytes off the wire, NaN payloads and signs included, and write them back.
+#[cfg(feature = "shrink_wrap")]
+#[expect(clippy::expect_used, reason = "a property fails by panicking")]
+fn wire_maybe_nan(data: &[u8]) {
+    use shrink_wrap::prelude::*;
+    let mut buf = [0u8; 16];
+    if let Some(&b) = data.first_chunk::<4>() {
+        let m = M::from_ww_bytes(data).expect("every 4 bytes are an f32");
+        assert_eq!(m.get().to_bits(), u32::from_le_bytes(b), "{data:02x?}");
+        assert_eq!(m.to_ww_bytes(&mut buf).expect("encodes"), &b);
+    }
+    if let Some(&b) = data.first_chunk::<8>() {
+        let m = Fixed::<Volt, One, f64, MaybeNan>::from_ww_bytes(data)
+            .expect("every 8 bytes are an f64");
+        assert_eq!(m.get().to_bits(), u64::from_le_bytes(b), "{data:02x?}");
+        assert_eq!(m.to_ww_bytes(&mut buf).expect("encodes"), &b);
+    }
+}
+
+/// `s` as JSON (a number) and as `with_unit` text: a NaN-free type holds no NaN; every value read writes and reads
+/// back, a NaN of a [MaybeNan] as a NaN.
+#[cfg(all(feature = "serde", feature = "std"))]
+#[expect(
+    clippy::expect_used,
+    clippy::panic,
+    reason = "a property fails by panicking"
+)]
+fn text_input<P, T, B>(s: &str)
+where
+    P: exact_units::FixedScale,
+    T: exact_units::Storage
+        + core::fmt::Debug
+        + serde::Serialize
+        + for<'de> serde::Deserialize<'de>,
+    B: exact_units::Bounds<T>,
+{
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[serde(transparent)]
+    struct Text<P: exact_units::FixedScale, T: exact_units::Storage, B: exact_units::Bounds<T>>(
+        #[serde(with = "exact_units::serde::with_unit")] Fixed<Volt, P, T, B>,
+    );
+
+    let same = |a: T, b: T| a == b || (a.is_nan() && b.is_nan());
+    if let Ok(v) = serde_json::from_str::<Fixed<Volt, P, T, B>>(s) {
+        holds::<T, B>(v.get(), "JSON");
+    }
+    let Ok(Text(v)) = serde_json::from_value::<Text<P, T, B>>(serde_json::Value::String(s.into()))
+    else {
+        return;
+    };
+    holds::<T, B>(v.get(), "text");
+    let written = serde_json::to_value(Text(v)).expect("writes");
+    let back = serde_json::from_value::<Text<P, T, B>>(written.clone());
+    if P::SCALE == exact_units::Magnitude::ONE {
+        let Text(back) =
+            back.unwrap_or_else(|e| panic!("{s:?} wrote {written}, which reads as {e}"));
+        assert!(same(back.get(), v.get()), "{s:?} wrote {written}");
+    } else if let Ok(Text(back)) = back {
+        // a scaled float goes through f64 both ways and may come back another float (`52.65 mV` of an f64 writes
+        // `0.05264999999999999 V`): P2401#3nov-0058h; NaN stays NaN and a number a number
+        assert_eq!(
+            back.get().is_nan(),
+            v.get().is_nan(),
+            "{s:?} wrote {written}"
+        );
+    }
+}
+
 #[cfg(not(any(kani, fuzzing)))]
 mod tests {
     use super::*;
@@ -244,7 +377,54 @@ mod tests {
         );
     }
 
+    /// Hand-picked input of the fuzz target `nan_free`: the bytes of NaN, ±∞ and the edges of `f32` and `f64`, and
+    /// text and JSON for NaN, ±∞ and values whose scaling overflows.
+    #[test]
+    #[cfg(any(feature = "shrink_wrap", all(feature = "serde", feature = "std")))]
+    fn hand_picked_input() {
+        for x in SPECIAL {
+            input(&x.to_le_bytes());
+            input(&f64::from(x).to_le_bytes());
+        }
+        input(&0x7fc0_0001_u32.to_le_bytes());
+        input(&0xfff8_0000_0000_0001_u64.to_le_bytes());
+        for s in [
+            "NaN V",
+            "nan V",
+            "-NaN V",
+            "inf V",
+            "-inf V",
+            "Infinity mV",
+            "1e39 V",
+            "1e39 kV",
+            "1e308 kV",
+            "1e-46 mV",
+            "-0 V",
+            "2.5 V",
+            "2.6 V",
+            "NaN",
+            "null",
+            "1e39",
+            "-1e309",
+            "0",
+        ] {
+            input(s.as_bytes());
+        }
+    }
+
     proptest! {
+        #[test]
+        #[cfg(any(feature = "shrink_wrap", all(feature = "serde", feature = "std")))]
+        fn drawn_input(data in proptest::collection::vec(any::<u8>(), 0..16)) {
+            input(&data);
+        }
+
+        #[test]
+        #[cfg(any(feature = "shrink_wrap", all(feature = "serde", feature = "std")))]
+        fn drawn_text(s in "-?[0-9]{0,3}(\\.[0-9]{0,3})?(e-?[0-9]{1,3})? ?(m|k|M|G|µ)?V") {
+            input(s.as_bytes());
+        }
+
         #[test]
         fn drawn_floats_operate(a in any::<f32>(), b in any::<f32>()) {
             operates(a, b);

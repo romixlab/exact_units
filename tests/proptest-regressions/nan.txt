@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 1789971e6e8f75a35bdbf92b2eb795ac7f4d581bbd98608aee5cd44fb9ae372c # shrinks to a = -0.0, b = -0.0
+cc c39d20ddde2fd835a1e26a8c7a7de22f51377fe0415b1a6b662746932dea5f07 # shrinks to s = "52.65mV"

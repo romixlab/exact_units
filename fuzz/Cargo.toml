@@ -12,9 +12,11 @@ cargo-fuzz = true
 
 # the features of exact_units the property functions ask for with cfg(feature = ..), all on
 [features]
-default = ["customary", "serde"]
+default = ["customary", "serde", "shrink_wrap", "std"]
 customary = ["exact_units/customary"]
 serde = ["exact_units/serde"]
+shrink_wrap = ["exact_units/shrink_wrap"]
+std = ["exact_units/std"]
 
 [dependencies]
 arbitrary = { version = "1", features = ["derive"] }
@@ -82,6 +84,13 @@ bench = false
 [[bin]]
 name = "q_text"
 path = "fuzz_targets/q_text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "nan_free"
+path = "fuzz_targets/nan_free.rs"
 test = false
 doc = false
 bench = false

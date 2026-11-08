@@ -7,6 +7,8 @@
 
 #[path = "../../tests/props/exact_text.rs"]
 pub mod exact_text;
+#[path = "../../tests/props/nan.rs"]
+pub mod nan;
 #[path = "../../tests/props/panics.rs"]
 pub mod panics;
 #[path = "../../tests/props/q_text.rs"]
