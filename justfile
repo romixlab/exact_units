@@ -47,11 +47,13 @@ fuzz target seconds="60":
     mkdir -p corpus/{{target}}
     ASAN_OPTIONS=malloc_context_size=4 cargo +nightly fuzz run {{target}} corpus/{{target}} seeds/{{target}} -- -dict=units.dict -max_total_time={{seconds}} -max_len=4096
 
-# Format, sort, spelling, clippy and rustdoc as CI runs them, warnings are errors
+# Format, sort, spelling, clippy and rustdoc as CI runs them, warnings are errors; no long decimal in the book or the
+# examples (tests/long_decimals.rs: a shown result checks with q!(9.542425... V), exact digits are listed)
 lint:
     cargo fmt --check
     cargo sort --check
     typos
+    cargo nextest run --test long_decimals
     cargo clippy --all-targets -- -D warnings
     cargo clippy --all-targets --all-features -- -D warnings
     cargo clippy --all-targets --no-default-features --features std -- -D warnings
