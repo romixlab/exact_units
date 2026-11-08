@@ -169,3 +169,28 @@ pub fn gain_in_band_literal(gain: MilliGain) -> bool {
 pub fn gain_in_band_raw(gain: MilliGain) -> bool {
     (708..=1412).contains(&gain.get())
 }
+
+/// A voltage as an `f32`, NaN-free.
+pub type VoltF32 = Fixed<Volt, exact_units::prefix::One, f32>;
+
+/// `a + b > l` on plain `f32`s: false where the sum is NaN.
+#[unsafe(no_mangle)]
+pub fn plain_sum_above(a: f32, b: f32, l: f32) -> bool {
+    a + b > l
+}
+
+/// `!(a + b <= l)` on plain `f32`s: true where the sum is NaN.
+#[unsafe(no_mangle)]
+#[expect(
+    clippy::neg_cmp_op_on_partial_ord,
+    reason = "`!(x <= l)` on purpose: true for NaN, what gt_or(l, true) compiles to"
+)]
+pub fn plain_sum_not_at_most(a: f32, b: f32, l: f32) -> bool {
+    !(a + b <= l)
+}
+
+/// `(a + b).gt_or(l, true)` on NaN-free values: the sum is a `MaybeNan`, compared naming NaN's answer.
+#[unsafe(no_mangle)]
+pub fn fixed_sum_above(a: VoltF32, b: VoltF32, l: VoltF32) -> bool {
+    (a + b).gt_or(l, true)
+}

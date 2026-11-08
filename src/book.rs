@@ -26,6 +26,8 @@ pages! {
     #[cfg(all(feature = "time", feature = "dimensionless"))]
     Fractions = "maths/fractions.md";
     Bounds = "maths/bounds.md";
+    #[cfg(feature = "q")]
+    Floats = "maths/floats.md";
     Rounding = "maths/rounding.md";
     Overflow = "maths/overflow.md";
     Kinds = "maths/kinds.md";

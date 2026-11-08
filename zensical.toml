@@ -38,6 +38,7 @@ nav = [
             "maths/conversions.md",
             "maths/fractions.md",
             "maths/bounds.md",
+            "maths/floats.md",
             { "Advanced" = [
                     "maths/rounding.md",
                     "maths/overflow.md",

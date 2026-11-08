@@ -401,3 +401,42 @@ fn point_and_level_ranges_are_the_hand_written_compares() {
         );
     }
 }
+
+/// A NaN-free float's sum compared with `gt_or` costs what plain `f32` code does, on a Cortex-M4F:
+/// `(a + b).gt_or(l, true)` is `!(a + b <= l)` on plain `f32`s, and as many instructions as `a + b > l`, one
+/// `vadd.f32` and one `vcmp.f32` each; only the condition differs (`hi`, true where the compare is unordered, for
+/// `gt`). The book's page "Floats: NaN and infinity" shows the two bodies.
+#[test]
+fn nan_free_sum_compare_is_the_plain_float_code() {
+    let target = "thumbv7em-none-eabihf";
+    let Some(asm) = asm_for(target) else {
+        return;
+    };
+    let instructions = |name: &str| -> Vec<String> {
+        normalize(&resolve(&asm, name))
+            .into_iter()
+            .filter(|l| !l.ends_with(':') && !l.starts_with('.'))
+            .collect()
+    };
+    let fixed = instructions("fixed_sum_above");
+    assert_eq!(
+        fixed,
+        instructions("plain_sum_not_at_most"),
+        "{target}: fixed_sum_above should be !(a + b <= l) on plain f32s"
+    );
+    let plain = instructions("plain_sum_above");
+    assert_eq!(
+        fixed.len(),
+        plain.len(),
+        "{target}: gt_or should cost what a + b > l does: {fixed:#?} against {plain:#?}"
+    );
+    for body in [&fixed, &plain] {
+        for op in ["vadd.f32", "vcmp.f32"] {
+            assert_eq!(
+                body.iter().filter(|l| l.starts_with(op)).count(),
+                1,
+                "{target}: one {op}: {body:#?}"
+            );
+        }
+    }
+}

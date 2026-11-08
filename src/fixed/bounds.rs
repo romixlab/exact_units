@@ -170,8 +170,8 @@ impl Unlimited<f64> for MaybeNan {}
 /// ```compile_fail
 /// use exact_units::{Finite, Fixed, prefix::One, units::Volt};
 ///
-/// let _ = Fixed::<Volt, One, f32, Finite>::bounded(f32::INFINITY);
-/// const _: Fixed<Volt, One, f32, Finite> = Fixed::bounded(f32::INFINITY); // a compile error in const code
+/// type V = Fixed<Volt, One, f32, Finite>;
+/// const INF: V = V::bounded(f32::INFINITY); // a compile error in const code
 /// ```
 ///
 /// ```compile_fail

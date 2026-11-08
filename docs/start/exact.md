@@ -212,7 +212,7 @@ assert!(temp.gt_or(limit, true)); // NaN counts as over the limit: shut down
 assert_eq!(temp.not_nan(), None);
 ```
 
-On a Cortex-M4F (`thumbv7em-none-eabihf`, measured on 7 November 2026 at `opt-level` 3 and `z`) each costs what the plain `f32` code does: a `+` is 4 instructions either way, and `(a + b).gt_or(limit, true)` is the 9 (at `z`, 6) of `a + b > limit`, its compare `!(x <= limit)`.
+On a Cortex-M4F (`thumbv7em-none-eabihf`, measured on 7 November 2026 at `opt-level` 3 and `z`) each costs what the plain `f32` code does: a `+` is 4 instructions either way, and `(a + b).gt_or(limit, true)` is the 9 (at `z`, 6) of `a + b > limit`, its compare `!(x <= limit)`. [Floats: NaN and infinity](../maths/floats.md) shows the assembly, `tests/q_asm.rs` checks it, and the page covers `Finite` and sorting floats too.
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::One, units::Volt};
