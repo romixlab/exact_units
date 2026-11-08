@@ -202,11 +202,13 @@ pub use damping::DampingCoefficient;
 pub use damping::LogarithmicDecrement;
 
 use crate::complex::{ComplexStorage, Policy};
+#[cfg(any(feature = "mechanical", feature = "chemical"))]
+use crate::units::Absorbance;
 #[cfg(feature = "chemical")]
 use crate::units::MolarCentimeter;
-use crate::units::{Absorbance, Decibel, DecibelLoss, Neper, NeperLoss, OpticalDepth, Per};
 #[cfg(feature = "mechanical")]
-use crate::units::{CentimetreMegahertz, Meter};
+use crate::units::{CentimetreMegahertz, Meter, OpticalDepth};
+use crate::units::{Decibel, DecibelLoss, Neper, NeperLoss, Per};
 use crate::{Dim, Fixed, Unit, Unlimited};
 
 /// The dimension of a level signed as a gain, [Neper]'s: the counted base `Neper` of this crate.
