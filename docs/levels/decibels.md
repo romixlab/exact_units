@@ -18,14 +18,15 @@ $$
 
 ## The kind picks the formula
 
-In `exact_units` the unit's [kind](../maths/kinds.md) picks the form, so nobody has to remember it:
+In `exact_units` the unit's [kind](../maths/kinds.md) picks the form, so nobody has to remember it. `to_db` gives the level as a value of its own, a `Fixed<Decibel, One, f64>`, so it keeps its unit and checks against `q!`; `None` for a gain below 0, which has no level:
 
 ```rust
-use exact_units::{Fixed, prefix::{Milli, One}, units::{Ampere, Per, Volt, Watt}};
+use exact_units::{Fixed, q, prefix::{Milli, One}, units::{Ampere, Decibel, Per, Volt, Watt}};
 
-assert_eq!(Fixed::<Per<Volt, Volt>, One, f64>::bounded(10.0).to_db(), 20.0);   // 20·lg
-assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::bounded(100.0).to_db(), 20.0);  // 10·lg
-assert_eq!(Fixed::<Per<Ampere, Ampere>, Milli, u32>::new(100).to_db(), -20.0);
+assert!(Fixed::<Per<Volt, Volt>, One, f64>::bounded(10.0).to_db().unwrap() == q!(20 Decibel));   // 20·lg
+assert!(Fixed::<Per<Watt, Watt>, One, f64>::bounded(100.0).to_db().unwrap() == q!(20 Decibel));  // 10·lg
+assert!(Fixed::<Per<Ampere, Ampere>, Milli, u32>::new(100).to_db().unwrap() == q!(-20 Decibel));
+assert!(Fixed::<Per<Volt, Volt>, One, f64>::bounded(2.0).to_db().unwrap().is_in(q!(6.0205... Decibel)));
 ```
 
 A plain `Ratio` (a duty cycle) has no level. 0.5 duty is not −3 dB, and the compiler says so:
@@ -198,17 +199,20 @@ assert_eq!(watts.get(), 135_335); // 1/e² = 0.135335..
 At run time `to_np` and `from_np` (`f64`; `to_np_f32` and `from_np_f32` for the `f32` of a Cortex-M4F) take the same forms, with feature `std` or `libm`, and `1 Np = 20/ln 10 dB` holds for both:
 
 ```rust
-use exact_units::{Fixed, prefix::One, units::{Per, Volt, Watt}};
+use exact_units::{Fixed, q, prefix::One, units::{Decibel, Neper, Per, Volt, Watt}};
 
 let e = core::f64::consts::E;
 let volts = Fixed::<Per<Volt, Volt>, One, f64>::bounded(1.0 / e);
 let watts = Fixed::<Per<Watt, Watt>, One, f64>::bounded(1.0 / (e * e));
-assert!((volts.to_np() + 1.0).abs() < 1e-12);
-assert!((watts.to_np() + 1.0).abs() < 1e-12);
+let one_np_down = q!(-1.001 Neper ..= -0.999 Neper, Inside);
+assert!(volts.to_np().unwrap().is_in(one_np_down));
+assert!(watts.to_np().unwrap().is_in(one_np_down));
 
-let np_in_db = 20.0 / core::f64::consts::LN_10;
-assert!((volts.to_np() * np_in_db - volts.to_db()).abs() < 1e-12);
-assert!((watts.to_np() * np_in_db - watts.to_db()).abs() < 1e-12);
+// 1 Np is 20/ln 10 dB: the level converts by the units' exact scales
+let in_db = volts.to_np().unwrap().convert::<Decibel, One, f64>().unwrap();
+assert!(in_db.is_in(q!(-8.685889... Decibel)));
+assert!(volts.to_db().unwrap().is_in(q!(-8.685889... Decibel)));
+assert!(watts.to_db().unwrap().is_in(q!(-8.685889... Decibel)));
 ```
 
 ## A level as a quantity

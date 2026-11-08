@@ -969,7 +969,7 @@ fn in_comparisons() {
     assert!(VoltGain::<Milli, u16>::new(690) < MINUS_3);
 }
 
-#[cfg(any(feature = "std", feature = "libm"))]
+#[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
 mod run_time {
     use super::*;
 
@@ -987,9 +987,9 @@ mod run_time {
                 (f64::from(g32.get()) / g.get() - 1.0).abs() < 1e-5,
                 "{x} dB"
             );
-            let back = g.to_db();
+            let back = g.to_db().unwrap().get();
             assert!((back - x).abs() < 1e-9, "{x} dB: {back}");
-            let back32 = g32.to_db_f32();
+            let back32 = g32.to_db_f32().unwrap().get();
             assert!(
                 (f64::from(back32) - x).abs() < 1e-3 + x.abs() * 1e-6,
                 "{x} dB: {back32}"
@@ -1000,7 +1000,7 @@ mod run_time {
     #[test]
     fn integer_storage_in_f32() {
         let g = VoltGain::<Milli, u16>::new(100);
-        assert_eq!(g.to_db_f32(), -20.0);
+        assert_eq!(g.to_db_f32().unwrap().get(), -20.0);
         assert_eq!(
             PowerGain::<Milli, u32>::from_db_f32(20.0),
             Some(Fixed::new(100_000))

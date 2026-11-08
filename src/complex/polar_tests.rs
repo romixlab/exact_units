@@ -219,7 +219,7 @@ fn int_round_trip() {
     }
 }
 
-#[cfg(any(feature = "std", feature = "libm"))]
+#[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
 mod float {
     use super::*;
     use crate::prefix::{Milli, Pow2};
@@ -290,11 +290,17 @@ mod float {
             }
             let z = Complex::<Per<Volt, Volt>, Pow2<-15>, i16>::new(r, i);
             let exact = 20.0 * libm::log10(libm::hypot(f64::from(r), f64::from(i)) / 32_768.0);
-            assert!((z.to_db() - exact).abs() < 1e-12, "{r} {i}");
-            assert!((f64::from(z.to_db_f32()) - exact).abs() < 1e-4, "{r} {i}");
+            assert!((z.to_db().unwrap().get() - exact).abs() < 1e-12, "{r} {i}");
+            assert!(
+                (f64::from(z.to_db_f32().unwrap().get()) - exact).abs() < 1e-4,
+                "{r} {i}"
+            );
             // a power ratio: 10·lg|z|
             let p = Complex::<Per<Watt, Watt>, Pow2<-15>, i16>::new(r, i);
-            assert!((p.to_db() - exact / 2.0).abs() < 1e-12, "{r} {i}");
+            assert!(
+                (p.to_db().unwrap().get() - exact / 2.0).abs() < 1e-12,
+                "{r} {i}"
+            );
         }
     }
 
@@ -341,10 +347,10 @@ mod float {
                 .unwrap();
             assert!(near(g.re().get(), 1.0 / 3.0, 1.0) && g.im().get() == 0.0);
             assert!(near(g.vswr().get(), 2.0, 4.0));
-            assert!(near(g.return_loss_db(), 20.0 * libm::log10(3.0), 2.0));
+            assert!(near(g.return_loss().get(), 20.0 * libm::log10(3.0), 2.0));
             assert!(near(g.mismatch_loss().get(), 8.0 / 9.0, 1.0));
             assert!(near(
-                g.mismatch_loss().to_db(),
+                g.mismatch_loss().to_db().unwrap().get(),
                 10.0 * libm::log10(8.0 / 9.0),
                 4.0
             ));
@@ -356,8 +362,13 @@ mod float {
             assert!(near(g.re().get(), -0.2, 2.0) && near(g.im().get(), 0.4, 2.0));
             let m = libm::sqrt(0.2);
             assert!(near(g.vswr().get(), (1.0 + m) / (1.0 - m), 4.0));
-            assert!(near(g.return_loss_db(), -10.0 * libm::log10(0.2), 4.0));
-            assert!((f64::from(g.return_loss_db_f32()) - g.return_loss_db()).abs() < 1e-5);
+            assert!(near(g.return_loss().get(), -10.0 * libm::log10(0.2), 4.0));
+            // the same Γ in f32, its return loss worked out in f32
+            let g32 = Impedance::<One, f32>::bounded(25.0, 25.0)
+                .reflection(Z0::<One, f32>::bounded(50.0, 0.0))
+                .finite()
+                .unwrap();
+            assert!((f64::from(g32.return_loss().get()) - g.return_loss().get()).abs() < 1e-5);
         }
 
         #[test]
@@ -366,7 +377,7 @@ mod float {
             let matched = z0.get().reflection(z0).finite().unwrap();
             assert_eq!(matched.get(), (0.0, 0.0));
             assert_eq!(matched.vswr().get(), 1.0);
-            assert_eq!(matched.return_loss_db_f32(), f32::INFINITY);
+            assert_eq!(matched.return_loss().get(), f32::INFINITY);
             assert_eq!(matched.mismatch_loss().get(), 1.0);
             let short = Impedance::<Milli, f32>::bounded(0.0, 0.0)
                 .reflection(z0)
@@ -374,7 +385,7 @@ mod float {
                 .unwrap();
             assert_eq!(short.get(), (-1.0, 0.0));
             assert_eq!(short.vswr().get(), f32::INFINITY);
-            assert_eq!(short.return_loss_db_f32(), 0.0);
+            assert_eq!(short.return_loss().get(), 0.0);
             assert_eq!(short.mismatch_loss().get(), 0.0);
             let reactive = Impedance::<Milli, f32>::bounded(0.0, 30_000.0)
                 .reflection(z0)

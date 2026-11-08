@@ -117,23 +117,15 @@ norm_sqr_at! {
 
 #[cfg(any(feature = "std", feature = "libm"))]
 impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B> {
-    /// The level of |z| in dB by the unit's form, from the exact |z|²: 20·lg|z| = 10·lg|z|² for a ratio of
-    /// root-power quantities (a reflection coefficient V/V), 10·lg|z| for one of powers. A kind without a level form
-    /// doesn't compile. Feature `std` or `libm`.
-    ///
-    /// ```
-    /// # #[cfg(feature = "electrical")] {
-    /// use exact_units::{Complex, prefix::{Milli, One}, units::{Per, Volt}};
-    /// assert_eq!(Complex::<Per<Volt, Volt>, One, f64>::bounded(6.0, 8.0).to_db(), 20.0); // |z| = 10
-    /// assert_eq!(Complex::<Per<Volt, Volt>, Milli, i16>::new(60, -80).to_db(), -20.0); // 0.1
-    /// # }
-    /// ```
-    ///
-    /// ```compile_fail
-    /// use exact_units::{Complex, prefix::One, units::Ratio};
-    /// let _ = Complex::<Ratio, One, f64>::bounded(0.5, 0.5).to_db();
-    /// ```
-    pub fn to_db(self) -> f64 {
+    /// The number [to_db](Self::to_db) holds, NaN only for a NaN part.
+    #[cfg_attr(
+        not(feature = "levels"),
+        expect(
+            dead_code,
+            reason = "the typed to_db and to_np, and to_level, need `levels`"
+        )
+    )]
+    pub(crate) fn db_f64(self) -> f64 {
         let form = const { Fixed::<U, P, T>::LEVEL_FORM };
         let n = match T::norm_sqr(self.re, self.im).to_repr() {
             #[expect(
@@ -151,16 +143,15 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
         form.db_per_decade() / 2.0 * math::log10(n * s)
     }
 
-    /// [to_db](Self::to_db) in `f32`, with no `f64` on the way: the float of a Cortex-M4F or M33. |z|² of an `i32`
-    /// is rounded to `f32` first.
-    ///
-    /// ```
-    /// # #[cfg(feature = "electrical")] {
-    /// use exact_units::{Complex, prefix::Milli, units::{Per, Volt}};
-    /// assert_eq!(Complex::<Per<Volt, Volt>, Milli, i16>::new(60, -80).to_db_f32(), -20.0);
-    /// # }
-    /// ```
-    pub fn to_db_f32(self) -> f32 {
+    /// The number [to_db_f32](Self::to_db_f32) holds, worked out in `f32`.
+    #[cfg_attr(
+        not(feature = "levels"),
+        expect(
+            dead_code,
+            reason = "the typed to_db and to_np, and to_level, need `levels`"
+        )
+    )]
+    pub(crate) fn db_f32(self) -> f32 {
         #[expect(
             clippy::as_conversions,
             clippy::cast_possible_truncation,
@@ -178,5 +169,44 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
             (s * s) as f32
         };
         half * math::log10f(n * s)
+    }
+}
+
+#[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
+impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B> {
+    /// The level of |z| in dB by the unit's form, from the exact |z|²: 20·lg|z| = 10·lg|z|² for a ratio of
+    /// root-power quantities (a reflection coefficient V/V), 10·lg|z| for one of powers, worked out in `f64` and
+    /// rounded. z = 0 is −∞ dB; `None` only for a NaN part (a [MaybeNan](crate::MaybeNan) value). A kind without a
+    /// level form doesn't compile. Features `levels` and `std` or `libm`.
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{Complex, q, prefix::{Milli, One}, units::{Decibel, Per, Volt}};
+    /// assert!(Complex::<Per<Volt, Volt>, One, f64>::bounded(6.0, 8.0).to_db().unwrap() == q!(20 Decibel)); // |z| = 10
+    /// assert!(Complex::<Per<Volt, Volt>, Milli, i16>::new(60, -80).to_db().unwrap() == q!(-20 Decibel)); // 0.1
+    /// # }
+    /// ```
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Complex, prefix::One, units::Ratio};
+    /// let _ = Complex::<Ratio, One, f64>::bounded(0.5, 0.5).to_db();
+    /// ```
+    #[must_use]
+    pub fn to_db(self) -> Option<Fixed<crate::units::Decibel, crate::prefix::One, f64>> {
+        Fixed::try_new(self.db_f64()).ok()
+    }
+
+    /// [to_db](Self::to_db) in `f32`, with no `f64` on the way: the float of a Cortex-M4F or M33. |z|² of an `i32`
+    /// is rounded to `f32` first.
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{Complex, q, prefix::Milli, units::{Decibel, Per, Volt}};
+    /// assert!(Complex::<Per<Volt, Volt>, Milli, i16>::new(60, -80).to_db_f32().unwrap() == q!(-20 Decibel));
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn to_db_f32(self) -> Option<Fixed<crate::units::Decibel, crate::prefix::One, f32>> {
+        Fixed::try_new(self.db_f32()).ok()
     }
 }

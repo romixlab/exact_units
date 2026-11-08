@@ -88,9 +88,9 @@ fn landmarks(s: &mut Svg) {
         let amplitude = VoltMicro::from_db_const_rounded(exact, NearestEven).get();
         let power = PowerMicro::from_db_const_rounded(exact, NearestEven).get();
         // the stored ratios are the level again, within what a rounded micro can hold
-        let back = VoltGain::bounded(f64::from(amplitude) / 1e6).to_db();
+        let back = VoltGain::bounded(f64::from(amplitude) / 1e6).to_db().unwrap().get();
         assert!((back - f64::from(level)).abs() < 1e-4, "{level} dB, V/V");
-        let back = PowerGain::bounded(f64::from(power) / 1e6).to_db();
+        let back = PowerGain::bounded(f64::from(power) / 1e6).to_db().unwrap().get();
         assert!((back - f64::from(level)).abs() < 1e-4, "{level} dB, W/W");
 
         if level.abs() == 6 {
@@ -127,11 +127,11 @@ fn decades(s: &mut Svg) {
     for level in (DB_MIN..=-30).step_by(10) {
         let row = y(f64::from(level));
         let exponent = level / 10;
-        let back = PowerGain::bounded(10f64.powi(exponent)).to_db();
+        let back = PowerGain::bounded(10f64.powi(exponent)).to_db().unwrap().get();
         assert!((back - f64::from(level)).abs() < 1e-9, "{level} dB, W/W");
         s.text(POWER, row + 5.0, "end", "mono lg", &power_of_ten(exponent));
         if level % 20 == 0 {
-            let back = VoltGain::bounded(10f64.powi(level / 20)).to_db();
+            let back = VoltGain::bounded(10f64.powi(level / 20)).to_db().unwrap().get();
             assert!((back - f64::from(level)).abs() < 1e-9, "{level} dB, V/V");
             s.text(
                 AMPLITUDE,
@@ -187,7 +187,7 @@ struct Anchor {
 fn adc_floor(bits: i32) -> Anchor {
     // a full-scale sine over quantisation noise: (A²/2) / (q²/12) with q = 2A/2ᴺ
     let snr = 1.5 * 4f64.powi(bits);
-    let level = PowerGain::bounded(1.0 / snr).to_db();
+    let level = PowerGain::bounded(1.0 / snr).to_db().unwrap().get();
     let rule_of_thumb = 6.02 * f64::from(bits) + 1.76;
     assert!((level + rule_of_thumb).abs() < 0.02, "{bits} bits");
     Anchor {
@@ -208,9 +208,9 @@ fn dbfs(level: f64) -> String {
 }
 
 fn anchors(s: &mut Svg) {
-    let q15_step = Q15::<Per<Volt, Volt>>::of(1).to_db();
-    assert!((q15_step + 15.0 * VoltGain::bounded(2.0).to_db()).abs() < 1e-9);
-    let level_step = Level::new(1).to_db();
+    let q15_step = Q15::<Per<Volt, Volt>>::of(1).to_db().unwrap().get();
+    assert!((q15_step + 15.0 * VoltGain::bounded(2.0).to_db().unwrap().get()).abs() < 1e-9);
+    let level_step = Level::new(1).to_db().unwrap().get();
     assert!((level_step + 60.0).abs() < 1e-9);
 
     // longest next to the ruler: each label then runs right, past the bars that ended above it
@@ -269,8 +269,8 @@ fn anchors(s: &mut Svg) {
 /// The error of the rule of thumb, tinted as the rows it is about.
 fn thumb_note(s: &mut Svg) {
     let x = BARS;
-    let power_of_2 = PowerGain::bounded(2.0).to_db();
-    let amplitude_of_2 = VoltGain::bounded(2.0).to_db();
+    let power_of_2 = PowerGain::bounded(2.0).to_db().unwrap().get();
+    let amplitude_of_2 = VoltGain::bounded(2.0).to_db().unwrap().get();
     let plus_3 = PowerMicro::from_db_const_rounded(Decibels::new(3, 0), NearestEven).get();
     let short = (1.0 - f64::from(plus_3) / 2e6) * 100.0;
     s.text(

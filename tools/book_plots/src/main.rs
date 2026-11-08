@@ -255,8 +255,8 @@ fn db_step() -> String {
         if n > 200 && n % 16 != 0 {
             continue;
         }
-        let level = Gain::new(n).to_db();
-        let step = Gain::new(n + 1).to_db() - level;
+        let level = Gain::new(n).to_db().unwrap().get();
+        let step = Gain::new(n + 1).to_db().unwrap().get() - level;
         if level >= -60.0 && step.log10() >= -3.5 {
             pts.push((level, step.log10()));
         }

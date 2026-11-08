@@ -11,7 +11,7 @@
 //! into the stored value nearest to the exact gain, so the threshold is an integer literal in flash. A reading with
 //! bounds compares with that unbounded constant directly: one integer compare, the unit still checked.
 //!
-//! `cargo run --example 06_audio_limiter --features electrical,libm`
+//! `cargo run --example 06_audio_limiter --features electrical,levels,libm`
 
 #![expect(
     clippy::print_stdout,
@@ -51,8 +51,12 @@ fn main() {
         } else {
             "pass"
         };
-        // for the UI only: the level in dB, in hardware f32 (log10f), the formula again from the kind
-        println!("peak {peak} = {:.1} dBFS: {action}", peak.to_db_f32());
+        // for the UI only: the level in dB of full scale, a `Fixed<Decibel, One, f32>` in hardware f32 (log10f), the
+        // formula again from the kind
+        println!(
+            "peak {peak} = {:.1} FS: {action}",
+            peak.to_db_f32().unwrap()
+        );
     }
 
     // a level set at run time, from the UI: -12 dB is 251.188.. mV/V, not a whole number, so straight into the

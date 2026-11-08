@@ -74,8 +74,8 @@ struct Mark {
 /// What `n` Np is: `to_db` of e⁻ⁿ V/V and of e⁻²ⁿ W/W are one level, and that level as `Decibels` gives the two ratios
 /// back, correctly rounded by the crate.
 fn mark(n: i32, db_in_np: f64) -> Mark {
-    let db = VoltGain::bounded(E.powi(-n)).to_db();
-    let of_power = PowerGain::bounded(E.powi(-2 * n)).to_db();
+    let db = VoltGain::bounded(E.powi(-n)).to_db().unwrap().get();
+    let of_power = PowerGain::bounded(E.powi(-2 * n)).to_db().unwrap().get();
     assert!((db - of_power).abs() < 1e-9, "{n} Np, V/V against W/W");
     assert!((db * db_in_np + f64::from(n)).abs() < 1e-12, "{n} Np");
     #[expect(

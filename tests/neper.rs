@@ -224,19 +224,22 @@ fn np_and_db_are_one_level() {
     }
 }
 
-#[cfg(any(feature = "std", feature = "libm"))]
+#[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
 mod run_time {
     use super::*;
 
     #[test]
     fn forms() {
         let e = E;
-        assert_eq!(VoltGain::<One, f64>::bounded(e).to_np(), 1.0);
-        assert!((PowerGain::<One, f64>::bounded(e * e).to_np() - 1.0).abs() < 1e-15);
-        assert_eq!(VoltGain::<One, f64>::bounded(1.0).to_np(), 0.0);
+        assert_eq!(VoltGain::<One, f64>::bounded(e).to_np().unwrap().get(), 1.0);
+        assert!((PowerGain::<One, f64>::bounded(e * e).to_np().unwrap().get() - 1.0).abs() < 1e-15);
+        assert_eq!(
+            VoltGain::<One, f64>::bounded(1.0).to_np().unwrap().get(),
+            0.0
+        );
         // 100 mV/V of an amplitude is ln 0.1 = -2.302585 Np; 100 mW/W of a power is half of it
-        let a = VoltGain::<Milli, u32>::new(100).to_np();
-        let b = PowerGain::<Milli, u32>::new(100).to_np();
+        let a = VoltGain::<Milli, u32>::new(100).to_np().unwrap().get();
+        let b = PowerGain::<Milli, u32>::new(100).to_np().unwrap().get();
         assert!((a + LN_10).abs() < 1e-15);
         assert!((b * 2.0 - a).abs() < 1e-15);
         assert_eq!(VoltGain::<Milli, u32>::from_np(0.0), Some(Fixed::new(1000)));
@@ -250,15 +253,24 @@ mod run_time {
             let x = np.to_f64();
             let v = VoltGain::<One, f64>::from_np(x).unwrap();
             let p = PowerGain::<One, f64>::from_np(x).unwrap();
-            for (n, db) in [(v.to_np(), v.to_db()), (p.to_np(), p.to_db())] {
+            for (n, db) in [
+                (v.to_np().unwrap().get(), v.to_db().unwrap().get()),
+                (p.to_np().unwrap().get(), p.to_db().unwrap().get()),
+            ] {
                 let want = n * (20.0 / LN_10);
                 assert!(
                     (want - db).abs() <= 1e-13 * (1.0 + db.abs()),
                     "{x} Np: {want} dB vs {db} dB"
                 );
             }
-            assert!((v.to_np() - x).abs() < 1e-12 * (1.0 + x.abs()), "{x}");
-            assert!((p.to_np() - x).abs() < 1e-12 * (1.0 + x.abs()), "{x}");
+            assert!(
+                (v.to_np().unwrap().get() - x).abs() < 1e-12 * (1.0 + x.abs()),
+                "{x}"
+            );
+            assert!(
+                (p.to_np().unwrap().get() - x).abs() < 1e-12 * (1.0 + x.abs()),
+                "{x}"
+            );
         }
     }
 
@@ -272,11 +284,14 @@ mod run_time {
                 (f64::from(g32.get()) / g.get() - 1.0).abs() < 1e-5 * (1.0 + x.abs()),
                 "{x} Np"
             );
-            assert!((g.to_np() - x).abs() < 1e-12 * (1.0 + x.abs()), "{x}");
             assert!(
-                (f64::from(g32.to_np_f32()) - x).abs() < 1e-3 + x.abs() * 1e-5,
+                (g.to_np().unwrap().get() - x).abs() < 1e-12 * (1.0 + x.abs()),
+                "{x}"
+            );
+            assert!(
+                (f64::from(g32.to_np_f32().unwrap().get()) - x).abs() < 1e-3 + x.abs() * 1e-5,
                 "{x} Np: {}",
-                g32.to_np_f32()
+                g32.to_np_f32().unwrap().get()
             );
         }
         let c: VoltGain<Micro, u32> = np!(-1, NearestEven);
@@ -286,6 +301,9 @@ mod run_time {
             PowerGain::<Milli, u32>::from_np_f32(0.0),
             Some(Fixed::new(1000))
         );
-        assert_eq!(VoltGain::<Milli, u16>::new(1000).to_np_f32(), 0.0);
+        assert_eq!(
+            VoltGain::<Milli, u16>::new(1000).to_np_f32().unwrap().get(),
+            0.0
+        );
     }
 }

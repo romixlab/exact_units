@@ -75,7 +75,7 @@ fn prefix_names() {
 #[test]
 fn kinds_of_markers() {
     use exact_units::{Exact, Fixed, Kind, LevelForm, prefix::One};
-    use units::{Ampere, Ohm, Ratio, Siemens, Times, Volt, Watt};
+    use units::{Ampere, Decibel, Ohm, Ratio, Siemens, Times, Volt, Watt};
 
     let volt = <Volt as Unit>::DIM;
     assert_eq!(<Per<Volt, Volt> as Unit>::KIND, Kind::RatioOf(volt));
@@ -121,24 +121,28 @@ fn kinds_of_markers() {
     );
     assert_eq!(Exact::<Volt>::int(i128::MAX).scaled(Exact::int(4)), None);
 
-    // decibels by kind: 20·lg for V/V and A/A, 10·lg for W/W
-    let db = |x: f64, y: f64| (x - y).abs() < 1e-12;
+    // decibels by kind: 20·lg for V/V and A/A, 10·lg for W/W, as a level in dB
+    let db = |x: Option<Fixed<Decibel, One, f64>>, y: f64| (x.unwrap().get() - y).abs() < 1e-12;
     assert!(db(
         Fixed::<Per<Volt, Volt>, One, f64>::bounded(2.0).to_db(),
-        6.020599913279624
+        20.0 * 2f64.log10()
     ));
     assert!(db(
         Fixed::<Per<Watt, Watt>, One, f64>::bounded(2.0).to_db(),
-        3.010299956639812
+        10.0 * 2f64.log10()
     ));
     assert!(db(
         Fixed::<Per<Ampere, Ampere>, One, f64>::bounded(0.5).to_db(),
-        -6.020599913279624
+        -20.0 * 2f64.log10()
     ));
+    assert_eq!(
+        Fixed::<Per<Volt, Volt>, One, f64>::bounded(-1.0).to_db(),
+        None
+    );
     let back = Fixed::<Per<Watt, Watt>, One, f64>::from_db(-3.0)
         .unwrap()
         .get();
-    assert!(db(back, 10f64.powf(-0.3)));
+    assert!((back - 10f64.powf(-0.3)).abs() < 1e-12);
 }
 
 /// Minutes, hours, days and weeks are exact scales of the second: they convert both ways where the count is whole.

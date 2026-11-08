@@ -417,8 +417,8 @@ impl<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>> Fixe
         r: crate::Rounding,
     ) -> Option<Fixed<L, P2, T2>> {
         let x = match const { Via::of::<L, P2>() } {
-            Via::Db(k) => self.to_db() * k,
-            Via::Np(k) => self.to_np() * k,
+            Via::Db(k) => self.db_f64() * k,
+            Via::Np(k) => self.np_f64() * k,
         };
         if !x.is_finite() {
             return None;

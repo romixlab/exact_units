@@ -7,18 +7,18 @@ level: advanced
 dBm is a power level against a fixed reference, 1 mW: nothing new, a `Per<Watt, Watt>` power ratio of the
 measured power to that reference, the same idiom [dBFS](../levels/thresholds.md#dbfs) uses against full scale.
 The kind of a W/W ratio already picks 10·lg ([Decibels](../levels/decibels.md#the-kind-picks-the-formula)), so
-`to_db` gives dBm directly:
+`to_db` gives dBm directly, as a `Fixed<Decibel, One, f64>`:
 
 ```rust
-# #[cfg(any(feature = "std", feature = "libm"))] {
-use exact_units::{Fixed, db, prefix::One, units::{Per, Watt}};
+# #[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))] {
+use exact_units::{Fixed, db, prefix::One, q, units::{Decibel, Per, Watt}};
 
 // +30 dBm, the classic 1 W: 1000 mW against the 1 mW reference, a whole number of decades, exact
 const TX: Fixed<Per<Watt, Watt>, One, u32> = db!(30);
 assert_eq!(TX.get(), 1_000);
 
 let p = Fixed::<Per<Watt, Watt>, One, f64>::bounded(1000.0);
-assert_eq!(p.to_db(), 30.0);
+assert!(p.to_db().unwrap() == q!(30 Decibel));
 # }
 ```
 
@@ -30,20 +30,20 @@ A coax or a fibre's loss is a rate, dB per unit length, and `Fixed::over` turns 
 
 ```rust
 # #[cfg(all(feature = "levels", feature = "mechanical", any(feature = "std", feature = "libm")))] {
-use exact_units::{Fixed, Rounding::NearestEven, prefix::One, units::{Decibel, Loss, Meter, Per, Watt}};
+use exact_units::{Fixed, Rounding::NearestEven, prefix::One, q, units::{Decibel, Loss, Meter, Per, Watt}};
 
 let alpha = Fixed::<Per<Loss<Decibel>, Meter>, One, f64>::bounded(0.177); // 17.7 dB/100 m
 let run = Fixed::<Meter, One, f64>::bounded(10.0);
 let loss: Fixed<Loss<Decibel>, One, f64> = alpha.over(run, NearestEven).unwrap();
-assert!((loss.get() - 1.77).abs() < 1e-9);
+assert!(loss.is_in(q!(1.77 Loss<Decibel> +- 0.000001 Loss<Decibel>, Inside)));
 
 let tx = Fixed::<Per<Watt, Watt>, One, f64>::bounded(1000.0); // +30 dBm
-let at_antenna_dbm = tx.to_db() - loss.get();
-assert!((at_antenna_dbm - 28.23).abs() < 1e-9); // +28.23 dBm at the antenna
+let at_antenna_dbm = (tx.to_db().unwrap() + loss.as_gain()).not_nan().unwrap();
+assert!(at_antenna_dbm.is_in(q!(28.23 Decibel +- 0.000001 Decibel, Inside))); // +28.23 dBm at the antenna
 # }
 ```
 
-A loss is signed as a loss (positive for a decay, [Decibels](../levels/decibels.md#a-level-as-a-quantity)), so it subtracts directly from a gain-signed dBm level; `as_gain` negates it where both sides must be the same sign before an addition.
+A loss is signed as a loss (positive for a decay, [Decibels](../levels/decibels.md#a-level-as-a-quantity)), and a level of gain and one of loss don't add: `as_gain` negates the loss, so both sides are levels of gain before the addition.
 
 ## Power of a complex value
 

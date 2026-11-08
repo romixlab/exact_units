@@ -10,19 +10,19 @@ $$
 \Gamma = \frac{Z - Z_0}{Z + Z_0}
 $$
 
-- **Γ is `Complex<Per<Volt, Volt>, One, F>`**, a ratio of root-power quantities: its `to_db` is 20·lg|Γ|, and `return_loss_db` is −20·lg|Γ|, positive for a passive load.
+- **Γ is `Complex<Per<Volt, Volt>, One, F>`**, a ratio of root-power quantities: its `to_db` is 20·lg|Γ|, and `return_loss` is −20·lg|Γ|, a `Fixed<Loss<Decibel>, One, F>` positive for a passive load.
 - **VSWR** is `(1 + |Γ|) / (1 − |Γ|)`, the ratio of the standing wave's largest voltage to its smallest, a `Fixed<Per<Volt, Volt>, One, F>`; infinite at |Γ| ≥ 1.
 - **Mismatch loss** is `1 − |Γ|²`, the share of the incident power the load takes, a `Fixed<Per<Watt, Watt>, One, F>`: its `to_db` is 10·lg, the loss as a negative level (−0.51 dB at VSWR 2).
 
 ```rust
-# #[cfg(all(feature = "electrical", any(feature = "std", feature = "libm")))] {
-use exact_units::{Complex, Fixed, Impedance, Z0, prefix::One, q};
+# #[cfg(all(feature = "electrical", feature = "levels", any(feature = "std", feature = "libm")))] {
+use exact_units::{Complex, Impedance, Z0, prefix::One, q, units::{Decibel, Loss}};
 
 let z0 = Z0::<One, f64>::bounded(50.0, 0.0);
 let gamma = Impedance::<One, f64>::bounded(100.0, 0.0).reflection(z0).finite().unwrap();
 assert_eq!(gamma, Complex::<_, _, f64>::bounded(1.0 / 3.0, 0.0));
-assert!((gamma.vswr().get() - 2.0).abs() < 1e-12);
-assert!((gamma.return_loss_db() - 9.542425094393248).abs() < 1e-12);
+assert!(gamma.vswr().is_in(q!(2 V/V +- 0.000001 V/V, Inside))); // 1.9999999999999998 in f64
+assert!(gamma.return_loss().is_in(q!(9.542425... Loss<Decibel>))); // 20·lg 3
 assert!(gamma.mismatch_loss().is_in(q!(0.888... W/W))); // 8/9 of the power, -0.51 dB as its to_db()
 # }
 ```

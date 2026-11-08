@@ -5,7 +5,9 @@
 //! - [Fixed::to_db] / [Fixed::from_db] in `f64`, [Fixed::to_db_f32] / [Fixed::from_db_f32] in `f32`, the float a
 //!   Cortex-M4F or M33 has in hardware (`f64` is software there). With feature `std` or `libm`: `log10` and `powf`
 //!   aren't in `core`. With `libm` (pure Rust, no C) they come from it even when `std` is on, so a host and a
-//!   firmware compute the same bits.
+//!   firmware compute the same bits. `to_db` gives a level as a typed value, `Option<Fixed<Decibel, One, f64>>`
+//!   (feature `levels` too), so it checks against `q!(6.0205... Decibel)` and keeps its unit; `from_db` takes the
+//!   bare number a setting or a reading arrives as.
 //! - [Fixed::from_db_const] and [db!](crate::db): a level written in decimal (`db!(-3.01)`) becomes the stored value
 //!   at compile time, exactly: the stored value nearest to `10^(dB/20)` (or `/10`), worked out in integers with an
 //!   error bound, no float math at run time and no feature needed. A firmware compares the integers.
@@ -548,24 +550,15 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
 
 #[cfg(any(feature = "std", feature = "libm"))]
 impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> {
-    /// The gain in dB: 20·lg for a ratio of root-power quantities (V/V, A/A), 10·lg for one of powers (W/W). A
-    /// kind without a level form (a plain [Ratio](crate::units::Ratio), a duty cycle) doesn't compile. Feature
-    /// `std` or `libm`.
-    ///
-    /// ```
-    /// # #[cfg(feature = "electrical")] {
-    /// use exact_units::{Fixed, prefix::{Milli, One}, units::{Ampere, Per, Volt, Watt}};
-    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f64>::bounded(10.0).to_db(), 20.0);
-    /// assert_eq!(Fixed::<Per<Ampere, Ampere>, Milli, u32>::new(100).to_db(), -20.0);
-    /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::bounded(100.0).to_db(), 20.0);
-    /// # }
-    /// ```
-    ///
-    /// ```compile_fail
-    /// use exact_units::{Fixed, prefix::One, units::Ratio};
-    /// let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_db();
-    /// ```
-    pub fn to_db(self) -> f64 {
+    /// The number [to_db](Self::to_db) holds: 20·lg or 10·lg by the kind, NaN for a gain below 0.
+    #[cfg_attr(
+        not(feature = "levels"),
+        expect(
+            dead_code,
+            reason = "the typed to_db and to_np, and to_level, need `levels`"
+        )
+    )]
+    pub(crate) fn db_f64(self) -> f64 {
         let form = const { Self::LEVEL_FORM };
         let x = match self.get().to_repr() {
             #[expect(
@@ -598,16 +591,15 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
         Self::try_new(T::from_float(x)?).ok()
     }
 
-    /// [to_db](Self::to_db) in `f32`, with no `f64` on the way: the float of a Cortex-M4F or M33.
-    ///
-    /// ```
-    /// # #[cfg(feature = "electrical")] {
-    /// use exact_units::{Fixed, prefix::{Milli, One}, units::{Per, Volt}};
-    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f32>::bounded(10.0).to_db_f32(), 20.0);
-    /// assert_eq!(Fixed::<Per<Volt, Volt>, Milli, u16>::new(100).to_db_f32(), -20.0);
-    /// # }
-    /// ```
-    pub fn to_db_f32(self) -> f32 {
+    /// The number [to_db_f32](Self::to_db_f32) holds, worked out in `f32`.
+    #[cfg_attr(
+        not(feature = "levels"),
+        expect(
+            dead_code,
+            reason = "the typed to_db and to_np, and to_level, need `levels`"
+        )
+    )]
+    pub(crate) fn db_f32(self) -> f32 {
         #[expect(
             clippy::as_conversions,
             clippy::cast_possible_truncation,
@@ -650,23 +642,15 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
         Self::try_new(T::from_f32(x)?).ok()
     }
 
-    /// The gain in Np: `ln(x)` for a ratio of root-power quantities (V/V, A/A), `½·ln(x)` for one of powers
-    /// (W/W). A kind without a level form doesn't compile. Feature `std` or `libm`.
-    ///
-    /// ```
-    /// # #[cfg(feature = "electrical")] {
-    /// use exact_units::{Fixed, prefix::One, units::{Per, Volt, Watt}};
-    /// let e = core::f64::consts::E;
-    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f64>::bounded(e).to_np(), 1.0);
-    /// assert_eq!(Fixed::<Per<Watt, Watt>, One, f64>::bounded(e * e).to_np(), 1.0);
-    /// # }
-    /// ```
-    ///
-    /// ```compile_fail
-    /// use exact_units::{Fixed, prefix::One, units::Ratio};
-    /// let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_np();
-    /// ```
-    pub fn to_np(self) -> f64 {
+    /// The number [to_np](Self::to_np) holds: `ln(x)` or `½·ln(x)` by the kind, NaN for a gain below 0.
+    #[cfg_attr(
+        not(feature = "levels"),
+        expect(
+            dead_code,
+            reason = "the typed to_db and to_np, and to_level, need `levels`"
+        )
+    )]
+    pub(crate) fn np_f64(self) -> f64 {
         let form = const { Self::LEVEL_FORM };
         let x = match self.get().to_repr() {
             #[expect(
@@ -699,15 +683,15 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
         Self::try_new(T::from_float(x)?).ok()
     }
 
-    /// [to_np](Self::to_np) in `f32`, with no `f64` on the way: the float of a Cortex-M4F or M33.
-    ///
-    /// ```
-    /// # #[cfg(feature = "electrical")] {
-    /// use exact_units::{Fixed, prefix::One, units::{Per, Volt}};
-    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f32>::bounded(1.0).to_np_f32(), 0.0);
-    /// # }
-    /// ```
-    pub fn to_np_f32(self) -> f32 {
+    /// The number [to_np_f32](Self::to_np_f32) holds, worked out in `f32`.
+    #[cfg_attr(
+        not(feature = "levels"),
+        expect(
+            dead_code,
+            reason = "the typed to_db and to_np, and to_level, need `levels`"
+        )
+    )]
+    pub(crate) fn np_f32(self) -> f32 {
         #[expect(
             clippy::as_conversions,
             clippy::cast_possible_truncation,
@@ -748,5 +732,85 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
         let x = math::exp_ef(np / per_ln)
             * const { (1.0 / (P::SCALE.to_f64() * U::EXPR.factor())) as f32 };
         Self::try_new(T::from_f32(x)?).ok()
+    }
+}
+
+/// The levels of a gain as typed values, `Fixed<Decibel, One, f64>` and its kin, so a result keeps its unit and
+/// checks against `q!(.. Decibel)`. Features `levels` and `std` or `libm`.
+#[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
+impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> {
+    /// The gain in dB: 20·lg for a ratio of root-power quantities (V/V, A/A), 10·lg for one of powers (W/W), worked
+    /// out in `f64` and rounded. A gain of 0 is −∞ dB; `None` for a gain below 0, which has no level. A kind without
+    /// a level form (a plain [Ratio](crate::units::Ratio), a duty cycle) doesn't compile. [to_level](Fixed::to_level)
+    /// takes the level into another scale or storage, rounded by name.
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{Fixed, q, prefix::{Milli, One}, units::{Ampere, Decibel, Per, Volt, Watt}};
+    /// assert!(Fixed::<Per<Volt, Volt>, One, f64>::bounded(10.0).to_db().unwrap() == q!(20 Decibel));
+    /// assert!(Fixed::<Per<Ampere, Ampere>, Milli, u32>::new(100).to_db().unwrap() == q!(-20 Decibel));
+    /// assert!(Fixed::<Per<Watt, Watt>, One, f64>::bounded(100.0).to_db().unwrap() == q!(20 Decibel));
+    /// // a voltage ratio of 2 is 6.0206.. dB
+    /// assert!(Fixed::<Per<Volt, Volt>, One, f64>::bounded(2.0).to_db().unwrap().is_in(q!(6.0205... Decibel)));
+    /// assert_eq!(Fixed::<Per<Volt, Volt>, One, f64>::bounded(-1.0).to_db(), None);
+    /// # }
+    /// ```
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Fixed, prefix::One, units::Ratio};
+    /// let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_db();
+    /// ```
+    #[must_use]
+    pub fn to_db(self) -> Option<Fixed<crate::units::Decibel, crate::prefix::One, f64>> {
+        Fixed::try_new(self.db_f64()).ok()
+    }
+
+    /// [to_db](Self::to_db) in `f32`, with no `f64` on the way: the float of a Cortex-M4F or M33.
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{Fixed, q, prefix::{Milli, One}, units::{Decibel, Per, Volt}};
+    /// assert!(Fixed::<Per<Volt, Volt>, One, f32>::bounded(10.0).to_db_f32().unwrap() == q!(20 Decibel));
+    /// assert!(Fixed::<Per<Volt, Volt>, Milli, u16>::new(100).to_db_f32().unwrap() == q!(-20 Decibel));
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn to_db_f32(self) -> Option<Fixed<crate::units::Decibel, crate::prefix::One, f32>> {
+        Fixed::try_new(self.db_f32()).ok()
+    }
+
+    /// The gain in Np: `ln(x)` for a ratio of root-power quantities (V/V, A/A), `½·ln(x)` for one of powers
+    /// (W/W), worked out in `f64` and rounded. A gain of 0 is −∞ Np; `None` for a gain below 0. A kind without a
+    /// level form doesn't compile.
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{Fixed, q, prefix::One, units::{Neper, Per, Volt, Watt}};
+    /// let e = core::f64::consts::E;
+    /// assert!(Fixed::<Per<Volt, Volt>, One, f64>::bounded(e).to_np().unwrap() == q!(1 Neper));
+    /// assert!(Fixed::<Per<Watt, Watt>, One, f64>::bounded(e * e).to_np().unwrap() == q!(1 Neper));
+    /// # }
+    /// ```
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Fixed, prefix::One, units::Ratio};
+    /// let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_np();
+    /// ```
+    #[must_use]
+    pub fn to_np(self) -> Option<Fixed<crate::units::Neper, crate::prefix::One, f64>> {
+        Fixed::try_new(self.np_f64()).ok()
+    }
+
+    /// [to_np](Self::to_np) in `f32`, with no `f64` on the way: the float of a Cortex-M4F or M33.
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{Fixed, q, prefix::One, units::{Neper, Per, Volt}};
+    /// assert!(Fixed::<Per<Volt, Volt>, One, f32>::bounded(1.0).to_np_f32().unwrap() == q!(0 Neper));
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn to_np_f32(self) -> Option<Fixed<crate::units::Neper, crate::prefix::One, f32>> {
+        Fixed::try_new(self.np_f32()).ok()
     }
 }

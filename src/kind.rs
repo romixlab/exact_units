@@ -568,7 +568,11 @@ mod tests {
         assert_eq!(Kind::Plain.level_form(), None);
     }
 
-    #[cfg(all(feature = "electrical", any(feature = "std", feature = "libm")))]
+    #[cfg(all(
+        feature = "electrical",
+        feature = "levels",
+        any(feature = "std", feature = "libm")
+    ))]
     #[test]
     fn power_waves_take_20_lg() {
         use crate::Fixed;
@@ -576,7 +580,7 @@ mod tests {
         use crate::units::{Per, Sqrt, Watt};
         // |S21| = |b2/a1| of 0.1 is -20 dB, not -10
         let s21 = Fixed::<Per<Sqrt<Watt>, Sqrt<Watt>>, One, f64>::bounded(0.1);
-        assert!((s21.to_db() + 20.0).abs() < 1e-12);
+        assert!((s21.to_db().unwrap().get() + 20.0).abs() < 1e-12);
     }
 
     #[cfg(feature = "angle")]

@@ -4,21 +4,22 @@
 //! `db!(norm_sqr ..)` ([level](crate::complex::level)).
 //!
 //! - **Γ is `Complex<Per<Volt, Volt>, One, F>`**, a ratio of root-power quantities: its [to_db](Complex::to_db) is
-//!   20·lg|Γ|, and [return_loss_db](Complex::return_loss_db) is −20·lg|Γ|, positive for a passive load.
+//!   20·lg|Γ|, and [return_loss](Complex::return_loss) is −20·lg|Γ|, a `Fixed<Loss<Decibel>, One, F>` positive for
+//!   a passive load.
 //! - **VSWR** is `(1 + |Γ|) / (1 − |Γ|)`, the ratio of the standing wave's largest voltage to its smallest, a
 //!   `Fixed<Per<Volt, Volt>, One, F>`; infinite at |Γ| ≥ 1.
 //! - **Mismatch loss** is `1 − |Γ|²`, the share of the incident power the load takes, a `Fixed<Per<Watt, Watt>, One,
 //!   F>`: its `to_db` is 10·lg, the loss as a negative level (−0.51 dB at VSWR 2).
 //!
 //! ```
-//! # #[cfg(all(feature = "electrical", any(feature = "std", feature = "libm")))] {
-//! use exact_units::{Complex, Fixed, Impedance, Z0, prefix::One, q};
+//! # #[cfg(all(feature = "electrical", feature = "levels", any(feature = "std", feature = "libm")))] {
+//! use exact_units::{Complex, Impedance, Z0, prefix::One, q, units::{Decibel, Loss}};
 //!
 //! let z0 = Z0::<One, f64>::bounded(50.0, 0.0);
 //! let gamma = Impedance::<One, f64>::bounded(100.0, 0.0).reflection(z0).finite().unwrap();
 //! assert_eq!(gamma, Complex::<_, _, f64>::bounded(1.0 / 3.0, 0.0));
-//! assert!((gamma.vswr().get() - 2.0).abs() < 1e-12);
-//! assert!((gamma.return_loss_db() - 9.542425094393248).abs() < 1e-12);
+//! assert!(gamma.vswr().is_in(q!(2 V/V +- 0.000001 V/V, Inside))); // 1.9999999999999998 in f64
+//! assert!(gamma.return_loss().is_in(q!(9.542425... Loss<Decibel>))); // 20·lg 3
 //! assert!(gamma.mismatch_loss().is_in(q!(0.888... W/W))); // 8/9 of the power, -0.51 dB as its to_db()
 //! # }
 //! ```
@@ -49,6 +50,8 @@
 use super::{Complex, ComplexStorage, Extended};
 use crate::fixed::Repr;
 use crate::prefix::One;
+#[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
+use crate::units::{Decibel, Loss};
 use crate::units::{Ohm, Per, Siemens, Volt, Watt};
 use crate::{Fixed, FixedScale, OutOfBounds, Storage, Unlimited};
 use core::fmt;
@@ -432,24 +435,37 @@ macro_rules! float_rf {
                 let g = self.abs().get();
                 Fixed::from_nan_free(if g >= 1.0 { $ty::INFINITY } else { (1.0 + g) / (1.0 - g) })
             }
-
-            /// The return loss −20·lg|Γ| in dB, positive for a passive load ([to_db](Complex::to_db) negated).
-            /// Feature `std` or `libm`.
-            #[inline(always)]
-            pub fn return_loss_db(self) -> f64 {
-                -self.to_db()
-            }
-
-            /// [return_loss_db](Self::return_loss_db) in `f32` ([to_db_f32](Complex::to_db_f32) negated).
-            #[inline(always)]
-            pub fn return_loss_db_f32(self) -> f32 {
-                -self.to_db_f32()
-            }
         }
     )*};
 }
 
 float_rf!(f32 f64);
+
+macro_rules! return_loss {
+    ($($ty:ident $db:ident)*) => {$(
+        #[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
+        impl Gamma<$ty> {
+            /// The return loss −20·lg|Γ| in dB as a loss, positive for a passive load, worked out in the storage's
+            /// float: +∞ when matched, 0 for a short or an open. Features `levels` and `std` or `libm`.
+            ///
+            /// ```
+            /// # #[cfg(feature = "electrical")] {
+            /// use exact_units::{Impedance, Z0, prefix::One, q, units::{Decibel, Loss}};
+            /// let z0 = Z0::<One, f32>::bounded(50.0, 0.0);
+            /// let gamma = Impedance::<One, f32>::bounded(25.0, 0.0).reflection(z0).finite().unwrap();
+            /// assert!(gamma.return_loss().is_in(q!(9.54... Loss<Decibel>))); // |Γ| = 1/3
+            /// # }
+            /// ```
+            #[inline(always)]
+            pub fn return_loss(self) -> Fixed<Loss<Decibel>, One, $ty> {
+                // |Γ|² is no NaN for a Γ that has none, so neither is its level
+                Fixed::from_nan_free(-self.$db())
+            }
+        }
+    )*};
+}
+
+return_loss!(f32 db_f32 f64 db_f64);
 
 #[cfg(test)]
 mod tests;

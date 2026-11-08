@@ -4,21 +4,21 @@ level: advanced
 
 # A worked matching example
 
-A tuner measures an antenna's impedance at a few frequencies against a 50 Ω line. A bench tool shows Γ, VSWR, return loss and mismatch loss on a host; the firmware on the antenna side only answers "matched or not" per sweep step, from a reflectometer's Q15 Γ, on a part without an FPU. `cargo run --example 13_impedance_match --features electrical,angle,dimensionless,libm` runs the whole thing — [Examples](../recipes/examples.md) has the line and the file.
+A tuner measures an antenna's impedance at a few frequencies against a 50 Ω line. A bench tool shows Γ, VSWR, return loss and mismatch loss on a host; the firmware on the antenna side only answers "matched or not" per sweep step, from a reflectometer's Q15 Γ, on a part without an FPU. `cargo run --example 13_impedance_match --features electrical,angle,dimensionless,levels,libm` runs the whole thing — [Examples](../recipes/examples.md) has the line and the file.
 
 ## On the bench, in floats
 
 100 Ω on a 50 Ω line ([Impedance and admittance](impedance.md), [Reflection](reflection.md)):
 
 ```rust
-# #[cfg(all(feature = "electrical", any(feature = "std", feature = "libm")))] {
-use exact_units::{Admittance, Impedance, Z0, prefix::{Milli, One}, q};
+# #[cfg(all(feature = "electrical", feature = "levels", any(feature = "std", feature = "libm")))] {
+use exact_units::{Admittance, Impedance, Z0, prefix::{Milli, One}, q, units::{Decibel, Loss}};
 
 let z0 = Z0::<One, f64>::bounded(50.0, 0.0);
 let z = Impedance::<One, f64>::bounded(100.0, 0.0);
 let gamma = z.reflection(z0).finite().unwrap();
-assert!((gamma.vswr().get() - 2.0).abs() < 1e-12);
-assert!((gamma.return_loss_db() - 9.542425094393248).abs() < 1e-12);
+assert!(gamma.vswr().is_in(q!(2 V/V +- 0.000001 V/V, Inside)));
+assert!(gamma.return_loss().is_in(q!(9.542425... Loss<Decibel>)));
 assert!(gamma.mismatch_loss().is_in(q!(0.888... W/W))); // 8/9 of the power, -0.51 dB as its to_db()
 
 // at 440 MHz the antenna looks inductive, 82 + 35j Ω: a shunt element is chosen in admittance

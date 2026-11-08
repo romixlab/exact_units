@@ -11,7 +11,7 @@
 //! meant and works the threshold out at compile time, in integers, so the firmware compares `norm_sqr` (two
 //! multiplies, no root, no log) with a constant.
 //!
-//! `cargo run --example 13_impedance_match --features electrical,angle,dimensionless,libm`
+//! `cargo run --example 13_impedance_match --features electrical,angle,dimensionless,levels,libm`
 
 #![expect(
     clippy::print_stdout,
@@ -20,8 +20,8 @@
 )]
 
 use exact_units::prefix::{Milli, One, Pow2, Product};
-use exact_units::units::{Degree, Per, Phase, Times, Volt};
-use exact_units::{Admittance, Complex, Fixed, Impedance, Saturating, Z0, db};
+use exact_units::units::{Decibel, Degree, Loss, Per, Phase, Times, Volt};
+use exact_units::{Admittance, Complex, Fixed, Impedance, Saturating, Z0, db, q};
 
 /// Γ from the reflectometer: b/a in Q15, saturating at the ends.
 type GammaQ15 = Complex<Per<Volt, Volt>, Pow2<-15>, i16, Saturating>;
@@ -49,12 +49,12 @@ fn main() {
         let p = gamma.to_polar();
         let deg = p.arg().convert::<Phase<Degree>, One, f64>().unwrap();
         println!(
-            "  {mhz} MHz  Z = {z:#}  Γ = {:.3} ∠ {:6.1}°  VSWR {:.2}  RL {:5.2} dB  ML {:.2} dB",
+            "  {mhz} MHz  Z = {z:#}  Γ = {:.3} ∠ {:6.1}°  VSWR {:.2}  RL {:.2}  ML {:.2}",
             p.abs().get(),
             deg.get(),
             gamma.vswr().get(),
-            gamma.return_loss_db(),
-            gamma.mismatch_loss().to_db(),
+            gamma.return_loss(),
+            gamma.mismatch_loss().to_db().unwrap(),
         );
     }
 
@@ -63,9 +63,15 @@ fn main() {
         .reflection(z0)
         .finite()
         .unwrap();
-    assert!((gamma.vswr().get() - 2.0).abs() < 1e-12);
-    assert!((gamma.return_loss_db() - 9.542).abs() < 1e-3);
-    assert!((gamma.mismatch_loss().to_db() + 0.512).abs() < 1e-3);
+    assert!(gamma.vswr().is_in(q!(2 V/V +- 0.000001 V/V, Inside)));
+    assert!(gamma.return_loss().is_in(q!(9.542... Loss<Decibel>)));
+    assert!(
+        gamma
+            .mismatch_loss()
+            .to_db()
+            .unwrap()
+            .is_in(q!(-0.511...Decibel))
+    );
 
     // a shunt element is chosen in admittance: Y = 1/Z, here in mS
     let y: Admittance<Milli, f64> = Impedance::<One, f64>::bounded(82.0, 35.0)
@@ -90,9 +96,9 @@ fn main() {
         let p = g.to_polar();
         let deg = f32::from(p.arg().get()) * 360.0 / 65_536.0;
         println!(
-            "  Γ = {g}: |Γ| = {} ({:.1} dB) ∠ {deg:.1}°: {verdict} (with the slip: {slip})",
+            "  Γ = {g}: |Γ| = {} ({:.1}) ∠ {deg:.1}°: {verdict} (with the slip: {slip})",
             p.abs(),
-            g.to_db_f32(),
+            g.to_db_f32().unwrap(),
         );
     }
     assert!(GammaQ15::of(-1_014, 1_356).norm_sqr() <= MATCHED);
