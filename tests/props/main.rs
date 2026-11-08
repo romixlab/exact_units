@@ -40,6 +40,10 @@ mod q_literal;
 mod q_point;
 #[cfg(all(feature = "q", feature = "electrical"))]
 mod q_range;
+#[cfg(all(feature = "q", feature = "electrical", not(kani)))]
+mod q_range_level;
+#[cfg(all(feature = "q", feature = "thermal", feature = "angle", not(kani)))]
+mod q_range_point;
 #[cfg(all(feature = "q", not(kani)))]
 mod q_text;
 mod reference;

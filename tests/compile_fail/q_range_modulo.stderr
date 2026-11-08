@@ -1,0 +1,16 @@
+error[E0271]: type mismatch resolving `<Angle<Degree> as Origin>::Modulus == Linear`
+ --> tests/compile_fail/q_range_modulo.rs:6:21
+  |
+6 |     let _ = a.is_in(q!(0 @ Angle<Degree> ..= 90 @ Angle<Degree>));
+  |               ----- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Linear`, found `Modulo<Rational<360, 1>>`
+  |               |
+  |               required by a bound introduced by this call
+  |
+  = note: expected struct `Linear`
+             found struct `Modulo<Rational<360, 1>>`
+  = note: required for `LiteralRange<LiteralAt<0, 0, Steps, Angle<Degree>>, LiteralAt<9, 1, Steps, Angle<Degree>>, false, false, 0>` to implement `Contains<Point<Angle<Degree>, Fixed<Degree, exact_units::prefix::Centi, i16>>>`
+note: required by a bound in `exact_units::contains::<impl Point<O, V>>::is_in`
+ --> src/contains.rs
+  |
+  |     pub fn is_in<R: Contains<Self>>(&self, set: R) -> bool {
+  |                     ^^^^^^^^^^^^^^ required by this bound in `exact_units::contains::<impl Point<O, V>>::is_in`

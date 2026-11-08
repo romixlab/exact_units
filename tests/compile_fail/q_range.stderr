@@ -10,18 +10,23 @@ error[E0080]: evaluation panicked: the lower end of this range is no stored valu
 note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Milli, i16>>::fold_range::<Volt, Volt>`
  --> src/literal/range.rs
   |
-  |                   let (a, b) = fold_int(
-  |  ______________________________^
+  | /                 Self::fold_cuts(
   | |                     &[(cut::<Lo, U, P>(lo), ls, lu.as_str()), (cut::<Hi, U, P>(hi), hs, hu.as_str())],
   | |                     open,
   | |                     fit,
-  | |                     min,
-  | |                     max,
-  | |                 );
+  | |                 )
   | |_________________^
 ...
   |   range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
   |   ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Milli, i16>>::fold_cuts`
+ --> src/literal/range.rs
+  |
+  |                 let (a, b) = fold_int(ends, open, fit, min, max);
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
 note: inside `exact_units::literal::range::fold_int`
  --> src/literal/range.rs
   |
@@ -70,18 +75,23 @@ error[E0080]: evaluation panicked: the upper end of this range is no stored valu
 note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Milli, i16>>::fold_range::<Volt, Volt>`
  --> src/literal/range.rs
   |
-  |                   let (a, b) = fold_int(
-  |  ______________________________^
+  | /                 Self::fold_cuts(
   | |                     &[(cut::<Lo, U, P>(lo), ls, lu.as_str()), (cut::<Hi, U, P>(hi), hs, hu.as_str())],
   | |                     open,
   | |                     fit,
-  | |                     min,
-  | |                     max,
-  | |                 );
+  | |                 )
   | |_________________^
 ...
   |   range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
   |   ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Milli, i16>>::fold_cuts`
+ --> src/literal/range.rs
+  |
+  |                 let (a, b) = fold_int(ends, open, fit, min, max);
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
 note: inside `exact_units::literal::range::fold_int`
  --> src/literal/range.rs
   |
@@ -116,18 +126,23 @@ error[E0080]: evaluation panicked: no stored value is in this range: it lies bet
 note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Deci, i16>>::fold_range::<Volt, Volt>`
  --> src/literal/range.rs
   |
-  |                   let (a, b) = fold_int(
-  |  ______________________________^
+  | /                 Self::fold_cuts(
   | |                     &[(cut::<Lo, U, P>(lo), ls, lu.as_str()), (cut::<Hi, U, P>(hi), hs, hu.as_str())],
   | |                     open,
   | |                     fit,
-  | |                     min,
-  | |                     max,
-  | |                 );
+  | |                 )
   | |_________________^
 ...
   |   range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
   |   ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Deci, i16>>::fold_cuts`
+ --> src/literal/range.rs
+  |
+  |                 let (a, b) = fold_int(ends, open, fit, min, max);
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
 note: inside `exact_units::literal::range::fold_int`
  --> src/literal/range.rs
   |
@@ -162,18 +177,23 @@ error[E0080]: evaluation panicked: every value of this storage and its bounds is
 note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Milli, u8>>::fold_range::<Volt, Volt>`
  --> src/literal/range.rs
   |
-  |                   let (a, b) = fold_int(
-  |  ______________________________^
+  | /                 Self::fold_cuts(
   | |                     &[(cut::<Lo, U, P>(lo), ls, lu.as_str()), (cut::<Hi, U, P>(hi), hs, hu.as_str())],
   | |                     open,
   | |                     fit,
-  | |                     min,
-  | |                     max,
-  | |                 );
+  | |                 )
   | |_________________^
 ...
   |   range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
   |   ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Milli, u8>>::fold_cuts`
+ --> src/literal/range.rs
+  |
+  |                 let (a, b) = fold_int(ends, open, fit, min, max);
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
 note: inside `exact_units::literal::range::fold_int`
  --> $RUST/core/src/panic.rs
   |
@@ -209,8 +229,25 @@ error[E0080]: evaluation panicked: the lower end of this range is no float of th
 note: inside `exact_units::literal::range::<impl Fixed<Volt, One, f32>>::fold_range::<Volt, Volt>`
  --> src/literal/range.rs
   |
-  |                               $end(false, l.down, lo.num() < 0, scale_in::<Lo, U, P>(), u.as_str())
-  |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  | /                 Self::fold_floats(
+  | |                     &[
+  | |                         (Below::<$ty>::of::<Lo, U, P>(lo), lo.num() < 0, ls, lu.as_str()),
+  | |                         (Below::<$ty>::of::<Hi, U, P>(hi), hi.num() < 0, hs, hu.as_str()),
+... |
+  | |                     fit,
+  | |                 )
+  | |_________________^
+...
+  | / range_float! {
+  | |     f32 float_end_f32;
+  | |     f64 float_end_f64;
+  | | }
+  | |_- in this macro invocation
+note: inside `exact_units::literal::range::<impl Fixed<Volt, One, f32>>::fold_floats`
+ --> src/literal/range.rs
+  |
+  |                           _ => $end(false, l.down, l_neg, l_step, l_unit),
+  |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
   | / range_float! {
   | |     f32 float_end_f32;

@@ -423,3 +423,136 @@ pub(crate) mod range {
         Some(lo)
     }
 }
+
+/// The reference of `q!` ranges whose ends are known by their order alone (properties 32 and 33, `q_range_point.rs`,
+/// `q_range_level.rs`): a point at another origin, a gain `10^(x/20)` with no decimal. The same reading as
+/// [range]'s, over `end(t)`, the order of stored value `t` against the end, in place of a decimal.
+#[cfg(all(feature = "q", not(kani)))]
+pub(crate) mod range_order {
+    use core::cmp::Ordering::{self, Equal, Greater, Less};
+
+    /// The order of a stored value against an end, `None` where the reference doesn't fit.
+    pub(crate) type End<'a> = &'a dyn Fn(i128) -> Option<Ordering>;
+
+    /// A range: its ends, the lower one out for `lo_open`, the upper one for `open`, `fit` 0 (an end off the steps
+    /// refused), 1 (`Inside`) or 2 (`Outside`).
+    #[derive(Copy, Clone)]
+    pub(crate) struct Ends<'a> {
+        pub(crate) lo: End<'a>,
+        pub(crate) hi: End<'a>,
+        pub(crate) lo_open: bool,
+        pub(crate) open: bool,
+        pub(crate) fit: u8,
+    }
+
+    /// Whether a stored value of `min ..= max` equals `end`: the first one not below it does.
+    fn on_step(min: i128, max: i128, end: End<'_>) -> Option<bool> {
+        let f = first_true(min, max, |t| Some(end(t)? != Less))?;
+        Some(f <= max && end(f)? == Equal)
+    }
+
+    /// Whether each end equals a stored value of `min ..= max`, worked out once for a range.
+    fn steps(min: i128, max: i128, e: Ends<'_>) -> Option<[bool; 2]> {
+        Some([on_step(min, max, e.lo)?, on_step(min, max, e.hi)?])
+    }
+
+    /// Whether `t` passes the lower end: `Outside` moves an end off the steps to the step below it, so `t` is in
+    /// where `t + 1` is above it.
+    fn above_lower(t: i128, e: Ends<'_>, [lo_on, _]: [bool; 2]) -> Option<bool> {
+        Some(if e.fit == 2 && !lo_on {
+            (e.lo)(t + 1)? == Greater
+        } else if lo_on && e.lo_open {
+            (e.lo)(t)? == Greater
+        } else {
+            (e.lo)(t)? != Less
+        })
+    }
+
+    /// Whether `t` passes the upper end.
+    fn below_upper(t: i128, e: Ends<'_>, [_, hi_on]: [bool; 2]) -> Option<bool> {
+        let o = (e.hi)(t)?;
+        Some(if hi_on {
+            if e.open { o == Less } else { o != Greater }
+        } else if e.fit == 2 {
+            (e.hi)(t - 1)? == Less
+        } else {
+            o == Less
+        })
+    }
+
+    /// Whether stored value `t` of `min ..= max` is in the range.
+    pub(crate) fn member(min: i128, max: i128, t: i128, e: Ends<'_>) -> Option<bool> {
+        let on = steps(min, max, e)?;
+        Some(above_lower(t, e, on)? && below_upper(t, e, on)?)
+    }
+
+    /// The stored values the range holds, `first .. past`, one run: below it the lower end fails, from `past` on the
+    /// upper one.
+    pub(crate) fn run(min: i128, max: i128, e: Ends<'_>) -> Option<core::ops::Range<i128>> {
+        let on = steps(min, max, e)?;
+        let first = first_true(min, max, |t| above_lower(t, e, on))?;
+        let past = first_true(min, max, |t| Some(!below_upper(t, e, on)?))?;
+        Some(first..past)
+    }
+
+    /// Whether the range over the stored values `min ..= max` is refused: an end off the steps strictly inside the
+    /// storage's range with no fit named, no value in it, or every value in it.
+    pub(crate) fn refused(min: i128, max: i128, e: Ends<'_>) -> Option<bool> {
+        let [lo_on, hi_on] = steps(min, max, e)?;
+        let inside = |end: End<'_>, on: bool| -> Option<bool> {
+            Some(!on && end(min)? == Less && end(max)? == Greater)
+        };
+        let off = e.fit == 0 && (inside(e.lo, lo_on)? || inside(e.hi, hi_on)?);
+        let r = run(min, max, e)?;
+        Some(off || r.is_empty() || (r.start == min && r.end == max + 1))
+    }
+
+    /// That a fold of the range is refused (`None`) exactly where the reference refuses it, and that its ends `a ..= b`
+    /// hold exactly the stored values the reference puts in it, checked at `t`, at both ends and a step past each;
+    /// nothing where the reference doesn't fit.
+    pub(crate) fn assert_fold(
+        min: i128,
+        max: i128,
+        t: i128,
+        e: Ends<'_>,
+        got: Option<(i128, i128)>,
+        what: &str,
+    ) {
+        let Some(refused) = refused(min, max, e) else {
+            return;
+        };
+        match got {
+            None => assert!(refused, "{what} refused, the reference takes it"),
+            Some((a, b)) => {
+                assert!(
+                    !refused,
+                    "{what} taken as {a} ..= {b}, the reference refuses it"
+                );
+                for x in [t, a, b, a - 1, b + 1] {
+                    if (min..=max).contains(&x)
+                        && let Some(want) = member(min, max, x, e)
+                    {
+                        assert_eq!(
+                            a <= x && x <= b,
+                            want,
+                            "{x} in {what} folded to {a} ..= {b}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// The least `t` of `min ..= max` where `p` holds, for a `p` false then true; `max + 1` where it never holds.
+    fn first_true(min: i128, max: i128, p: impl Fn(i128) -> Option<bool>) -> Option<i128> {
+        if !p(max)? {
+            return Some(max + 1);
+        }
+        let (mut lo, mut hi) = (min, max);
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            if p(mid)? { hi = mid } else { lo = mid + 1 }
+        }
+        Some(lo)
+    }
+}

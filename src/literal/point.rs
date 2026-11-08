@@ -22,6 +22,10 @@
 //!   (`q!(370 deg @ Angle<Degree>)` is the point at 10°), and compared with the point's number as stored, as two
 //!   points are. `<`, `<=`, `>`, `>=` only for a [Linear] origin: points that wrap have no order.
 //! - Integer storages.
+//! - A range of points, `p.is_in(q!(20 degC ..= 25 degC))`, `q!(25 degC +- 0.5)`, folds both ends the same way into
+//!   two compares, by the rules of a [range](crate::literal::range): an end that is no stored value (68.01 °F
+//!   against steps of 0.01 °C) needs `, Inside` or `, Outside`, and the error names the stored values around it in
+//!   the point's frame, `2000 = 20 K @ Celsius`. [Linear] origins only.
 //!
 //! ```
 //! # #[cfg(feature = "thermal")] {
@@ -34,6 +38,9 @@
 //! assert!(t < q!("25.01 °C"));
 //! let room = Point::<Celsius, Fixed<Kelvin, Centi, i16>>::from_raw(2_150);
 //! assert!(q!(20 degC) < room && room < q!(22 @ Celsius));
+//! assert!(room.is_in(q!(20 degC ..= 25 degC)) && room.is_in(q!(68 degF ..= 77 degF)));
+//! assert!(!room.is_in(q!(21.7 degC +- 0.1)));
+//! assert!(room.is_in(q!(70.71 degF ..= 77 degF, Outside))); // 21.5055.. °C, between 2150 and 2151
 //! # }
 //! ```
 //!
@@ -61,10 +68,12 @@ use core::cmp::Ordering;
 use core::marker::PhantomData;
 
 use super::quantity::{AtMost, Cut, cut_scale};
+use super::range::LiteralRange;
 use super::{Decimal, scale_in};
+use crate::conv_error::Symbol;
 use crate::point::{Linear, Modulus, Origin, Point};
 use crate::prefix::One;
-use crate::{Bounds, Fixed, FixedScale, Magnitude, Offset, Unit};
+use crate::{Bounds, Contains, Fixed, FixedScale, Magnitude, Offset, Unit};
 
 /// A decimal literal at an origin, `NUM · 10^EXP` of `S` from the origin `O`: what `q!(25 degC)` and
 /// `q!(300 K @ AbsoluteZero)` give. `S` is a [Unit], or [Steps] for a number in `O`'s own step.
@@ -401,3 +410,71 @@ macro_rules! point_cmp {
 }
 
 point_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
+
+macro_rules! point_range {
+    ($($ty:ident)*) => {$(
+        impl<O: Origin<Unit = U, Modulus = Linear>, U: Unit, P: FixedScale, B: Bounds<$ty>> Point<O, Fixed<U, P, $ty, B>> {
+            /// The stored values `lo ..= hi` a `q!` range of points folds to, its ends `lo` of `S1` at `L1` and `hi`
+            /// of `S2` at `L2`, at run time: what [LiteralRange]'s `contains` folds in a `const` block, for the
+            /// properties of `tests/props`. Panics where that is a compile error.
+            #[doc(hidden)]
+            #[must_use]
+            pub fn literal_range_at<S1: PointUnit<L1>, L1: Origin<Unit = U>, S2: PointUnit<L2>, L2: Origin<Unit = U>>(
+                lo: Decimal,
+                hi: Decimal,
+                open: [bool; 2],
+                fit: u8,
+            ) -> ($ty, $ty) {
+                Self::fold_range_at::<S1, L1, S2, L2>(lo, hi, open, fit)
+            }
+
+            const fn fold_range_at<S1: PointUnit<L1>, L1: Origin<Unit = U>, S2: PointUnit<L2>, L2: Origin<Unit = U>>(
+                lo: Decimal,
+                hi: Decimal,
+                open: [bool; 2],
+                fit: u8,
+            ) -> ($ty, $ty) {
+                // the messages name stored values in the point's own frame, `21.5 K @ Celsius`, as q! takes them
+                let u = Symbol::at(U::EXPR, O::NAME);
+                Fixed::<U, P, $ty, B>::fold_cuts(
+                    &[
+                        (cut_at::<S1, L1, O, P>(lo), P::SCALE, u.as_str()),
+                        (cut_at::<S2, L2, O, P>(hi), P::SCALE, u.as_str()),
+                    ],
+                    open,
+                    fit,
+                )
+            }
+        }
+
+        impl<O, U, P, B, S1, L1, S2, L2, const N1: i64, const E1: i16, const N2: i64, const E2: i16, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8>
+            Contains<Point<O, Fixed<U, P, $ty, B>>>
+            for LiteralRange<LiteralAt<N1, E1, S1, L1>, LiteralAt<N2, E2, S2, L2>, LO_OPEN, HI_OPEN, FIT>
+        where
+            O: Origin<Unit = U, Modulus = Linear>,
+            L1: Origin<Unit = U, Reference = O::Reference, Modulus = Linear>,
+            L2: Origin<Unit = U, Reference = O::Reference, Modulus = Linear>,
+            U: Unit,
+            P: FixedScale,
+            B: Bounds<$ty>,
+            S1: PointUnit<L1>,
+            S2: PointUnit<L2>,
+        {
+            #[inline]
+            fn contains(&self, p: &Point<O, Fixed<U, P, $ty, B>>) -> bool {
+                let (lo, hi) = const {
+                    Point::<O, Fixed<U, P, $ty, B>>::fold_range_at::<S1, L1, S2, L2>(
+                        Decimal::new(N1, E1),
+                        Decimal::new(N2, E2),
+                        [LO_OPEN, HI_OPEN],
+                        FIT,
+                    )
+                };
+                let t = p.raw();
+                lo <= t && t <= hi
+            }
+        }
+    )*};
+}
+
+point_range!(u8 u16 u32 u64 i8 i16 i32 i64);

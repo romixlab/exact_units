@@ -12,7 +12,7 @@ publish = false
 crate-type = ["lib"]
 
 [dependencies]
-exact_units = { path = "../..", default-features = false, features = ["q", "mechanical", "time", "angle", "electrical"] }
+exact_units = { path = "../..", default-features = false, features = ["q", "mechanical", "time", "angle", "electrical", "thermal"] }
 
 [profile.release]
 opt-level = "s"

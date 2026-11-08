@@ -295,9 +295,22 @@ macro_rules! range_int {
                 Self::fold_range::<Lo, Hi>(lo, hi, open, fit)
             }
 
+            const fn fold_range<Lo: Unit, Hi: Unit>(lo: Decimal, hi: Decimal, open: [bool; 2], fit: u8) -> ($ty, $ty) {
+                let (ls, hs) = (scale_in::<Lo, U, P>(), scale_in::<Hi, U, P>());
+                let (lu, hu) = (Symbol::of(Lo::EXPR), Symbol::of(Hi::EXPR));
+                Self::fold_cuts(
+                    &[(cut::<Lo, U, P>(lo), ls, lu.as_str()), (cut::<Hi, U, P>(hi), hs, hu.as_str())],
+                    open,
+                    fit,
+                )
+            }
+
+            /// The stored values `lo ..= hi` of a range whose ends are cut to steps of `P` already (a point's, a
+            /// gain's): [fold_int] over the storage's range narrowed by `B`. Each end comes with a step of the
+            /// storage in the unit the messages name it in.
             #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
             #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
-            const fn fold_range<Lo: Unit, Hi: Unit>(lo: Decimal, hi: Decimal, open: [bool; 2], fit: u8) -> ($ty, $ty) {
+            pub(super) const fn fold_cuts(ends: &[(Cut, Magnitude, &str); 2], open: [bool; 2], fit: u8) -> ($ty, $ty) {
                 let min = match B::MIN {
                     Some(m) => m as i128,
                     None => $ty::MIN as i128,
@@ -306,15 +319,7 @@ macro_rules! range_int {
                     Some(m) => m as i128,
                     None => $ty::MAX as i128,
                 };
-                let (ls, hs) = (scale_in::<Lo, U, P>(), scale_in::<Hi, U, P>());
-                let (lu, hu) = (Symbol::of(Lo::EXPR), Symbol::of(Hi::EXPR));
-                let (a, b) = fold_int(
-                    &[(cut::<Lo, U, P>(lo), ls, lu.as_str()), (cut::<Hi, U, P>(hi), hs, hu.as_str())],
-                    open,
-                    fit,
-                    min,
-                    max,
-                );
+                let (a, b) = fold_int(ends, open, fit, min, max);
                 #[allow(
                     clippy::cast_possible_truncation,
                     clippy::cast_sign_loss,
@@ -355,6 +360,29 @@ macro_rules! range_float {
             }
 
             const fn fold_range<Lo: Unit, Hi: Unit>(lo: Decimal, hi: Decimal, open: [bool; 2], fit: u8) -> ($ty, $ty) {
+                let (ls, hs) = (scale_in::<Lo, U, P>(), scale_in::<Hi, U, P>());
+                let (lu, hu) = (Symbol::of(Lo::EXPR), Symbol::of(Hi::EXPR));
+                Self::fold_floats(
+                    &[
+                        (Below::<$ty>::of::<Lo, U, P>(lo), lo.num() < 0, ls, lu.as_str()),
+                        (Below::<$ty>::of::<Hi, U, P>(hi), hi.num() < 0, hs, hu.as_str()),
+                    ],
+                    open,
+                    fit,
+                )
+            }
+
+            /// The floats `lo ..= hi` of a range whose ends are folded to floats already (a gain's): each end, with
+            /// whether it is negative and a step of the storage in the unit the messages name it in, moved as `fit`
+            /// says, then cut to the bounds; a compile error for an end that is no float without a fit, and for a
+            /// range no float or every float is in.
+            pub(super) const fn fold_floats(
+                ends: &[(Below<$ty>, bool, Magnitude, &str); 2],
+                open: [bool; 2],
+                fit: u8,
+            ) -> ($ty, $ty) {
+                let [(l, l_neg, l_step, l_unit), (h, h_neg, h_step, h_unit)] = *ends;
+                let [lo_open, hi_open] = open;
                 let min = match B::MIN {
                     Some(m) => m,
                     None => $ty::NEG_INFINITY,
@@ -363,18 +391,13 @@ macro_rules! range_float {
                     Some(m) => m,
                     None => $ty::INFINITY,
                 };
-                let (l, h) = (Below::<$ty>::of::<Lo, U, P>(lo), Below::<$ty>::of::<Hi, U, P>(hi));
-                let [lo_open, hi_open] = open;
                 let lo_f = if l.exact {
                     if lo_open { l.down.next_up() } else { l.down }
                 } else {
                     match fit {
                         INSIDE => l.down.next_up(),
                         OUTSIDE => l.down,
-                        _ => {
-                            let u = Symbol::of(Lo::EXPR);
-                            $end(false, l.down, lo.num() < 0, scale_in::<Lo, U, P>(), u.as_str())
-                        }
+                        _ => $end(false, l.down, l_neg, l_step, l_unit),
                     }
                 };
                 let hi_f = if h.exact {
@@ -383,17 +406,13 @@ macro_rules! range_float {
                     match fit {
                         INSIDE => h.down,
                         OUTSIDE => h.down.next_up(),
-                        _ => {
-                            let u = Symbol::of(Hi::EXPR);
-                            $end(true, h.down, hi.num() < 0, scale_in::<Hi, U, P>(), u.as_str())
-                        }
+                        _ => $end(true, h.down, h_neg, h_step, h_unit),
                     }
                 };
                 let lo_f = if lo_f < min { min } else { lo_f };
                 let hi_f = if hi_f > max { max } else { hi_f };
                 if lo_f > hi_f {
-                    let u = Symbol::of(Hi::EXPR);
-                    refuse_range_empty(None, scale_in::<Hi, U, P>(), u.as_str());
+                    refuse_range_empty(None, h_step, h_unit);
                 }
                 assert!(
                     !(lo_f <= min && hi_f >= max),

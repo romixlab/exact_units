@@ -131,6 +131,40 @@ Nothing is rounded: a literal between two stored values is above the one and bel
 
 A reading is not an amount, so a point literal doesn't compare with a `Fixed`, and a plain `q!(300 K)` doesn't compare with a `Point`. Gauge and absolute pressure don't compare, as they don't convert. Points that wrap (an `Angle<..>`) take `==` only: the literal is taken into the period first, so `q!(370 deg @ Angle<Degree>)` is the point at 10°, and `<` doesn't compile, as a heading has no order.
 
+### A range of points
+
+A limit check on a temperature is a range of two points: `p.is_in(q!(20 degC ..= 25 degC))`, as for an amount ([Ranges and tolerances](../start/literals.md#ranges-and-tolerances)). Both ends are at one origin, written at each end or once after the last number, and folded into the point's frame at compile time, so the check is two integer compares:
+
+```rust
+use exact_units::{Fixed, Point, q, origins::{AbsoluteZero, Celsius}, prefix::Centi, units::Kelvin};
+
+let room = Point::<Celsius, Fixed<Kelvin, Centi, i16>>::from_raw(2_150); // 21.5 °C
+assert!(room.is_in(q!(20 degC ..= 25 degC)));
+assert!(room.is_in(q!(-40 ..= 85 degC)));                // the origin once
+assert!(room.is_in(q!(22 degC +- 0.5)));                 // 21.5 °C ..= 22.5 °C
+assert!(room.is_in(q!(68 degF ..= 77 degF)));            // 20 °C ..= 25 °C exactly
+assert!(room.is_in(q!(293.15 K @ AbsoluteZero ..= 298.15 K @ AbsoluteZero)));
+assert!(!room.is_in(q!(18 degC .. 21.5 degC)));          // `..`: the upper end out
+```
+
+- **A tolerance is an amount in the point's own step.** `q!(25 degC +- 0.5)` and `q!(25 degC +- 0.5 degC)` are 24.5 °C ..= 25.5 °C. A tolerance in another unit (`+- 0.5 K`) and a part of a point (`+- 1 %`, of 25 °C or of 298.15 K?) don't compile: write the ends.
+- **An end at another origin is rarely a stored value.** 68.01 °F is 20.00555.. °C, between `2000 = 20 K @ Celsius` and `2001 = 20.01 K @ Celsius`. As for an amount, that doesn't compile until the literal says which way the end moves, `, Inside` or `, Outside`, and the error names the stored values around it in the point's own frame, ready to paste.
+- A range every stored value is in, and one none is in, don't compile. Points that wrap have no order, so no range of them compiles.
+
+```rust
+use exact_units::{Fixed, Point, q, origins::Celsius, prefix::Centi, units::Kelvin};
+
+let t = Point::<Celsius, Fixed<Kelvin, Centi, i16>>::from_raw(2_000); // 20 °C, below 68.01 °F
+assert!(!t.is_in(q!(68.01 degF ..= 77 degF, Inside)));
+assert!(t.is_in(q!(68.01 degF ..= 77 degF, Outside)));
+```
+
+```rust,compile_fail
+use exact_units::{Fixed, Point, q, origins::Celsius, prefix::Centi, units::Kelvin};
+let t = Point::<Celsius, Fixed<Kelvin, Centi, i16>>::from_raw(2_000);
+let _ = t.is_in(q!(68.01 degF ..= 77 degF)); // 20.00555.. °C: Inside or Outside?
+```
+
 ## Origins the crate ships
 
 `exact_units::origins` has these:

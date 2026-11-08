@@ -139,3 +139,33 @@ pub fn in_range_past(v: MilliVolt) -> bool {
 pub fn at_least_raw(v: MilliVolt) -> bool {
     v.get() >= 4900
 }
+
+/// A temperature in steps of 0.01 K from 0 °C.
+pub type CentiCelsius = exact_units::Point<
+    exact_units::origins::Celsius,
+    Fixed<exact_units::units::Kelvin, Centi, i16>,
+>;
+
+/// `t.is_in(q!(68 degF ..= 77 degF))`: 20 °C ..= 25 °C exactly, `2000 <= t && t <= 2500`.
+#[unsafe(no_mangle)]
+pub fn point_in_range_literal(t: CentiCelsius) -> bool {
+    t.is_in(q!(68 degF ..= 77 degF))
+}
+
+/// `2000 <= t && t <= 2500` by hand on the stored value.
+#[unsafe(no_mangle)]
+pub fn point_in_range_raw(t: CentiCelsius) -> bool {
+    (2000..=2500).contains(&t.raw())
+}
+
+/// `gain.is_in(q!(-3 dB ..= 3 dB, Inside))`: 10^(±3/20) is 707.94.. and 1412.53.. mV/V, so `708 <= t && t <= 1412`.
+#[unsafe(no_mangle)]
+pub fn gain_in_band_literal(gain: MilliGain) -> bool {
+    gain.is_in(q!(-3 dB ..= 3 dB, Inside))
+}
+
+/// `708 <= t && t <= 1412` by hand on the stored value.
+#[unsafe(no_mangle)]
+pub fn gain_in_band_raw(gain: MilliGain) -> bool {
+    (708..=1412).contains(&gain.get())
+}

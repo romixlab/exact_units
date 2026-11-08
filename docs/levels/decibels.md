@@ -112,6 +112,33 @@ assert!(Fixed::<Decibel, Centi, i16>::new(-301) < q!(-3 Decibel));
 assert!(Fixed::<Loss<Decibel>, Centi, i16>::new(301) > q!(3 Loss<Decibel>));
 ```
 
+### A range of levels
+
+A gain checked against a band is a range of two levels, `gain.is_in(q!(-3 dB ..= 3 dB, Inside))`, as for an amount ([Ranges and tolerances](../start/literals.md#ranges-and-tolerances)). Each end is folded to the gain's steps at compile time as one `q!(-3 dB)` is, and the gain grows with the level, so the check is two compares. `q!(20 dB +- 1 dB)` is 19 dB ..= 21 dB: a tolerance of a level is a level.
+
+The gain of a level that isn't a whole number of decades is no fraction, so it is never a stored value: 10^(−3/20) lies between 707 and 708 mV/V. Such an end doesn't compile until the literal says which way it moves, `, Inside` (the gains within the real band) or `, Outside` (the fewest stored values that cover it), and the error names the stored values around it. An end of whole decades on a step needs neither word.
+
+```rust
+use exact_units::{Fixed, q, prefix::{Milli, One}, units::{Per, Volt}};
+
+type Gain = Fixed<Per<Volt, Volt>, Milli, u16>;
+
+assert!(Gain::new(708).is_in(q!(-3 dB ..= 3 dB, Inside)));   // 10^(−3/20) = 0.70794..
+assert!(!Gain::new(707).is_in(q!(-3 dB ..= 3 dB, Inside)));
+assert!(Gain::new(707).is_in(q!(-3 dB ..= 3 dB, Outside)));
+assert!(Gain::new(10_000).is_in(q!(0 dB ..= 20 dB)));        // whole decades: exact ends
+assert!(Gain::new(9_000).is_in(q!(20 dB +- 1 dB, Inside)));  // 8.9125.. ..= 11.220..
+let f = Fixed::<Per<Volt, Volt>, One, f32>::bounded(0.5);
+assert!(f.is_in(q!(-6.1 dB ..= -6 dB, Inside)));             // the floats within 0.49545.. ..= 0.50118..
+```
+
+```rust,compile_fail
+use exact_units::{Fixed, q, prefix::Milli, units::{Per, Volt}};
+let _ = Fixed::<Per<Volt, Volt>, Milli, u16>::new(1000).is_in(q!(-3 dB ..= 3 dB)); // Inside or Outside?
+```
+
+A part of a level (`q!(20 dB +- 1 %)`) doesn't compile, nor does a range that every stored value is in or none is. A float may be NaN, and NaN is in no range. An `Exact` gain takes no range of levels, as it takes no single level.
+
 ## At run time
 
 | Method | Float | Needs |

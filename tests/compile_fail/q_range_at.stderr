@@ -1,0 +1,253 @@
+error[E0080]: evaluation panicked: the lower end of this range is no stored value: the stored values around it are 2000 = 20 K @ Celsius and 2001 = 20.01 K @ Celsius; write the range with `, Inside` (each end that is no stored value moves inward: the stored values within it) or `, Outside` (outward: the fewest stored values that cover it), q!(.., Inside)
+ --> src/literal/point.rs
+  |
+  | /                     Point::<O, Fixed<U, P, $ty, B>>::fold_range_at::<S1, L1, S2, L2>(
+  | |                         Decimal::new(N1, E1),
+  | |                         Decimal::new(N2, E2),
+  | |                         [LO_OPEN, HI_OPEN],
+  | |                         FIT,
+  | |                     )
+  | |_____________________^ evaluation of `exact_units::literal::point::<impl exact_units::Contains<exact_units::Point<exact_units::origins::Celsius, exact_units::Fixed<exact_units::units::Kelvin, exact_units::prefix::Centi, i16>>> for exact_units::literal::LiteralRange<exact_units::literal::LiteralAt<6801, -2, exact_units::literal::Steps, exact_units::origins::Fahrenheit>, exact_units::literal::LiteralAt<77, 0, exact_units::literal::Steps, exact_units::origins::Fahrenheit>, false, false, 0>>::contains::{constant#0}` failed inside this call
+...
+  |   point_range!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ------------------------------------------- in this macro invocation
+  |
+note: inside `point::<impl Point<Celsius, Fixed<Kelvin, exact_units::prefix::Centi, i16>>>::fold_range_at::<Steps, Fahrenheit, Steps, Fahrenheit>`
+ --> src/literal/point.rs
+  |
+  | /                 Fixed::<U, P, $ty, B>::fold_cuts(
+  | |                     &[
+  | |                         (cut_at::<S1, L1, O, P>(lo), P::SCALE, u.as_str()),
+  | |                         (cut_at::<S2, L2, O, P>(hi), P::SCALE, u.as_str()),
+... |
+  | |                     fit,
+  | |                 )
+  | |_________________^
+...
+  |   point_range!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ------------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::<impl Fixed<Kelvin, exact_units::prefix::Centi, i16>>::fold_cuts`
+ --> src/literal/range.rs
+  |
+  |                 let (a, b) = fold_int(ends, open, fit, min, max);
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::fold_int`
+ --> src/literal/range.rs
+  |
+  |             _ => refuse_range_end(false, lo.floor, lo_step, lo_unit),
+  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::steps::refuse_range_end`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+ --> src/literal/point.rs
+  |
+  |                   let (lo, hi) = const {
+  |  ________________________________^
+  | |                     Point::<O, Fixed<U, P, $ty, B>>::fold_range_at::<S1, L1, S2, L2>(
+  | |                         Decimal::new(N1, E1),
+  | |                         Decimal::new(N2, E2),
+... |
+  | |                 };
+  | |_________________^
+...
+  |   point_range!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ------------------------------------------- in this macro invocation
+  |
+  = note: this note originates in the macro `point_range` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn point::<impl Contains<Point<Celsius, Fixed<Kelvin, exact_units::prefix::Centi, i16>>> for LiteralRange<LiteralAt<6801, -2, Steps, Fahrenheit>, LiteralAt<77, 0, Steps, Fahrenheit>, false, false, 0>>::contains`
+ --> src/contains.rs
+  |
+  |         set.contains(self)
+  |         ^^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: every value of this storage and its bounds is in this range, so the check would never fail: check the unit and the scale, or drop the check
+ --> src/literal/point.rs
+  |
+  | /                     Point::<O, Fixed<U, P, $ty, B>>::fold_range_at::<S1, L1, S2, L2>(
+  | |                         Decimal::new(N1, E1),
+  | |                         Decimal::new(N2, E2),
+  | |                         [LO_OPEN, HI_OPEN],
+  | |                         FIT,
+  | |                     )
+  | |_____________________^ evaluation of `exact_units::literal::point::<impl exact_units::Contains<exact_units::Point<exact_units::origins::Celsius, exact_units::Fixed<exact_units::units::Kelvin, exact_units::prefix::Centi, u8>>> for exact_units::literal::LiteralRange<exact_units::literal::LiteralAt<0, 0, exact_units::literal::Steps, exact_units::origins::Celsius>, exact_units::literal::LiteralAt<5, 0, exact_units::literal::Steps, exact_units::origins::Celsius>, false, false, 0>>::contains::{constant#0}` failed inside this call
+...
+  |   point_range!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ------------------------------------------- in this macro invocation
+  |
+note: inside `point::<impl Point<Celsius, Fixed<Kelvin, exact_units::prefix::Centi, u8>>>::fold_range_at::<Steps, Celsius, Steps, Celsius>`
+ --> src/literal/point.rs
+  |
+  | /                 Fixed::<U, P, $ty, B>::fold_cuts(
+  | |                     &[
+  | |                         (cut_at::<S1, L1, O, P>(lo), P::SCALE, u.as_str()),
+  | |                         (cut_at::<S2, L2, O, P>(hi), P::SCALE, u.as_str()),
+... |
+  | |                     fit,
+  | |                 )
+  | |_________________^
+...
+  |   point_range!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ------------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::<impl Fixed<Kelvin, exact_units::prefix::Centi, u8>>::fold_cuts`
+ --> src/literal/range.rs
+  |
+  |                 let (a, b) = fold_int(ends, open, fit, min, max);
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::fold_int`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/range.rs
+  |
+  | /     assert!(
+  | |         !(lo_c == min && hi_c == max),
+  | |         "every value of this storage and its bounds is in this range, so the check would never fail: check the unit and the scale...
+  | |     );
+  | |_____- in this macro invocation
+
+note: the above error was encountered while instantiating `fn point::<impl Contains<Point<Celsius, Fixed<Kelvin, exact_units::prefix::Centi, u8>>> for LiteralRange<LiteralAt<0, 0, Steps, Celsius>, LiteralAt<5, 0, Steps, Celsius>, false, false, 0>>::contains`
+ --> src/contains.rs
+  |
+  |         set.contains(self)
+  |         ^^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: the lower end of this range is no stored value: the stored values around it are 707 = 0.707 V/V and 708 = 0.708 V/V; write the range with `, Inside` (each end that is no stored value moves inward: the stored values within it) or `, Outside` (outward: the fewest stored values that cover it), q!(.., Inside)
+ --> src/literal/level.rs
+  |
+  | /                     Fixed::<U, P, $ty, B>::fold_level_range::<L1, L2>(
+  | |                         Decimal::new(N1, E1),
+  | |                         Decimal::new(N2, E2),
+  | |                         [LO_OPEN, HI_OPEN],
+  | |                         FIT,
+  | |                     )
+  | |_____________________^ evaluation of `exact_units::literal::level::<impl exact_units::Contains<exact_units::Fixed<exact_units::units::Per<exact_units::units::Volt, exact_units::units::Volt>, exact_units::prefix::Milli, u16>> for exact_units::literal::LiteralRange<exact_units::literal::LevelLiteral<-3, 0, exact_units::literal::Db>, exact_units::literal::LevelLiteral<3, 0, exact_units::literal::Db>, false, false, 0>>::contains::{constant#0}` failed inside this call
+...
+  |   level_range!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ------------------------------------------- in this macro invocation
+  |
+note: inside `exact_units::literal::level::<impl Fixed<Per<Volt, Volt>, exact_units::prefix::Milli, u16>>::fold_level_range::<Db, Db>`
+ --> src/literal/level.rs
+  |
+  | /                 Self::fold_cuts(
+  | |                     &[
+  | |                         (cut(gain::<U, P, L1>(lo)), P::SCALE, u.as_str()),
+  | |                         (cut(gain::<U, P, L2>(hi)), P::SCALE, u.as_str()),
+... |
+  | |                     fit,
+  | |                 )
+  | |_________________^
+...
+  |   level_range!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ------------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::<impl Fixed<Per<Volt, Volt>, exact_units::prefix::Milli, u16>>::fold_cuts`
+ --> src/literal/range.rs
+  |
+  |                 let (a, b) = fold_int(ends, open, fit, min, max);
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::fold_int`
+ --> src/literal/range.rs
+  |
+  |             _ => refuse_range_end(false, lo.floor, lo_step, lo_unit),
+  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::steps::refuse_range_end`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+ --> src/literal/level.rs
+  |
+  |                   let (lo, hi) = const {
+  |  ________________________________^
+  | |                     Fixed::<U, P, $ty, B>::fold_level_range::<L1, L2>(
+  | |                         Decimal::new(N1, E1),
+  | |                         Decimal::new(N2, E2),
+... |
+  | |                 };
+  | |_________________^
+...
+  |   level_range!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ------------------------------------------- in this macro invocation
+  |
+  = note: this note originates in the macro `level_range_contains` which comes from the expansion of the macro `level_range` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn exact_units::literal::level::<impl Contains<Fixed<Per<Volt, Volt>, exact_units::prefix::Milli, u16>> for LiteralRange<LevelLiteral<-3, 0, Db>, LevelLiteral<3, 0, Db>, false, false, 0>>::contains`
+ --> src/contains.rs
+  |
+  |         set.contains(self)
+  |         ^^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: q!(x dB) and q!(x Np) compare with a gain of root-power quantities (V/V, A/A, Pa/Pa: 20·lg) or of powers (W/W: 10·lg): a plain Ratio or another kind has no level form
+ --> src/literal/level.rs
+  |
+  | /                     Fixed::<U, P, $ty, B>::fold_level_range::<L1, L2>(
+  | |                         Decimal::new(N1, E1),
+  | |                         Decimal::new(N2, E2),
+  | |                         [LO_OPEN, HI_OPEN],
+  | |                         FIT,
+  | |                     )
+  | |_____________________^ evaluation of `exact_units::literal::level::<impl exact_units::Contains<exact_units::Fixed<exact_units::units::Ratio, exact_units::prefix::Milli, u16>> for exact_units::literal::LiteralRange<exact_units::literal::LevelLiteral<-3, 0, exact_units::literal::Db>, exact_units::literal::LevelLiteral<3, 0, exact_units::literal::Db>, false, false, 1>>::contains::{constant#0}` failed inside this call
+...
+  |   level_range!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ------------------------------------------- in this macro invocation
+  |
+note: inside `exact_units::literal::level::<impl Fixed<Ratio, exact_units::prefix::Milli, u16>>::fold_level_range::<Db, Db>`
+ --> src/literal/level.rs
+  |
+  |                         (cut(gain::<U, P, L1>(lo)), P::SCALE, u.as_str()),
+  |                              ^^^^^^^^^^^^^^^^^^^^
+...
+  | level_range!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ------------------------------------------- in this macro invocation
+note: inside `exact_units::literal::level::gain::<Ratio, exact_units::prefix::Milli, Db>`
+ --> src/literal/level.rs
+  |
+  |     let form = form::<U>();
+  |                ^^^^^^^^^^^
+note: inside `exact_units::literal::level::form::<Ratio>`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/level.rs
+  |
+  |           None => panic!(
+  |  _________________-
+  | |             "q!(x dB) and q!(x Np) compare with a gain of root-power quantities (V/V, A/A, Pa/Pa: 20·lg) or of \
+  | |              powers (W/W: 10·lg): a plain Ratio or another kind has no level form"
+  | |         ),
+  | |_________- in this macro invocation
+
+note: the above error was encountered while instantiating `fn exact_units::literal::level::<impl Contains<Fixed<Ratio, exact_units::prefix::Milli, u16>> for LiteralRange<LevelLiteral<-3, 0, Db>, LevelLiteral<3, 0, Db>, false, false, 1>>::contains`
+ --> src/contains.rs
+  |
+  |         set.contains(self)
+  |         ^^^^^^^^^^^^^^^^^^

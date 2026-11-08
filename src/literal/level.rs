@@ -16,6 +16,10 @@
 //!   of gain and one of loss differ in sign, so `q!` asks for the unit, `q!(-3 Decibel)` or `q!(3 Loss<Decibel>)`.
 //!   Inside a unit (`dB/km`) the symbols are refused for the same reason.
 //! - An [Exact](crate::Exact) gain has no compare with a level: 10^(x/20) is no fraction, and an `Exact` is one.
+//! - A range of levels, `gain.is_in(q!(-3 dB ..= 3 dB, Inside))`, `q!(20 dB +- 1 dB, Inside)`, folds both ends the
+//!   same way into two compares, by the rules of a [range](crate::literal::range). A gain that is no stored value
+//!   (every level but whole decades) needs `, Inside` or `, Outside`, and the error names the stored values around
+//!   it.
 //!
 //! ```
 //! # #[cfg(feature = "electrical")] {
@@ -31,6 +35,8 @@
 //! let g = Fixed::<Per<Volt, Volt>, One, f32>::bounded(0.5);
 //! assert!(g < q!(-6 dB)); // 0.50118.. V/V
 //! assert!(g > q!(-6.03 dB));
+//! assert!(v.is_in(q!(-3 dB ..= 3 dB, Outside)) && !v.is_in(q!(-3 dB ..= 3 dB, Inside)));
+//! assert!(Fixed::<Per<Volt, Volt>, Milli, u16>::new(10_000).is_in(q!(0 dB ..= 20 dB)));
 //! # }
 //! ```
 //!
@@ -72,8 +78,10 @@ use core::marker::PhantomData;
 
 use super::Decimal;
 use super::quantity::{AtMost, Below, Cut, cut_scale};
+use super::range::LiteralRange;
+use crate::conv_error::Symbol;
 use crate::decibel::exact::Interval;
-use crate::{Bounds, Fixed, FixedScale, LevelForm, Magnitude, NanFree, Unit};
+use crate::{Bounds, Contains, Fixed, FixedScale, LevelForm, Magnitude, NanFree, Unit};
 
 /// A level of a gain as a type, `NUM · 10^EXP` of the level `L` ([Db] or [Np]): what `q!(-3 dB)` gives, compared
 /// with a linear gain whose kind picks the form ([module](crate::literal::level)).
@@ -552,3 +560,118 @@ macro_rules! level_cmp_float {
 }
 
 level_cmp_float!(f32 f64);
+
+macro_rules! level_range {
+    ($($ty:ident)*) => {$(
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
+            /// The stored values `lo ..= hi` a `q!` range of levels `lo` of `L1` and `hi` of `L2` folds to, at run
+            /// time: what [LiteralRange]'s `contains` folds in a `const` block, for the properties of
+            /// `tests/props`. Panics where that is a compile error.
+            #[doc(hidden)]
+            #[must_use]
+            pub fn level_range<L1: LevelSymbol, L2: LevelSymbol>(lo: Decimal, hi: Decimal, open: [bool; 2], fit: u8) -> ($ty, $ty) {
+                Self::fold_level_range::<L1, L2>(lo, hi, open, fit)
+            }
+
+            const fn fold_level_range<L1: LevelSymbol, L2: LevelSymbol>(
+                lo: Decimal,
+                hi: Decimal,
+                open: [bool; 2],
+                fit: u8,
+            ) -> ($ty, $ty) {
+                let u = Symbol::of(U::EXPR);
+                Self::fold_cuts(
+                    &[
+                        (cut(gain::<U, P, L1>(lo)), P::SCALE, u.as_str()),
+                        (cut(gain::<U, P, L2>(hi)), P::SCALE, u.as_str()),
+                    ],
+                    open,
+                    fit,
+                )
+            }
+        }
+
+        level_range_contains!($ty);
+    )*};
+}
+
+macro_rules! level_range_float {
+    ($($ty:ident)*) => {$(
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>> Fixed<U, P, $ty, B> {
+            /// The floats `lo ..= hi` a `q!` range of levels `lo` of `L1` and `hi` of `L2` folds to, at run time:
+            /// what [LiteralRange]'s `contains` folds in a `const` block, for the properties of `tests/props`.
+            /// Panics where that is a compile error.
+            #[doc(hidden)]
+            #[must_use]
+            pub fn level_range<L1: LevelSymbol, L2: LevelSymbol>(lo: Decimal, hi: Decimal, open: [bool; 2], fit: u8) -> ($ty, $ty) {
+                Self::fold_level_range::<L1, L2>(lo, hi, open, fit)
+            }
+
+            const fn fold_level_range<L1: LevelSymbol, L2: LevelSymbol>(
+                lo: Decimal,
+                hi: Decimal,
+                open: [bool; 2],
+                fit: u8,
+            ) -> ($ty, $ty) {
+                let u = Symbol::of(U::EXPR);
+                // a gain is never negative
+                Self::fold_floats(
+                    &[
+                        (Below::<$ty>::of_interval(Some(interval(gain::<U, P, L1>(lo))), false), false, P::SCALE, u.as_str()),
+                        (Below::<$ty>::of_interval(Some(interval(gain::<U, P, L2>(hi))), false), false, P::SCALE, u.as_str()),
+                    ],
+                    open,
+                    fit,
+                )
+            }
+        }
+
+        level_range_contains!($ty);
+    )*};
+}
+
+/// `gain.is_in(q!(-3 dB ..= 3 dB))`: both ends folded in a `const` block, two compares at run time.
+macro_rules! level_range_contains {
+    ($ty:ident) => {
+        impl<
+            U: Unit,
+            P: FixedScale,
+            B: Bounds<$ty>,
+            L1: LevelSymbol,
+            L2: LevelSymbol,
+            const N1: i64,
+            const E1: i16,
+            const N2: i64,
+            const E2: i16,
+            const LO_OPEN: bool,
+            const HI_OPEN: bool,
+            const FIT: u8,
+        > Contains<Fixed<U, P, $ty, B>>
+            for LiteralRange<
+                LevelLiteral<N1, E1, L1>,
+                LevelLiteral<N2, E2, L2>,
+                LO_OPEN,
+                HI_OPEN,
+                FIT,
+            >
+        {
+            /// `false` for NaN.
+            #[inline]
+            fn contains(&self, v: &Fixed<U, P, $ty, B>) -> bool {
+                let (lo, hi) = const {
+                    Fixed::<U, P, $ty, B>::fold_level_range::<L1, L2>(
+                        Decimal::new(N1, E1),
+                        Decimal::new(N2, E2),
+                        [LO_OPEN, HI_OPEN],
+                        FIT,
+                    )
+                };
+                let t = v.get();
+                lo <= t && t <= hi
+            }
+        }
+    };
+}
+
+level_range!(u8 u16 u32 u64 i8 i16 i32 i64);
+level_range_float!(f32 f64);

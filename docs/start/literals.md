@@ -435,6 +435,8 @@ The macro refuses what reads two ways. `q!(5 % +- 1 %)` could be 1 % of 5 % or o
 
 NaN is in no range. "Not in it" is the safe answer whichever way a check branches, so a float that may be NaN has `is_in` too, and it gives `false` for NaN.
 
+A range of points (`q!(20 degC ..= 25 degC)`, `q!(25 degC +- 0.5)`) checks a `Point`, and a range of levels (`q!(-3 dB ..= 3 dB, Inside)`, `q!(20 dB +- 1 dB, Inside)`) a linear gain, by the same rules: see [A range of points](../points/points.md#a-range-of-points) and [A range of levels](../levels/decibels.md#a-range-of-levels). An end at another origin (68.01 °F against steps of 0.01 °C) and the gain of a level that isn't whole decades are rarely stored values, so they need `Inside` or `Outside` more often than an amount does.
+
 ### Known leading digits
 
 A result such as a return loss is often a long decimal, 9.542425094393248 dB, and an example that spells it out is hard to read. A decimal followed by `...` is the range of the values whose decimal starts with those digits:

@@ -29,7 +29,7 @@ fn decimal(num: i64, exp: i16) -> BigRational {
 }
 
 /// `t` steps of `num_s / den_s` against the gain of `num · 10^exp` dB, `per` dB a decade (20 root-power, 10 power).
-fn order_db(t: &BigRational, num: i64, exp: i16, per: i64) -> Ordering {
+pub(crate) fn order_db(t: &BigRational, num: i64, exp: i16, per: i64) -> Ordering {
     // x / per = n / d
     let (n, d) = if exp >= 0 {
         (num * 10_i64.pow(exp.unsigned_abs().into()), per)
@@ -40,7 +40,7 @@ fn order_db(t: &BigRational, num: i64, exp: i16, per: i64) -> Ordering {
 }
 
 /// `t` against the gain of `num · 10^exp` Np, `times` 1 (root-power, `e^x`) or 2 (power, `e^(2x)`).
-fn order_np(t: &BigRational, num: i64, exp: i16, times: i64) -> Ordering {
+pub(crate) fn order_np(t: &BigRational, num: i64, exp: i16, times: i64) -> Ordering {
     order_exp(
         t,
         &(decimal(num, exp) * BigRational::from_integer(times.into())),

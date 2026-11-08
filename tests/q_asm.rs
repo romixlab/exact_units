@@ -376,3 +376,28 @@ fn range_literal_is_the_hand_written_compares() {
         "in_range_past should be one compare: {past:#?}"
     );
 }
+
+/// A `q!` range of points and one of levels are the two compares written by hand too: `q!(68 degF ..= 77 degF)`
+/// against a point in 0.01 K from 0 °C is `2000 <= t && t <= 2500`, `q!(-3 dB ..= 3 dB, Inside)` against a gain in
+/// mV/V `708 <= t && t <= 1412`.
+#[test]
+fn point_and_level_ranges_are_the_hand_written_compares() {
+    let Some(asm) = asm_for("thumbv6m-none-eabi") else {
+        return;
+    };
+    for (name, raw) in [
+        ("point_in_range_literal", "point_in_range_raw"),
+        ("gain_in_band_literal", "gain_in_band_raw"),
+    ] {
+        let raw_body = normalize(&resolve(&asm, raw));
+        assert!(
+            compares(&raw_body) <= 2,
+            "{raw} (the limits by hand) should be at most two compares: {raw_body:#?}"
+        );
+        assert_eq!(
+            normalize(&resolve(&asm, name)),
+            raw_body,
+            "{name} should be {raw}'s body (the hand-written limits), but its asm differs"
+        );
+    }
+}

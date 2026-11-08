@@ -13,18 +13,18 @@ use exact_units::units::{Degree, Kelvin};
 use exact_units::{Fixed, Point};
 
 /// A fraction `(n, d)`, `d >= 1`.
-type Frac = (i128, i128);
+pub(crate) type Frac = (i128, i128);
 
 /// 0 K above absolute zero.
-const ZERO: Frac = (0, 1);
+pub(crate) const ZERO: Frac = (0, 1);
 /// 273.15 K: where °C starts.
-const CELSIUS: Frac = (5463, 20);
+pub(crate) const CELSIUS: Frac = (5463, 20);
 /// 459.67 °R of 5/9 K: where °F starts.
-const FAHRENHEIT: Frac = (45967, 180);
+pub(crate) const FAHRENHEIT: Frac = (45967, 180);
 /// A step of 1 K.
-const KELVIN: Frac = (1, 1);
+pub(crate) const KELVIN: Frac = (1, 1);
 /// A step of 5/9 K: °F and °R.
-const DEGREE_F: Frac = (5, 9);
+pub(crate) const DEGREE_F: Frac = (5, 9);
 
 /// The point `t · step + origin` against the literal `num · 10^exp · unit + at`, exactly; `None` where the products
 /// don't fit `i128`.

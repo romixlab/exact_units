@@ -481,6 +481,11 @@ impl Symbol {
         Symbol(push_symbol(Msg::new(), e))
     }
 
+    /// The symbol and an origin, `K @ Celsius`: a point's frame, as `q!` writes a point literal in it.
+    pub(crate) const fn at(e: &UnitExpr, origin: &str) -> Symbol {
+        Symbol(push_symbol(Msg::new(), e).push(" @ ").push(origin))
+    }
+
     pub(crate) const fn as_str(&self) -> &str {
         self.0.as_str()
     }
