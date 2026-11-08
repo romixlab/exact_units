@@ -783,11 +783,11 @@ const fn refuse(src: &Src, pair: Pair) -> ! {
             t.push(name);
             t.push("(");
             t.push(args);
-            t.push(", NearestEven)");
+            t.push(", Floor | Ceil | Truncate | NearestEven | NearestAway)");
         }
         Src::Fn { name } => {
             t.push(name);
-            t.push("_rounded(.., Rounding::NearestEven)");
+            t.push("_rounded(.., Rounding::Floor | Ceil | Truncate | NearestEven | NearestAway)");
         }
     }
     panic!("{}", t.as_str())
