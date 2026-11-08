@@ -219,7 +219,7 @@ fn int_round_trip() {
     }
 }
 
-#[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
+#[cfg(any(feature = "std", feature = "libm"))]
 mod float {
     use super::*;
     use crate::prefix::{Milli, Pow2};

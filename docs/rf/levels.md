@@ -10,7 +10,7 @@ The kind of a W/W ratio already picks 10·lg ([Decibels](../levels/decibels.md#t
 `to_db` gives dBm directly, as a `Fixed<Decibel, One, f64>`:
 
 ```rust
-# #[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))] {
+# #[cfg(any(feature = "std", feature = "libm"))] {
 use exact_units::{Fixed, db, prefix::One, q, units::{Decibel, Per, Watt}};
 
 // +30 dBm, the classic 1 W: 1000 mW against the 1 mW reference, a whole number of decades, exact

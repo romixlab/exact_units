@@ -11,7 +11,7 @@
 //! meant and works the threshold out at compile time, in integers, so the firmware compares `norm_sqr` (two
 //! multiplies, no root, no log) with a constant.
 //!
-//! `cargo run --example 13_impedance_match --features electrical,angle,dimensionless,levels,libm`
+//! `cargo run --example 13_impedance_match --features electrical,angle,dimensionless,libm`
 
 #![expect(
     clippy::print_stdout,

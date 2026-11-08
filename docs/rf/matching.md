@@ -4,14 +4,14 @@ level: advanced
 
 # A worked matching example
 
-A tuner measures an antenna's impedance at a few frequencies against a 50 Ω line. A bench tool shows Γ, VSWR, return loss and mismatch loss on a host; the firmware on the antenna side only answers "matched or not" per sweep step, from a reflectometer's Q15 Γ, on a part without an FPU. `cargo run --example 13_impedance_match --features electrical,angle,dimensionless,levels,libm` runs the whole thing — [Examples](../recipes/examples.md) has the line and the file.
+A tuner measures an antenna's impedance at a few frequencies against a 50 Ω line. A bench tool shows Γ, VSWR, return loss and mismatch loss on a host; the firmware on the antenna side only answers "matched or not" per sweep step, from a reflectometer's Q15 Γ, on a part without an FPU. `cargo run --example 13_impedance_match --features electrical,angle,dimensionless,libm` runs the whole thing — [Examples](../recipes/examples.md) has the line and the file.
 
 ## On the bench, in floats
 
 100 Ω on a 50 Ω line ([Impedance and admittance](impedance.md), [Reflection](reflection.md)):
 
 ```rust
-# #[cfg(all(feature = "electrical", feature = "levels", any(feature = "std", feature = "libm")))] {
+# #[cfg(all(feature = "electrical", any(feature = "std", feature = "libm")))] {
 use exact_units::{Admittance, Impedance, Z0, prefix::{Milli, One}, q, units::{Decibel, Loss}};
 
 let z0 = Z0::<One, f64>::bounded(50.0, 0.0);

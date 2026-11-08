@@ -12,7 +12,7 @@
 //!   F>`: its `to_db` is 10·lg, the loss as a negative level (−0.51 dB at VSWR 2).
 //!
 //! ```
-//! # #[cfg(all(feature = "electrical", feature = "levels", any(feature = "std", feature = "libm")))] {
+//! # #[cfg(all(feature = "electrical", any(feature = "std", feature = "libm")))] {
 //! use exact_units::{Complex, Impedance, Z0, prefix::One, q, units::{Decibel, Loss}};
 //!
 //! let z0 = Z0::<One, f64>::bounded(50.0, 0.0);
@@ -50,7 +50,7 @@
 use super::{Complex, ComplexStorage, Extended};
 use crate::fixed::Repr;
 use crate::prefix::One;
-#[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
+#[cfg(any(feature = "std", feature = "libm"))]
 use crate::units::{Decibel, Loss};
 use crate::units::{Ohm, Per, Siemens, Volt, Watt};
 use crate::{Fixed, FixedScale, OutOfBounds, Storage, Unlimited};
@@ -443,10 +443,10 @@ float_rf!(f32 f64);
 
 macro_rules! return_loss {
     ($($ty:ident $db:ident)*) => {$(
-        #[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
+        #[cfg(any(feature = "std", feature = "libm"))]
         impl Gamma<$ty> {
             /// The return loss −20·lg|Γ| in dB as a loss, positive for a passive load, worked out in the storage's
-            /// float: +∞ when matched, 0 for a short or an open. Features `levels` and `std` or `libm`.
+            /// float: +∞ when matched, 0 for a short or an open. Feature `std` or `libm`.
             ///
             /// ```
             /// # #[cfg(feature = "electrical")] {

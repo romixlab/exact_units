@@ -224,7 +224,7 @@ fn np_and_db_are_one_level() {
     }
 }
 
-#[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
+#[cfg(any(feature = "std", feature = "libm"))]
 mod run_time {
     use super::*;
 

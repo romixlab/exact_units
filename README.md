@@ -84,7 +84,7 @@ The API reference is on [docs.rs](https://docs.rs/exact_units).
 | `shrink_wrap` | the wire format of [WireWeaver](https://github.com/vhrdtech/wire_weaver); exact-width bit fields `U1`..`U64` / `I2`..`I64` (opt-in, not a default) |
 | `serde`       | `serde` for the numbers, `no_std` without alloc, bounds checked on reading; `"1.5 ms"` text with `serde::with_unit` (for `Fixed` and `Exact`); with `std` also `Magnitude` and `Offset` |
 | `defmt`       | `defmt::Format`                                                                                      |
-| `libm`        | `to_db` / `from_db` without `std`, from the pure-Rust `libm` (`to_db` with `levels`)                 |
+| `libm`        | `to_db` / `from_db` without `std`, from the pure-Rust `libm`; turns on `levels` for the dB and Np markers |
 
 Default: `std` and `q`. A client that needs the wire format enables `shrink_wrap` too; a firmware turns the defaults off and picks its unit groups:
 

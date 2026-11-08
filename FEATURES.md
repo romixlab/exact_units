@@ -419,7 +419,7 @@ non-linear named scales.
 - 🚧 **LVL-1 Levels: dB, dBm, dBV, dBFS, dBc, Np, LUFS, RSSI** (was STD-67) · `v0.5` — first piece done: a gain's dB by its kind
   (UNIT-2), `Fixed::to_db` / `from_db` with 20·lg for ratios of root-power quantities (V/V, A/A, Pa/Pa) and 10·lg for
   powers (W/W, J/J), a plain `Ratio` refused at compile time; `to_db` / `from_db` in `f64` and `f32`, without `std`
-  through the `libm` feature, `to_db` a typed `Option<Fixed<Decibel, One, f64>>` (with `levels`) that checks against `q!(6.0205... Decibel)`; `db!()` works the stored value out exactly at compile time, a rounding named where the gain is no stored value (`db!(-3, NearestEven)`). Missing: the rest below.
+  through the `libm` feature, `to_db` a typed `Option<Fixed<Decibel, One, f64>>` (`libm` turns on `levels` for the markers) that checks against `q!(6.0205... Decibel)`; `db!()` works the stored value out exactly at compile time, a rounding named where the gain is no stored value (`db!(-3, NearestEven)`). Missing: the rest below.
   `Level<Kind, Ref>` on the point
   algebra: level − level = gain, level + gain = level, references named (1 mW, 1 V, 20 µPa, full scale with its sine
   or square convention). The log base comes from the level's unit (Np coherent on a log-ratio base, B, dB, octave,

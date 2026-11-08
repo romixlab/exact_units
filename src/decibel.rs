@@ -6,7 +6,7 @@
 //!   Cortex-M4F or M33 has in hardware (`f64` is software there). With feature `std` or `libm`: `log10` and `powf`
 //!   aren't in `core`. With `libm` (pure Rust, no C) they come from it even when `std` is on, so a host and a
 //!   firmware compute the same bits. `to_db` gives a level as a typed value, `Option<Fixed<Decibel, One, f64>>`
-//!   (feature `levels` too), so it checks against `q!(6.0205... Decibel)` and keeps its unit; `from_db` takes the
+//!   (`libm` turns on `levels` for its markers), so it checks against `q!(6.0205... Decibel)` and keeps its unit; `from_db` takes the
 //!   bare number a setting or a reading arrives as.
 //! - [Fixed::from_db_const] and [db!](crate::db): a level written in decimal (`db!(-3.01)`) becomes the stored value
 //!   at compile time, exactly: the stored value nearest to `10^(dB/20)` (or `/10`), worked out in integers with an
@@ -551,13 +551,6 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
 #[cfg(any(feature = "std", feature = "libm"))]
 impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// The number [to_db](Self::to_db) holds: 20·lg or 10·lg by the kind, NaN for a gain below 0.
-    #[cfg_attr(
-        not(feature = "levels"),
-        expect(
-            dead_code,
-            reason = "the typed to_db and to_np, and to_level, need `levels`"
-        )
-    )]
     pub(crate) fn db_f64(self) -> f64 {
         let form = const { Self::LEVEL_FORM };
         let x = match self.get().to_repr() {
@@ -592,13 +585,6 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     }
 
     /// The number [to_db_f32](Self::to_db_f32) holds, worked out in `f32`.
-    #[cfg_attr(
-        not(feature = "levels"),
-        expect(
-            dead_code,
-            reason = "the typed to_db and to_np, and to_level, need `levels`"
-        )
-    )]
     pub(crate) fn db_f32(self) -> f32 {
         #[expect(
             clippy::as_conversions,
@@ -643,13 +629,6 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     }
 
     /// The number [to_np](Self::to_np) holds: `ln(x)` or `½·ln(x)` by the kind, NaN for a gain below 0.
-    #[cfg_attr(
-        not(feature = "levels"),
-        expect(
-            dead_code,
-            reason = "the typed to_db and to_np, and to_level, need `levels`"
-        )
-    )]
     pub(crate) fn np_f64(self) -> f64 {
         let form = const { Self::LEVEL_FORM };
         let x = match self.get().to_repr() {
@@ -684,13 +663,6 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
     }
 
     /// The number [to_np_f32](Self::to_np_f32) holds, worked out in `f32`.
-    #[cfg_attr(
-        not(feature = "levels"),
-        expect(
-            dead_code,
-            reason = "the typed to_db and to_np, and to_level, need `levels`"
-        )
-    )]
     pub(crate) fn np_f32(self) -> f32 {
         #[expect(
             clippy::as_conversions,
@@ -736,8 +708,8 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
 }
 
 /// The levels of a gain as typed values, `Fixed<Decibel, One, f64>` and its kin, so a result keeps its unit and
-/// checks against `q!(.. Decibel)`. Features `levels` and `std` or `libm`.
-#[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
+/// checks against `q!(.. Decibel)`. Feature `std` or `libm`, each of which turns on `levels` for the markers.
+#[cfg(any(feature = "std", feature = "libm"))]
 impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// The gain in dB: 20·lg for a ratio of root-power quantities (V/V, A/A), 10·lg for one of powers (W/W), worked
     /// out in `f64` and rounded. A gain of 0 is −∞ dB; `None` for a gain below 0, which has no level. A kind without

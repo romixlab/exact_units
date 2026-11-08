@@ -11,7 +11,7 @@
 //! into the stored value nearest to the exact gain, so the threshold is an integer literal in flash. A reading with
 //! bounds compares with that unbounded constant directly: one integer compare, the unit still checked.
 //!
-//! `cargo run --example 06_audio_limiter --features electrical,levels,libm`
+//! `cargo run --example 06_audio_limiter --features electrical,libm`
 
 #![expect(
     clippy::print_stdout,

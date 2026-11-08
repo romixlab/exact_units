@@ -568,11 +568,7 @@ mod tests {
         assert_eq!(Kind::Plain.level_form(), None);
     }
 
-    #[cfg(all(
-        feature = "electrical",
-        feature = "levels",
-        any(feature = "std", feature = "libm")
-    ))]
+    #[cfg(all(feature = "electrical", any(feature = "std", feature = "libm")))]
     #[test]
     fn power_waves_take_20_lg() {
         use crate::Fixed;

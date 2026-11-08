@@ -118,13 +118,6 @@ norm_sqr_at! {
 #[cfg(any(feature = "std", feature = "libm"))]
 impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B> {
     /// The number [to_db](Self::to_db) holds, NaN only for a NaN part.
-    #[cfg_attr(
-        not(feature = "levels"),
-        expect(
-            dead_code,
-            reason = "the typed to_db and to_np, and to_level, need `levels`"
-        )
-    )]
     pub(crate) fn db_f64(self) -> f64 {
         let form = const { Fixed::<U, P, T>::LEVEL_FORM };
         let n = match T::norm_sqr(self.re, self.im).to_repr() {
@@ -144,13 +137,6 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
     }
 
     /// The number [to_db_f32](Self::to_db_f32) holds, worked out in `f32`.
-    #[cfg_attr(
-        not(feature = "levels"),
-        expect(
-            dead_code,
-            reason = "the typed to_db and to_np, and to_level, need `levels`"
-        )
-    )]
     pub(crate) fn db_f32(self) -> f32 {
         #[expect(
             clippy::as_conversions,
@@ -172,12 +158,12 @@ impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B
     }
 }
 
-#[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
+#[cfg(any(feature = "std", feature = "libm"))]
 impl<U: Unit, P: FixedScale, T: NormStorage, B: Unlimited<T>> Complex<U, P, T, B> {
     /// The level of |z| in dB by the unit's form, from the exact |z|²: 20·lg|z| = 10·lg|z|² for a ratio of
     /// root-power quantities (a reflection coefficient V/V), 10·lg|z| for one of powers, worked out in `f64` and
     /// rounded. z = 0 is −∞ dB; `None` only for a NaN part (a [MaybeNan](crate::MaybeNan) value). A kind without a
-    /// level form doesn't compile. Features `levels` and `std` or `libm`.
+    /// level form doesn't compile. Feature `std` or `libm`.
     ///
     /// ```
     /// # #[cfg(feature = "electrical")] {

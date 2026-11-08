@@ -969,7 +969,7 @@ fn in_comparisons() {
     assert!(VoltGain::<Milli, u16>::new(690) < MINUS_3);
 }
 
-#[cfg(all(feature = "levels", any(feature = "std", feature = "libm")))]
+#[cfg(any(feature = "std", feature = "libm"))]
 mod run_time {
     use super::*;
 

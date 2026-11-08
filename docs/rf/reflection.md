@@ -15,7 +15,7 @@ $$
 - **Mismatch loss** is `1 − |Γ|²`, the share of the incident power the load takes, a `Fixed<Per<Watt, Watt>, One, F>`: its `to_db` is 10·lg, the loss as a negative level (−0.51 dB at VSWR 2).
 
 ```rust
-# #[cfg(all(feature = "electrical", feature = "levels", any(feature = "std", feature = "libm")))] {
+# #[cfg(all(feature = "electrical", any(feature = "std", feature = "libm")))] {
 use exact_units::{Complex, Impedance, Z0, prefix::One, q, units::{Decibel, Loss}};
 
 let z0 = Z0::<One, f64>::bounded(50.0, 0.0);
