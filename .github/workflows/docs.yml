@@ -4,6 +4,17 @@ name: Book
 # deploy job publishes the built site to GitHub Pages with actions/deploy-pages (Pages source "GitHub Actions"; the
 # domain exact.vhrd.tech is a repository setting, no CNAME file). It runs on every push to main, and by hand on main
 # with "deploy" ticked (see the job).
+#
+# Concurrency: a pull request or merge-queue entry still cancels its own superseded runs (one group per branch or
+# queue entry, cancel-in-progress true). Every run on main — a push or a manual "deploy" dispatch — instead shares
+# one fixed group with cancel-in-progress false, covering both jobs. GitHub then runs at most one run per group and
+# keeps at most one pending behind it, the most recently queued one, cancelling an older pending run outright
+# (docs.github.com, "Control the concurrency of workflows and jobs"). So on main: a running build+deploy is never
+# interrupted mid-deploy, two main runs never build or deploy at once, and a commit superseded before its run starts
+# is dropped whole rather than left to publish late over a newer one. This is the same "pages" group GitHub's own
+# Pages starter workflow (actions/starter-workflows pages/static.yml) puts on its one job; here it is the whole
+# workflow's group instead of a single job's, because build (unlike deploy) also runs for pull requests and the
+# merge queue and must keep cancelling per branch there.
 
 on:
   merge_group:
@@ -18,8 +29,9 @@ on:
         default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
+  group: >-
+    ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && 'main' || (github.head_ref || github.run_id) }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
