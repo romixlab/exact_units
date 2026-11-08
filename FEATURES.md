@@ -488,8 +488,9 @@ angles, complex power.
   `atan2` and `sin`/`cos` (feature `std` or `libm`); integers without a float: `abs` the correctly rounded root of
   the exact `norm_sqr` in the unsigned twin, `arg` by CORDIC into a `PhaseBam16` / `PhaseBam32` within 0.51 of a
   step, `from_polar` by Q31 sin/cos. `to_db` from |z|², `norm_sqr_at_rounded(Decibels, Rounding)` and `db!(norm_sqr -15, Floor)` as a typed
-  threshold; RF helpers on an impedance (Γ, VSWR, return loss), example `13_impedance_match`. Γ and Z ↔ Y return
-  `Result<_, Undefined>`, the cause named for the physics (`LoadIsMinusZ0`, `Short`, `Open`).
+  threshold; RF helpers on an impedance (Γ, VSWR, return loss), example `13_impedance_match`. Γ and Z ↔ Y are on
+  the extended plane, `Extended<T>`: a short's Y and an open's Z are `Extended::Infinity` (`Admittance::SHORT`,
+  `Impedance::OPEN`), Z = −Z₀ is Γ = ∞, and `reflection` takes a `Z0`, finite and not 0 by its type.
 
 ## Numbers and units at the edges (`IO`)
 

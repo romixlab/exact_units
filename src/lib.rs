@@ -88,11 +88,15 @@ pub mod units;
 
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
 pub use complex::Nco;
+#[cfg(all(feature = "electrical", feature = "dimensionless"))]
+pub use complex::Undefined;
 #[cfg(feature = "electrical")]
-pub use complex::{Admittance, Impedance, Undefined};
+pub use complex::{Admittance, Impedance, Z0};
 #[cfg(feature = "dimensionless")]
 pub use complex::{CQ15, CQ31};
-pub use complex::{Complex, ComplexStorage, Interleaved, IqStorage, Mac, NormStorage, Polar};
+pub use complex::{
+    Complex, ComplexStorage, Extended, Interleaved, IqStorage, Mac, NormStorage, Polar,
+};
 #[doc(hidden)]
 pub use exact::Fraction8;
 #[doc(hidden)]

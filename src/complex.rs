@@ -966,6 +966,9 @@ pub use iq::Nco;
 pub use iq::{CQ15, CQ31};
 pub use iq::{Interleaved, IqStorage, Mac};
 
+mod extended;
+pub use extended::Extended;
+
 pub mod level;
 pub mod polar;
 pub use polar::Polar;
@@ -975,10 +978,12 @@ mod power;
 
 #[cfg(feature = "electrical")]
 pub mod rf;
+#[cfg(feature = "electrical")]
+pub use rf::Z0;
 
-#[cfg(feature = "electrical")]
+#[cfg(all(feature = "electrical", feature = "dimensionless"))]
 mod undefined;
-#[cfg(feature = "electrical")]
+#[cfg(all(feature = "electrical", feature = "dimensionless"))]
 pub use undefined::Undefined;
 
 #[cfg(test)]

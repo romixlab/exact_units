@@ -330,13 +330,14 @@ mod float {
     #[cfg(feature = "electrical")]
     mod rf {
         use super::*;
-        use crate::{Admittance, Impedance};
+        use crate::{Admittance, Impedance, Z0};
 
         #[test]
         fn worked_values() {
-            let z0 = Impedance::<One, f64>::bounded(50.0, 0.0);
+            let z0 = Z0::<One, f64>::bounded(50.0, 0.0);
             let g = Impedance::<One, f64>::bounded(100.0, 0.0)
                 .reflection(z0)
+                .finite()
                 .unwrap();
             assert!(near(g.re().get(), 1.0 / 3.0, 1.0) && g.im().get() == 0.0);
             assert!(near(g.vswr().get(), 2.0, 4.0));
@@ -350,6 +351,7 @@ mod float {
             // 25 + 25j Ω: Γ = (−25 + 25j) / (75 + 25j) = −0.2 + 0.4j
             let g = Impedance::<One, f64>::bounded(25.0, 25.0)
                 .reflection(z0)
+                .finite()
                 .unwrap();
             assert!(near(g.re().get(), -0.2, 2.0) && near(g.im().get(), 0.4, 2.0));
             let m = libm::sqrt(0.2);
@@ -360,14 +362,15 @@ mod float {
 
         #[test]
         fn ends() {
-            let z0 = Impedance::<Milli, f32>::bounded(50_000.0, 0.0);
-            let matched = z0.reflection(z0).unwrap();
+            let z0 = Z0::<Milli, f32>::bounded(50_000.0, 0.0);
+            let matched = z0.get().reflection(z0).finite().unwrap();
             assert_eq!(matched.get(), (0.0, 0.0));
             assert_eq!(matched.vswr().get(), 1.0);
             assert_eq!(matched.return_loss_db_f32(), f32::INFINITY);
             assert_eq!(matched.mismatch_loss().get(), 1.0);
             let short = Impedance::<Milli, f32>::bounded(0.0, 0.0)
                 .reflection(z0)
+                .finite()
                 .unwrap();
             assert_eq!(short.get(), (-1.0, 0.0));
             assert_eq!(short.vswr().get(), f32::INFINITY);
@@ -375,6 +378,7 @@ mod float {
             assert_eq!(short.mismatch_loss().get(), 0.0);
             let reactive = Impedance::<Milli, f32>::bounded(0.0, 30_000.0)
                 .reflection(z0)
+                .finite()
                 .unwrap();
             assert!((reactive.abs().get() - 1.0).abs() < 1e-6);
         }
@@ -383,14 +387,14 @@ mod float {
         fn admittance_round_trip() {
             for (re, im) in pairs_i32(1_000).filter(|&p| p != (0, 0)) {
                 let z = Impedance::<Milli, f64>::bounded(f64::from(re), f64::from(im));
-                let y: Admittance<Pow2<-20>, f64> = z.to_admittance().unwrap();
+                let y: Admittance<Pow2<-20>, f64> = z.to_admittance().finite().unwrap();
                 let (zr, zi) = (z.re().get() * 1e-3, z.im().get() * 1e-3);
                 let n = zr * zr + zi * zi;
                 // each part within a few ulps of |Y|, which a small part can't promise of itself
                 let tol = 8.0 * f64::EPSILON * y.abs().get();
                 assert!((y.re().get() - zr / n * libm::ldexp(1.0, 20)).abs() <= tol);
                 assert!((y.im().get() + zi / n * libm::ldexp(1.0, 20)).abs() <= tol);
-                let back = y.to_impedance::<Milli>().unwrap();
+                let back = y.to_impedance::<Milli>().finite().unwrap();
                 let tol = 16.0 * f64::EPSILON * z.abs().get();
                 assert!((back.re().get() - z.re().get()).abs() <= tol);
                 assert!((back.im().get() - z.im().get()).abs() <= tol);
