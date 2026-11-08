@@ -18,7 +18,7 @@
 //! let z0 = Z0::<One, f64>::bounded(50.0, 0.0);
 //! let gamma = Impedance::<One, f64>::bounded(100.0, 0.0).reflection(z0).finite().unwrap();
 //! assert_eq!(gamma, Complex::<_, _, f64>::bounded(1.0 / 3.0, 0.0));
-//! assert!(gamma.vswr().is_in(q!(2 V/V +- 0.000001 V/V, Inside))); // 1.9999999999999998 in f64
+//! assert!(gamma.vswr().is_in(q!(2 V/V +- 0.000001 V/V, Inside))); // a hair under 2 in f64
 //! assert!(gamma.return_loss().is_in(q!(9.542425... Loss<Decibel>))); // 20·lg 3
 //! assert!(gamma.mismatch_loss().is_in(q!(0.888... W/W))); // 8/9 of the power, -0.51 dB as its to_db()
 //! # }

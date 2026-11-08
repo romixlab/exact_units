@@ -93,7 +93,7 @@
 //! ```compile_fail
 //! # #[cfg(feature = "angle")] {
 //! use exact_units::{Fixed, q, prefix::One, units::Radian};
-//! let a = Fixed::<Radian, One, f64>::bounded(1.5707963267948966);
+//! let a = Fixed::<Radian, One, f64>::bounded(core::f64::consts::FRAC_PI_2);
 //! let _ = a == q!(90 deg);
 //! # }
 //! # #[cfg(not(feature = "angle"))] compile_error!("the case needs angle");

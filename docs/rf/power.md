@@ -12,9 +12,9 @@ Complex power (ISO 80000-6): `S = V · I*` of RMS voltage and current phasors, a
 # #[cfg(all(feature = "electrical", feature = "dimensionless"))] {
 use exact_units::{Complex, prefix::One, q, units::{Ampere, Volt}};
 
-// 230 V at 0°, 10 A lagging 30° behind it
+// 230 V at 0°, 10 A lagging 30° behind it: 10·cos 30° − 10j·sin 30°
 let v = Complex::<Volt, One, f64>::bounded(230.0, 0.0);
-let i = Complex::<Ampere, One, f64>::bounded(8.660254037844387, -5.0);
+let i = Complex::<Ampere, One, f64>::bounded(10.0 * 0.75f64.sqrt(), -5.0);
 let s = v.apparent_power(i);
 assert_eq!(s.active().get().round(), 1992.0); // active power, W
 assert_eq!(s.reactive().get(), 1150.0); // reactive power, var

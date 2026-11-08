@@ -8,7 +8,7 @@
 //! thruster impulse in lbf·s and the next read it as N·s, 4.45 times off.
 //!
 //! Here each customary unit is a marker with its exact definition (`docs/customary.md` lists them all): a psi is
-//! 6894.757293168361… Pa as an exact fraction, not a typed constant. There is no bare `Gallon`, only `GallonUs` and
+//! 6894.757… Pa as an exact fraction, not a typed constant. There is no bare `Gallon`, only `GallonUs` and
 //! `GallonImperial`, so the question is asked when the type is written. A unit that comes from a measured property
 //! (an inch of mercury at 32 °F) says so, and names its source.
 //!

@@ -597,8 +597,8 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// the factor `U · P / (U2 · P2)` is worked out at compile time, so a conversion costs what [to](Self::to) costs.
     ///
     /// ```
-    /// # #[cfg(feature = "customary")] {
-    /// use exact_units::{Fixed, prefix::{One, Pico}, units::{Newton, PoundForce, Second, Times}};
+    /// # #[cfg(all(feature = "customary", feature = "q"))] {
+    /// use exact_units::{Fixed, q, prefix::{One, Pico}, units::{Newton, PoundForce, Second, Times}};
     ///
     /// // 1 lbf·s is 4.4482216152605 N·s exactly
     /// let impulse = Fixed::<Times<PoundForce, Second>, One, i64>::new(2);
@@ -610,7 +610,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// assert_eq!(impulse.convert::<Times<Newton, Second>, One, i64>(), None);
     /// // in a float it scales
     /// let f = impulse.convert::<Times<Newton, Second>, One, f64>().unwrap();
-    /// assert!((f.get() - 8.896443230521).abs() < 1e-12);
+    /// assert!(f.is_in(q!(8.8964432305... N*s)));
     /// # }
     /// ```
     ///

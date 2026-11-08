@@ -24,7 +24,7 @@
 //!
 //! ```
 //! # #[cfg(all(feature = "levels", feature = "electrical", feature = "mechanical"))] {
-//! use exact_units::{Fixed, Rounding, fixed, prefix::{Centi, Micro, One}, units::{Decibel, Loss, Meter, Neper, Per, Volt}};
+//! use exact_units::{Fixed, Rounding, fixed, prefix::{Centi, Micro, One}, q, units::{Decibel, Loss, Meter, Neper, Per, Volt}};
 //!
 //! // a cable's 17.7 dB/100 m, positive as the datasheet writes it, in nepers per meter exactly rounded
 //! type Alpha = Fixed<Per<Loss<Neper>, Meter>, Micro, u32>;
@@ -34,8 +34,8 @@
 //! // a gain of 0.5 V/V is −6.02 dB, a loss of 6.02 dB
 //! let gain = Fixed::<Per<Volt, Volt>, One, f64>::bounded(0.5);
 //! let level: Fixed<Decibel, One, f64> = gain.to_level(Rounding::NearestEven).unwrap();
-//! assert!((level.get() + 6.0206).abs() < 1e-4);
-//! assert!((level.as_loss().get() - 6.0206).abs() < 1e-4);
+//! assert!(level.is_in(q!(-6.0205... Decibel)));
+//! assert!(level.as_loss().is_in(q!(6.0205... Loss<Decibel>)));
 //! # }
 //! ```
 //!
@@ -43,7 +43,7 @@
 //!
 //! ```
 //! # #[cfg(all(feature = "levels", feature = "electrical", feature = "mechanical", feature = "chemical"))] {
-//! use exact_units::{Fixed, Rounding, prefix::{Micro, Milli, One}};
+//! use exact_units::{Fixed, Rounding, prefix::{Micro, Milli, One}, q};
 //! use exact_units::units::{
 //!     Absorbance, Decibel, LinearAttenuation, Loss, Meter, MolarAbsorptivity, MolePerLitre, Neper, OpticalDepth, Per,
 //!     Watt,
@@ -62,7 +62,7 @@
 //!
 //! // T = 10^(−A)
 //! let t = a.to_gain::<Per<Watt, Watt>, One, f64>().unwrap();
-//! assert!((t.get() - 0.2388).abs() < 1e-4);
+//! assert!(t.is_in(q!(0.2387... W/W)));
 //!
 //! // a fibre's 0.2 dB/km: μ is twice α
 //! let fibre = Fixed::<Per<Loss<Decibel>, Meter>, Milli, f64>::bounded(0.2);
@@ -506,18 +506,18 @@ impl<L: Unit, X: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds
     ///
     /// ```
     /// # #[cfg(all(feature = "levels", feature = "mechanical"))] {
-    /// use exact_units::{Fixed, Rounding::NearestEven, prefix::{Deci, One}, units::{Decibel, Feet100, Loss, Metres100, Per}};
+    /// use exact_units::{Fixed, Rounding::NearestEven, prefix::{Deci, One}, q, units::{Decibel, Feet100, Loss, Metres100, Per}};
     ///
     /// // Belden 8259: 5.4 dB/100 ft, over 820 ft (8.2 "100 ft" units) of cable
     /// let alpha = Fixed::<Per<Loss<Decibel>, Feet100>, Deci, i32>::new(54);
     /// let length = Fixed::<Feet100, Deci, i32>::new(82);
     /// let loss: Fixed<Loss<Decibel>, One, f64> = alpha.over(length, NearestEven).unwrap();
-    /// assert!((loss.get() - 44.28).abs() < 1e-9);
+    /// assert!(loss.is_in(q!(44.28 Loss<Decibel> +- 0.000001 Loss<Decibel>, Inside)));
     ///
     /// let alpha_si = Fixed::<Per<Loss<Decibel>, Metres100>, Deci, i32>::new(177); // 17.7 dB/100 m
     /// let length_si = Fixed::<Metres100, One, i32>::new(1);
     /// let loss_si: Fixed<Loss<Decibel>, One, f64> = alpha_si.over(length_si, NearestEven).unwrap();
-    /// assert!((loss_si.get() - 17.7).abs() < 1e-9);
+    /// assert!(loss_si.is_in(q!(17.7 Loss<Decibel> +- 0.000001 Loss<Decibel>, Inside)));
     /// # }
     /// ```
     #[must_use]

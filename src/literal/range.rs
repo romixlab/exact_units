@@ -25,7 +25,7 @@
 //!   are always exact and `Inside` or `Outside` changes nothing.
 //! - Known leading digits, `q!(9.542425... V)`: the values whose decimal starts with those digits, `9.542425 V ..<
 //!   9.542426 V`; `q!(-9.54... V)` is `-9.55 V <.. -9.54 V`, its lower end out. The digits are cut, never rounded:
-//!   a value of 9.5424250943 V is in `9.542425...` and not in `9.542426...`. Against a storage it holds exactly the
+//!   a value of 9.54242509.. V is in `9.542425...` and not in `9.542426...`. Against a storage it holds exactly the
 //!   stored values with those digits, as `Inside` would, so no fit is written; one no stored value has is a compile
 //!   error as for any range. A prefix has a digit after its point (`9...` reads as 9 to 10 or as 9, 90, 900, ..) and
 //!   no exponent.
@@ -52,7 +52,7 @@
 //! ```
 //! # #[cfg(feature = "electrical")] {
 //! use exact_units::{Fixed, q, prefix::One, units::Volt};
-//! let v = Fixed::<Volt, One, f64>::bounded(9.542425094393248);
+//! let v = Fixed::<Volt, One, f64>::bounded(20.0 * 3f64.log10()); // 9.54242509.. V
 //! assert!(v.is_in(q!(9.542425... V)));
 //! assert!(!v.is_in(q!(9.542426... V))); // a rounded prefix is no prefix
 //! assert!(Fixed::<Volt, One, f64>::bounded(-9.542425).is_in(q!(-9.5424... V)));

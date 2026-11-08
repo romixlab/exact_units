@@ -227,7 +227,7 @@ With feature `levels` (in `quantities`), a level is a number of its own unit, no
 - A logarithm is no exact number. `to_level` works it in `f64` and rounds it once by the `Rounding` you pass.
 
 ```rust
-use exact_units::{Fixed, Rounding, fixed, prefix::{Centi, Micro, One}};
+use exact_units::{Fixed, Rounding, fixed, prefix::{Centi, Micro, One}, q};
 use exact_units::units::{Decibel, Loss, Meter, Neper, Per, Volt};
 
 // a cable's loss as the datasheet writes it, positive, in an integer of µNp/m
@@ -243,8 +243,8 @@ assert_eq!(np.get(), 2_037_788);
 // the edge to a gain: V/V takes 20·lg, and a loss is the gain negated
 let gain = Fixed::<Per<Volt, Volt>, One, f64>::bounded(0.1);
 let loss: Fixed<Loss<Decibel>, One, f64> = gain.to_level(Rounding::NearestEven).unwrap();
-assert!((loss.get() - 20.0).abs() < 1e-12);
-assert!((loss.as_gain().get() + 20.0).abs() < 1e-12);
+assert!(loss == q!(20 Loss<Decibel>));
+assert!(loss.as_gain() == q!(-20 Decibel));
 ```
 
 A loss is not a gain, so the compiler refuses to mix them:
@@ -265,7 +265,7 @@ Beer-Lambert is written on the transmitted power ratio T, without the ½ of a le
 - `MolarAbsorptivity` is ε, the L/(mol·cm) of tables, printed AU/(M·cm). `ε·l·c` converts to an `Absorbance`.
 
 ```rust
-use exact_units::{Fixed, Rounding, prefix::{Micro, Milli, One}};
+use exact_units::{Fixed, Rounding, prefix::{Micro, Milli, One}, q};
 use exact_units::units::{
     Absorbance, Decibel, LinearAttenuation, Loss, Meter, MolarAbsorptivity, MolePerLitre, Neper, OpticalDepth, Per, Watt,
 };
@@ -283,7 +283,7 @@ assert_eq!(tau.get(), 1432);
 
 // T = 10^(−A), in a float: an integer storage takes whole numbers only
 let t = a.to_gain::<Per<Watt, Watt>, One, f64>().unwrap();
-assert!((t.get() - 0.2388).abs() < 1e-4);
+assert!(t.is_in(q!(0.2387... W/W)));
 
 // a fibre's 0.2 dB/km is 23 µNp/m of field, and μ is twice that
 let fibre = Fixed::<Per<Loss<Decibel>, Meter>, Milli, f64>::bounded(0.2);

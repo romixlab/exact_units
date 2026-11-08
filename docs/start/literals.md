@@ -262,7 +262,7 @@ let _ = v != q!(3.4028235e38 V); // above f32::MAX
 ```rust,compile_fail
 # #[cfg(feature = "angle")] {
 use exact_units::{Fixed, q, prefix::One, units::Radian};
-let a = Fixed::<Radian, One, f64>::bounded(1.5707963267948966);
+let a = Fixed::<Radian, One, f64>::bounded(core::f64::consts::FRAC_PI_2);
 let _ = a == q!(90 deg); // π/2 is no f64
 # }
 # #[cfg(not(feature = "angle"))] compile_error!("the case needs angle");
@@ -439,17 +439,17 @@ A range of points (`q!(20 degC ..= 25 degC)`, `q!(25 degC +- 0.5)`) checks a `Po
 
 ### Known leading digits
 
-A result such as a return loss is often a long decimal, 9.542425094393248 dB, and an example that spells it out is hard to read. A decimal followed by `...` is the range of the values whose decimal starts with those digits:
+A result such as a return loss is often a long decimal, 20·lg 3 = 9.54242509.. dB, and an example that spells out all its digits is hard to read. A decimal followed by `...` is the range of the values whose decimal starts with those digits:
 
 ```rust
 # #[cfg(feature = "electrical")] {
 use exact_units::{Fixed, q, prefix::One, units::Volt};
 
-let v = Fixed::<Volt, One, f64>::bounded(9.542425094393248);
+let v = Fixed::<Volt, One, f64>::bounded(20.0 * 3f64.log10()); // 9.54242509.. V
 assert!(v.is_in(q!(9.542425... V)));   // 9.542425 V ..< 9.542426 V
 assert!(v.is_in(q!(9.54... V)));       // fewer digits, a wider range
 assert!(!v.is_in(q!(9.542426... V)));  // the digits are cut, never rounded
-let n = Fixed::<Volt, One, f64>::bounded(-9.542425094393248);
+let n = Fixed::<Volt, One, f64>::bounded(-20.0 * 3f64.log10());
 assert!(n.is_in(q!(-9.54... V)));      // -9.55 V <.. -9.54 V
 assert!(n.is_in(q!("-9.54… V")));      // in a string, `…` works too
 # }
