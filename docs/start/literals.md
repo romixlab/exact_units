@@ -437,6 +437,26 @@ NaN is in no range. "Not in it" is the safe answer whichever way a check branche
 
 A range of points (`q!(20 degC ..= 25 degC)`, `q!(25 degC +- 0.5)`) checks a `Point`, and a range of levels (`q!(-3 dB ..= 3 dB, Inside)`, `q!(20 dB +- 1 dB, Inside)`) a linear gain, by the same rules: see [A range of points](../points/points.md#a-range-of-points) and [A range of levels](../levels/decibels.md#a-range-of-levels). An end at another origin (68.01 °F against steps of 0.01 °C) and the gain of a level that isn't whole decades are rarely stored values, so they need `Inside` or `Outside` more often than an amount does.
 
+### Tolerance literals
+
+`q!(+- 50 mV)` and `q!(+- 1 %)` are a tolerance alone, with no nominal: for a target chosen at run time, as a setpoint is. An absolute amount folds once to whole steps of the target it is later given; a relative one (`%`, `‰`, `ppm`, `ppb`) is a `Tolerance`, usable wherever one is taken:
+
+```rust
+# #[cfg(all(feature = "electrical", feature = "dimensionless"))] {
+use exact_units::{Fit, Fixed, q, prefix::Milli, units::Volt};
+
+let setpoint = Fixed::<Volt, Milli, i32>::new(5000);
+let w = q!(+- 50 mV).window(setpoint); // folded to whole steps, no Fit needed
+assert_eq!(w.to_string(), "4950 mV ..= 5050 mV");
+
+// a relative literal is a Tolerance, wherever one is taken
+assert_eq!(q!(+- 1 %, Inside).window(setpoint), setpoint.window(q!(+- 1 %), Fit::Inside));
+# }
+# #[cfg(not(all(feature = "electrical", feature = "dimensionless")))] compile_error!("the case needs electrical and dimensionless");
+```
+
+An amount that isn't a whole number of steps needs `, Inside` or `, Outside`, as a range end does; a relative one needs it too, since the window it folds to at run time is rarely a stored value either, and there is no way to prove that at compile time for a target not known yet. A `q!` range itself folds to a `Window` the same way, no target needed since both ends are already written: `q!(4.9 V ..= 5.1 V).window::<Fixed<Volt, Milli, i16>>()` is `4900 mV ..= 5100 mV`, the type named at the call site since nothing else fixes it.
+
 ### Known leading digits
 
 A result such as a return loss is often a long decimal, 20·lg 3 = 9.54242509.. dB, and an example that spells out all its digits is hard to read. A decimal followed by `...` is the range of the values whose decimal starts with those digits:

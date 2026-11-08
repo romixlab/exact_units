@@ -886,6 +886,34 @@ pub(crate) const fn refuse_range_float_end(
 }
 
 #[cfg(feature = "q")]
+/// The compile error for an absolute tolerance literal's amount that is no whole number of steps, between
+/// `floor` and `floor + 1` (`step` in units of `unit`), with no `Inside` or `Outside` named.
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "floor < i128::MAX, as cut_scale checks"
+)]
+pub(crate) const fn refuse_tolerance_amount(floor: i128, step: Magnitude, unit: &str) -> ! {
+    let mut t = Text::new();
+    t.push(
+        "this tolerance's amount is no whole number of steps: the stored amounts around it are ",
+    );
+    let a = push_step(&mut t, floor, step, unit);
+    t.push(" and ");
+    let b = push_step(&mut t, floor + 1, step, unit);
+    if !(a && b) {
+        t.push(", whose values aren't finite decimals");
+    }
+    t.push(
+        "; write the tolerance with `, Inside` (rounds the amount down) or `, Outside` (up), q!(+- .., Inside)",
+    );
+    panic!("{}", t.as_str())
+}
+
+#[cfg(feature = "q")]
 /// The compile error for a `q!` range no stored value is in: between the steps `below` and `below + 1` where it
 /// lies inside the storage's range, else past it.
 #[expect(

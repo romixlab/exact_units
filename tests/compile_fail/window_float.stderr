@@ -2,7 +2,7 @@ error[E0080]: evaluation panicked: a window from a tolerance is for integer stor
  --> $RUST/core/src/panic.rs
   |
   |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
-  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::window::<impl exact_units::Fixed<exact_units::units::Ratio, exact_units::prefix::Milli, f32, exact_units::MaybeNan>>::window::{constant#0}` failed here
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::window::<impl exact_units::Fixed<exact_units::units::Ratio, exact_units::prefix::Milli, f32, exact_units::MaybeNan>>::window::<exact_units::Tolerance>::{constant#0}` failed here
   |
  ::: src/window.rs
   |
@@ -23,7 +23,7 @@ note: erroneous constant encountered
   | |         };
   | |_________^
 
-note: the above error was encountered while instantiating `fn exact_units::window::<impl Fixed<Ratio, exact_units::prefix::Milli, f32, MaybeNan>>::window`
+note: the above error was encountered while instantiating `fn exact_units::window::<impl Fixed<Ratio, exact_units::prefix::Milli, f32, MaybeNan>>::window::<Tolerance>`
  --> tests/compile_fail/window_float.rs:8:13
   |
 8 |     let _ = F::of(1.0).window(Tolerance::percent(1), Fit::Inside);
@@ -33,7 +33,7 @@ error[E0080]: evaluation panicked: a tolerance between stored values is for inte
  --> $RUST/core/src/panic.rs
   |
   |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
-  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::window::<impl exact_units::Fixed<exact_units::units::Ratio, exact_units::prefix::Milli, f32, exact_units::MaybeNan>>::is_within::{constant#0}` failed here
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::window::<impl exact_units::Fixed<exact_units::units::Ratio, exact_units::prefix::Milli, f32, exact_units::MaybeNan>>::is_within::<exact_units::Tolerance>::{constant#0}` failed here
   |
  ::: src/window.rs
   |
@@ -54,7 +54,7 @@ note: erroneous constant encountered
   | |         };
   | |_________^
 
-note: the above error was encountered while instantiating `fn exact_units::window::<impl Fixed<Ratio, exact_units::prefix::Milli, f32, MaybeNan>>::is_within`
+note: the above error was encountered while instantiating `fn exact_units::window::<impl Fixed<Ratio, exact_units::prefix::Milli, f32, MaybeNan>>::is_within::<Tolerance>`
  --> tests/compile_fail/window_float.rs:9:13
   |
 9 |     let _ = F::of(1.0).is_within(F::of(1.0), Tolerance::percent(1));

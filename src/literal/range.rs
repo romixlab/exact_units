@@ -136,10 +136,15 @@
 use core::marker::PhantomData;
 
 use super::quantity::{Below, Cut, cut, fraction};
-use super::steps::{FloatFormat, refuse_range_empty, refuse_range_end, refuse_range_float_end};
+use super::steps::{
+    FloatFormat, refuse_range_empty, refuse_range_end, refuse_range_float_end,
+    refuse_tolerance_amount,
+};
 use super::{Decimal, LiteralIn, scale_in};
 use crate::conv_error::Symbol;
-use crate::{Bounds, Contains, Exact, Fixed, FixedScale, Magnitude, Unit};
+use crate::{Bounds, Contains, Exact, Fixed, FixedScale, Magnitude, Repr, Storage, Unit, Window};
+#[cfg(feature = "dimensionless")]
+use crate::{Fit, Tolerance, units::Ratio};
 
 /// No `Inside` or `Outside` written: an end that is no stored value is refused.
 const EXACT: u8 = 0;
@@ -186,23 +191,68 @@ impl<Lo, Hi, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8> Copy
 {
 }
 
-/// A tolerance alone, `q!(+- 50 mV)`, `q!(+- 1 %)`: its amount `A` a `q!` literal as a type, `FIT` as for
-/// [LiteralRange]. What takes one is NUM-24's (a window or a compare around a target chosen at run time).
-#[derive(Debug)]
-pub struct LiteralTolerance<A, const FIT: u8>(PhantomData<A>);
+/// What a `q!` range literal folds to as a [Window]: hidden, implemented per storage so `.window::<F>()` can pick
+/// the right one from its turbofish, as [Contains] does for `is_in`.
+#[doc(hidden)]
+pub trait FoldWindow<F> {
+    /// The window, under the range's own fit.
+    fn fold_window(&self) -> Window<F>;
+}
 
-impl<A, const FIT: u8> LiteralTolerance<A, FIT> {
+impl<Lo, Hi, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8>
+    LiteralRange<Lo, Hi, LO_OPEN, HI_OPEN, FIT>
+{
+    /// The window of stored values this range folds to, under its own fit: the ends [contains](Self::contains)
+    /// checks against, as a value a control loop can keep instead of folding it again on every check. `F` is the
+    /// [Fixed] type the range is of; nothing else fixes it, so it is named at the call site:
+    /// `q!(4.9 V ..= 5.1 V).window::<Fixed<Volt, Milli, i16>>()`.
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+    ///
+    /// type MilliVolts = Fixed<Volt, Milli, i16>;
+    /// let w = q!(4.9 V ..= 5.1 V).window::<MilliVolts>();
+    /// assert_eq!(w.to_string(), "4900 mV ..= 5100 mV");
+    /// assert!(MilliVolts::new(5100).is_in(w));
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn window<F>(&self) -> Window<F>
+    where
+        Self: FoldWindow<F>,
+    {
+        FoldWindow::fold_window(self)
+    }
+}
+
+/// `false`: `LiteralTolerance`'s amount is in the target's own unit (`q!(+- 50 mV)`), folded to whole steps.
+const ABSOLUTE: bool = false;
+/// `true`: the amount is of the target's magnitude (`%`, `‰`, `ppm`, `ppb`), folded to a `Tolerance`. Named only
+/// where that type exists: the `dimensionless` feature, as `Tolerance` itself needs.
+#[cfg(feature = "dimensionless")]
+const RELATIVE: bool = true;
+
+/// A tolerance alone, `q!(+- 50 mV)` or `q!(+- 1 %)`: its amount `A` a `q!` literal as a type, `FIT` as for
+/// [LiteralRange], `REL` whether it is relative (`%`, `‰`, `ppm`, `ppb`, decided by the macro from the amount's own
+/// unit). An absolute one (`REL` false) folds once to whole steps of a target chosen at run time (`window`),
+/// needing no other feature; a relative one (`REL` true) to a run-time tolerance (`to_tolerance`, `window`),
+/// usable wherever one is taken, needing `dimensionless`, as `Tolerance` itself does.
+#[derive(Debug)]
+pub struct LiteralTolerance<A, const FIT: u8, const REL: bool>(PhantomData<A>);
+
+impl<A, const FIT: u8, const REL: bool> LiteralTolerance<A, FIT, REL> {
     /// The tolerance; `q!` writes it.
     pub const NEW: Self = LiteralTolerance(PhantomData);
 }
 
-impl<A, const FIT: u8> Clone for LiteralTolerance<A, FIT> {
+impl<A, const FIT: u8, const REL: bool> Clone for LiteralTolerance<A, FIT, REL> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<A, const FIT: u8> Copy for LiteralTolerance<A, FIT> {}
+impl<A, const FIT: u8, const REL: bool> Copy for LiteralTolerance<A, FIT, REL> {}
 
 /// A `q!` amount as a type, its number and unit read back: the end of a range.
 #[doc(hidden)]
@@ -218,6 +268,126 @@ impl<const N: i64, const E: i16, S: Unit> Amount for LiteralIn<N, E, S> {
     const VALUE: Decimal = Decimal::new(N, E);
 
     type S = S;
+}
+
+/// An absolute tolerance's amount `x` (in units of `S`, at least 0, as the macro checks) as whole steps of `P`:
+/// its floor where it is one, else `fit` decides (`INSIDE` rounds down, `OUTSIDE` up, `EXACT` a compile error
+/// naming the stored amounts around it). `step` and `unit` are `S` in `U` at `P`, for that message.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "floor < i128::MAX, as cut_scale checks, so floor + 1 fits"
+)]
+const fn fold_tolerance<S: Unit, U: Unit, P: FixedScale>(x: Decimal, fit: u8) -> i128 {
+    let step = scale_in::<S, U, P>();
+    let unit = Symbol::of(S::EXPR);
+    let c = cut::<S, U, P>(x);
+    if c.exact {
+        c.floor
+    } else {
+        match fit {
+            INSIDE => c.floor,
+            OUTSIDE => c.floor + 1,
+            _ => refuse_tolerance_amount(c.floor, step, unit.as_str()),
+        }
+    }
+}
+
+/// `x` of a [Storage] as `i128`: never reached for a float, where each caller refuses it first.
+fn as_int<T: Storage>(x: T) -> i128 {
+    match x.to_repr() {
+        Repr::Int(i) => i,
+        Repr::Float(_) => 0,
+    }
+}
+
+impl<A: Amount, const FIT: u8> LiteralTolerance<A, FIT, ABSOLUTE> {
+    /// The window of this absolute tolerance around `target`: `target` ± the amount folded once to whole steps of
+    /// `target`'s scale, its own `Inside` or `Outside` deciding an amount that isn't one, as a range end's fit
+    /// does; cut to the type's range and bounds, as [Fixed::window](crate::Fixed::window) is for a relative
+    /// tolerance. `A`'s unit must be `target`'s own, up to a prefix.
+    ///
+    /// Integer storages only: a float storage is a compile error.
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+    ///
+    /// let setpoint = Fixed::<Volt, Milli, i32>::new(5000);
+    /// let w = q!(+- 50 mV).window(setpoint);
+    /// assert_eq!(w.to_string(), "4950 mV ..= 5050 mV");
+    /// assert!(Fixed::new(4950).is_in(w) && !Fixed::new(4949).is_in(w));
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn window<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>>(
+        self,
+        target: Fixed<U, P, T, B>,
+    ) -> Window<Fixed<U, P, T, B>> {
+        const {
+            assert!(
+                !T::IS_FLOAT,
+                "a window from an absolute tolerance is for integer storages"
+            );
+        };
+        let d = const { fold_tolerance::<A::S, U, P>(A::VALUE, FIT) };
+        let b = as_int(target.get());
+        let min = B::MIN.map_or(T::MIN_INT, |m| as_int(m).max(T::MIN_INT));
+        let max = B::MAX.map_or(T::MAX_INT, |m| as_int(m).min(T::MAX_INT));
+        let (lo, hi) = (b.saturating_sub(d).max(min), b.saturating_add(d).min(max));
+        let end = |x| Fixed::new_unchecked(T::from_int(x).unwrap_or(target.get()));
+        Window::from_sorted(end(lo), end(hi))
+    }
+}
+
+#[cfg(feature = "dimensionless")]
+impl<A: Amount, const FIT: u8> LiteralTolerance<A, FIT, RELATIVE> {
+    /// This relative tolerance (`%`, `‰`, `ppm`, `ppb`) as a run-time [Tolerance]: exact, a fraction of `A`'s own
+    /// decimal, so its `FIT` makes no difference here (it is for the window around a target, [window](Self::window)).
+    #[must_use]
+    pub const fn to_tolerance(self) -> Tolerance {
+        Tolerance::of(Exact::of(fraction::<A::S, Ratio>(A::VALUE)))
+    }
+
+    /// The window of this tolerance around `target`, under its own fit: [Fixed::window](crate::Fixed::window) of
+    /// [to_tolerance](Self::to_tolerance). Integer storages only, as `Fixed::window` is; `FIT` must be `Inside` or
+    /// `Outside`, as the window is folded at run time and can't be proved exact at compile time.
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{Fixed, Fit, q, prefix::Milli, units::Volt};
+    ///
+    /// let setpoint = Fixed::<Volt, Milli, i32>::new(3333);
+    /// let w = q!(+- 1 %, Inside).window(setpoint);
+    /// assert_eq!(w.to_string(), "3300 mV ..= 3366 mV");
+    /// // a relative literal is a Tolerance wherever one is taken, Fit written out instead of in the literal
+    /// assert_eq!(q!(+- 1 %, Outside).window(setpoint), setpoint.window(q!(+- 1 %), Fit::Outside));
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn window<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>>(
+        self,
+        target: Fixed<U, P, T, B>,
+    ) -> Window<Fixed<U, P, T, B>> {
+        const {
+            assert!(
+                FIT != EXACT,
+                "a tolerance around a run-time target needs `, Inside` or `, Outside`: q!(+- 1 %, Inside)"
+            );
+        };
+        let fit = if FIT == INSIDE {
+            Fit::Inside
+        } else {
+            Fit::Outside
+        };
+        target.window(self.to_tolerance(), fit)
+    }
+}
+
+#[cfg(feature = "dimensionless")]
+impl<A: Amount, const FIT: u8> From<LiteralTolerance<A, FIT, RELATIVE>> for Tolerance {
+    fn from(value: LiteralTolerance<A, FIT, RELATIVE>) -> Self {
+        value.to_tolerance()
+    }
 }
 
 /// The stored values `lo ..= hi` of a range on an integer storage whose range, narrowed by its bounds, is `min ..=
@@ -342,6 +512,17 @@ macro_rules! range_int {
                 lo <= t && t <= hi
             }
         }
+
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, Lo: Amount, Hi: Amount, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8>
+            FoldWindow<Fixed<U, P, $ty, B>> for LiteralRange<Lo, Hi, LO_OPEN, HI_OPEN, FIT>
+        {
+            fn fold_window(&self) -> Window<Fixed<U, P, $ty, B>> {
+                let (lo, hi) = const {
+                    Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT)
+                };
+                Window::from_sorted(Fixed::new_unchecked(lo), Fixed::new_unchecked(hi))
+            }
+        }
     )*};
 }
 
@@ -433,6 +614,17 @@ macro_rules! range_float {
                 };
                 let t = v.get();
                 lo <= t && t <= hi
+            }
+        }
+
+        impl<U: Unit, P: FixedScale, B: Bounds<$ty>, Lo: Amount, Hi: Amount, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8>
+            FoldWindow<Fixed<U, P, $ty, B>> for LiteralRange<Lo, Hi, LO_OPEN, HI_OPEN, FIT>
+        {
+            fn fold_window(&self) -> Window<Fixed<U, P, $ty, B>> {
+                let (lo, hi) = const {
+                    Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT)
+                };
+                Window::from_sorted(Fixed::new_unchecked(lo), Fixed::new_unchecked(hi))
             }
         }
     )*};

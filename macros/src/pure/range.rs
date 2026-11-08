@@ -67,6 +67,9 @@ pub(crate) enum Input {
         amount: Literal,
         /// What an amount that is no whole number of steps does.
         fit: Fit,
+        /// Whether the amount is relative (`%`, `‰`, `ppm`, `ppb`, any marker of `units::Ratio`): of a run-time
+        /// target's magnitude, folded to a `Tolerance`, rather than of its own unit, folded to whole steps.
+        rel: bool,
     },
 }
 
@@ -202,9 +205,11 @@ impl Read<'_> {
                 ));
             }
             nonnegative(&amount, plus)?;
+            let rel = relative(&amount);
             return Ok(Input::Tolerance {
                 amount,
                 fit: self.fit,
+                rel,
             });
         }
         let nominal = self.body.get(..k).unwrap_or_default();

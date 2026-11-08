@@ -236,6 +236,16 @@ assert!(!reading.is_in(inside) && outside.contains(&reading));
 
 A window and `is_within` are for integer storages; a float storage doesn't compile. NaN is in no window, also of a `MaybeNan` type.
 
+A relative `q!` literal (`q!(+- 1 %)`) is a `Tolerance`, wherever one is taken; an absolute one (`q!(+- 50 mV)`) has its own `window`, folded once to whole steps of the target it is given, its own `, Inside` or `, Outside` standing in for `fit`:
+
+```rust
+use exact_units::{Fit, Fixed, q, prefix::Milli, units::Volt};
+
+let setpoint = Fixed::<Volt, Milli, i32>::new(3333);
+assert_eq!(setpoint.window(q!(+- 1 %), Fit::Inside), q!(+- 1 %, Inside).window(setpoint));
+assert_eq!(q!(+- 50 mV).window(setpoint).to_string(), "3283 mV ..= 3383 mV");
+```
+
 ## Cost
 
 An `Exact` is 48 bytes, and its arithmetic is `u128` multiplies and divisions with a gcd at each step. That is fine on a host and slow on a microcontroller, where most `u128` operations are library calls. Firmware gets the results as `Fixed` constants. The type is `no_std` and needs no alloc, and nothing of it is linked unless it is used.

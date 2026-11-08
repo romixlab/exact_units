@@ -143,15 +143,25 @@ fn tolerances() {
     let (lo, _) = range("5 m / s ^ 2 +- 1 cm / s ^ 2");
     assert_eq!((lo.num, lo.exp), (499, -2));
     match read("+- 50 mV") {
-        Input::Tolerance { amount, fit } => {
-            assert_eq!((amount.num, amount.exp, fit), (5, -2, Fit::Exact));
+        Input::Tolerance { amount, fit, rel } => {
+            assert_eq!(
+                (amount.num, amount.exp, fit, rel),
+                (5, -2, Fit::Exact, false)
+            );
         }
         i => panic!("{i:?}"),
     }
     match read("+- 1 % , Inside") {
-        Input::Tolerance { amount, fit } => {
-            assert_eq!((amount.num, amount.exp, fit), (1, -2, Fit::Inside));
+        Input::Tolerance { amount, fit, rel } => {
+            assert_eq!(
+                (amount.num, amount.exp, fit, rel),
+                (1, -2, Fit::Inside, true)
+            );
         }
+        i => panic!("{i:?}"),
+    }
+    match read("+- 1 ppm") {
+        Input::Tolerance { rel, .. } => assert!(rel),
         i => panic!("{i:?}"),
     }
 }

@@ -14,8 +14,8 @@ use pure::model::{Delim, Error, Tok};
 use pure::range::{self, Input};
 
 /// `q!($crate; 100 m/s)`: the literal `exact_units::literal::LiteralIn<N, E, Unit>::NEW`; a range `q!($crate; 4.9 V
-/// ..= 5.1 V)` is `LiteralRange<Lo, Hi, LO_OPEN, HI_OPEN, FIT>::NEW` of two such ends, a tolerance alone `LiteralTolerance<A,
-/// FIT>::NEW`. Called by exact_units' `q!`, which writes the `$crate;` in front.
+/// ..= 5.1 V)` is `LiteralRange<Lo, Hi, LO_OPEN, HI_OPEN, FIT>::NEW` of two such ends, a tolerance alone
+/// `LiteralTolerance<A, FIT, REL>::NEW`. Called by exact_units' `q!`, which writes the `$crate;` in front.
 #[proc_macro]
 pub fn q(input: TokenStream) -> TokenStream {
     let mut trees = input.into_iter();
@@ -53,11 +53,11 @@ pub fn q(input: TokenStream) -> TokenStream {
             out.text(&format!(", {lo_open}, {open}, {}>::NEW", fit.code()));
             out.ts
         }
-        Ok(Input::Tolerance { amount, fit }) => {
+        Ok(Input::Tolerance { amount, fit, rel }) => {
             let mut out = Out::new(&krate);
             out.krate("::literal::LiteralTolerance::<");
             out.end_type(&amount, &side);
-            out.text(&format!(", {}>::NEW", fit.code()));
+            out.text(&format!(", {}, {rel}>::NEW", fit.code()));
             out.ts
         }
         Err(e) => error(&e, &side, "q!"),

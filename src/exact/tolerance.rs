@@ -122,8 +122,9 @@ impl<U: Unit> Exact<U> {
     pub fn within(
         self,
         target: Self,
-        tolerance: Tolerance,
+        tolerance: impl Into<Tolerance>,
     ) -> Result<Exact<Ratio>, OffTarget<Self>> {
+        let tolerance = tolerance.into();
         let error = self.rel_error(target);
         match error {
             _ if self == target => Ok(Exact::ZERO),

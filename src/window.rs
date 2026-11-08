@@ -49,6 +49,16 @@ pub struct Window<F> {
     hi: F,
 }
 
+#[cfg(feature = "q")]
+impl<F> Window<F> {
+    /// `lo ..= hi`, trusting `lo <= hi` already: for a caller in the crate that just folded a `q!` range or
+    /// tolerance literal and proved it (`refuse_range_empty` is the compile error otherwise), so no check is done
+    /// or needed again at run time.
+    pub(crate) const fn from_sorted(lo: F, hi: F) -> Self {
+        Self { lo, hi }
+    }
+}
+
 impl<U, P, T: Storage, B: Bounds<T>> Window<Fixed<U, P, T, B>> {
     /// `lo ..= hi`, `None` where `hi` is below `lo` or either is NaN: an empty window is no window.
     #[must_use]
@@ -99,7 +109,9 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// real ends `self · (1 ± t)` fall between stored values moved as `fit` says, and cut to the type's range and
     /// bounds. The ends are worked out once, exactly, in integers; each check against the window is then two compares
     /// ([Window::contains]). A window around a value always holds that value; around 0 it is 0 alone. With
-    /// [Fit::Inside], `x.is_in(target.window(tol, Fit::Inside))` is `x.is_within(target, tol)`.
+    /// [Fit::Inside], `x.is_in(target.window(tol, Fit::Inside))` is `x.is_within(target, tol)`. `tolerance` is
+    /// anything a [Tolerance] comes from, a relative `q!` literal (`q!(+- 1 %)`) included: an absolute one
+    /// (`q!(+- 50 mV)`) has its own `window` instead, needing no `fit` (its own `Inside`/`Outside` is that).
     ///
     /// Integer storages only: a float storage is a compile error.
     ///
@@ -122,13 +134,14 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// let _ = Fixed::<Ratio, Milli, f32, MaybeNan>::of(1.0).window(Tolerance::percent(1), Fit::Inside);
     /// ```
     #[must_use]
-    pub fn window(self, tolerance: Tolerance, fit: Fit) -> Window<Self> {
+    pub fn window(self, tolerance: impl Into<Tolerance>, fit: Fit) -> Window<Self> {
         const {
             assert!(
                 !T::IS_FLOAT,
                 "a window from a tolerance is for integer storages"
             );
         };
+        let tolerance = tolerance.into();
         let b = int(self.get());
         let (p, q) = parts(tolerance);
         let d = reach(b.unsigned_abs(), p, q, fit);
@@ -163,14 +176,14 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// # }
     /// ```
     #[must_use]
-    pub fn is_within(self, target: Self, tolerance: Tolerance) -> bool {
+    pub fn is_within(self, target: Self, tolerance: impl Into<Tolerance>) -> bool {
         const {
             assert!(
                 !T::IS_FLOAT,
                 "a tolerance between stored values is for integer storages"
             );
         };
-        let (p, q) = parts(tolerance);
+        let (p, q) = parts(tolerance.into());
         if T::BITS <= 32
             && let (Ok(p), Ok(q)) = (u32::try_from(p), u32::try_from(q))
         {
@@ -208,7 +221,7 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     pub fn within(
         self,
         target: Self,
-        tolerance: Tolerance,
+        tolerance: impl Into<Tolerance>,
     ) -> Result<Exact<Ratio>, OffTarget<Self>> {
         const {
             assert!(
@@ -216,6 +229,7 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
                 "a tolerance between stored values is for integer storages"
             );
         };
+        let tolerance = tolerance.into();
         let (a, b) = (int(self.get()), int(target.get()));
         // two values of 64 bits at most differ in i128; the sign goes on the numerator
         let off = if b < 0 {
