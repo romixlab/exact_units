@@ -21,8 +21,9 @@ use shrink_wrap::{Nibble, UNib32, UVlq32, UVlq64};
 /// bound that doesn't fit `T` is a compile error where the type is used. Bytes never change because of a bound.
 ///
 /// The markers of this crate are [Unbounded], [Range] (integers up to `i64`), [RangeU64] (the top of `u64`),
-/// [RangeDec] (floats) and [MaybeNan] (a float that may be NaN). Every marker but [MaybeNan] refuses NaN. An API's own marker works in Rust, but introspection sees only its name, while dynamic clients
-/// read the limits of these three from their parameters.
+/// [RangeDec] (floats), [Finite] (a float that is neither ±∞ nor NaN) and [MaybeNan] (a float that may be NaN). Every
+/// marker but [MaybeNan] refuses NaN. An API's own marker works in Rust, but introspection sees only its name, while
+/// dynamic clients read the limits of [Range], [RangeU64] and [RangeDec] from their parameters.
 pub trait Bounds<T: Storage>: Copy + Default + 'static {
     /// The lowest value allowed, `None` for no limit.
     const MIN: Option<T>;
@@ -142,6 +143,65 @@ impl Bounds<f64> for MaybeNan {
 impl Unlimited<f32> for MaybeNan {}
 
 impl Unlimited<f64> for MaybeNan {}
+
+/// Every finite float, neither ±∞ nor NaN: a float (`f32`, `f64`) that must stay a number. [Unbounded] keeps ±∞ (the
+/// VSWR of a total reflection, an `f32` that overflows), `Finite` says the value can't be one. The ends are `T::MIN`
+/// and `T::MAX`, the largest finite floats, so [contains](Bounds::contains) refuses ±∞ and NaN.
+///
+/// A bounded type: no `new` and no `+`, `-`, `*` or `/`, [try_new](super::Fixed::try_new) and the `const fn`
+/// [bounded](super::Fixed::bounded) make one, `checked_*` is `None` where the result is ±∞ or NaN, the wire, serde
+/// and text refuse both. A float `Fixed<_, _, f32>` goes over with [to_bounds](super::Fixed::to_bounds), and back
+/// with [unbounded](super::Fixed::unbounded). Only for floats: `Fixed<_, _, u16, Finite>` doesn't compile.
+///
+/// ```
+/// use exact_units::{Finite, Fixed, OutOfBounds, prefix::One, units::Volt};
+///
+/// type V = Fixed<Volt, One, f32, Finite>;
+/// const LIMIT: V = V::bounded(3.3);
+/// assert_eq!(V::try_new(f32::INFINITY), Err(OutOfBounds));
+/// assert_eq!(V::try_new(f32::NAN), Err(OutOfBounds));
+/// let big = V::bounded(f32::MAX);
+/// assert_eq!(big.checked_add(big), None); // the sum is +∞
+/// assert_eq!(LIMIT.checked_add(LIMIT).map(V::get), Some(6.6));
+/// let inf = Fixed::<Volt, One, f32>::bounded(f32::INFINITY);
+/// assert_eq!(inf.to_bounds::<Finite>(), Err(OutOfBounds));
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Finite, Fixed, prefix::One, units::Volt};
+///
+/// let _ = Fixed::<Volt, One, f32, Finite>::bounded(f32::INFINITY);
+/// const _: Fixed<Volt, One, f32, Finite> = Fixed::bounded(f32::INFINITY); // a compile error in const code
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Finite, Fixed, prefix::One, units::Volt};
+///
+/// let v = Fixed::<Volt, One, f32, Finite>::bounded(1.0);
+/// let _ = v + v; // a bounded type: checked_add
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{Finite, Fixed, prefix::One, units::Volt};
+///
+/// let _ = Fixed::<Volt, One, u16, Finite>::try_new(1); // only for floats
+/// ```
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Finite;
+
+impl Bounds<f32> for Finite {
+    const MIN: Option<f32> = Some(f32::MIN);
+
+    const MAX: Option<f32> = Some(f32::MAX);
+}
+
+impl Bounds<f64> for Finite {
+    const MIN: Option<f64> = Some(f64::MIN);
+
+    const MAX: Option<f64> = Some(f64::MAX);
+}
+
+impl NanFree for Finite {}
 
 /// A bound that refuses NaN: every bound but [MaybeNan]. Only values of such bounds have `<`, `>` and `==`, as a
 /// compare with NaN is false and would pass for an answer. An API's own bounds marker implements it to compare.

@@ -38,9 +38,23 @@ assert_eq!(LONG.get(), 5000);
 | `Range<MIN, MAX>` | `MIN ..= MAX`, `i64` bounds |
 | `RangeU64<MIN, MAX>` | the same for large unsigned values |
 | `RangeDec<MIN, MAX, EXP>` | decimal bounds for floats: `RangeDec<-5, 5, -1>` is $-0.5 \dots 0.5$ |
+| `Finite` | every finite float: `f32` and `f64` without ±∞ and NaN |
+| `MaybeNan` | every float, NaN included: what float arithmetic gives |
 | `Saturating`, `Wrapping` | every value; they set what overflow does: [Overflow](overflow.md) |
 
-A float's NaN is never within bounds. A range that doesn't fit the storage doesn't build:
+A float's NaN is never within bounds but `MaybeNan`'s. `Unbounded` keeps ±∞; a float that must stay a number says
+so with `Finite`, a bounded type like `RangeDec`, made with `try_new` or `bounded` and added with `checked_add`:
+
+```rust
+use exact_units::{Finite, Fixed, OutOfBounds, prefix::One, units::Volt};
+
+type V = Fixed<Volt, One, f32, Finite>;
+assert_eq!(V::try_new(f32::INFINITY), Err(OutOfBounds));
+let big = V::bounded(f32::MAX);
+assert_eq!(big.checked_add(big), None);
+```
+
+A range that doesn't fit the storage doesn't build:
 
 ```rust,compile_fail
 use exact_units::{Fixed, Range, prefix::One, units::Ratio};

@@ -8,10 +8,11 @@
 
 use exact_units::prefix::One;
 use exact_units::units::{Ampere, Volt};
-use exact_units::{Fixed, MaybeNan, OutOfBounds};
+use exact_units::{Finite, Fixed, MaybeNan, OutOfBounds};
 
 type V = Fixed<Volt, One, f32>;
 type M = Fixed<Volt, One, f32, MaybeNan>;
+type F = Fixed<Volt, One, f32, Finite>;
 
 /// The values where IEEE 754 makes NaN: ±0, ±∞ and their neighbours.
 pub(crate) const SPECIAL: [f32; 13] = [
@@ -133,6 +134,48 @@ fn maybe_nan(a: f32, b: f32) {
     }
 }
 
+/// [Finite] holds exactly the finite floats, with their bits: `try_new` and `to_bounds` refuse ±∞ and NaN and
+/// nothing else, and `unbounded` gives the same bits back. For `f64` too, through the same float widened.
+pub(crate) fn finite_constructs(x: f32) {
+    match F::try_new(x) {
+        Ok(f) => {
+            assert!(x.is_finite(), "{x:e} taken");
+            assert_eq!(f.get().to_bits(), x.to_bits());
+            assert_eq!(f.unbounded().get().to_bits(), x.to_bits());
+        }
+        Err(OutOfBounds) => assert!(!x.is_finite(), "{x:e} refused"),
+    }
+    assert_eq!(
+        M::of(x)
+            .not_nan()
+            .and_then(|v| v.to_bounds::<Finite>().ok()),
+        F::try_new(x).ok()
+    );
+    let w = f64::from(x);
+    assert_eq!(
+        Fixed::<Volt, One, f64, Finite>::try_new(w).is_ok(),
+        w.is_finite()
+    );
+}
+
+/// `checked_*` of two [Finite] values is the IEEE 754 result where that is finite and `None` where it is ±∞ or NaN.
+pub(crate) fn finite_operates(a: f32, b: f32) {
+    let (Ok(x), Ok(y)) = (F::try_new(a), F::try_new(b)) else {
+        return;
+    };
+    let ok = |op: &str, ieee: f32, got: Option<F>| {
+        assert_eq!(
+            got.map(|v| v.get().to_bits()),
+            ieee.is_finite().then_some(ieee.to_bits()),
+            "{a:e} {op} {b:e}"
+        );
+    };
+    ok("+", a + b, x.checked_add(y));
+    ok("-", a - b, x.checked_sub(y));
+    ok("*", a * b, x.checked_mul(b));
+    ok("/", a / b, x.checked_div(b));
+}
+
 /// The wire: the bytes of NaN are refused by a NaN-free type, read by a `MaybeNan` one; every other float reads back.
 #[cfg(feature = "shrink_wrap")]
 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
@@ -165,7 +208,16 @@ mod tests {
         for a in SPECIAL {
             for b in SPECIAL {
                 operates(a, b);
+                finite_operates(a, b);
             }
+        }
+    }
+
+    /// Every f32 whose low 16 bits are 0 against [Finite], ±∞ and the NaNs among them.
+    #[test]
+    fn every_f32_finite_constructs() {
+        for hi in 0..=u16::MAX {
+            finite_constructs(f32::from_bits(u32::from(hi) << 16));
         }
     }
 
@@ -201,6 +253,12 @@ mod tests {
         #[test]
         fn drawn_floats_construct(x in any::<f32>()) {
             constructs(x);
+            finite_constructs(x);
+        }
+
+        #[test]
+        fn drawn_finite_floats_operate(a in any::<f32>(), b in any::<f32>()) {
+            finite_operates(a, b);
         }
     }
 }

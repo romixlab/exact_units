@@ -11,8 +11,8 @@ use core::marker::PhantomData;
 use shrink_wrap::prelude::*;
 
 pub use bounds::{
-    Bounds, MaybeNan, NanFree, OutOfBounds, Range, RangeDec, RangeU64, Saturating, Unbounded,
-    Unlimited, Wrapping,
+    Bounds, Finite, MaybeNan, NanFree, OutOfBounds, Range, RangeDec, RangeU64, Saturating,
+    Unbounded, Unlimited, Wrapping,
 };
 pub use prefix::{DecimalPrefix, FixedScale};
 pub use rounding::{Overflow, Requantizer, Rounding, StorageKind, requantize};
