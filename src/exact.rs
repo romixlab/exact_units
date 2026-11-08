@@ -301,9 +301,6 @@ const fn factor<U: Unit, U2: Unit>() -> Fraction {
     if !U::KIND.same(U2::KIND) {
         crate::conv_error::kind_mismatch::<U, U2>("an Exact");
     }
-    if U::EXPR.has_offset() || U2::EXPR.has_offset() {
-        crate::conv_error::has_offset::<U, U2>("an Exact");
-    }
     let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
         crate::conv_error::no_exact_factor::<U, U2>("an Exact")
     };
@@ -321,9 +318,6 @@ const fn factor<U: Unit, U2: Unit>() -> Fraction {
 const fn recip_factor<U: Unit, U2: Unit>() -> Fraction {
     if !U::DIM.mul(U2::DIM).is_one() {
         crate::conv_error::recip_mismatch::<U, U2>();
-    }
-    if U::EXPR.has_offset() || U2::EXPR.has_offset() {
-        crate::conv_error::has_offset::<U, U2>("an Exact's recip");
     }
     let (Some(a), Some(b)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
         crate::conv_error::no_exact_factor::<U, U2>("an Exact's recip")

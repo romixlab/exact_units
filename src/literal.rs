@@ -261,9 +261,6 @@ const fn scale_in<S: Unit, U: Unit, P: FixedScale>() -> Magnitude {
     if !S::KIND.same(U::KIND) {
         crate::conv_error::kind_mismatch::<S, U>("a literal's unit");
     }
-    if S::EXPR.has_offset() || U::EXPR.has_offset() {
-        crate::conv_error::has_offset::<S, U>("a literal's unit");
-    }
     let (Some(from), Some(to)) = (S::EXPR.magnitude(), U::EXPR.magnitude()) else {
         crate::conv_error::no_exact_factor::<S, U>("a literal's unit")
     };

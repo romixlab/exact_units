@@ -332,7 +332,7 @@ crate::unit! {
     #[cfg(feature = "angle")]
     pub struct Radian = "rad", [rad 1];
 
-    /// Angle in degrees of arc, ° (π/180 rad, exactly: [Scale::Exact](crate::Scale::Exact)).
+    /// Angle in degrees of arc, ° (π/180 rad, exactly: an exact [Magnitude](crate::Magnitude)).
     #[cfg(feature = "angle")]
     pub struct Degree = "°", [rad 1], Exact(1 / 180, pi 1);
 
@@ -408,10 +408,6 @@ crate::unit! {
     /// Thermodynamic temperature in kelvins, K.
     #[cfg(feature = "thermal")]
     pub struct Kelvin = "K", [k 1];
-
-    /// Temperature in degrees Celsius, °C (K − 273.15). No products: a product with an offset scale means nothing.
-    #[cfg(feature = "thermal")]
-    pub struct DegreeCelsius = "°C", [k 1], Affine { factor: 1.0, offset: 273.15 };
 
     /// Heat flux density in watts per square meter, W/m² (kg·s⁻³, SI Brochure, 9th ed., table 6): heat through a
     /// surface. The same unit as [Irradiance], and converts to it.
@@ -830,14 +826,23 @@ impl<A: Unit, B: Unit> Unit for Times<A, B> {
 }
 
 /// The named unit of this crate called `name` (the marker's name, `"Volt"`), if its feature is enabled: what a
-/// dynamic client needs to show a `Quantity<Volt>` it only knows from introspection data.
+/// dynamic client needs to show a `Quantity<Volt>` it only knows from introspection data. [by_id] takes any crate's id.
 #[must_use]
 pub fn by_name(name: &str) -> Option<&'static UnitExpr> {
     let all = ALL.iter();
     #[cfg(feature = "customary")]
     let all = all.chain(CUSTOMARY);
     all.copied()
-        .find(|expr| matches!(expr, UnitExpr::Named { name: n, .. } if *n == name))
+        .find(|expr| matches!(expr, UnitExpr::Named(def) if def.id.name == name))
+}
+
+/// The named unit of this crate with the identity `id`, if its feature is enabled; `None` for another crate's.
+#[must_use]
+pub fn by_id(id: crate::MarkerId<'_>) -> Option<&'static UnitExpr> {
+    if id.crate_name != env!("CARGO_CRATE_NAME") {
+        return None;
+    }
+    by_name(id.name)
 }
 
 /// Other spellings text input takes for the named unit `name` (the marker's name, `"Nit"`), next to the symbol it is

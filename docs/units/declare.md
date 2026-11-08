@@ -37,7 +37,7 @@ assert_eq!(Bucket::DIM, exact_units::counted!(Bucket));
 A line is `<attributes> <visibility> struct <Name> = "<symbol>", <dimension>[, <scale>];`:
 
 - **Dimension**: exponents of `s`, `m`, `kg`, `a`, `k`, `mol`, `cd`, `rad`, `bit` (`[kg 1, m 2, s -3, a -1]` is a volt, `[]` a plain number), or `counted` for a base of its own, named by your crate and the marker.
-- **Scale**, coherent when left out: `Pow10(-3)`, or `Exact(num / den, pow10 e, pow2 e, pi e)`.
+- **Scale**, an exact [`Magnitude`](../nomicon/magnitude.md), one when left out: `Pow10(-3)`, or `Exact(num / den, pow10 e, pow2 e, pi e)`. A unit has no offset: a scale with a zero of its own, like °C, is an [origin](../points/points.md) of points.
 - **Kind**, after the dimension: `kind "resistance"` makes a unit that doesn't convert to others of its dimension.
 - **Provenance**, after the scale: `conventional("NIST SP 811", 2008)` marks a unit fixed by a measured property (inHg at 32 °F) rather than a definition.
 

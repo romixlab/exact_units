@@ -427,7 +427,7 @@ fn symbols_are_unique_but_for_shared_units() {
     let named: Vec<(&str, &str)> = units::ALL
         .iter()
         .filter_map(|e| match e {
-            UnitExpr::Named { name, symbol, .. } => Some((*name, *symbol)),
+            UnitExpr::Named(def) => Some((def.id.name, def.names.symbol)),
             _ => None,
         })
         .collect();
@@ -482,4 +482,64 @@ fn prefixes_on_powered_symbols() {
         "5 k(m³/kg)"
     );
     assert_eq!(Fixed::<Density, Milli, u8>::new(5).to_string(), "5 mg/L");
+}
+
+/// A unit is who declares it (UNIT-7): this test crate's `Rpm` carries the test crate's name, and another crate's
+/// `Rpm` with the very same line is another unit, which prints the same.
+#[test]
+fn identity_is_crate_and_name() {
+    use exact_units::{MarkerId, UnitDef, UnitExpr};
+    exact_units::unit! {
+        /// Revolutions per minute.
+        pub struct Rpm = "rpm", [rad 1, s -1], Exact(1 / 30, pi 1);
+    }
+    let ours = <Rpm as Unit>::EXPR.def().unwrap();
+    assert_eq!(
+        ours.id,
+        MarkerId {
+            crate_name: env!("CARGO_CRATE_NAME"),
+            name: "Rpm"
+        }
+    );
+    assert_eq!(ours.id.to_string(), "units::Rpm");
+    let theirs = UnitDef {
+        id: MarkerId {
+            crate_name: "my_api",
+            name: "Rpm",
+        },
+        ..*ours
+    };
+    let theirs: &'static UnitDef<'static> = Box::leak(Box::new(theirs));
+    let theirs = UnitExpr::Named(theirs);
+    assert_ne!(theirs, *<Rpm as Unit>::EXPR);
+    assert_eq!(theirs.to_string(), <Rpm as Unit>::EXPR.to_string());
+    assert_eq!(theirs.magnitude(), <Rpm as Unit>::EXPR.magnitude());
+    assert_eq!(
+        <units::Volt as Unit>::EXPR.def().unwrap().id.to_string(),
+        "exact_units::Volt"
+    );
+    assert_eq!(units::by_id(ours.id), None);
+    assert_eq!(
+        units::by_id(<units::Volt as Unit>::EXPR.def().unwrap().id),
+        Some(<units::Volt as Unit>::EXPR)
+    );
+}
+
+/// A marker is the same unit wherever it moves in its crate, so this crate has one marker per name: `by_name` and
+/// `by_id` find each one.
+#[test]
+fn one_marker_per_name() {
+    use exact_units::UnitExpr;
+    let all = units::ALL.iter();
+    #[cfg(feature = "customary")]
+    let all = all.chain(units::CUSTOMARY);
+    let mut names = std::collections::BTreeSet::new();
+    for e in all {
+        let UnitExpr::Named(def) = e else {
+            panic!("{e:?} in the catalogue")
+        };
+        assert_eq!(def.id.crate_name, "exact_units");
+        assert!(names.insert(def.id.name), "{} twice", def.id.name);
+        assert_eq!(units::by_id(def.id), Some(*e));
+    }
 }

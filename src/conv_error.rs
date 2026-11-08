@@ -205,7 +205,7 @@ const fn push_kind(msg: Msg, k: Kind<'_>) -> Msg {
 /// The symbol of a unit expression, as written after a number: `N·m`, empty for [units::Ratio](crate::units::Ratio).
 const fn push_symbol(mut msg: Msg, e: &UnitExpr) -> Msg {
     match e {
-        UnitExpr::Named { symbol, .. } => msg.push(symbol),
+        UnitExpr::Named(def) => msg.push(def.names.symbol),
         UnitExpr::Mul(a, b) => {
             msg = push_symbol(msg, a);
             msg = msg.push("·");
@@ -224,7 +224,7 @@ const fn push_symbol(mut msg: Msg, e: &UnitExpr) -> Msg {
 /// The type name of a unit expression: `Volt`, `Per<Torque, AngularVelocity>`.
 const fn push_name(mut msg: Msg, e: &UnitExpr) -> Msg {
     match e {
-        UnitExpr::Named { name, .. } => msg.push(name),
+        UnitExpr::Named(def) => msg.push(def.id.name),
         UnitExpr::Mul(a, b) => push_pair(msg, "Times", a, b),
         UnitExpr::Div(a, b) => push_pair(msg, "Per", a, b),
         UnitExpr::Pow(a, n) => {
@@ -430,32 +430,8 @@ pub(crate) const fn recip_mismatch<A: Unit, B: Unit>() -> ! {
     panic!("{}", msg.as_str())
 }
 
-/// The panic for a unit with an offset scale (°C) where a `Fixed` or `Exact` conversion needs an exact factor to
-/// SI: it converts as a [Point](crate::Point), not these.
-#[expect(
-    clippy::panic,
-    reason = "a compile error in const code (a panic at run time), as documented at every call site"
-)]
-pub(crate) const fn has_offset<A: Unit, B: Unit>(what: &str) -> ! {
-    let mut msg = Msg::new().push(what);
-    msg = msg.push(" converts as a Point, not these: ");
-    msg = push_unit(msg, A::EXPR);
-    if A::EXPR.has_offset() && B::EXPR.has_offset() {
-        msg = msg.push(" and ");
-        msg = push_unit(msg, B::EXPR);
-        msg = msg.push(" both have an offset (like °C)");
-    } else if A::EXPR.has_offset() {
-        msg = msg.push(" has an offset (like °C)");
-    } else {
-        msg = msg.push(" converts with ");
-        msg = push_unit(msg, B::EXPR);
-        msg = msg.push(", which has an offset (like °C)");
-    }
-    panic!("{}", msg.as_str())
-}
-
-/// The panic for a unit whose factor to SI isn't exact (an `Affine` scale is [has_offset], this is the rarer case:
-/// a product or quotient whose [Magnitude](crate::Magnitude) leaves what it can hold).
+/// The panic for a unit whose factor to SI isn't exact: a product or quotient whose [Magnitude](crate::Magnitude)
+/// leaves what it can hold.
 #[expect(
     clippy::panic,
     reason = "a compile error in const code (a panic at run time), as documented at every call site"

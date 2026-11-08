@@ -16,7 +16,8 @@ use exact_units::prefix::{Centi, Milli, One};
 use exact_units::units::{Kelvin, Ratio, Sample, Volt};
 use exact_units::{
     Complex, Counted, Dim, Fixed, FullScaleBits, Index, IndexFrom1, Irrational, Magnitude, Offset,
-    Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, SIExpr, SIExprOwned, Scale, Seq, tree,
+    Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, SIExpr, SIExprOwned, Seq, UnitDef,
+    UnitDefOwned, tree,
 };
 use shrink_wrap::max_size::MaxSize;
 use shrink_wrap::prelude::*;
@@ -274,29 +275,25 @@ impl Expr {
         match self {
             Expr::Known(i) => {
                 let all = exact_units::units::ALL;
-                let Some(exact_units::UnitExpr::Named {
-                    name,
-                    symbol,
-                    dim,
-                    scale,
-                    ..
-                }) = all.get(usize::from(*i) % all.len())
+                let Some(exact_units::UnitExpr::Named(def)) = all.get(usize::from(*i) % all.len())
                 else {
                     panic!("ALL holds named units")
                 };
-                SIExprOwned::Named {
-                    name: (*name).to_string(),
-                    symbol: (*symbol).to_string(),
-                    dim: (*dim).into(),
-                    scale: *scale,
-                }
+                SIExprOwned::Def((**def).into())
             }
-            Expr::Own(name, symbol, [s, m, kg], p10) => SIExprOwned::Named {
-                name: name.clone(),
-                symbol: symbol.clone(),
+            Expr::Own(name, symbol, [s, m, kg], p10) => SIExprOwned::Def(UnitDefOwned {
+                id: exact_units::MarkerIdOwned {
+                    crate_name: "props".into(),
+                    name: name.clone(),
+                },
+                names: exact_units::UnitNamesOwned {
+                    symbol: symbol.clone(),
+                },
                 dim: Dim::new(*s % 8, *m % 8, *kg % 8, 0, 0, 0, 0).into(),
-                scale: Scale::Pow10(*p10),
-            },
+                quantity: None,
+                scale: Magnitude::checked_pow10(*p10).unwrap_or(Magnitude::ONE),
+                provenance: exact_units::ProvenanceOwned::Defined,
+            }),
             Expr::Mul(a, b) => SIExprOwned::Mul(Box::new(a.build()), Box::new(b.build())),
             Expr::Div(a, b) => SIExprOwned::Div(Box::new(a.build()), Box::new(b.build())),
             Expr::Pow(a, n) => SIExprOwned::Pow(Box::new(a.build()), *n),
@@ -339,7 +336,7 @@ pub(crate) fn si_expr(e: &Expr) {
 /// Every walk of a decoded unit; its owned form is cut at `MAX_UNIT_DEPTH` levels however deep the bytes.
 fn walk(e: &SIExpr<'_>) {
     let _ = (e.to_string(), e.name().to_string(), e.symbol().to_string());
-    let _ = (e.dim(), e.factor(), e.magnitude(), e.offset(), e.known());
+    let _ = (e.dim(), e.factor(), e.magnitude(), e.known());
     let _ = (tree::is_ratio(e), tree::same(e, e));
     let owned = SIExprOwned::from(e);
     let _ = owned.to_string();
@@ -353,7 +350,7 @@ fn walk(e: &SIExpr<'_>) {
 /// The nodes on the longest path from the root of an owned tree to a named unit.
 fn owned_depth(e: &SIExprOwned) -> usize {
     match e {
-        SIExprOwned::Named { .. } => 1,
+        SIExprOwned::Def(_) => 1,
         SIExprOwned::Mul(a, b) | SIExprOwned::Div(a, b) => 1 + owned_depth(a).max(owned_depth(b)),
         SIExprOwned::Pow(a, _) | SIExprOwned::Sqrt(a) => 1 + owned_depth(a),
     }
@@ -362,12 +359,7 @@ fn owned_depth(e: &SIExprOwned) -> usize {
 /// Every walk of an owned unit.
 fn walk_owned(e: &SIExprOwned) {
     let _ = e.to_string();
-    let _ = (
-        tree::dim(&e),
-        tree::factor(&e),
-        tree::magnitude(&e),
-        tree::offset(&e),
-    );
+    let _ = (tree::dim(&e), tree::factor(&e), tree::magnitude(&e));
 }
 
 /// Bytes from outside, as the type `which` picks: an error or a value that round-trips, and a decoded unit walks.
@@ -400,15 +392,15 @@ pub(crate) fn any_bytes(which: u8, bytes: &[u8]) {
             }
         }
         8 => {
-            if let Ok(s) = Scale::from_ww_bytes(bytes) {
+            if let Ok(d) = UnitDef::from_ww_bytes(bytes) {
                 let mut buf = vec![0u8; BUF];
                 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
-                let again = s.to_ww_bytes(&mut buf).expect("encodes").to_vec();
+                let again = d.to_ww_bytes(&mut buf).expect("encodes").to_vec();
                 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
-                let back = Scale::from_ww_bytes(&again).expect("decodes");
-                // the bytes, not ==: an Affine scale may hold a NaN
-                assert_eq!(back.to_ww_bytes(&mut buf).ok(), Some(&again[..]));
-                let _ = (s.factor(), s.magnitude(), s.offset());
+                let back = UnitDef::from_ww_bytes(&again).expect("decodes");
+                assert_eq!(back, d);
+                assert!(d.dim.is_canonical(), "{d:?} decodes, not canonical");
+                let _ = (d.id.to_string(), d.scale.to_f64(), d.kind());
             }
         }
         9 => {

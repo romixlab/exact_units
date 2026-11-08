@@ -9,7 +9,7 @@
 //! - [Fixed]`<U, P, T, B>`: a `T` in unit `U` and scale `P` (a prefix, a binary prefix, a power of ten, a fraction),
 //!   within bounds `B`. `Fixed<Second, Micro, u32>` is a time in µs, the same bytes as the `u32` it replaces.
 //!   Conversions between scales are exact or refused, never rounded through a float.
-//! - [units]: zero-size unit markers (SI, angle, information, counted things) with their [Dim] and [Scale], and the
+//! - [units]: zero-size unit markers (SI, angle, information, counted things) with their [UnitDef] (identity, [Dim], exact scale), and the
 //!   products and quotients the compiler checks (`Volt · Ampere` is `Watt`).
 //! - [Dim]: the dimension as data: SI base exponents, angle, information, up to [MAX_COUNTED] counted bases and a
 //!   square root (V/√Hz). [Magnitude]: a factor of integers and powers of 10, 2 and π (`°` is π/180 rad).
@@ -111,8 +111,9 @@ pub use exact::{OffTarget, Tolerance};
 pub use fixed::{Bam16, Bam32, PhaseBam16, PhaseBam32};
 pub use fixed::{
     Bounds, Count, DecimalPrefix, Finite, Fixed, FixedScale, MaybeNan, NanFree, OutOfBounds,
-    Overflow, Range, RangeDec, RangeU64, Repr, Requantizer, Rounding, Saturating, Storage,
-    StorageKind, StorageOrd, Unbounded, Unlimited, UnsignedStorage, Wrapping, prefix, requantize,
+    Overflow, Range, RangeDec, RangeU64, Repr, Requantizer, Rounding, Saturating, ScaleDef,
+    Storage, StorageKind, StorageOrd, Unbounded, Unlimited, UnsignedStorage, Wrapping, prefix,
+    requantize,
 };
 #[cfg(feature = "information")]
 pub use fixed::{Bytes, Gibibytes, Kibibytes, Mebibytes};
@@ -138,9 +139,14 @@ pub use si_prefix::{FullScaleBits, Pow2Exp, Pow10Exp, Prefix, PrefixDecimal, Pre
 pub use tree::MAX_UNIT_DEPTH;
 #[doc(hidden)]
 pub use unit::exp as __dim_exp;
-pub use unit::{Counted, Dim, MAX_COUNTED, Provenance, Scale, Unit, UnitDiv, UnitExpr, UnitMul};
+pub use unit::{
+    Counted, Dim, MAX_COUNTED, MarkerId, Provenance, Unit, UnitDef, UnitDiv, UnitExpr, UnitMul,
+    UnitNames,
+};
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
-pub use unit::{CountedOwned, DimOwned, ProvenanceOwned};
+pub use unit::{
+    CountedOwned, DimOwned, MarkerIdOwned, ProvenanceOwned, UnitDefOwned, UnitNamesOwned,
+};
 pub use window::{Fit, Window};
 
 /// The [Dim] of a counted unit marker `Name` of the crate this is written in: `Dim::counted(<this crate>, "Name")`,

@@ -310,7 +310,6 @@ These `unit!` symbols are no `q!` symbol: a compound one is written with operato
 | W/m³ | `PowerDensity` |
 | rad/s | `AngularVelocity` |
 | rad/s² | `AngularAcceleration` |
-| °C | `DegreeCelsius` |
 | W/m² | `HeatFluxDensity` |
 | J/K | `HeatCapacity` |
 | J/K | `Entropy` |

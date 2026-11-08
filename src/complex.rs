@@ -635,7 +635,7 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
         o: Overflow,
     ) -> Option<(T3, T3)> {
         let q = const {
-            check_product::<U, U2, P, P2>(false);
+            check_product::<P, P2>(false);
             Requant::of_terms::<T, T3>(Product::<P, P2>::SCALE.div(P3::SCALE), false, 2)
         };
         let (a, b, c, d) = (self.re, self.im, rhs.re, rhs.im);
@@ -663,7 +663,7 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
         self,
         rhs: Complex<U2, P2, T, B2>,
     ) -> Option<Complex<Times<U, U2>, Product<P, P2>, T>> {
-        const { check_product::<U, U2, P, P2>(false) };
+        const { check_product::<P, P2>(false) };
         let (a, b, c, d) = (self.re, self.im, rhs.re, rhs.im);
         Complex::try_new(
             a.checked_mul(c)?.checked_sub(b.checked_mul(d)?)?,
@@ -844,7 +844,7 @@ mod arith {
 
         #[inline(always)]
         fn mul(self, rhs: Fixed<U2, P2, T, B>) -> Self::Output {
-            const { check_product::<U, U2, P, P2>(false) };
+            const { check_product::<P, P2>(false) };
             let x = rhs.get();
             Complex::of_unchecked(B::mul(self.re, x), B::mul(self.im, x))
         }
@@ -861,7 +861,7 @@ mod arith {
 
         #[inline(always)]
         fn div(self, rhs: Fixed<U2, P2, T, B>) -> Self::Output {
-            const { check_product::<U, U2, P, P2>(true) };
+            const { check_product::<P, P2>(true) };
             let x = rhs.get();
             Complex::of_unchecked(B::div(self.re, x), B::div(self.im, x))
         }
@@ -877,7 +877,7 @@ mod arith {
 
         #[inline(always)]
         fn mul(self, rhs: Complex<U2, P2, T, B>) -> Self::Output {
-            const { check_product::<U, U2, P, P2>(false) };
+            const { check_product::<P, P2>(false) };
             let (a, b, c, d) = (self.re, self.im, rhs.re, rhs.im);
             Complex::of_unchecked(
                 B::sub(B::mul(a, c), B::mul(b, d)),
@@ -897,7 +897,7 @@ mod arith {
 
                 #[inline(always)]
                 fn div(self, rhs: Complex<U2, P2, $ty>) -> Self::Output {
-                    const { check_product::<U, U2, P, P2>(true) };
+                    const { check_product::<P, P2>(true) };
                     let (a, b, c, d) = (self.re, self.im, rhs.re, rhs.im);
                     let n = c * c + d * d;
                     Complex::of_unchecked((a * c + b * d) / n, (b * c - a * d) / n)

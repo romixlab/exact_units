@@ -111,13 +111,6 @@
 //! let _ = t * Fixed::<Ratio, Centi, i32>::new(200);
 //! ```
 //!
-//! nor a unit with an offset:
-//!
-//! ```compile_fail
-//! use exact_units::{Fixed, prefix::One, units::{DegreeCelsius, Ratio}};
-//! let _ = Fixed::<DegreeCelsius, One, i32>::new(20) * Fixed::<Ratio, One, i32>::new(2);
-//! ```
-//!
 //! A product of two voltage gains is a voltage gain, not a plain ratio:
 //!
 //! ```compile_fail
@@ -167,12 +160,8 @@ use crate::unit::Unit;
 use crate::units::{Per, Times};
 use core::ops::{Div, Mul};
 
-/// What every product and quotient checks at compile time: no unit with an offset, and an exact scale.
-pub(crate) const fn check<U1: Unit, U2: Unit, P1: FixedScale, P2: FixedScale>(per: bool) {
-    assert!(
-        !U1::EXPR.has_offset() && !U2::EXPR.has_offset(),
-        "a unit with an offset scale (°C) doesn't multiply or divide: take its difference in kelvin"
-    );
+/// What every product and quotient checks at compile time: an exact scale.
+pub(crate) const fn check<P1: FixedScale, P2: FixedScale>(per: bool) {
     let scale = if per {
         Quotient::<P1, P2>::SCALE
     } else {
@@ -194,7 +183,7 @@ macro_rules! policy {
 
             #[inline(always)]
             fn mul(self, rhs: Fixed<U2, P2, T, $b>) -> Self::Output {
-                const { check::<U1, U2, P1, P2>(false) };
+                const { check::<P1, P2>(false) };
                 Fixed::new_unchecked(self.value.$mul(rhs.value))
             }
         }
@@ -207,7 +196,7 @@ macro_rules! policy {
 
             #[inline(always)]
             fn div(self, rhs: Fixed<U2, P2, T, $b>) -> Self::Output {
-                const { check::<U1, U2, P1, P2>(true) };
+                const { check::<P1, P2>(true) };
                 Fixed::new_unchecked(self.value.$div(rhs.value))
             }
         }
@@ -231,7 +220,7 @@ macro_rules! maybe_nan {
 
             #[inline(always)]
             fn mul(self, rhs: Fixed<U2, P2, $ty, $b2>) -> Self::Output {
-                const { check::<U1, U2, P1, P2>(false) };
+                const { check::<P1, P2>(false) };
                 Fixed::new_unchecked(self.value * rhs.value)
             }
         }
@@ -243,7 +232,7 @@ macro_rules! maybe_nan {
 
             #[inline(always)]
             fn div(self, rhs: Fixed<U2, P2, $ty, $b2>) -> Self::Output {
-                const { check::<U1, U2, P1, P2>(true) };
+                const { check::<P1, P2>(true) };
                 Fixed::new_unchecked(self.value / rhs.value)
             }
         }
@@ -272,7 +261,7 @@ where
     #[inline(always)]
     fn mul(self, rhs: Fixed<U2, P2, T, Range<B0, B1>>) -> Self::Output {
         const {
-            check::<U1, U2, P1, P2>(false);
+            check::<P1, P2>(false);
             proven_product::<T>(A0, A1, B0, B1);
         };
         // proven in range: wrapping is the plain multiply
@@ -327,7 +316,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         self,
         rhs: Fixed<U2, P2, T, B2>,
     ) -> Option<Fixed<Times<U, U2>, Product<P, P2>, T>> {
-        const { check::<U, U2, P, P2>(false) };
+        const { check::<P, P2>(false) };
         self.value
             .checked_mul(rhs.value)
             .and_then(Fixed::from_number)
@@ -340,7 +329,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         self,
         rhs: Fixed<U2, P2, T, B2>,
     ) -> Fixed<Times<U, U2>, Product<P, P2>, T, T::Arith> {
-        const { check::<U, U2, P, P2>(false) };
+        const { check::<P, P2>(false) };
         Fixed::new_unchecked(self.value.saturating_mul(rhs.value))
     }
 
@@ -351,7 +340,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         self,
         rhs: Fixed<U2, P2, T, B2>,
     ) -> Fixed<Times<U, U2>, Product<P, P2>, T, T::Arith> {
-        const { check::<U, U2, P, P2>(false) };
+        const { check::<P, P2>(false) };
         Fixed::new_unchecked(self.value.wrapping_mul(rhs.value))
     }
 
@@ -366,7 +355,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         self,
         rhs: Fixed<U2, P2, T, B2>,
     ) -> Option<Fixed<Per<U, U2>, Quotient<P, P2>, T>> {
-        const { check::<U, U2, P, P2>(true) };
+        const { check::<P, P2>(true) };
         self.value
             .checked_div(rhs.value)
             .and_then(Fixed::from_number)
@@ -379,7 +368,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         self,
         rhs: Fixed<U2, P2, T, B2>,
     ) -> Fixed<Per<U, U2>, Quotient<P, P2>, T, T::Arith> {
-        const { check::<U, U2, P, P2>(true) };
+        const { check::<P, P2>(true) };
         Fixed::new_unchecked(self.value.saturating_div(rhs.value))
     }
 
@@ -390,7 +379,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         self,
         rhs: Fixed<U2, P2, T, B2>,
     ) -> Fixed<Per<U, U2>, Quotient<P, P2>, T, T::Arith> {
-        const { check::<U, U2, P, P2>(true) };
+        const { check::<P, P2>(true) };
         Fixed::new_unchecked(self.value.wrapping_div(rhs.value))
     }
 
@@ -443,7 +432,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         o: Overflow,
     ) -> Option<Fixed<Times<U, U2>, P3, T3>> {
         let q = const {
-            check::<U, U2, P, P2>(false);
+            check::<P, P2>(false);
             Requant::of::<T, T3>(Product::<P, P2>::SCALE.div(P3::SCALE), false)
         };
         q.times(self.value, rhs.value, r, o)
@@ -489,7 +478,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         o: Overflow,
     ) -> Option<Fixed<Per<U, U2>, P3, T3>> {
         let q = const {
-            check::<U, U2, P, P2>(true);
+            check::<P, P2>(true);
             Requant::of::<T, T3>(Quotient::<P, P2>::SCALE.div(P3::SCALE), true)
         };
         q.per(self.value, rhs.value, r, o)

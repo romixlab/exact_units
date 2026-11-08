@@ -869,67 +869,175 @@ pub(crate) const fn superscript_digit(d: u32) -> &'static str {
     }
 }
 
-/// How a value in a unit becomes coherent SI (the unit of [Dim] with no factor): `si = value · factor + offset`.
+/// Who a marker is: the crate that declares it, as Rust names it (`CARGO_CRATE_NAME`: `exact_units`, `my_api`), and
+/// the marker's name (`Rpm`). Every marker kind has one: a unit ([UnitDef]), an origin ([OriginDef](crate::OriginDef)),
+/// a scale ([ScaleDef](crate::ScaleDef)), a [Reference](crate::Reference).
 ///
-/// On the wire a nibble for the variant and its numbers: `Coherent` is `0`, `Pow10(-3)` is `1` and `fd`.
+/// Two crates' `Rpm` are two units, which print the same. The name is the marker's own, not its module path: a
+/// marker stays the same unit when it moves between modules of its crate, so a crate has one marker of a kind per name.
 #[cfg_attr(
     feature = "shrink_wrap",
     derive_shrink_wrap(
         borrowed,
         owned(feature = "std"),
-        ww_repr = u4,
-        // part of a unit's description: a reader can't convert with a scale it doesn't know
-        no_future_version
+        derive_owned(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord),
+        cfg_attr_owned(feature = "serde", derive(serde::Serialize, serde::Deserialize)),
+        final_structure
+    )
+)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct MarkerId<'i> {
+    /// The crate that declares the marker: `exact_units`.
+    pub crate_name: &'i str,
+    /// The marker's name: `Volt`.
+    pub name: &'i str,
+}
+
+/// `crate::Name`: `exact_units::Volt`.
+impl fmt::Display for MarkerId<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}::{}", self.crate_name, self.name)
+    }
+}
+
+/// How a unit is written. Only the symbol for now; spellings, an ASCII form and the prefixes it takes join it (IO-9).
+#[cfg_attr(
+    feature = "shrink_wrap",
+    derive_shrink_wrap(
+        borrowed,
+        owned(feature = "std"),
+        derive_owned(Clone, Debug, PartialEq, Eq, Hash),
+        cfg_attr_owned(feature = "serde", derive(serde::Serialize, serde::Deserialize))
+    )
+)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct UnitNames<'i> {
+    /// As written after a number: `V`, empty for [Ratio](crate::units::Ratio).
+    pub symbol: &'i str,
+}
+
+/// A named unit as data: who it is, how it is written, its dimension, its kind of quantity, its exact factor to
+/// coherent SI and where that factor comes from. [unit!](crate::unit) builds one per marker ([UnitExpr::Named]), and the
+/// same record is a unit's definition in an API model and in a run-time [SIExpr].
+///
+/// The scale is a [Magnitude](crate::Magnitude), always: a unit has no offset (°C is the origin
+/// [Celsius](crate::origins::Celsius) of kelvins) and no float factor.
+#[cfg_attr(
+    feature = "shrink_wrap",
+    derive_shrink_wrap(
+        borrowed,
+        owned(feature = "std"),
+        derive_owned(Clone, Debug, PartialEq),
+        cfg_attr_owned(feature = "serde", derive(serde::Serialize, serde::Deserialize))
     )
 )]
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Scale {
-    /// The unit is coherent SI: V, A, N·m, rad.
-    Coherent,
-    /// A power of ten: g is 10⁻³ kg, L is 10⁻³ m³.
-    Pow10(i8),
-    /// A factor and an offset: °C is K − 273.15, `Affine { factor: 1.0, offset: 273.15 }`.
-    Affine {
-        /// SI per unit.
-        factor: f64,
-        /// SI at the unit's zero.
-        offset: f64,
-    },
-    /// An exact factor, integers and a power of π: ° is π/180 rad, a turn 2π rad, rpm π/30 rad/s, eV
-    /// 1.602176634·10⁻¹⁹ J. Every reader computes the same value.
-    Exact(crate::Magnitude),
+pub struct UnitDef<'i> {
+    /// The crate and marker that declare it.
+    pub id: MarkerId<'i>,
+    /// How it is written.
+    pub names: UnitNames<'i>,
+    /// Its dimension.
+    pub dim: Dim<'i>,
+    /// The kind of quantity of its own, by its ISO 80000 name (`"resistance"` for [Ohm](crate::units::Ohm)), `None`
+    /// for a plain unit ([Kind::Named](crate::Kind)). A quantity reference once quantity specs exist (UNIT-8).
+    pub quantity: Option<&'i str>,
+    /// The exact factor to coherent SI: ° is π/180 rad, eV 1.602176634·10⁻¹⁹ J.
+    pub scale: crate::Magnitude,
+    /// Whether the scale is the unit's definition or a value a source prints.
+    pub provenance: Provenance<'i>,
 }
 
-impl Scale {
-    /// The factor, without the offset of an `Affine` scale.
+impl UnitDef<'_> {
+    /// The [Kind] of a unit with this definition.
     #[must_use]
-    pub const fn factor(&self) -> f64 {
-        match *self {
-            Scale::Coherent => 1.0,
-            Scale::Pow10(exp) => crate::num::pow10_f64(exp),
-            Scale::Affine { factor, .. } => factor,
-            Scale::Exact(scale) => scale.to_f64(),
+    pub const fn kind(&self) -> Kind<'_> {
+        match self.quantity {
+            Some(name) => Kind::Named(name),
+            None => Kind::Plain,
+        }
+    }
+}
+
+#[cfg(all(feature = "std", feature = "shrink_wrap"))]
+mod owned_defs {
+    use super::{
+        MarkerId, MarkerIdOwned, Provenance, ProvenanceOwned, UnitDef, UnitDefOwned, UnitNames,
+        UnitNamesOwned,
+    };
+
+    impl MarkerIdOwned {
+        /// The same identity, borrowed.
+        #[must_use]
+        pub fn as_id(&self) -> MarkerId<'_> {
+            MarkerId {
+                crate_name: &self.crate_name,
+                name: &self.name,
+            }
         }
     }
 
-    /// The factor exactly: `None` for an `Affine` scale.
-    #[must_use]
-    pub const fn magnitude(&self) -> Option<crate::Magnitude> {
-        match *self {
-            Scale::Coherent => Some(crate::Magnitude::ONE),
-            Scale::Pow10(e) => crate::Magnitude::checked_pow10(e),
-            Scale::Exact(m) => Some(m),
-            Scale::Affine { .. } => None,
+    impl From<MarkerId<'_>> for MarkerIdOwned {
+        fn from(id: MarkerId<'_>) -> Self {
+            MarkerIdOwned {
+                crate_name: id.crate_name.into(),
+                name: id.name.into(),
+            }
         }
     }
 
-    /// The offset of an `Affine` scale, `0.0` for the others.
-    #[must_use]
-    pub const fn offset(&self) -> f64 {
-        match *self {
-            Scale::Affine { offset, .. } => offset,
-            _ => 0.0,
+    impl From<Provenance<'_>> for ProvenanceOwned {
+        fn from(p: Provenance<'_>) -> Self {
+            match p {
+                Provenance::Defined => ProvenanceOwned::Defined,
+                Provenance::Conventional { source, year } => ProvenanceOwned::Conventional {
+                    source: source.into(),
+                    year,
+                },
+                Provenance::Unknown(v) => ProvenanceOwned::Unknown(v),
+            }
+        }
+    }
+
+    impl UnitDefOwned {
+        /// The same definition, borrowed.
+        #[must_use]
+        pub fn as_def(&self) -> UnitDef<'_> {
+            UnitDef {
+                id: self.id.as_id(),
+                names: UnitNames {
+                    symbol: &self.names.symbol,
+                },
+                dim: self.dim.as_dim(),
+                quantity: self.quantity.as_deref(),
+                scale: self.scale,
+                provenance: match &self.provenance {
+                    ProvenanceOwned::Defined => Provenance::Defined,
+                    ProvenanceOwned::Conventional { source, year } => Provenance::Conventional {
+                        source,
+                        year: *year,
+                    },
+                    ProvenanceOwned::Unknown(v) => Provenance::Unknown(*v),
+                },
+            }
+        }
+    }
+
+    impl From<UnitDef<'_>> for UnitDefOwned {
+        fn from(d: UnitDef<'_>) -> Self {
+            UnitDefOwned {
+                id: d.id.into(),
+                names: UnitNamesOwned {
+                    symbol: d.names.symbol.into(),
+                },
+                dim: d.dim.into(),
+                quantity: d.quantity.map(Into::into),
+                scale: d.scale,
+                provenance: d.provenance.into(),
+            }
         }
     }
 }
@@ -988,26 +1096,10 @@ impl Default for ProvenanceOwned {
 /// A unit as a tree: named units, and products and quotients of them (`Per<Torque, AngularVelocity>` is
 /// `Div(Torque, AngularVelocity)`). Every [Unit] has one in [Unit::EXPR]; [units::by_name](crate::units::by_name)
 /// finds the named ones of this crate.
-// Only ever in `static`s and consts, never moved around: boxing the named variant would buy nothing
-#[expect(
-    clippy::large_enum_variant,
-    reason = "only in statics and consts, never moved"
-)]
 #[derive(Debug, PartialEq)]
 pub enum UnitExpr {
     /// A unit with a marker of its own.
-    Named {
-        /// The marker's name: `"Volt"`.
-        name: &'static str,
-        /// `"V"`, empty for [Ratio](crate::units::Ratio).
-        symbol: &'static str,
-        /// The unit's dimension.
-        dim: Dim<'static>,
-        /// How a value in the unit becomes coherent SI.
-        scale: Scale,
-        /// Whether the scale is the unit's definition or a measured value written down by convention.
-        provenance: Provenance<'static>,
-    },
+    Named(&'static UnitDef<'static>),
     /// `A · B`, [Times](crate::units::Times).
     Mul(&'static UnitExpr, &'static UnitExpr),
     /// `A / B`, [Per](crate::units::Per).
@@ -1025,7 +1117,7 @@ impl UnitExpr {
     #[must_use]
     pub const fn depth(&self) -> usize {
         let below = match self {
-            UnitExpr::Named { .. } => return 1,
+            UnitExpr::Named(_) => return 1,
             UnitExpr::Mul(a, b) | UnitExpr::Div(a, b) => {
                 let (a, b) = (a.depth(), b.depth());
                 if a > b { a } else { b }
@@ -1044,7 +1136,7 @@ impl UnitExpr {
     )]
     pub const fn dim(&self) -> Dim<'static> {
         match self {
-            UnitExpr::Named { dim, .. } => *dim,
+            UnitExpr::Named(def) => def.dim,
             UnitExpr::Mul(a, b) => a.dim().mul(b.dim()),
             UnitExpr::Div(a, b) => a.dim().div(b.dim()),
             UnitExpr::Pow(a, n) => match a.dim().checked_pow(*n) {
@@ -1055,11 +1147,11 @@ impl UnitExpr {
         }
     }
 
-    /// The factor to coherent SI of the whole expression (offsets left out: a product with °C is not affine).
+    /// The factor to coherent SI of the whole expression, as a float: [magnitude](Self::magnitude) is the exact one.
     #[must_use]
     pub const fn factor(&self) -> f64 {
         match self {
-            UnitExpr::Named { scale, .. } => scale.factor(),
+            UnitExpr::Named(def) => def.scale.to_f64(),
             UnitExpr::Mul(a, b) => a.factor() * b.factor(),
             UnitExpr::Div(a, b) => a.factor() / b.factor(),
             UnitExpr::Pow(a, n) => crate::num::powi_f64(a.factor(), *n),
@@ -1067,8 +1159,8 @@ impl UnitExpr {
         }
     }
 
-    /// The exact factor to coherent SI of the whole expression: `None` when a named unit in it has an
-    /// `Affine` scale, or a product leaves what a [Magnitude](crate::Magnitude) holds. A pound-force second is
+    /// The exact factor to coherent SI of the whole expression: `None` when a product leaves what a
+    /// [Magnitude](crate::Magnitude) holds. A pound-force second is
     /// 0.45359237 · 9.80665 N·s.
     #[must_use]
     #[expect(
@@ -1078,7 +1170,7 @@ impl UnitExpr {
     pub const fn magnitude(&self) -> Option<crate::Magnitude> {
         use crate::Magnitude;
         match self {
-            UnitExpr::Named { scale, .. } => scale.magnitude(),
+            UnitExpr::Named(def) => Some(def.scale),
             UnitExpr::Mul(a, b) => match (a.magnitude(), b.magnitude()) {
                 (Some(a), Some(b)) => ok(a.checked_mul(b)),
                 _ => None,
@@ -1114,22 +1206,12 @@ impl UnitExpr {
         }
     }
 
-    /// The offset to coherent SI: only a named unit with an `Affine` scale has one.
+    /// The definition of a named unit, `None` for a compound one.
     #[must_use]
-    pub const fn offset(&self) -> f64 {
+    pub const fn def(&self) -> Option<&'static UnitDef<'static>> {
         match self {
-            UnitExpr::Named { scale, .. } => scale.offset(),
-            _ => 0.0,
-        }
-    }
-
-    /// Whether a named unit in the expression has an `Affine` scale (°C).
-    #[must_use]
-    pub const fn has_offset(&self) -> bool {
-        match self {
-            UnitExpr::Named { scale, .. } => matches!(scale, Scale::Affine { .. }),
-            UnitExpr::Mul(a, b) | UnitExpr::Div(a, b) => a.has_offset() || b.has_offset(),
-            UnitExpr::Pow(a, _) | UnitExpr::Sqrt(a) => a.has_offset(),
+            UnitExpr::Named(def) => Some(def),
+            _ => None,
         }
     }
 

@@ -44,7 +44,7 @@ mod table;
 
 use core::fmt::Write as _;
 use entry::Prefixes;
-use exact_units::{Dim, Magnitude, Scale, UnitExpr, units};
+use exact_units::{Dim, Magnitude, UnitExpr, units};
 use prefix::{PREFIXES, Prefix};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -61,8 +61,7 @@ const ALIASES: &[(&str, &str, i8)] = &[
     ("deg", "Degree", 0),
 ];
 
-/// Symbols `q!` reads as a point at an origin, never as a unit (the `unit!` line `DegreeCelsius = "°C"` is a
-/// difference in °C, written as a type). `(symbol, origin)`.
+/// Symbols `q!` reads as a point at an origin, never as a unit (a unit has no offset). `(symbol, origin)`.
 const ORIGIN_SYMBOLS: &[(&str, &str)] = &[
     ("°C", "Celsius"),
     ("degC", "Celsius"),
@@ -272,40 +271,35 @@ fn generate() -> Generated {
     let in_catalogue: Vec<&str> = catalogue
         .iter()
         .map(|e| match e {
-            UnitExpr::Named { name, .. } => *name,
+            UnitExpr::Named(def) => def.id.name,
             e => panic!("{e:?} in the catalogue"),
         })
         .collect();
     assert_eq!(names, in_catalogue, "the unit! lines read from source");
 
     let value = |line: &Line, pow10: i8| {
-        let Some(UnitExpr::Named {
-            symbol, dim, scale, ..
-        }) = units::by_name(&line.name)
-        else {
+        let Some(UnitExpr::Named(def)) = units::by_name(&line.name) else {
             panic!("{} is no named unit", line.name);
         };
-        assert_eq!(*symbol, line.symbol, "the symbol of {}", line.name);
+        assert_eq!(def.names.symbol, line.symbol, "the symbol of {}", line.name);
         Value {
-            dim: *dim,
+            dim: def.dim,
             kind: line.kind.clone(),
-            scale: match scale {
-                Scale::Affine { .. } => None,
-                s => s.magnitude().map(|m| m.mul(Magnitude::pow10(pow10))),
-            },
+            scale: Some(def.scale.mul(Magnitude::pow10(pow10))),
             far: None,
         }
     };
     let prefixes = |line: &Line| {
-        let Some(UnitExpr::Named { dim, scale, .. }) = units::by_name(&line.name) else {
+        let Some(UnitExpr::Named(def)) = units::by_name(&line.name) else {
             panic!("{} is no named unit", line.name);
         };
+        let (dim, scale) = (def.dim, def.scale);
         if BINARY.contains(&line.name.as_str()) {
             Prefixes::SiBinary
         } else if FROM_KILO.contains(&line.name.as_str()) {
             Prefixes::SiFromKilo
         } else if SCALED_WITH_PREFIX.contains(&line.name.as_str())
-            || (matches!(scale, Scale::Coherent)
+            || (scale == Magnitude::ONE
                 && dim.counted_bases().next().is_none()
                 && !matches!(
                     line.group.as_str(),
@@ -776,7 +770,7 @@ fn table_and_page_are_generated() {
 fn no_bare_symbol_reads_a_qualified_unit() {
     use resolve::{Symbol, resolve};
     let own = |marker: &str| match units::by_name(marker.trim_start_matches("units::")) {
-        Some(UnitExpr::Named { symbol, .. }) => *symbol,
+        Some(UnitExpr::Named(def)) => def.names.symbol,
         _ => panic!("{marker} is no named unit"),
     };
     // qualified: a parenthesis or a qualifier word (`gal (US)`, `liq qt (US)`, `oz t`); `cd/m²` is a compound

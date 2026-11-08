@@ -136,6 +136,11 @@ mod angle {
 
                 const OFFSET: Offset = Offset::ZERO;
 
+                const ID: crate::MarkerId<'static> = crate::MarkerId {
+                    crate_name: "exact_units",
+                    name: "Angle",
+                };
+
                 const NAME: &'static str = "Angle";
 
                 const SYMBOL: &'static str = $symbol;

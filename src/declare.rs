@@ -31,11 +31,20 @@
 ///   a -1]` for a volt, `[]` for a ratio), or `counted`: a counted base of its own named by the crate and the marker
 ///   ([counted!](crate::counted)), or `counted(Other)`: the counted base of the marker `Other` of the same crate, a
 ///   scaled unit of it (the decibel of the neper).
-/// - The scale, coherent when left out: `Pow10(-3)`, `Exact(1 / 180, pi 1)` (`num / den`, then optionally `pow10 e`,
-///   `pow2 e`, `pi e`, `ln2 e`, `ln10 e` in that order, see [Magnitude::new](crate::Magnitude::new); the decibel is
-///   `Exact(1 / 20, ln10 1)` of the neper), so every reader computes the same
-///   value; or `Affine { factor: 1.0, offset: 273.15 }` for a unit with an offset (moves to origins, PT-1). A float
-///   factor isn't a unit's scale: an exact one is a `Magnitude`, and a factor known only at run time is a value.
+/// - The scale, an exact [Magnitude](crate::Magnitude), one when left out: `Pow10(-3)`, `Exact(1 / 180, pi 1)`
+///   (`num / den`, then optionally `pow10 e`, `pow2 e`, `pi e`, `ln2 e`, `ln10 e` in that order, see
+///   [Magnitude::new](crate::Magnitude::new); the decibel is `Exact(1 / 20, ln10 1)` of the neper), so every reader
+///   computes the same value. A unit has no offset: a scale with a zero of its own is an origin of points
+///   ([origin!](crate::origin)), and a float factor isn't a unit's scale.
+///
+///   ```compile_fail
+///   exact_units::unit! {
+///       /// °C as a unit with an offset: refused, it is the origin `origins::Celsius`.
+///       pub struct DegC = "°C", [k 1], Affine { factor: 1.0, offset: 273.15 };
+///   }
+///   ```
+/// - The marker's identity is the crate that declares it (`CARGO_CRATE_NAME`) and its name
+///   ([MarkerId](crate::MarkerId)): two crates' `Rpm` are two units.
 /// - After the dimension, `kind "resistance"` names a kind of quantity of its own ([Kind::Named](crate::Kind)):
 ///   such a unit doesn't convert to or from another of its dimension, `Ohm` is no `Per<Volt, Ampere>`.
 /// - After the scale, `conventional("NIST SP 811", 2008)` marks a unit fixed by a physical property (mercury at
@@ -87,14 +96,21 @@ macro_rules! unit {
                 [] $(#[$($attr)*])* =>
                 impl $crate::Unit for $name {
                     const DIM: $crate::Dim<'static> = $crate::__unit_dim!($name $dim $(($base))?);
-                    const KIND: $crate::Kind<'static> = $crate::__unit_kind!($($qkind)?);
-                    const EXPR: &'static $crate::UnitExpr = &$crate::UnitExpr::Named {
-                        name: stringify!($name),
-                        symbol: $symbol,
+                    const KIND: $crate::Kind<'static> = match Self::EXPR {
+                        $crate::UnitExpr::Named(def) => def.kind(),
+                        _ => $crate::Kind::Plain,
+                    };
+                    const EXPR: &'static $crate::UnitExpr = &$crate::UnitExpr::Named(&$crate::UnitDef {
+                        id: $crate::MarkerId {
+                            crate_name: env!("CARGO_CRATE_NAME"),
+                            name: stringify!($name),
+                        },
+                        names: $crate::UnitNames { symbol: $symbol },
                         dim: Self::DIM,
+                        quantity: $crate::__unit_quantity!($($qkind)?),
                         scale: $crate::__unit_scale!($($kind $args)?),
                         provenance: $crate::__unit_provenance!($($($source $year)?)?),
-                    };
+                    });
                 }
             }
         )*
@@ -143,6 +159,10 @@ macro_rules! scale {
                     const SYMBOL: &'static str = $symbol;
                     const NAME: &'static str = stringify!($name);
                     const RUNTIME: Option<$crate::Prefix> = $crate::__scale_runtime!($($prefix)?);
+                    const ID: Option<$crate::MarkerId<'static>> = Some($crate::MarkerId {
+                        crate_name: env!("CARGO_CRATE_NAME"),
+                        name: stringify!($name),
+                    });
                 }
             }
             $crate::__scale_decimal! { [$(#[$($attr)*])*] $name $($prefix)? }
@@ -184,15 +204,15 @@ macro_rules! __unit_dim {
     }};
 }
 
-/// The kind of a [unit!] line: `kind "<name>"` after the dimension, else plain.
+/// The kind of quantity of a [unit!] line: `kind "<name>"` after the dimension, else none.
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __unit_kind {
+macro_rules! __unit_quantity {
     () => {
-        $crate::Kind::Plain
+        None
     };
     ($name:literal) => {
-        $crate::Kind::Named($name)
+        Some($name)
     };
 }
 
@@ -201,19 +221,19 @@ macro_rules! __unit_kind {
 #[macro_export]
 macro_rules! __unit_scale {
     () => {
-        $crate::Scale::Coherent
+        $crate::Magnitude::ONE
     };
     (Pow10 ($e:literal)) => {
-        $crate::Scale::Pow10($e)
+        $crate::Magnitude::pow10($e)
     };
-    (Affine { factor: $f:literal, offset: $o:literal $(,)? }) => {
-        $crate::Scale::Affine {
-            factor: $f,
-            offset: $o,
-        }
+    (Affine $($rest:tt)*) => {
+        compile_error!(
+            "a unit has no offset: a scale with a zero of its own is an origin of points (`origin!`, °C is \
+             `origins::Celsius` of kelvins)"
+        )
     };
     (Exact ($($m:tt)*)) => {
-        $crate::Scale::Exact($crate::__magnitude!($($m)*))
+        $crate::__magnitude!($($m)*)
     };
 }
 

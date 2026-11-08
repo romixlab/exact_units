@@ -27,6 +27,34 @@ pub trait FixedScale: Copy + Default + 'static {
 
     /// The run-time prefix of the same scale, `None` for a binary prefix and other factors.
     const RUNTIME: Option<Prefix>;
+
+    /// Who the marker is, for a marker of its own ([scale!](crate::scale)): `exact_units::Milli`. `None` for a
+    /// generic one, named by its arguments ([Pow10], [Rational], [Product]).
+    const ID: Option<crate::MarkerId<'static>> = None;
+
+    /// All of it as data, for introspection and the API model.
+    const DEF: ScaleDef = ScaleDef {
+        id: Self::ID,
+        name: Self::NAME,
+        symbol: Self::SYMBOL,
+        scale: Self::SCALE,
+        runtime: Self::RUNTIME,
+    };
+}
+
+/// A [FixedScale] as data: what a client needs to read numbers of a scale it only knows from the API model.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct ScaleDef {
+    /// [FixedScale::ID].
+    pub id: Option<crate::MarkerId<'static>>,
+    /// [FixedScale::NAME].
+    pub name: &'static str,
+    /// [FixedScale::SYMBOL].
+    pub symbol: &'static str,
+    /// [FixedScale::SCALE].
+    pub scale: Magnitude,
+    /// [FixedScale::RUNTIME].
+    pub runtime: Option<Prefix>,
 }
 
 /// A decimal prefix, one a `ww_si::Quantity` can have too.

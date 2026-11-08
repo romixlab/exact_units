@@ -393,7 +393,7 @@ impl<U1: Unit, P1: FixedScale, U2: Unit, P2: FixedScale, T: IqStorage>
         a: Complex<U1, P1, T, B1>,
         b: Complex<U2, P2, T, B2>,
     ) {
-        const { check_product::<U1, U2, P1, P2>(false) };
+        const { check_product::<P1, P2>(false) };
         let (a, b, c, d) = (a.re, a.im, b.re, b.im);
         self.re = T::mac(self.re, (a, c), (b, d), true);
         self.im = T::mac(self.im, (a, d), (b, c), false);
@@ -406,7 +406,7 @@ impl<U1: Unit, P1: FixedScale, U2: Unit, P2: FixedScale, T: IqStorage>
         a: Complex<U1, P1, T, B1>,
         b: Complex<U2, P2, T, B2>,
     ) {
-        const { check_product::<U1, U2, P1, P2>(false) };
+        const { check_product::<P1, P2>(false) };
         let (a, b, c, d) = (a.re, a.im, b.re, b.im);
         self.re = T::mac(self.re, (a, c), (b, d), false);
         self.im = T::mac(self.im, (b, c), (a, d), true);

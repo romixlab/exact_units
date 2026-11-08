@@ -140,9 +140,10 @@ macro_rules! every_marker {
 
 /// Whether the first factor of a symbol has a power.
 fn has_power(e: &UnitExpr) -> Option<&'static str> {
-    let UnitExpr::Named { name, symbol, .. } = e else {
+    let UnitExpr::Named(def) = e else {
         return None;
     };
+    let (name, symbol) = (def.id.name, def.names.symbol);
     let lead = symbol.split(['/', '·']).next()?;
     lead.contains(['²', '³', '⁴', '⁵', '⁶']).then_some(name)
 }
@@ -305,7 +306,7 @@ fn old_spelling<U: Unit, P: FixedScale>(v: i64) -> Option<String> {
         return None;
     }
     let symbol = U::EXPR.to_string();
-    let bare = matches!(U::EXPR, UnitExpr::Named { .. })
+    let bare = matches!(U::EXPR, UnitExpr::Named(_))
         && !symbol.starts_with("kg")
         && !symbol.split('/').next()?.contains(['²', '³']);
     Some(if bare {

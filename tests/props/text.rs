@@ -241,13 +241,13 @@ fn all_units() -> impl Iterator<Item = &'static UnitExpr> {
 /// `units::by_name(s)` is the named unit of this crate whose name is `s`, and that unit's name is `s`.
 pub(crate) fn unit_name(s: &str) {
     match units::by_name(s) {
-        Some(e @ UnitExpr::Named { name, .. }) => {
-            assert_eq!(*name, s);
+        Some(e @ UnitExpr::Named(def)) => {
+            assert_eq!(def.id.name, s);
             assert!(all_units().any(|u| u == e), "{s:?}");
         }
         Some(e) => panic!("{s:?} names a compound unit {e:?}"),
         None => assert!(
-            all_units().all(|u| !matches!(u, UnitExpr::Named { name, .. } if *name == s)),
+            all_units().all(|u| !matches!(u, UnitExpr::Named(def) if def.id.name == s)),
             "{s:?} is a unit by_name doesn't find"
         ),
     }
@@ -259,8 +259,8 @@ pub(crate) fn names_round_trip() {
         prefix_name(p.name());
     }
     for u in all_units() {
-        if let UnitExpr::Named { name, .. } = u {
-            assert_eq!(units::by_name(name), Some(u), "{name}");
+        if let UnitExpr::Named(def) = u {
+            assert_eq!(units::by_name(def.id.name), Some(u), "{}", def.id.name);
         }
     }
 }

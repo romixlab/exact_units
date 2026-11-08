@@ -290,8 +290,9 @@ mod thermal {
     fn definitions() {
         let d = Fahrenheit::DEF;
         assert_eq!(d.name, "Fahrenheit");
+        assert_eq!(d.id.to_string(), "exact_units::Fahrenheit");
         assert_eq!(d.symbol, "°F");
-        assert_eq!(d.reference, "");
+        assert_eq!(d.reference, <crate::UnitZero as crate::Reference>::ID);
         assert_eq!(d.offset, Offset::ratio(45967, 180));
         assert_eq!(d.step, Magnitude::ratio(5, 9));
         assert_eq!(d.modulus, None);
@@ -345,7 +346,11 @@ mod pressure {
                 .map(Point::raw),
             Some(321_325)
         );
-        assert_eq!(Gauge::DEF.reference, "ambient pressure");
+        assert_eq!(
+            Gauge::DEF.reference,
+            <crate::AmbientPressure as crate::Reference>::ID
+        );
+        assert_eq!(Gauge::DEF.reference.name, "AmbientPressure");
     }
 }
 
@@ -501,6 +506,11 @@ mod angle {
     struct Index;
 
     impl crate::Reference for Index {
+        const ID: crate::MarkerId<'static> = crate::MarkerId {
+            crate_name: "tests",
+            name: "Index",
+        };
+
         const NAME: &'static str = "encoder index";
     }
 

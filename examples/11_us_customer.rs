@@ -75,10 +75,8 @@ fn main() {
         .convert_rounded::<Pascal, One, f32>(Rounding::NearestEven)
         .unwrap();
     println!("29.92 inHg is {baro} (conventional), {baro_32f} (at 32 °F)");
-    if let UnitExpr::Named {
-        provenance: Provenance::Conventional { source, year },
-        ..
-    } = <InchOfMercury32f as Unit>::EXPR
+    if let UnitExpr::Named(def) = <InchOfMercury32f as Unit>::EXPR
+        && let Provenance::Conventional { source, year } = def.provenance
     {
         println!("inHg (32 °F) comes from {source} ({year})");
     }

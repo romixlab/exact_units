@@ -39,6 +39,9 @@ mod tests;
 /// run time ([AmbientPressure] for gauge pressure, an encoder's index pulse). Points of origins with different
 /// references don't convert into each other at compile time.
 pub trait Reference: Copy + Default + 'static {
+    /// Who the reference is: `exact_units::UnitZero`.
+    const ID: crate::MarkerId<'static>;
+
     /// What the zero is, `""` for the unit's own zero: `"ambient pressure"`.
     const NAME: &'static str;
 }
@@ -48,6 +51,11 @@ pub trait Reference: Copy + Default + 'static {
 pub struct UnitZero;
 
 impl Reference for UnitZero {
+    const ID: crate::MarkerId<'static> = crate::MarkerId {
+        crate_name: "exact_units",
+        name: "UnitZero",
+    };
+
     const NAME: &'static str = "";
 }
 
@@ -56,6 +64,11 @@ impl Reference for UnitZero {
 pub struct AmbientPressure;
 
 impl Reference for AmbientPressure {
+    const ID: crate::MarkerId<'static> = crate::MarkerId {
+        crate_name: "exact_units",
+        name: "AmbientPressure",
+    };
+
     const NAME: &'static str = "ambient pressure";
 }
 
@@ -109,6 +122,9 @@ pub trait Origin: Copy + Default + 'static {
     /// Where the origin lies, from the reference's zero, in [Unit](Self::Unit): °C is 273.15 K.
     const OFFSET: Offset;
 
+    /// Who the origin is: the crate that declares it and the marker's name, `exact_units::Celsius`.
+    const ID: crate::MarkerId<'static>;
+
     /// The marker's name: `"Celsius"`.
     const NAME: &'static str;
 
@@ -124,10 +140,11 @@ pub trait Origin: Copy + Default + 'static {
 
     /// All of it as data, for introspection and the API model.
     const DEF: OriginDef = OriginDef {
+        id: Self::ID,
         name: Self::NAME,
         symbol: Self::SYMBOL,
         unit: <Self::Unit as Unit>::EXPR,
-        reference: <Self::Reference as Reference>::NAME,
+        reference: <Self::Reference as Reference>::ID,
         offset: Self::OFFSET,
         modulus: <Self::Modulus as Modulus>::MODULUS,
         step: Self::STEP,
@@ -138,14 +155,16 @@ pub trait Origin: Copy + Default + 'static {
 /// An [Origin] as data: what a client needs to read and show points of an origin it only knows from the API model.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct OriginDef {
+    /// The crate and marker that declare it: [Origin::ID].
+    pub id: crate::MarkerId<'static>,
     /// The marker's name: `"Celsius"`.
     pub name: &'static str,
     /// As written after a number: `"°C"`.
     pub symbol: &'static str,
     /// The unit of the points' numbers.
     pub unit: &'static UnitExpr,
-    /// The [Reference]'s name, `""` for the unit's zero.
-    pub reference: &'static str,
+    /// The [Reference] the offset is measured from: [UnitZero] for the unit's zero.
+    pub reference: crate::MarkerId<'static>,
     /// The origin above the reference, in the unit: [Origin::OFFSET].
     pub offset: Offset,
     /// The period in the unit, `None` when points don't wrap.
@@ -207,6 +226,11 @@ macro_rules! origin {
 
             const OFFSET: $crate::Offset = $offset;
 
+            const ID: $crate::MarkerId<'static> = $crate::MarkerId {
+                crate_name: env!("CARGO_CRATE_NAME"),
+                name: stringify!($name),
+            };
+
             const NAME: &'static str = stringify!($name);
 
             const SYMBOL: &'static str = $symbol;
@@ -234,6 +258,11 @@ macro_rules! origin {
             type Modulus = <$parent as $crate::Origin>::Modulus;
 
             const OFFSET: $crate::Offset = <$parent as $crate::Origin>::OFFSET.add($offset);
+
+            const ID: $crate::MarkerId<'static> = $crate::MarkerId {
+                crate_name: env!("CARGO_CRATE_NAME"),
+                name: stringify!($name),
+            };
 
             const NAME: &'static str = stringify!($name);
 

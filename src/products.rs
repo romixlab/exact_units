@@ -63,12 +63,6 @@ macro_rules! products {
                         .same(<crate::units::$o as crate::Unit>::DIM),
                     concat!(stringify!($a * $b = $o), ": SI exponents differ")
                 );
-                assert!(
-                    !<crate::units::$a as crate::Unit>::EXPR.has_offset()
-                        && !<crate::units::$b as crate::Unit>::EXPR.has_offset()
-                        && !<crate::units::$o as crate::Unit>::EXPR.has_offset(),
-                    concat!(stringify!($a * $b = $o), ": a unit with an offset scale can't be in a product")
-                );
             };
         )*
 

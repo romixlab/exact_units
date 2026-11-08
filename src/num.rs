@@ -10,7 +10,7 @@ const POW10_F64: [f64; 31] = [
     1e17, 1e18, 1e19, 1e20, 1e21, 1e22, 1e23, 1e24, 1e25, 1e26, 1e27, 1e28, 1e29, 1e30,
 ];
 
-/// `10^exp` in `const` code (what [Scale::Pow10](crate::Scale::Pow10) multiplies by).
+/// `10^exp` in `const` code (a power-of-ten scale as a float).
 #[must_use]
 #[expect(
     clippy::arithmetic_side_effects,

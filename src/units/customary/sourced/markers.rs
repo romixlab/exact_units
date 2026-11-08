@@ -5,7 +5,7 @@ use super::{AMBIGUOUS, Dim as CatDim, Exact, Mag, ORIGINS, Src, UNITS, Unit as C
 use crate::origins::{Fahrenheit, Rankine};
 use crate::prefix::Milli;
 use crate::units::{self, CUSTOMARY, Degree, Kelvin, Radian, Turn};
-use crate::{Dim, FixedScale, Magnitude, Offset, Origin, Provenance, Scale, Unit, UnitExpr};
+use crate::{Dim, FixedScale, Magnitude, Offset, Origin, Provenance, Unit, UnitExpr};
 use std::collections::BTreeSet;
 use std::string::String;
 
@@ -59,20 +59,15 @@ fn one_marker_per_unit_with_its_definition() {
         .collect();
     assert_eq!(rows.len(), CUSTOMARY.len());
     for (u, expr) in rows.iter().zip(CUSTOMARY) {
-        let UnitExpr::Named {
-            name,
-            symbol,
-            dim: d,
-            scale,
-            provenance,
-        } = expr
-        else {
+        let UnitExpr::Named(def) = expr else {
             panic!("{} is not a named unit", u.id)
         };
-        assert_eq!(*name, camel(u.id), "markers in catalogue order");
-        assert_eq!(*symbol, u.symbol, "{name}");
-        assert_eq!(*d, dim(u.dim), "{name}");
-        assert_eq!(*scale, Scale::Exact(magnitude(u.mag)), "{name}");
+        let (name, provenance) = (def.id.name, def.provenance);
+        assert_eq!(def.id.crate_name, "exact_units", "{name}");
+        assert_eq!(name, camel(u.id), "markers in catalogue order");
+        assert_eq!(def.names.symbol, u.symbol, "{name}");
+        assert_eq!(def.dim, dim(u.dim), "{name}");
+        assert_eq!(def.scale, magnitude(u.mag), "{name}");
         assert_eq!(
             matches!(provenance, Provenance::Conventional { .. }),
             u.exact == Exact::Measured,
@@ -84,13 +79,8 @@ fn one_marker_per_unit_with_its_definition() {
 
 #[test]
 fn the_rest_is_other_markers_and_origins() {
-    let exact = |s: Scale| match s {
-        Scale::Exact(m) => m,
-        Scale::Coherent => Magnitude::ONE,
-        other => panic!("{other:?}"),
-    };
     let scale = |e: &UnitExpr| match e {
-        UnitExpr::Named { scale, .. } => exact(*scale),
+        UnitExpr::Named(def) => def.scale,
         other => panic!("{other:?}"),
     };
     assert_eq!(scale(Degree::EXPR), magnitude(row("degree_angle").mag));
@@ -124,7 +114,7 @@ fn no_marker_is_named_by_an_ambiguous_word() {
         .iter()
         .chain(CUSTOMARY)
         .filter_map(|e| match e {
-            UnitExpr::Named { name, .. } => Some(*name),
+            UnitExpr::Named(def) => Some(def.id.name),
             _ => None,
         })
         .collect();
@@ -196,13 +186,10 @@ fn docs_blocks() -> Vec<(&'static str, String)> {
     }
     let mut conventional = String::from("| Marker | Symbol | Value in SI |\n|---|---|---|\n");
     for e in CUSTOMARY {
-        if let UnitExpr::Named {
-            name,
-            symbol,
-            provenance: Provenance::Conventional { source, year },
-            ..
-        } = e
+        if let UnitExpr::Named(def) = e
+            && let Provenance::Conventional { source, year } = def.provenance
         {
+            let (name, symbol) = (def.id.name, def.names.symbol);
             let u = UNITS.iter().find(|u| camel(u.id) == *name).unwrap();
             let p = u.sp811.unwrap();
             writeln!(

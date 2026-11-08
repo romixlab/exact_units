@@ -2,8 +2,8 @@
 
 use crate::tree::{self, Node, Tree};
 #[cfg(feature = "std")]
-use crate::unit::DimOwned;
-use crate::unit::{Dim, Scale, Unit, UnitExpr};
+use crate::unit::UnitDefOwned;
+use crate::unit::{Dim, Unit, UnitDef, UnitExpr};
 use core::fmt;
 use shrink_wrap::prelude::*;
 
@@ -14,7 +14,7 @@ use shrink_wrap::prelude::*;
 /// Children are [RefBox]es: decoding an `SIExpr` reads only its top node, the rest is decoded when walked. Every
 /// walk stops at [MAX_UNIT_DEPTH](crate::MAX_UNIT_DEPTH) levels.
 ///
-/// On the wire a nibble for the variant, then its fields: `Volt` is the name, the symbol, its [Dim] and [Scale].
+/// On the wire a nibble for the variant, then its fields: `Volt` is its [UnitDef].
 // TODO: a `validate = ..` here that refuses a tree deeper than MAX_UNIT_DEPTH, on reading (borrowed and
 // owned) and before writing, once shrink_wrap runs validate on enums and on write. Until then the encoder writes a
 // tree of any depth, the owned reader stops at shrink_wrap's 128 nesting levels (124 nodes), the borrowed one reads
@@ -28,17 +28,8 @@ use shrink_wrap::prelude::*;
     no_future_version
 )]
 pub enum SIExpr<'i> {
-    /// A named unit: `name` is the marker's (`"Volt"`, a device's own `"Rpm"`), `symbol` as written after a number.
-    Named {
-        /// The marker's name.
-        name: &'i str,
-        /// As written after a number.
-        symbol: &'i str,
-        /// The unit's dimension.
-        dim: Dim<'i>,
-        /// How a value in the unit becomes coherent SI.
-        scale: Scale,
-    },
+    /// A named unit, described in full: `exact_units::Volt`, a device's own `my_api::Rpm`.
+    Def(UnitDef<'i>),
     /// `A · B`, [Times](crate::units::Times).
     Mul(RefBox<'i, SIExpr<'i>>, RefBox<'i, SIExpr<'i>>),
     /// `A / B`, [Per](crate::units::Per).
@@ -65,18 +56,7 @@ impl SIExpr<'static> {
     )]
     pub const fn named(e: &'static UnitExpr) -> SIExpr<'static> {
         match *e {
-            UnitExpr::Named {
-                name,
-                symbol,
-                dim,
-                scale,
-                ..
-            } => SIExpr::Named {
-                name,
-                symbol,
-                dim,
-                scale,
-            },
+            UnitExpr::Named(def) => SIExpr::Def(*def),
             _ => panic!("SIExpr::named of a compound UnitExpr"),
         }
     }
@@ -97,17 +77,11 @@ impl<'i> SIExpr<'i> {
         tree::factor(self)
     }
 
-    /// The exact factor to coherent SI of the whole tree, as [UnitExpr::magnitude]; `None` like [dim](Self::dim),
-    /// with an `Affine` or `Factor` scale in it, or a product a [Magnitude](crate::Magnitude) doesn't hold.
+    /// The exact factor to coherent SI of the whole tree, as [UnitExpr::magnitude]; `None` like [dim](Self::dim), or
+    /// for a product a [Magnitude](crate::Magnitude) doesn't hold.
     #[must_use]
     pub fn magnitude(&self) -> Option<crate::Magnitude> {
         tree::magnitude(self)
-    }
-
-    /// The offset to coherent SI: only a named unit with an `Affine` scale (°C) has one.
-    #[must_use]
-    pub fn offset(&self) -> f64 {
-        tree::offset(self)
     }
 
     /// The symbol as written after a number: `V`, `N·m/(rad/s)`, empty for a ratio. Same as `Display`.
@@ -122,30 +96,26 @@ impl<'i> SIExpr<'i> {
         tree::name(self)
     }
 
-    /// The named unit of this crate this is, if it is one (same name, symbol, dimension and scale as in
-    /// [by_name](crate::units::by_name)).
+    /// The named unit of this crate this is, if it is one (the same identity and definition as in
+    /// [by_id](crate::units::by_id)).
     #[must_use]
     pub fn known(&self) -> Option<&'static UnitExpr> {
-        let SIExpr::Named { name, .. } = self else {
+        let SIExpr::Def(def) = self else {
             return None;
         };
-        crate::units::by_name(name).filter(|known| self == *known)
+        crate::units::by_id(def.id).filter(|known| self == *known)
     }
 }
 
 impl<'i> Tree<'i> for SIExpr<'i> {
     fn node(&self) -> Option<Node<'i, Self>> {
         Some(match self {
-            SIExpr::Named {
-                name,
-                symbol,
-                dim,
-                scale,
-            } => Node::Named {
-                name,
-                symbol,
-                dim: Some(*dim),
-                scale: Some(*scale),
+            SIExpr::Def(def) => Node::Named {
+                crate_name: Some(def.id.crate_name),
+                name: def.id.name,
+                symbol: def.names.symbol,
+                dim: Some(def.dim),
+                scale: Some(def.scale),
             },
             SIExpr::Mul(a, b) => Node::Mul(a.read().ok()?, b.read().ok()?),
             SIExpr::Div(a, b) => Node::Div(a.read().ok()?, b.read().ok()?),
@@ -155,7 +125,7 @@ impl<'i> Tree<'i> for SIExpr<'i> {
     }
 }
 
-/// The same unit tree: every named unit with the same name, symbol, dimension and scale, in the same shape.
+/// The same unit tree: every named unit with the same identity and definition, in the same shape.
 impl PartialEq<UnitExpr> for SIExpr<'_> {
     fn eq(&self, other: &UnitExpr) -> bool {
         tree::same(self, &other)
@@ -171,23 +141,20 @@ impl fmt::Display for SIExpr<'_> {
 
 #[cfg(feature = "std")]
 mod owned {
-    use super::{Dim, Node, RefBox, SIExpr, SIExprOwned, Scale, Tree, UnitExpr, fmt, tree};
+    use super::{Dim, Node, RefBox, SIExpr, SIExprOwned, Tree, UnitExpr, fmt, tree};
+    use crate::unit::{MarkerIdOwned, UnitDefOwned, UnitNamesOwned};
     use std::boxed::Box;
     use std::string::ToString;
 
     impl<'a> Tree<'a> for &'a SIExprOwned {
         fn node(&self) -> Option<Node<'a, Self>> {
             Some(match *self {
-                SIExprOwned::Named {
-                    name,
-                    symbol,
-                    dim,
-                    scale,
-                } => Node::Named {
-                    name,
-                    symbol,
-                    dim: Some(dim.as_dim()),
-                    scale: Some(*scale),
+                SIExprOwned::Def(def) => Node::Named {
+                    crate_name: Some(&def.id.crate_name),
+                    name: &def.id.name,
+                    symbol: &def.names.symbol,
+                    dim: Some(def.dim.as_dim()),
+                    scale: Some(def.scale),
                 },
                 SIExprOwned::Mul(a, b) => Node::Mul(&**a, &**b),
                 SIExprOwned::Div(a, b) => Node::Div(&**a, &**b),
@@ -201,18 +168,7 @@ mod owned {
     impl From<&UnitExpr> for SIExprOwned {
         fn from(e: &UnitExpr) -> Self {
             match *e {
-                UnitExpr::Named {
-                    name,
-                    symbol,
-                    dim,
-                    scale,
-                    ..
-                } => SIExprOwned::Named {
-                    name: name.to_string(),
-                    symbol: symbol.to_string(),
-                    dim: dim.into(),
-                    scale,
-                },
+                UnitExpr::Named(def) => SIExprOwned::Def((*def).into()),
                 UnitExpr::Mul(a, b) => SIExprOwned::Mul(Box::new(a.into()), Box::new(b.into())),
                 UnitExpr::Div(a, b) => SIExprOwned::Div(Box::new(a.into()), Box::new(b.into())),
                 UnitExpr::Pow(a, n) => SIExprOwned::Pow(Box::new(a.into()), n),
@@ -240,12 +196,6 @@ mod owned {
             tree::magnitude(&self)
         }
 
-        /// Like [SIExpr::offset].
-        #[must_use]
-        pub fn offset(&self) -> f64 {
-            tree::offset(&self)
-        }
-
         /// Like [SIExpr::name].
         #[must_use]
         pub fn name(&self) -> impl fmt::Display + '_ {
@@ -255,10 +205,10 @@ mod owned {
         /// Like [SIExpr::known].
         #[must_use]
         pub fn known(&self) -> Option<&'static UnitExpr> {
-            let SIExprOwned::Named { name, .. } = self else {
+            let SIExprOwned::Def(def) = self else {
                 return None;
             };
-            crate::units::by_name(name).filter(|known| self == *known)
+            crate::units::by_id(def.id.as_id()).filter(|known| self == *known)
         }
     }
 
@@ -278,11 +228,20 @@ mod owned {
         fn from(e: &SIExpr<'_>) -> Self {
             fn conv(e: &SIExpr<'_>, depth: usize) -> SIExprOwned {
                 // past the depth limit or not decoding: kept as an unknown named unit, shown as `?`
-                let unknown = || SIExprOwned::Named {
-                    name: "?".to_string(),
-                    symbol: "?".to_string(),
-                    dim: Dim::ONE.into(),
-                    scale: Scale::Coherent,
+                let unknown = || {
+                    SIExprOwned::Def(UnitDefOwned {
+                        id: MarkerIdOwned {
+                            crate_name: "?".to_string(),
+                            name: "?".to_string(),
+                        },
+                        names: UnitNamesOwned {
+                            symbol: "?".to_string(),
+                        },
+                        dim: Dim::ONE.into(),
+                        quantity: None,
+                        scale: crate::Magnitude::ONE,
+                        provenance: crate::ProvenanceOwned::Defined,
+                    })
                 };
                 if depth >= crate::MAX_UNIT_DEPTH {
                     return unknown();
@@ -296,17 +255,7 @@ mod owned {
                     Err(_) => Box::new(unknown()),
                 };
                 match e {
-                    SIExpr::Named {
-                        name,
-                        symbol,
-                        dim,
-                        scale,
-                    } => SIExprOwned::Named {
-                        name: name.to_string(),
-                        symbol: symbol.to_string(),
-                        dim: (*dim).into(),
-                        scale: *scale,
-                    },
+                    SIExpr::Def(def) => SIExprOwned::Def((*def).into()),
                     SIExpr::Mul(a, b) => SIExprOwned::Mul(child(a), child(b)),
                     SIExpr::Div(a, b) => SIExprOwned::Div(child(a), child(b)),
                     SIExpr::Pow(a, n) => SIExprOwned::Pow(child(a), *n),
@@ -348,7 +297,7 @@ impl defmt::Format for DefmtExpr<'_, '_> {
             }
         };
         match self.0 {
-            SIExpr::Named { symbol, .. } => defmt::write!(f, "{=str}", symbol),
+            SIExpr::Def(def) => defmt::write!(f, "{=str}", def.names.symbol),
             SIExpr::Mul(a, b) => {
                 defmt::write!(f, "(");
                 child(a, f);

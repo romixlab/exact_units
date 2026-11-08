@@ -17,7 +17,7 @@ The markers come in groups, one cargo feature each. A firmware turns on only the
 | `fields` | `ElectricFieldStrength` (V/m), `MagneticFieldStrength` (A/m), `CurrentDensity` (A/m²), `ChargeDensity` (C/m³), `ElectricDisplacement` (C/m²), `Permittivity` (F/m), `Permeability` (H/m), `Resistivity` (Ω·m), `Conductivity` (S/m) |
 | `mechanical` | `Meter`, `Gram`, `Newton`, `Pascal`, `Joule`, `Torque`, `Litre`, `Speed`, `Acceleration`, ...; `Area`, `Volume`, `Density`, `Momentum`, `MomentOfInertia`, `DynamicViscosity` (Pa·s), `KinematicViscosity` (m²/s), `EnergyDensity` (J/m³), ... |
 | `angle` | `Radian`, `Degree`, `Turn`, `Steradian`, `AngularVelocity`, `AngularAcceleration` |
-| `thermal` | `Kelvin`, `DegreeCelsius`, `HeatFluxDensity` (W/m²), `HeatCapacity` and `Entropy` (J/K), `SpecificHeatCapacity`, `ThermalConductivity`, `ThermalConductance` (W/K), `ThermalResistance` (K/W), `HeatTransferCoefficient` |
+| `thermal` | `Kelvin` (°C and °F are origins of points, `origins::Celsius`), `HeatFluxDensity` (W/m²), `HeatCapacity` and `Entropy` (J/K), `SpecificHeatCapacity`, `ThermalConductivity`, `ThermalConductance` (W/K), `ThermalResistance` (K/W), `HeatTransferCoefficient` |
 | `chemical` | `Mole`, `Katal`, `MolarConcentration` (mol/m³), `MolePerLitre`, `Molality`, `MolarMass`, `GramPerMole`, `MolarEnergy`, `MolarHeatCapacity` |
 | `photometric` | `Candela`, `Lumen`, `Lux`, `Nit` (cd/m²), `LuminousEfficacy` (lm/W) |
 | `radiometric` | `Irradiance` (W/m²), `RadiantIntensity` (W/sr), `Radiance` (W/(m²·sr)) |

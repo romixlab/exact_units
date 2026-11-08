@@ -1,7 +1,7 @@
 //! [Fixed]: a number with its unit, prefix and storage fixed at compile time, on the wire exactly the number.
 
 use crate::tree::{moved, write_unit};
-use crate::unit::{Unit, UnitExpr};
+use crate::unit::{Unit, UnitDef, UnitExpr, UnitNames};
 use crate::{Magnitude, Prefix};
 use core::cmp::Ordering;
 use core::fmt;
@@ -14,7 +14,7 @@ pub use bounds::{
     Bounds, Finite, MaybeNan, NanFree, OutOfBounds, Range, RangeDec, RangeU64, Saturating,
     Unbounded, Unlimited, Wrapping,
 };
-pub use prefix::{DecimalPrefix, FixedScale};
+pub use prefix::{DecimalPrefix, FixedScale, ScaleDef};
 pub use rounding::{Overflow, Requantizer, Rounding, StorageKind, requantize};
 pub use storage::{Repr, Storage, StorageOrd, UnsignedStorage};
 
@@ -610,8 +610,8 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
 
     /// The same value in another unit `U2` of the same dimension, scale `P2` and storage `T2`, if that is exact: a
     /// pound-force second in newton seconds. `None` as for [to](Self::to); never a value reinterpreted in the other
-    /// unit. Both units need an exact factor to SI ([Scale::Exact](crate::Scale), a power of ten or coherent), and
-    /// the factor `U · P / (U2 · P2)` is worked out at compile time, so a conversion costs what [to](Self::to) costs.
+    /// unit. Every unit's factor to SI is an exact [Magnitude](crate::Magnitude), and the factor `U · P / (U2 · P2)`
+    /// is worked out at compile time, so a conversion costs what [to](Self::to) costs.
     ///
     /// ```
     /// # #[cfg(all(feature = "customary", feature = "q"))] {
@@ -1252,9 +1252,6 @@ impl Conversion {
         if !U::KIND.same(U2::KIND) {
             crate::conv_error::kind_mismatch::<U, U2>("a Fixed");
         }
-        if U::EXPR.has_offset() || U2::EXPR.has_offset() {
-            crate::conv_error::has_offset::<U, U2>("a Fixed");
-        }
         let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
             crate::conv_error::no_exact_factor::<U, U2>("a Fixed")
         };
@@ -1569,8 +1566,14 @@ pub(crate) fn write_prefix_unit<P: FixedScale>(
         return write_unit(Prefix::Unit, &unit, f);
     }
     match unit {
-        UnitExpr::Named { symbol: "", .. } => write!(f, " {}", P::SYMBOL),
-        UnitExpr::Named { symbol, .. } if crate::tree::prefix_binds(symbol) => {
+        UnitExpr::Named(UnitDef {
+            names: UnitNames { symbol: "" },
+            ..
+        }) => write!(f, " {}", P::SYMBOL),
+        UnitExpr::Named(UnitDef {
+            names: UnitNames { symbol },
+            ..
+        }) if crate::tree::prefix_binds(symbol) => {
             write!(f, " {}{symbol}", P::SYMBOL)
         }
         unit => write!(f, " {}({unit})", P::SYMBOL),
@@ -1618,7 +1621,13 @@ impl<U: Unit, P: FixedScale, T: Storage + defmt::Format, B: Bounds<T>> defmt::Fo
                     den
                 );
             }
-            (UnitExpr::Named { symbol, .. }, Some(crate::tree::Moved::Inside(p))) => {
+            (
+                UnitExpr::Named(UnitDef {
+                    names: UnitNames { symbol },
+                    ..
+                }),
+                Some(crate::tree::Moved::Inside(p)),
+            ) => {
                 return defmt::write!(f, "{} {=str}{=str}", self.value, p.symbol(), *symbol);
             }
             (_, Some(crate::tree::Moved::Litre(litres, rest))) => {
@@ -1627,17 +1636,29 @@ impl<U: Unit, P: FixedScale, T: Storage + defmt::Format, B: Bounds<T>> defmt::Fo
             _ => {}
         }
         match U::EXPR {
-            UnitExpr::Named { symbol: "", .. } if P::RUNTIME.is_some() => {
+            UnitExpr::Named(UnitDef {
+                names: UnitNames { symbol: "" },
+                ..
+            }) if P::RUNTIME.is_some() => {
                 defmt::write!(f, "{}", self.value);
                 Prefix::defmt_ratio(P::RUNTIME.unwrap_or(Prefix::Unit), f);
             }
-            UnitExpr::Named { symbol, .. } if P::SYMBOL.is_empty() && P::RUNTIME.is_none() => {
+            UnitExpr::Named(UnitDef {
+                names: UnitNames { symbol },
+                ..
+            }) if P::SYMBOL.is_empty() && P::RUNTIME.is_none() => {
                 defmt::write!(f, "{} ·{} {=str}", self.value, P::SCALE, symbol);
             }
-            UnitExpr::Named { symbol, .. } if crate::tree::prefix_binds(symbol) => {
+            UnitExpr::Named(UnitDef {
+                names: UnitNames { symbol },
+                ..
+            }) if crate::tree::prefix_binds(symbol) => {
                 defmt::write!(f, "{} {=str}{=str}", self.value, P::SYMBOL, symbol);
             }
-            UnitExpr::Named { symbol, .. } => {
+            UnitExpr::Named(UnitDef {
+                names: UnitNames { symbol },
+                ..
+            }) => {
                 defmt::write!(f, "{} {=str}({=str})", self.value, P::SYMBOL, symbol);
             }
             // compound units are rare on a device: the type name instead of a rendered tree
@@ -1776,21 +1797,23 @@ mod tests {
 
     #[test]
     fn unit_magnitude() {
-        use crate::unit::{Scale, UnitExpr};
+        use crate::unit::{MarkerId, UnitDef, UnitExpr, UnitNames};
         use crate::{Dim, Magnitude};
         assert_eq!(<Volt as Unit>::EXPR.magnitude(), Some(Magnitude::ONE));
-        static F: UnitExpr = UnitExpr::Named {
-            name: "Affine",
-            symbol: "m~",
-            dim: Dim::new(0, 1, 0, 0, 0, 0, 0),
-            scale: Scale::Affine {
-                factor: 0.3,
-                offset: 0.0,
+        // 10⁶⁰ m: its square leaves what a Magnitude holds (±63½)
+        static F: UnitExpr = UnitExpr::Named(&UnitDef {
+            id: MarkerId {
+                crate_name: "test",
+                name: "Huge",
             },
+            names: UnitNames { symbol: "m~" },
+            dim: Dim::new(0, 1, 0, 0, 0, 0, 0),
+            quantity: None,
+            scale: Magnitude::pow10(60),
             provenance: crate::Provenance::Defined,
-        };
-        static M: UnitExpr = UnitExpr::Mul(&F, <Second as Unit>::EXPR);
-        assert_eq!(F.magnitude(), None);
+        });
+        static M: UnitExpr = UnitExpr::Mul(&F, &F);
+        assert_eq!(F.magnitude(), Some(Magnitude::pow10(60)));
         assert_eq!(M.magnitude(), None);
     }
 

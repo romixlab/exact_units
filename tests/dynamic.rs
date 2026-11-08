@@ -1,4 +1,4 @@
-//! Units known only at run time (STD-37): `Dim` and `Scale` on the wire, `SIExpr`; golden bytes and round trips,
+//! Units known only at run time (STD-37): `Dim` and `UnitDef` on the wire, `SIExpr`; golden bytes and round trips,
 //! and that each is shown like the typed unit it maps onto.
 #![cfg(all(feature = "std", feature = "quantities"))]
 #![expect(clippy::panic, reason = "a test fails by panicking")]
@@ -10,7 +10,8 @@
 use core::fmt;
 use exact_units::units::{self, AngularVelocity, Per, Times, Torque};
 use exact_units::{
-    Dim, MAX_UNIT_DEPTH, Magnitude, Prefix, SIExpr, SIExprOwned, Scale, Unit, UnitExpr, tree,
+    Dim, MAX_UNIT_DEPTH, Magnitude, MarkerId, Prefix, Provenance, SIExpr, SIExprOwned, Unit,
+    UnitDef, UnitDefOwned, UnitExpr, UnitNames, tree,
 };
 use shrink_wrap::prelude::*;
 
@@ -123,35 +124,50 @@ fn dim_range() {
     assert_eq!(m4.checked_div(m4), Some(Dim::ONE));
 }
 
-#[test]
-fn scale_bytes() {
-    let mut buf = [0u8; 32];
-    let cases: [(Scale, &[u8]); 4] = [
-        (Scale::Coherent, &[0x00]),
-        (Scale::Pow10(-3), &[0x10, 0xfd]),
-        // a degree, π/180
-        (
-            Scale::Exact(Magnitude::new(1, 180, 0, 0, 1)),
-            &[0x30, 0xfe, 0x80, 0xfe, 0x80, 0x02, 0, 0, 0x83, 0xfc, 0, 0],
-        ),
-        (
-            Scale::Affine {
-                factor: 1.0,
-                offset: 273.15,
-            },
-            &[
-                0x20, 0, 0, 0, 0, 0, 0, 0xf0, 0x3f, 0x66, 0x66, 0x66, 0x66, 0x66, 0x12, 0x71, 0x40,
-            ],
-        ),
-    ];
-    for (scale, bytes) in cases {
-        assert_eq!(scale.to_ww_bytes(&mut buf).unwrap(), bytes, "{scale:?}");
-        assert_eq!(Scale::from_ww_bytes(bytes).unwrap(), scale);
+/// A plain coherent unit of this test: `name` as its marker, `symbol` after a number.
+const fn def(name: &'static str, symbol: &'static str, dim: Dim<'static>) -> UnitDef<'static> {
+    UnitDef {
+        id: MarkerId {
+            crate_name: "dynamic",
+            name,
+        },
+        names: UnitNames { symbol },
+        dim,
+        quantity: None,
+        scale: Magnitude::ONE,
+        provenance: Provenance::Defined,
     }
 }
 
-const VOLT_BYTES: [u8; 15] = [
-    0x00, b'V', b'o', b'l', b't', b'V', 0xd2, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x14,
+/// [def] as an owned run-time unit.
+fn owned(name: &'static str, symbol: &'static str, dim: Dim<'static>) -> SIExprOwned {
+    SIExprOwned::Def(def(name, symbol, dim).into())
+}
+
+/// The scale of a named unit is a `Magnitude` on the wire, whatever spelling the `unit!` line used.
+#[test]
+fn scale_is_a_magnitude() {
+    let mut buf = [0u8; 32];
+    for (unit, m) in [
+        (<units::Volt as Unit>::EXPR, Magnitude::ONE),
+        (<units::Gram as Unit>::EXPR, Magnitude::pow10(-3)),
+        (
+            <units::Degree as Unit>::EXPR,
+            Magnitude::new(1, 180, 0, 0, 1),
+        ),
+    ] {
+        let d = unit.def().unwrap();
+        assert_eq!(d.scale, m, "{unit}");
+        let bytes = m.to_ww_bytes(&mut buf).unwrap().to_vec();
+        assert_eq!(Magnitude::from_ww_bytes(&bytes).unwrap(), m);
+    }
+}
+
+/// `Volt` as a run-time unit: the `Def` tag, then its `UnitDef`: the crate, the name, the symbol, the dimension, no
+/// kind of its own, the scale one and the provenance `Defined`.
+const VOLT_BYTES: [u8; 31] = [
+    0x00, b'e', b'x', b'a', b'c', b't', b'_', b'u', b'n', b'i', b't', b's', b'V', b'o', b'l', b't',
+    b'V', 0x01, 0xd2, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x24, 0x39, 0x5b,
 ];
 
 #[test]
@@ -170,10 +186,10 @@ fn named_bytes() {
 
 #[test]
 fn compound_round_trip() {
-    let mut buf = [0u8; 128];
+    let mut buf = [0u8; 256];
     let si = <Viscous as Unit>::SI_EXPR;
     let bytes = si.to_ww_bytes(&mut buf).unwrap().to_vec();
-    assert_eq!(bytes.len(), 53);
+    assert_eq!(bytes.len(), 85);
     assert_eq!(&bytes[..2], [0x20, 0x00]);
     let back = SIExpr::from_ww_bytes(&bytes).unwrap();
     assert_eq!(&back, si);
@@ -216,21 +232,11 @@ fn owned_and_unit_expr() {
 
 #[test]
 fn pow() {
-    static METER: UnitExpr = UnitExpr::Named {
-        name: "Meter",
-        symbol: "m",
-        dim: Dim::new(0, 1, 0, 0, 0, 0, 0),
-        scale: Scale::Coherent,
-        provenance: exact_units::Provenance::Defined,
-    };
+    static METER_DEF: UnitDef<'static> = def("Meter", "m", Dim::new(0, 1, 0, 0, 0, 0, 0));
+    static METER: UnitExpr = UnitExpr::Named(&METER_DEF);
     static SQUARE: UnitExpr = UnitExpr::Pow(&METER, 2);
-    static SPEED: UnitExpr = UnitExpr::Named {
-        name: "Speed",
-        symbol: "m/s",
-        dim: Dim::new(-1, 1, 0, 0, 0, 0, 0),
-        scale: Scale::Coherent,
-        provenance: exact_units::Provenance::Defined,
-    };
+    static SPEED_DEF: UnitDef<'static> = def("Speed", "m/s", Dim::new(-1, 1, 0, 0, 0, 0, 0));
+    static SPEED: UnitExpr = UnitExpr::Named(&SPEED_DEF);
     static SPEED_SQ: UnitExpr = UnitExpr::Pow(&SPEED, 2);
     static PER_SQ: UnitExpr = UnitExpr::Div(&METER, &SQUARE);
     assert_eq!(SQUARE.to_string(), "m²");
@@ -473,12 +479,7 @@ fn quotients_agree() {
     // nothing says this `m` is a metre
     let not_a_metre = SIExprOwned::Div(
         Box::new(SIExprOwned::from(<units::Decibel as Unit>::EXPR)),
-        Box::new(SIExprOwned::Named {
-            name: "m".into(),
-            symbol: "m".into(),
-            dim: Dim::ONE.into(),
-            scale: Scale::Coherent,
-        }),
+        Box::new(owned("m", "m", Dim::ONE)),
     );
     assert_eq!(prefixed(Prefix::Milli, &&not_a_metre), " m(dB/m)");
 }
@@ -509,37 +510,18 @@ fn prefixes_on_trees() {
     assert_eq!(prefixed(Prefix::Pico, &&M4), " p(m⁴)");
     assert_eq!(prefixed(Prefix::Micro, &&V2), " µ(V²)");
 
-    let name_only = SIExprOwned::Named {
-        name: "m³".into(),
-        symbol: "m³".into(),
-        dim: Dim::ONE.into(),
-        scale: Scale::Coherent,
-    };
+    let name_only = owned("m³", "m³", Dim::ONE);
     assert_eq!(prefixed(Prefix::Micro, &&name_only), " µ(m³)");
 }
 
-/// Volt as an owned tree, its name, symbol, dimension and scale changed by `f`.
-fn volt_with(
-    f: impl FnOnce(&mut String, &mut String, &mut Dim<'static>, &mut Scale),
-) -> SIExprOwned {
-    let UnitExpr::Named {
-        name,
-        symbol,
-        mut dim,
-        mut scale,
-        ..
-    } = *<units::Volt as Unit>::EXPR
-    else {
+/// Volt as an owned tree, its definition changed by `f`.
+fn volt_with(f: impl FnOnce(&mut UnitDefOwned)) -> SIExprOwned {
+    let Some(volt) = <units::Volt as Unit>::EXPR.def() else {
         panic!("Volt is a named unit")
     };
-    let (mut name, mut symbol) = (name.to_string(), symbol.to_string());
-    f(&mut name, &mut symbol, &mut dim, &mut scale);
-    SIExprOwned::Named {
-        name,
-        symbol,
-        dim: dim.into(),
-        scale,
-    }
+    let mut d = UnitDefOwned::from(*volt);
+    f(&mut d);
+    SIExprOwned::Def(d)
 }
 
 /// A named unit read from the wire is a known unit only when all of it matches: one that differs from Volt in one
@@ -548,14 +530,16 @@ fn volt_with(
 fn forged_named_units() {
     let volt = <units::Volt as Unit>::EXPR;
     let ampere = <units::Ampere as Unit>::EXPR;
-    let real = volt_with(|_, _, _, _| {});
+    let real = volt_with(|_| {});
     assert_eq!(real, *volt);
     assert_eq!(real.known(), Some(volt));
     let forged = [
-        volt_with(|n, _, _, _| *n = "Volts".into()),
-        volt_with(|_, s, _, _| *s = "A".into()),
-        volt_with(|_, _, d, _| *d = <units::Ampere as Unit>::DIM),
-        volt_with(|_, _, _, c| *c = Scale::Pow10(-3)),
+        volt_with(|d| d.id.name = "Volts".into()),
+        // another crate's Volt is another unit
+        volt_with(|d| d.id.crate_name = "my_api".into()),
+        volt_with(|d| d.names.symbol = "A".into()),
+        volt_with(|d| d.dim = <units::Ampere as Unit>::DIM.into()),
+        volt_with(|d| d.scale = Magnitude::pow10(-3)),
         SIExprOwned::from(ampere),
     ];
     for f in &forged {
@@ -570,19 +554,11 @@ fn forged_named_units() {
         assert_eq!(owned.known().filter(|k| *k == volt), None, "{f:?}");
     }
     // Volt's name on Ampere's description is not a known unit at all
-    let renamed = SIExprOwned::from(ampere);
-    let SIExprOwned::Named {
-        symbol, dim, scale, ..
-    } = renamed
-    else {
+    let SIExprOwned::Def(mut renamed) = SIExprOwned::from(ampere) else {
         panic!("Ampere is a named unit")
     };
-    let renamed = SIExprOwned::Named {
-        name: "Volt".into(),
-        symbol,
-        dim,
-        scale,
-    };
+    renamed.id.name = "Volt".into();
+    let renamed = SIExprOwned::Def(renamed);
     assert_eq!(renamed.known(), None);
     let bytes = renamed.to_ww_bytes_owned().unwrap();
     assert_eq!(SIExpr::from_ww_bytes(&bytes).unwrap().known(), None);
@@ -628,13 +604,9 @@ fn compound_shapes() {
 }
 
 /// A ratio as a typed unit: no symbol, dimensionless, coherent.
-static RATIO: UnitExpr = UnitExpr::Named {
-    name: "Ratio",
-    symbol: "",
-    dim: Dim::ONE,
-    scale: Scale::Coherent,
-    provenance: exact_units::Provenance::Defined,
-};
+static RATIO_DEF: UnitDef<'static> = def("Ratio", "", Dim::ONE);
+/// [RATIO_DEF] as a typed unit.
+static RATIO: UnitExpr = UnitExpr::Named(&RATIO_DEF);
 
 /// `RATIO` in `levels` levels of the tree `wrap` makes, as a typed tree.
 fn deep_typed(levels: usize, wrap: fn(&'static UnitExpr) -> UnitExpr) -> &'static UnitExpr {
@@ -687,10 +659,10 @@ fn pow_levels(mut e: &SIExprOwned) -> (usize, &str) {
         levels += 1;
         e = a;
     }
-    let SIExprOwned::Named { name, .. } = e else {
+    let SIExprOwned::Def(d) = e else {
         panic!("a chain of Pow over a named unit")
     };
-    (levels, name)
+    (levels, &d.id.name)
 }
 
 /// A tree read from the wire becomes owned only up to [MAX_UNIT_DEPTH] levels, the rest is the unknown unit `?`:
@@ -755,12 +727,9 @@ fn validate_refuses() {
             Some(err),
             "{bad:?}"
         );
-        let unit = SIExprOwned::Named {
-            name: "Forged".into(),
-            symbol: "f".into(),
-            dim: bad.into(),
-            scale: Scale::Coherent,
-        };
+        let mut unit = UnitDefOwned::from(def("Forged", "f", Dim::ONE));
+        unit.dim = bad.into();
+        let unit = SIExprOwned::Def(unit);
         let bytes = unit.to_ww_bytes_owned().unwrap();
         assert!(SIExprOwned::from_ww_bytes_owned(&bytes).is_err(), "{bad:?}");
         assert!(SIExpr::from_ww_bytes(&bytes).is_err(), "{bad:?}");

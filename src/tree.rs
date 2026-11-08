@@ -17,7 +17,7 @@
 //! impl<'a> Tree<'a> for &'a MyUnit {
 //!     fn node(&self) -> Option<Node<'a, Self>> {
 //!         Some(match *self {
-//!             MyUnit::Name(n) => Node::Named { name: n, symbol: n, dim: None, scale: None },
+//!             MyUnit::Name(n) => Node::Named { crate_name: None, name: n, symbol: n, dim: None, scale: None },
 //!             MyUnit::Per(a, b) => Node::Div(&**a, &**b),
 //!         })
 //!     }
@@ -29,7 +29,8 @@
 //! assert_eq!(tree::dim(&&u), None);
 //! ```
 
-use crate::unit::{Dim, Scale, write_superscript};
+use crate::Magnitude;
+use crate::unit::{Dim, write_superscript};
 use crate::{Prefix, UnitExpr};
 use core::fmt;
 
@@ -70,14 +71,17 @@ pub enum Node<'a, E> {
     /// A named unit. `dim` and `scale` are `None` for a unit known by its name only (a user's marker that a client
     /// sees in introspection data): it is shown by name, without a dimension or a conversion to SI.
     Named {
+        /// The crate that declares the marker ([MarkerId](crate::MarkerId)), `None` for a unit a client knows by
+        /// name only.
+        crate_name: Option<&'a str>,
         /// The marker's name: `Volt`.
         name: &'a str,
         /// As written after a number: `V`; a unit known by name only has its name here.
         symbol: &'a str,
         /// The unit's dimension, `None` for a unit known by name only.
         dim: Option<Dim<'a>>,
-        /// How a value in the unit becomes coherent SI, `None` for a unit known by name only.
-        scale: Option<Scale>,
+        /// The exact factor to coherent SI, `None` for a unit known by name only.
+        scale: Option<Magnitude>,
     },
     /// `A · B`
     Mul(E, E),
@@ -94,12 +98,13 @@ impl<'a, E> Node<'a, E> {
     pub fn map<F>(self, mut f: impl FnMut(E) -> F) -> Node<'a, F> {
         match self {
             Node::Named {
+                crate_name,
                 name,
                 symbol,
                 dim,
                 scale,
-                ..
             } => Node::Named {
+                crate_name,
                 name,
                 symbol,
                 dim,
@@ -142,12 +147,12 @@ pub fn dim<'t, E: Tree<'t>>(e: &E) -> Option<Dim<'t>> {
     dim_at(e, 0)
 }
 
-/// Factor to coherent SI of the whole tree (offsets left out: a product with °C is not affine); `None` like [dim].
+/// Factor to coherent SI of the whole tree, as a float; `None` like [dim].
 pub fn factor<'t, E: Tree<'t>>(e: &E) -> Option<f64> {
     factor_at(e, 0)
 }
 
-/// The same tree: names, symbols, dimensions and scales of every named unit, and the same shape.
+/// The same tree: crates, names, symbols, dimensions and scales of every named unit, and the same shape.
 pub fn same<'s, 't, A: Tree<'s>, B: Tree<'t>>(a: &A, b: &B) -> bool {
     same_at(a, b, 0)
 }
@@ -155,17 +160,12 @@ pub fn same<'s, 't, A: Tree<'s>, B: Tree<'t>>(a: &A, b: &B) -> bool {
 impl Tree<'static> for &UnitExpr {
     fn node(&self) -> Option<Node<'static, Self>> {
         Some(match **self {
-            UnitExpr::Named {
-                name,
-                symbol,
-                dim,
-                scale,
-                ..
-            } => Node::Named {
-                name,
-                symbol,
-                dim: Some(dim),
-                scale: Some(scale),
+            UnitExpr::Named(def) => Node::Named {
+                crate_name: Some(def.id.crate_name),
+                name: def.id.name,
+                symbol: def.names.symbol,
+                dim: Some(def.dim),
+                scale: Some(def.scale),
             },
             UnitExpr::Mul(a, b) => Node::Mul(a, b),
             UnitExpr::Div(a, b) => Node::Div(a, b),
@@ -289,7 +289,7 @@ fn dim_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<Dim<'t>> {
     }
 }
 
-/// Factor to coherent SI of the whole tree (offsets left out), `None` when a part doesn't decode or it is too deep.
+/// Factor to coherent SI of the whole tree, `None` when a part doesn't decode or it is too deep.
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "depth < MAX_UNIT_DEPTH, checked first"
@@ -300,7 +300,7 @@ fn factor_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<f64> {
     }
     let d = depth + 1;
     match e.node()? {
-        Node::Named { scale, .. } => Some(scale?.factor()),
+        Node::Named { scale, .. } => Some(scale?.to_f64()),
         Node::Mul(a, b) => Some(factor_at(&a, d)? * factor_at(&b, d)?),
         Node::Div(a, b) => Some(factor_at(&a, d)? / factor_at(&b, d)?),
         Node::Pow(a, n) => Some(crate::num::powi_f64(factor_at(&a, d)?, n)),
@@ -308,9 +308,9 @@ fn factor_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<f64> {
     }
 }
 
-/// The exact factor to coherent SI of the whole tree, as [UnitExpr::magnitude]: `None` like [dim], with a `Factor` or
-/// `Affine` scale in it, or a product a [Magnitude](crate::Magnitude) doesn't hold.
-pub fn magnitude<'t, E: Tree<'t>>(e: &E) -> Option<crate::Magnitude> {
+/// The exact factor to coherent SI of the whole tree, as [UnitExpr::magnitude]: `None` like [dim], or for a product a
+/// [Magnitude] doesn't hold.
+pub fn magnitude<'t, E: Tree<'t>>(e: &E) -> Option<Magnitude> {
     magnitude_at(e, 0)
 }
 
@@ -318,38 +318,28 @@ pub fn magnitude<'t, E: Tree<'t>>(e: &E) -> Option<crate::Magnitude> {
     clippy::arithmetic_side_effects,
     reason = "depth < MAX_UNIT_DEPTH, checked first"
 )]
-fn magnitude_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<crate::Magnitude> {
+fn magnitude_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<Magnitude> {
     if depth >= MAX_UNIT_DEPTH {
         return None;
     }
     let d = depth + 1;
     match e.node()? {
-        Node::Named { scale, .. } => scale?.magnitude(),
+        Node::Named { scale, .. } => scale,
         Node::Mul(a, b) => magnitude_at(&a, d)?.checked_mul(magnitude_at(&b, d)?).ok(),
         Node::Div(a, b) => magnitude_at(&a, d)?.checked_div(magnitude_at(&b, d)?).ok(),
         Node::Pow(a, n) => {
             let a = magnitude_at(&a, d)?;
-            let mut r = crate::Magnitude::ONE;
+            let mut r = Magnitude::ONE;
             for _ in 0..n.unsigned_abs() {
                 r = r.checked_mul(a).ok()?;
             }
             if n < 0 {
-                crate::Magnitude::ONE.checked_div(r).ok()
+                Magnitude::ONE.checked_div(r).ok()
             } else {
                 Some(r)
             }
         }
         Node::Sqrt(a) => magnitude_at(&a, d)?.checked_sqrt().ok(),
-    }
-}
-
-/// Offset to coherent SI: only a named unit with an `Affine` scale (°C) has one.
-pub fn offset<'t, E: Tree<'t>>(e: &E) -> f64 {
-    match e.node() {
-        Some(Node::Named {
-            scale: Some(scale), ..
-        }) => scale.offset(),
-        _ => 0.0,
     }
 }
 
@@ -459,9 +449,10 @@ pub(crate) fn inside<'t, E: Tree<'t>>(prefix: Prefix, unit: &E) -> Option<Prefix
 /// spelling.
 fn litre<'t, E: Tree<'t>>(k: i8, unit: &E) -> Option<Moved<'t>> {
     let Node::Named {
+        crate_name: Some(env!("CARGO_CRATE_NAME")),
         name,
         symbol,
-        scale: Some(Scale::Coherent),
+        scale: Some(Magnitude::ONE),
         ..
     } = unit.node()?
     else {
@@ -503,7 +494,8 @@ pub(crate) fn quotient<'t, E: Tree<'t>>(unit: &E) -> Option<Quotient<'t>> {
             name,
             symbol,
             dim: Some(_),
-            scale: Some(Scale::Coherent),
+            scale: Some(Magnitude::ONE),
+            ..
         } => {
             let (num, den) = symbol.split_once('/')?;
             (num, plain(den), true, name)
@@ -521,7 +513,7 @@ pub(crate) fn quotient<'t, E: Tree<'t>>(unit: &E) -> Option<Quotient<'t>> {
             if matches!(b.node()?, Node::Named { dim: None, .. }) {
                 return None;
             }
-            let si = matches!(scale, Scale::Coherent | Scale::Pow10(_));
+            let si = scale.as_pow10().is_some();
             (symbol, den_symbol(&b), si, "")
         }
         _ => return None,
@@ -721,18 +713,20 @@ fn same_at<'s, 't, A: Tree<'s>, B: Tree<'t>>(a: &A, b: &B, depth: usize) -> bool
     match (a, b) {
         (
             Node::Named {
+                crate_name: k1,
                 name: n1,
                 symbol: s1,
                 dim: d1,
                 scale: c1,
             },
             Node::Named {
+                crate_name: k2,
                 name: n2,
                 symbol: s2,
                 dim: d2,
                 scale: c2,
             },
-        ) => n1 == n2 && s1 == s2 && d1 == d2 && c1 == c2,
+        ) => k1 == k2 && n1 == n2 && s1 == s2 && d1 == d2 && c1 == c2,
         (Node::Mul(a1, b1), Node::Mul(a2, b2)) | (Node::Div(a1, b1), Node::Div(a2, b2)) => {
             same_at(&a1, &a2, d) && same_at(&b1, &b2, d)
         }

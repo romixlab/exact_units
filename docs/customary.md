@@ -125,10 +125,9 @@ temperature. The markers say which one they are:
 
 The same for Btu and calories: the International Table and thermochemical ones are defined, those at a temperature or
 "mean" are measured. A measured unit's scale is the value NIST SP 811 prints, exact in this crate by convention only;
-`UnitExpr::Named`'s `provenance` is `Provenance::Conventional` for them, `Defined` for every other unit. An API
-model carries it too (as `ww_self::MarkerDef::ConventionalUnit`, a unit with its source, while a defined unit stays a
-plain `MarkerDef::Unit` and pays nothing for it), for these and for an API crate's own `unit!` lines with
-`conventional(..)`, so a client knows which scales are conventions:
+the `provenance` of their `UnitDef` is `Provenance::Conventional`, `Defined` for every other unit. An API model
+carries the same `UnitDef`, for these and for an API crate's own `unit!` lines with `conventional(..)`, so a client
+knows which scales are conventions:
 
 <!-- generated: conventional -->
 
