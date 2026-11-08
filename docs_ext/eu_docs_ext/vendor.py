@@ -7,14 +7,24 @@ GitHub release assets, so FONT_*_SHA256 is a plain sha256 of the zip this script
 docs/vendor/ is not in git: `just docs` and `just docs-build` run this first, and it does nothing when the pinned
 version is there already.
 
+Every fetch goes through `download()`: a local cache outside the repo, content-addressed by the pinned hash
+(`$EU_VENDOR_CACHE`, default `$XDG_CACHE_HOME/exact_units/book-vendor`, itself defaulting to `~/.cache/...`), so a
+warm cache needs no network at all, and a timeout, a connection error or an HTTP 5xx/429 from npm, GitHub or
+Google's font subsetter is retried with backoff instead of failing the gate outright. Any other HTTP error, or a
+hash mismatch (cached or freshly fetched), fails at once.
+
     uv run python -m eu_docs_ext.vendor [DOCS_DIR]
 """
 
 import base64
 import hashlib
 import io
+import os
 import sys
 import tarfile
+import tempfile
+import time
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -63,18 +73,80 @@ FALLBACK_MINIM_SHA256 = "5a00cc5c87afe8ae4bbf0da86f47d63c4b79a957a282df34b496642
 FALLBACK_LICENSE_URL = "https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/LICENSE"
 FALLBACK_LICENSE_SHA256 = "f2095b08bed08b23a6fe26112fcd679a2bee3f002eef077eb05d215ed1051bd8"
 
+# A timeout, a connection error and these statuses are worth retrying (a 503 from GitHub, a 429 from the font
+# subsetter); any other HTTP status is treated as permanent (a 404 means the pinned URL moved, not a glitch).
+RETRYABLE_STATUSES = {429, 500, 502, 503, 504}
+RETRY_ATTEMPTS = 4
+RETRY_BASE_SECONDS = 1.0
+
+
+def cache_dir() -> Path:
+    """Where `download()` keeps fetched files, content-addressed by their pinned hash. `EU_VENDOR_CACHE` names the
+    directory outright; otherwise it is `$XDG_CACHE_HOME/exact_units/book-vendor`, with `~/.cache` when
+    `XDG_CACHE_HOME` isn't set either."""
+    override = os.environ.get("EU_VENDOR_CACHE")
+    if override:
+        return Path(override)
+    base = os.environ.get("XDG_CACHE_HOME")
+    return (Path(base) if base else Path.home() / ".cache") / "exact_units" / "book-vendor"
+
+
+def _write_atomic(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        os.replace(tmp_name, path)
+    except Exception:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
+
+
+def _fetch(url: str) -> bytes:
+    """`url`'s bytes, retrying a timeout, a connection error or one of `RETRYABLE_STATUSES` with backoff. Any other
+    HTTP error exits at once: it means the pinned URL itself is wrong, not a glitch worth waiting out."""
+    last: Exception | None = None
+    for attempt in range(RETRY_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(url, timeout=60) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            if e.code not in RETRYABLE_STATUSES:
+                sys.exit(f"{url}: HTTP {e.code}, not retrying; check the URL or the pin")
+            last = e
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            last = e
+        if attempt < RETRY_ATTEMPTS - 1:
+            time.sleep(RETRY_BASE_SECONDS * 2**attempt)
+    sys.exit(f"{url}: still failing after {RETRY_ATTEMPTS} attempts ({last}); check network access and retry")
+
+
+def download(url: str, algo: str, want: str) -> bytes:
+    """`url`'s bytes, verified against `want` (a hex digest under `algo`, a `hashlib` name). A cached copy whose
+    hash already matches is returned with no network; otherwise `url` is fetched (`_fetch`, with retries), checked
+    against `want`, cached atomically and returned. A cached file with the wrong hash is ignored and refetched; a
+    freshly fetched one with the wrong hash exits without being cached."""
+    path = cache_dir() / f"{algo}-{want}"
+    if path.exists():
+        cached = path.read_bytes()
+        if hashlib.new(algo, cached).hexdigest() == want:
+            return cached
+    data = _fetch(url)
+    got = hashlib.new(algo, data).hexdigest()
+    if got != want:
+        sys.exit(f"{url}: the download's {algo} is {got}, the pinned one {want}")
+    _write_atomic(path, data)
+    return data
+
 
 def fetch(docs: Path) -> None:
     out = docs / "vendor" / "katex"
     stamp = out / "VERSION"
     if stamp.exists() and stamp.read_text().strip() == VERSION:
         return
-    with urllib.request.urlopen(TARBALL, timeout=60) as r:
-        data = r.read()
-    algo, want = INTEGRITY.split("-", 1)
-    got = base64.b64encode(hashlib.new(algo, data).digest()).decode()
-    if got != want:
-        sys.exit(f"katex {VERSION}: the download's {algo} is {got}, the pinned one {want}")
+    algo, want_b64 = INTEGRITY.split("-", 1)
+    data = download(TARBALL, algo, base64.b64decode(want_b64).hex())
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
         for member in tar.getmembers():
             name = member.name.removeprefix("package/")
@@ -103,11 +175,7 @@ def fetch_fonts(docs: Path) -> None:
         ("ibm-plex-sans", "IBMPlexSans", FONT_SANS_URL, FONT_SANS_SHA256, FONT_SANS_WEIGHTS),
         ("ibm-plex-mono", "IBMPlexMono", FONT_MONO_URL, FONT_MONO_SHA256, FONT_MONO_WEIGHTS),
     ):
-        with urllib.request.urlopen(url, timeout=60) as r:
-            data = r.read()
-        got = hashlib.sha256(data).hexdigest()
-        if got != sha256:
-            sys.exit(f"{family}: the download's sha256 is {got}, the pinned one {sha256}")
+        data = download(url, "sha256", sha256)
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             (out / "LICENSE.txt").write_bytes(z.read(f"{family}/LICENSE.txt"))
             for weight in weights:
@@ -120,11 +188,7 @@ def fetch_fonts(docs: Path) -> None:
         ("NotoSansSymbols-Minim.woff2", FALLBACK_MINIM_URL, FALLBACK_MINIM_SHA256),
         ("LICENSE-noto.txt", FALLBACK_LICENSE_URL, FALLBACK_LICENSE_SHA256),
     ):
-        with urllib.request.urlopen(url, timeout=60) as r:
-            data = r.read()
-        got = hashlib.sha256(data).hexdigest()
-        if got != sha256:
-            sys.exit(f"{name}: the download's sha256 is {got}, the pinned one {sha256}")
+        data = download(url, "sha256", sha256)
         (out / name).write_bytes(data)
     stamp.write_text(want_stamp + "\n")
 

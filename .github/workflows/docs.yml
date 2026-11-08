@@ -28,6 +28,10 @@ jobs:
   build:
     name: build the book (strict)
     runs-on: ubuntu-latest
+    env:
+      # eu_docs_ext.vendor's cache (KaTeX, IBM Plex, the Noto fallbacks): cached across runs below, keyed by the
+      # script's own hash, so a pin that hasn't changed needs no network even on a fresh runner.
+      EU_VENDOR_CACHE: ${{ github.workspace }}/.cache/book-vendor
     steps:
       - uses: actions/checkout@v7
       - uses: actions-rust-lang/setup-rust-toolchain@v2
@@ -35,6 +39,10 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.EU_VENDOR_CACHE }}
+          key: book-vendor-${{ hashFiles('docs_ext/eu_docs_ext/vendor.py') }}
       # the site's Markdown extensions (the `bits` fence, `rust,compile_fail` blocks)
       - run: uv run --group dev pytest -q docs_ext
       # KaTeX, the logo and the plots, then the site: a warning fails
