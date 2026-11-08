@@ -258,6 +258,25 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
 - ✅ **NUM-22 `q!` ranges and tolerances** — `v.is_in(q!(4.9 V ..= 5.1 V))`, `q!(4.9 V .. 5.1 V)` (the upper end out), `q!(4.9 ..= 5.1 V)` (the unit once), `q!(5 V +- 50 mV)`, `q!(5 V +- 1 %)` (of the nominal's magnitude: `%`, `‰`, `ppm`, `ppb`), `q!(5 V +2 % -1 %)`, `q!("5 V ± 1 %")` (`±` lexes only inside a string); `contains` too, through the trait `Contains` that `is_in` on `Fixed`, `Exact` and `Point` takes. The macro works a tolerance out into two decimal ends exactly and emits `literal::LiteralRange<Lo, Hi, OPEN, FIT>` of two `q!` literal types; a `const` block folds each end to a stored value, so a check is `lo <= t && t <= hi` (`tests/q_asm.rs`: the hand-written limits' instructions on thumbv6m, one `sub` and one unsigned compare; an end past the storage's range one compare). An end that is no stored value is a compile error naming the stored values (or floats) around it with their decimals unless the literal says `, Inside` (inward: the stored values within the real range) or `, Outside` (outward: the fewest that cover it); a range no value is in, and one every value of the type is in (storage narrowed by its bounds), are compile errors; the macro refuses an inverted or empty range, a part of a ratio (`5 % +- 1 %` reads two ways), of a point, of a level or of 0, and units that differ beyond a prefix. Integer and float storages, `MaybeNan` included (NaN is in no range), and `Exact` (two fraction compares). `q!(+- 50 mV)` alone is a `literal::LiteralTolerance` for NUM-24; ranges of points and levels parse and wait for PT-6 and LVL-7. Tests: `tests/props/q_range.rs` (the fold against `reference::range_member` and `range_refused` in `i128` for i8, u8, a bounded i8, i16 and i32, refusals included; `q!` walked over every i16; floats; a Kani proof over i8, written but not yet run: `just verify`), `macros/src/pure/range_tests.rs`, `tests/compile_fail/q_range.rs` and `q_range_grammar.rs`. Docs: [Ranges and tolerances](docs/start/literals.md#ranges-and-tolerances), [rule 2](docs/start/exact.md#2-exact-or-refused).
 - 📋 **NUM-24 `q!` tolerance literals** — `q!(+- 50 mV)` and `q!(+- 1 %)` (`LiteralTolerance`, parsed by NUM-22) wherever a `Tolerance` is taken around a run-time target (NUM-23's window and `within`), an absolute one folded to whole steps (`Inside` or `Outside` where it isn't), a relative one to p/q; `q!(a ..= b).window::<F>()`, the const fold as a value. P2401#8nov-0605d.
 - 💡 **NUM-25 A `q!` range as a type's bounds** — `Fixed<Volt, Milli, u16, bounds!(4.9 V ..= 5.1 V)>`. `Bounds<T>` knows only `T`, not the unit and scale, so the fold needs a design of its own. P2401#8nov-0605e.
+- ✅ **NUM-23 `Window<F>` and `Fixed::within` with a `Tolerance`** — `Window<F>`, a closed range of stored values
+  of one `Fixed` type (`Window::new(lo, hi)`, `lo`, `hi`, `contains`, `Display` `4950 mV ..= 5050 mV`, `{:#}`
+  `4.95 V ..= 5.05 V`), two compares of the storage, NaN in none. `target.window(tolerance, Fit::Inside |
+  Fit::Outside)` folds the ends of `target · (1 ± t)` once, in exact integers, to the stored values inside the real
+  window or the smallest window outside it, cut to the type's range and bounds; `Fit` is a crate-root enum, no
+  default. `a.is_within(b, tol)` decides `q · |a − b| <= p · |b|` (two 64-bit products for storages up to 32 bits and
+  `p`, `q` of 32 bits, 128-bit ones past that, no `u128` library call on thumbv6m); `a.within(b, tol)` gives the
+  exact error or an `OffTarget<Fixed<..>>` (`OffTarget<V>` now generic over the value type). A value equal to its
+  target is within, also at 0, on `Exact` too. `Contains` and `is_in` (shared with NUM-22, `src/contains.rs`).
+  Integer storages; a float storage is a compile error (NUM-26). Tests: `tests/props/window.rs` (every `i8` pair and
+  every pair of a bounded `u8` with ten tolerances; drawn storages up to 64 bits with `p`, `q` past 32, 64 and 128
+  bits, values aimed at the ends; Kani proofs over every `i8` pair and `u8` tolerance, not yet run),
+  `tests/compile_fail/window_float.rs`, doctests; book [Exact fractions](docs/maths/fractions.md#windows).
+- 💡 **NUM-26 Windows and tolerance on float storages** — `window`, `within` and `is_within` for `f32` and `f64`
+  `Fixed`, exact: `q · |a − b| <= p · |b|` on the floats' mantissas and exponents (wide, as `src/exact/compare.rs`
+  orders a float against an `Exact`), the ends of a window the floats just inside or outside the real ones. Not
+  needed yet: integer storages are what firmware checks against a setpoint.
+- 💡 **NUM-27 A refusal that names the value and its window** — `w.check(v) -> Result<(), OutOfWindow<F>>` for host
+  code, as `OffTarget` names a value and its target: `5070 mV is outside 4950 mV ..= 5050 mV`.
 
 ## Units and markers (`UNIT`)
 

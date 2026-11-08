@@ -98,7 +98,8 @@ impl<U: Unit> Exact<U> {
     }
 
     /// This value's relative error against `target` if it is within `tolerance`, else why not, naming both values:
-    /// `79.99998046875 MHz is -0.244140625 ppm off 80 MHz, outside ±0.1 ppm`.
+    /// `79.99998046875 MHz is -0.244140625 ppm off 80 MHz, outside ±0.1 ppm`. A value equal to its target is within
+    /// with an error of 0, also at 0; any other value against 0 has no relative error and is refused.
     ///
     /// ```
     /// # #[cfg(feature = "time")] {
@@ -109,55 +110,70 @@ impl<U: Unit> Exact<U> {
     /// assert!(fdcan.within(target, Tolerance::ppm(1)).is_ok());
     /// let e = fdcan.within(target, Tolerance::EXACT).unwrap_err();
     /// assert_eq!(e.to_string(), "79.99998046875 MHz is -0.244140625 ppm off 80 MHz, outside ±0 (exactly)");
+    /// assert_eq!(Exact::<Hertz>::ZERO.within(Exact::ZERO, Tolerance::EXACT), Ok(Exact::ZERO));
+    /// let e = Exact::<Hertz>::int(1).within(Exact::ZERO, Tolerance::percent(1)).unwrap_err();
+    /// assert_eq!(e.to_string(), "1 Hz is off 0 Hz: no relative error to a target of 0");
     /// # }
     /// ```
     #[expect(
         clippy::result_large_err,
         reason = "no alloc to box it in: the refusal carries the values it names, on a host's cold path"
     )]
-    pub fn within(self, target: Self, tolerance: Tolerance) -> Result<Exact<Ratio>, OffTarget<U>> {
+    pub fn within(
+        self,
+        target: Self,
+        tolerance: Tolerance,
+    ) -> Result<Exact<Ratio>, OffTarget<Self>> {
         let error = self.rel_error(target);
         match error {
+            _ if self == target => Ok(Exact::ZERO),
             Some(e) if tolerance.contains(e) => Ok(e),
             _ => Err(OffTarget {
                 achieved: self,
                 target,
                 error,
                 tolerance,
+                zero_target: target.is_zero(),
             }),
         }
     }
 }
 
-/// A value outside its tolerance of a target ([Exact::within]): both values, the error and the tolerance.
+/// A value outside its tolerance of a target ([Exact::within], [Fixed::within](crate::Fixed::within)): both values,
+/// the error and the tolerance. `V` is the type of the values, an [Exact] or a [Fixed](crate::Fixed).
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub struct OffTarget<U> {
+pub struct OffTarget<V> {
     /// The value checked.
-    pub achieved: Exact<U>,
+    pub achieved: V,
     /// What it should be.
-    pub target: Exact<U>,
-    /// The relative error, `None` for a target of 0 (or where it overflows).
+    pub target: V,
+    /// The relative error, `None` against a target of 0 (or, for an [Exact], where it overflows).
     pub error: Option<Exact<Ratio>>,
     /// What was allowed.
     pub tolerance: Tolerance,
+    /// Whether the target is 0: why `error` is `None`, when it is.
+    pub(crate) zero_target: bool,
 }
 
-impl<U: Unit> fmt::Display for OffTarget<U> {
+impl<V: fmt::Display> fmt::Display for OffTarget<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (a, t, tol) = (self.achieved, self.target, self.tolerance);
+        let (a, t, tol) = (&self.achieved, &self.target, self.tolerance);
         match self.error {
             Some(e) if tol.t.is_zero() => write!(f, "{a} is {e} off {t}, outside ±0 (exactly)"),
             Some(e) => write!(f, "{a} is {e} off {t}, outside {tol}"),
-            None if t.is_zero() => write!(f, "{a} is off {t}: no relative error to a target of 0"),
+            // an Exact's error is refused past u128 too; a Fixed's only for a target of 0
+            None if self.zero_target => {
+                write!(f, "{a} is off {t}: no relative error to a target of 0")
+            }
             None => write!(f, "{a} is off {t} by more than a fraction of u128s holds"),
         }
     }
 }
 
-impl<U: Unit> fmt::Debug for OffTarget<U> {
+impl<V: fmt::Display> fmt::Debug for OffTarget<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "OffTarget({self})")
     }
 }
 
-impl<U: Unit> core::error::Error for OffTarget<U> {}
+impl<V: fmt::Display> core::error::Error for OffTarget<V> {}

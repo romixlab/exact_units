@@ -303,7 +303,7 @@ impl Num {
     clippy::arithmetic_side_effects,
     reason = "a product of two 64-bit halves fits u128; mid is at most 3 * (2^64 - 1), hi the top half of a 256-bit product"
 )]
-const fn mul_wide(a: u128, b: u128) -> (u128, u128) {
+pub(crate) const fn mul_wide(a: u128, b: u128) -> (u128, u128) {
     #[expect(
         clippy::as_conversions,
         reason = "a const item: From is not const on stable"

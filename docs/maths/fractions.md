@@ -199,6 +199,43 @@ assert_eq!(
 
 `Tolerance::ppm`, `ppb` and `percent` take a whole number. `Tolerance::of(Exact::new_in::<Centi>(1, 4))` is ±0.25 %, and `Tolerance::EXACT` lets only the target itself through. `Ppm<T>` is a `Fixed` in parts per million, next to `Ppb<T>`, for the firmware side.
 
+A value equal to its target is within any tolerance, with an error of 0, also when both are 0. Any other value against a target of 0 has no relative error, and `within` refuses it.
+
+### Between two `Fixed` values
+
+A `Fixed` of an integer storage has the same `within`, and `is_within`, its bool. Both values have the same scale, so the scale cancels: the error is that of the stored integers, exact for every value. `is_within` decides `q · |a − b| <= p · |b|` for a tolerance `p/q`. For a storage of up to 32 bits and a tolerance whose `p` and `q` fit 32 bits (`percent`, `ppm`, `ppb`), that is two 64-bit products. That is the form for firmware.
+
+```rust
+use exact_units::{Hz, Tolerance};
+
+let target = Hz::<u32>::new(80_000_000);
+assert!(Hz::new(80_000_080).is_within(target, Tolerance::ppm(1)));
+assert!(!Hz::new(80_000_081).is_within(target, Tolerance::ppm(1)));
+let off = Hz::new(80_000_100).within(target, Tolerance::ppm(1)).unwrap_err();
+assert_eq!(off.to_string(), "80000100 Hz is 1.25 ppm off 80000000 Hz, outside ±1 ppm");
+```
+
+### Windows
+
+A control loop checks many readings against one setpoint. `target.window(tolerance, fit)` works the ends out once, exactly, and gives a `Window`: two values of the type. Each check is then two compares of the storage, with nothing wide left for run time. `contains` and `is_in` both check, in the order that reads best.
+
+The real ends `target · (1 ± t)` are rarely stored values, so the call names which stored values stand for them, a `Fit`. `Fit::Inside` moves the ends inward: the window holds the stored values within the tolerance and no others, so a value is in it exactly when `is_within` says so. `Fit::Outside` moves them outward: the smallest window of stored values that covers the real one. Both are cut to the type's range and bounds, and both hold the target.
+
+```rust
+use exact_units::{Fit, Fixed, Tolerance, prefix::Milli, units::Volt};
+
+let setpoint = Fixed::<Volt, Milli, i32>::new(3333);
+// 1 % of 3333 mV is 33.33 mV: the real window is 3299.67 mV ..= 3366.33 mV
+let inside = setpoint.window(Tolerance::percent(1), Fit::Inside);
+assert_eq!(format!("{inside:#}"), "3.3 V ..= 3.366 V");
+let outside = setpoint.window(Tolerance::percent(1), Fit::Outside);
+assert_eq!(outside.to_string(), "3299 mV ..= 3367 mV");
+let reading = Fixed::new(3367);
+assert!(!reading.is_in(inside) && outside.contains(&reading));
+```
+
+A window and `is_within` are for integer storages; a float storage doesn't compile. NaN is in no window, also of a `MaybeNan` type.
+
 ## Cost
 
 An `Exact` is 48 bytes, and its arithmetic is `u128` multiplies and divisions with a gcd at each step. That is fine on a host and slow on a microcontroller, where most `u128` operations are library calls. Firmware gets the results as `Fixed` constants. The type is `no_std` and needs no alloc, and nothing of it is linked unless it is used.

@@ -52,6 +52,7 @@ mod serde_values;
 mod text;
 #[cfg(all(not(kani), feature = "serde"))]
 mod unit_text;
+mod window;
 #[cfg(all(not(kani), feature = "std", feature = "shrink_wrap"))]
 mod wire;
 

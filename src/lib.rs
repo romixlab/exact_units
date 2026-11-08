@@ -86,6 +86,7 @@ mod text;
 pub mod tree;
 mod unit;
 pub mod units;
+mod window;
 
 #[cfg(all(feature = "angle", feature = "dimensionless"))]
 pub use complex::Nco;
@@ -140,6 +141,7 @@ pub use unit::exp as __dim_exp;
 pub use unit::{Counted, Dim, MAX_COUNTED, Provenance, Scale, Unit, UnitDiv, UnitExpr, UnitMul};
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use unit::{CountedOwned, DimOwned, ProvenanceOwned};
+pub use window::{Fit, Window};
 
 /// The [Dim] of a counted unit marker `Name` of the crate this is written in: `Dim::counted(<this crate>, "Name")`,
 /// with the crate as Rust names it (`CARGO_CRATE_NAME`). Two crates' markers of the same name are different bases.
