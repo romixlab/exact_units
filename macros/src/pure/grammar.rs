@@ -108,7 +108,7 @@ pub(crate) fn literal(toks: &[Tok], whole: usize) -> Result<Literal, Error> {
 }
 
 /// `[tok]` with the invisible groups of `macro_rules!` fragments opened.
-fn flatten(toks: &[Tok]) -> Vec<Tok> {
+pub(crate) fn flatten(toks: &[Tok]) -> Vec<Tok> {
     let mut out = Vec::new();
     for t in toks {
         match t {
@@ -123,7 +123,11 @@ fn flatten(toks: &[Tok]) -> Vec<Tok> {
     out
 }
 
-fn number_and_unit(toks: &[Tok], whole: usize, in_string: bool) -> Result<Literal, Error> {
+pub(crate) fn number_and_unit(
+    toks: &[Tok],
+    whole: usize,
+    in_string: bool,
+) -> Result<Literal, Error> {
     let (negative, rest) = match toks.split_first() {
         Some((t, rest)) if t.punct() == Some('-') => (true, rest),
         _ => (false, toks),

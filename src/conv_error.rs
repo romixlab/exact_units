@@ -470,6 +470,22 @@ pub(crate) const fn no_exact_factor<A: Unit, B: Unit>(what: &str) -> ! {
     panic!("{}", msg.as_str())
 }
 
+/// A unit's symbol as text, `N·m`: for the messages of a `q!` range, which name stored values in the unit of the
+/// literal.
+#[cfg(feature = "q")]
+pub(crate) struct Symbol(Msg);
+
+#[cfg(feature = "q")]
+impl Symbol {
+    pub(crate) const fn of(e: &UnitExpr) -> Symbol {
+        Symbol(push_symbol(Msg::new(), e))
+    }
+
+    pub(crate) const fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

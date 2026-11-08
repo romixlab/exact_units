@@ -610,6 +610,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
   literal" section on [Binary angles](docs/fixed_point/bam.md). `Exact` against a `Fixed` of a π-carrying
   scale now says to round through `f64`, as its error already does. A stray overflow-policy mismatch in
   [Overflow](docs/maths/overflow.md) also gained its "instead" (`with_overflow`).
+- `q!` ranges and tolerances (NUM-22): `v.is_in(q!(4.9 V ..= 5.1 V))`, `q!(4.9 V .. 5.1 V)`, `q!(4.9 ..= 5.1 V)`, `q!(5 V +- 50 mV)`, `q!(5 V +- 1 %)` (of the nominal), `q!(5 V +2 % -1 %)` and `q!("5 V ± 1 %")` (Rust's lexer takes `±` only in a string), and `q!(..).contains(&v)`. A check is two compares against stored values folded at compile time, the instructions of the hand-written limits on thumbv6m. An end that is no stored value is a compile error naming the stored values around it, until the literal says `, Inside` or `, Outside`; a range no value is in or every value is in doesn't compile, nor does a tolerance that reads two ways (`5 % +- 1 %`) or is a part of a point, a level or 0. Integer and float storages (NaN is in no range, so a `MaybeNan` float has `is_in` too) and `Exact`. New: the trait `Contains` with `is_in` on `Fixed`, `Exact` and `Point`; `literal::LiteralRange` and `literal::LiteralTolerance` (the latter for NUM-24). Book: [Ranges and tolerances](docs/start/literals.md#ranges-and-tolerances).
 
 ### 🐛 Fixes
 

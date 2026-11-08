@@ -11,9 +11,9 @@ use super::number::{Decimal, parse};
 use super::resolve::{Symbol, resolve};
 use super::table::{ORIGINS, REFUSED, UNITS};
 
-/// Tokens of `s`, split at spaces: a number is a literal, one of `*/^-%@:<>,` a punctuation, anything else an
-/// identifier. Ids count from 1.
-fn toks(s: &str) -> Vec<Tok> {
+/// Tokens of `s`, split at spaces: a number is a literal, one of `*/^-%@:<>,+.=` a punctuation (a word of `.=+-`
+/// alone, `..=` or `+-`, one joint punctuation per character), anything else an identifier. Ids count from 1.
+pub(super) fn toks(s: &str) -> Vec<Tok> {
     let mut words = Vec::new();
     let mut rest = s;
     while let Some(c) = rest.chars().next() {
@@ -29,28 +29,45 @@ fn toks(s: &str) -> Vec<Tok> {
             rest = &rest[end..];
         }
     }
-    words
-        .into_iter()
-        .zip(1..)
-        .map(|(w, id)| {
-            let mut c = w.chars();
-            match (c.next(), c.next()) {
-                (Some(ch), None) if "*/^-%@:<>,".contains(ch) => Tok::Punct {
+    let mut out = Vec::new();
+    let mut id = 1;
+    for w in words {
+        // `..=`, `..`, `+-`: one punctuation per character, joint to the next
+        if w.len() > 1 && w.chars().all(|c| ".=+-".contains(c)) {
+            let n = w.chars().count();
+            for (i, ch) in w.chars().enumerate() {
+                out.push(Tok::Punct {
                     ch,
-                    joint: ch == ':',
+                    joint: i + 1 < n,
                     id,
-                },
-                (Some(ch), _) if ch.is_ascii_digit() || ch == '"' => Tok::Lit {
-                    text: w.to_owned(),
-                    id,
-                },
-                _ => Tok::Ident {
-                    text: w.to_owned(),
-                    id,
-                },
+                });
+                id += 1;
             }
-        })
-        .collect()
+            continue;
+        }
+        out.push(word(w, id));
+        id += 1;
+    }
+    out
+}
+
+fn word(w: &str, id: usize) -> Tok {
+    let mut c = w.chars();
+    match (c.next(), c.next()) {
+        (Some(ch), None) if "*/^-%@:<>,+.=".contains(ch) => Tok::Punct {
+            ch,
+            joint: ch == ':',
+            id,
+        },
+        (Some(ch), _) if ch.is_ascii_digit() || ch == '"' => Tok::Lit {
+            text: w.to_owned(),
+            id,
+        },
+        _ => Tok::Ident {
+            text: w.to_owned(),
+            id,
+        },
+    }
 }
 
 fn lit(s: &str) -> Literal {

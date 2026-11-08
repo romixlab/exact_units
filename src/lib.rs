@@ -56,6 +56,7 @@ struct ReadmeDoctests;
 mod book;
 
 pub mod complex;
+mod contains;
 mod conv_error;
 pub mod cordic;
 pub mod decibel;
@@ -97,6 +98,7 @@ pub use complex::{CQ15, CQ31};
 pub use complex::{
     Complex, ComplexStorage, Extended, Interleaved, IqStorage, Mac, NormStorage, Polar,
 };
+pub use contains::Contains;
 #[doc(hidden)]
 pub use exact::Fraction8;
 #[doc(hidden)]

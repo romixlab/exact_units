@@ -74,6 +74,16 @@ use exact_units::{Fixed, fixed, prefix::Pow2, units::Ratio};
 const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1);
 ```
 
+The ends of a `q!` range follow the same rule. An end that is no stored value is a compile error naming the stored values around it, until the range says which way the end moves, `Inside` or `Outside` ([Ranges and tolerances](literals.md#ranges-and-tolerances)):
+
+```rust,compile_fail
+# #[cfg(feature = "electrical")] {
+use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+let _ = Fixed::<Volt, Milli, i16>::new(4_900).is_in(q!(4.9005 V ..= 5.1 V)); // Inside or Outside?
+# }
+# #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+```
+
 ## 3. Every lossy step is named
 
 Losing part of a value is often what you want. Then the code says how. `Rounding` has no default, so a rounding call always names its mode:

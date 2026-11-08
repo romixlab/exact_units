@@ -1,0 +1,71 @@
+error: q!: the upper end is below the lower one: write the lower end first, q!(4.9 V ..= 5.1 V)
+ --> tests/compile_fail/q_range_grammar.rs:6:22
+  |
+6 |     let _ = q!(5.1 V ..= 4.9 V);
+  |                      ^
+
+error: q!: a range `a .. a` holds nothing: write `..=` for a itself, or v == q!(..)
+ --> tests/compile_fail/q_range_grammar.rs:7:20
+  |
+7 |     let _ = q!(5 V .. 5 V);
+  |                    ^
+
+error: q!: a range has a lower end: q!(4.9 V ..= 5.1 V); for an upper bound alone write v <= q!(5.1 V)
+ --> tests/compile_fail/q_range_grammar.rs:8:16
+  |
+8 |     let _ = q!(..= 5 V);
+  |                ^
+
+error: q!: a part of a ratio reads two ways, of the nominal or as points of it (5 % +- 1 % is 4.95 % ..= 5.05 % or 4 % ..= 6 %): write the ends, q!(4 % ..= 6 %)
+ --> tests/compile_fail/q_range_grammar.rs:9:20
+  |
+9 |     let _ = q!(5 % +- 1 %);
+  |                    ^
+
+error: q!: a part of a point means nothing (1 % of 25 °C depends on the origin): write the tolerance in the point's unit, q!(25 degC +- 0.5)
+  --> tests/compile_fail/q_range_grammar.rs:10:24
+   |
+10 |     let _ = q!(25 degC +- 1 %);
+   |                        ^
+
+error: q!: a part of a nominal of 0 is 0: write the tolerance in the nominal's unit
+  --> tests/compile_fail/q_range_grammar.rs:11:20
+   |
+11 |     let _ = q!(0 V +- 1 %);
+   |                    ^
+
+error: q!: a tolerance is in the nominal's unit (5 V +- 50 mV) or a part of it (5 V +- 1 %): for other units write the ends, q!(4.95 V ..= 5.05 V)
+  --> tests/compile_fail/q_range_grammar.rs:12:21
+   |
+12 |     let _ = q!(1 in +- 0.1 mm);
+   |                     ^
+
+error: q!: a tolerance's amount is at least 0, its sign in `+` and `-`: q!(5 V +1 % -2 %)
+  --> tests/compile_fail/q_range_grammar.rs:13:20
+   |
+13 |     let _ = q!(5 V +- -1 %);
+   |                    ^
+
+error: q!: a tolerance is `+-` and its amount (q!(5 V +- 1 %)), or `+` and `-` with one each (q!(5 V +1 % -2 %))
+  --> tests/compile_fail/q_range_grammar.rs:14:20
+   |
+14 |     let _ = q!(5 V + 1 %);
+   |                    ^
+
+error: q!: `Inside` and `Outside` are for a range's ends: q!(4.91 V ..= 4.99 V, Inside); a literal alone has no ends to move
+  --> tests/compile_fail/q_range_grammar.rs:15:21
+   |
+15 |     let _ = q!(5 V, Inside);
+   |                     ^^^^^^
+
+error: q!: after the `,` of a range comes `Inside` (each inexact end moves inward) or `Outside` (outward)
+  --> tests/compile_fail/q_range_grammar.rs:16:33
+   |
+16 |     let _ = q!(4.9 V ..= 5.1 V, Middle);
+   |                                 ^^^^^^
+
+error: q!: a range has two amounts or two points at one origin, not one of each: q!(20 degC ..= 25 degC)
+  --> tests/compile_fail/q_range_grammar.rs:17:24
+   |
+17 |     let _ = q!(20 degC ..= 25 K);
+   |                        ^

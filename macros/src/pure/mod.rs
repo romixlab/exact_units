@@ -8,9 +8,12 @@ pub(crate) mod grammar;
 pub(crate) mod model;
 pub(crate) mod number;
 pub(crate) mod prefix;
+pub(crate) mod range;
 pub(crate) mod resolve;
 pub(crate) mod strlex;
 pub(crate) mod table;
 
+#[cfg(test)]
+mod range_tests;
 #[cfg(test)]
 mod tests;

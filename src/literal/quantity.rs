@@ -174,7 +174,7 @@ pub(super) struct Cut {
 }
 
 /// `x` of `S` in steps of `P · U`, exact ([cut_scale]).
-const fn cut<S: Unit, U: Unit, P: FixedScale>(x: Decimal) -> Cut {
+pub(super) const fn cut<S: Unit, U: Unit, P: FixedScale>(x: Decimal) -> Cut {
     // the units are checked for every literal, 0 too
     cut_scale(x, scale_in::<S, U, P>())
 }
@@ -405,8 +405,8 @@ literal_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
 /// largest finite float above it), `exact` whether it is that float.
 #[derive(Copy, Clone)]
 pub(super) struct Below<F> {
-    down: F,
-    exact: bool,
+    pub(super) down: F,
+    pub(super) exact: bool,
 }
 
 macro_rules! literal_cmp_float {
@@ -600,6 +600,10 @@ literal_cmp_float! {
 ///
 /// A point literal names an origin, and compares with a [Point](crate::Point) instead: `q!(25 degC)`, `q!(77 degF)`,
 /// `q!(25 "°C")`, `q!(298.15 K @ AbsoluteZero)`, `q!(77 @ Fahrenheit)` (see [point](crate::literal::point)).
+///
+/// A range is two literals or a nominal and a tolerance, checked with `is_in`: `q!(4.9 V ..= 5.1 V)`, `q!(4.9 V ..
+/// 5.1 V)`, `q!(5 V +- 1 %)`, `q!(5 V +2 % -1 %)`, `q!(4.91 V ..= 4.99 V, Inside)` (see
+/// [range](crate::literal::range)).
 #[macro_export]
 macro_rules! q {
     ($($t:tt)*) => { $crate::__macros::q!($crate; $($t)*) };
@@ -922,7 +926,7 @@ macro_rules! __q_customary {
     clippy::panic,
     reason = "a compile error in const code (a panic at run time): a literal no Fraction is"
 )]
-const fn fraction<S: Unit, U: Unit>(x: Decimal) -> Fraction {
+pub(super) const fn fraction<S: Unit, U: Unit>(x: Decimal) -> Fraction {
     let scale = scale_in::<S, U, One>();
     assert!(
         scale.is_rational(),

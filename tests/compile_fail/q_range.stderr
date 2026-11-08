@@ -1,0 +1,263 @@
+error[E0080]: evaluation panicked: the lower end of this range is no stored value: the stored values around it are 4900 = 4.9 V and 4901 = 4.901 V; write the range with `, Inside` (each end that is no stored value moves inward: the stored values within it) or `, Outside` (outward: the fewest stored values that cover it), q!(.., Inside)
+ --> src/literal/range.rs
+  |
+  |                     Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, OPEN, FIT)
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<49005, -4, exact_units::units::Volt>, exact_units::literal::LiteralIn<5, 0, exact_units::units::Volt>, false, 0> as exact_units::Contains<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Milli, i16>>>::contains::{constant#0}` failed inside this call
+...
+  | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+  |
+note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Milli, i16>>::fold_range::<Volt, Volt>`
+ --> src/literal/range.rs
+  |
+  |                   let (a, b) = fold_int(
+  |  ______________________________^
+  | |                     &[(cut::<Lo, U, P>(lo), ls, lu.as_str()), (cut::<Hi, U, P>(hi), hs, hu.as_str())],
+  | |                     open,
+  | |                     fit,
+  | |                     min,
+  | |                     max,
+  | |                 );
+  | |_________________^
+...
+  |   range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::fold_int`
+ --> src/literal/range.rs
+  |
+  |             _ => refuse_range_end(false, lo.floor, lo_step, lo_unit),
+  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::steps::refuse_range_end`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+ --> src/literal/range.rs
+  |
+  |                   let (lo, hi) = const {
+  |  ________________________________^
+  | |                     Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, OPEN, FIT)
+  | |                 };
+  | |_________________^
+...
+  |   range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ----------------------------------------- in this macro invocation
+  |
+  = note: this note originates in the macro `range_int` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn <LiteralRange<LiteralIn<49005, -4, Volt>, LiteralIn<5, 0, Volt>, false, 0> as Contains<Fixed<Volt, exact_units::prefix::Milli, i16>>>::contains`
+ --> src/contains.rs
+  |
+  |         set.contains(self)
+  |         ^^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: the upper end of this range is no stored value: the stored values around it are 5000 = 5 V and 5001 = 5.001 V; write the range with `, Inside` (each end that is no stored value moves inward: the stored values within it) or `, Outside` (outward: the fewest stored values that cover it), q!(.., Inside)
+ --> src/literal/range.rs
+  |
+  |                     Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, OPEN, FIT)
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<49, -1, exact_units::units::Volt>, exact_units::literal::LiteralIn<50005, -4, exact_units::units::Volt>, false, 0> as exact_units::Contains<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Milli, i16>>>::contains::{constant#0}` failed inside this call
+...
+  | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+  |
+note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Milli, i16>>::fold_range::<Volt, Volt>`
+ --> src/literal/range.rs
+  |
+  |                   let (a, b) = fold_int(
+  |  ______________________________^
+  | |                     &[(cut::<Lo, U, P>(lo), ls, lu.as_str()), (cut::<Hi, U, P>(hi), hs, hu.as_str())],
+  | |                     open,
+  | |                     fit,
+  | |                     min,
+  | |                     max,
+  | |                 );
+  | |_________________^
+...
+  |   range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::fold_int`
+ --> src/literal/range.rs
+  |
+  |             _ => refuse_range_end(true, hi.floor, hi_step, hi_unit),
+  |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::steps::refuse_range_end`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: the above error was encountered while instantiating `fn <LiteralRange<LiteralIn<49, -1, Volt>, LiteralIn<50005, -4, Volt>, false, 0> as Contains<Fixed<Volt, exact_units::prefix::Milli, i16>>>::contains`
+ --> src/contains.rs
+  |
+  |         set.contains(self)
+  |         ^^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: no stored value is in this range: it lies between the stored values 49 = 4.9 V and 50 = 5 V, so the check would never pass
+ --> src/literal/range.rs
+  |
+  |                     Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, OPEN, FIT)
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<491, -2, exact_units::units::Volt>, exact_units::literal::LiteralIn<499, -2, exact_units::units::Volt>, false, 1> as exact_units::Contains<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Deci, i16>>>::contains::{constant#0}` failed inside this call
+...
+  | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+  |
+note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Deci, i16>>::fold_range::<Volt, Volt>`
+ --> src/literal/range.rs
+  |
+  |                   let (a, b) = fold_int(
+  |  ______________________________^
+  | |                     &[(cut::<Lo, U, P>(lo), ls, lu.as_str()), (cut::<Hi, U, P>(hi), hs, hu.as_str())],
+  | |                     open,
+  | |                     fit,
+  | |                     min,
+  | |                     max,
+  | |                 );
+  | |_________________^
+...
+  |   range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::fold_int`
+ --> src/literal/range.rs
+  |
+  |         refuse_range_empty(between, hi_step, hi_unit);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `literal::steps::refuse_range_empty`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: the above error was encountered while instantiating `fn <LiteralRange<LiteralIn<491, -2, Volt>, LiteralIn<499, -2, Volt>, false, 1> as Contains<Fixed<Volt, exact_units::prefix::Deci, i16>>>::contains`
+ --> src/contains.rs
+  |
+  |         set.contains(self)
+  |         ^^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: every value of this storage and its bounds is in this range, so the check would never fail: check the unit and the scale, or drop the check
+ --> src/literal/range.rs
+  |
+  |                     Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, OPEN, FIT)
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<0, 0, exact_units::units::Volt>, exact_units::literal::LiteralIn<5, 0, exact_units::units::Volt>, false, 0> as exact_units::Contains<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Milli, u8>>>::contains::{constant#0}` failed inside this call
+...
+  | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
+  |
+note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Milli, u8>>::fold_range::<Volt, Volt>`
+ --> src/literal/range.rs
+  |
+  |                   let (a, b) = fold_int(
+  |  ______________________________^
+  | |                     &[(cut::<Lo, U, P>(lo), ls, lu.as_str()), (cut::<Hi, U, P>(hi), hs, hu.as_str())],
+  | |                     open,
+  | |                     fit,
+  | |                     min,
+  | |                     max,
+  | |                 );
+  | |_________________^
+...
+  |   range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  |   ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::fold_int`
+ --> $RUST/core/src/panic.rs
+  |
+  |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/range.rs
+  |
+  | /     assert!(
+  | |         !(lo_c == min && hi_c == max),
+  | |         "every value of this storage and its bounds is in this range, so the check would never fail: check the unit and the scale...
+  | |     );
+  | |_____- in this macro invocation
+
+note: the above error was encountered while instantiating `fn <LiteralRange<LiteralIn<0, 0, Volt>, LiteralIn<5, 0, Volt>, false, 0> as Contains<Fixed<Volt, exact_units::prefix::Milli, u8>>>::contains`
+ --> src/contains.rs
+  |
+  |         set.contains(self)
+  |         ^^^^^^^^^^^^^^^^^^
+
+error[E0080]: evaluation panicked: the lower end of this range is no float of the storage: the floats around it are 0.0999999940395355224609375 V and 0.100000001490116119384765625 V; write the range with `, Inside` (each end that is no stored value moves inward: the stored values within it) or `, Outside` (outward: the fewest stored values that cover it), q!(.., Inside)
+ --> src/literal/range.rs
+  |
+  |                       Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, OPEN, FIT)
+  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<1, -1, exact_units::units::Volt>, exact_units::literal::LiteralIn<2, -1, exact_units::units::Volt>, false, 0> as exact_units::Contains<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::One, f32>>>::contains::{constant#0}` failed inside this call
+...
+  | / range_float! {
+  | |     f32 float_end_f32;
+  | |     f64 float_end_f64;
+  | | }
+  | |_- in this macro invocation
+  |
+note: inside `exact_units::literal::range::<impl Fixed<Volt, One, f32>>::fold_range::<Volt, Volt>`
+ --> src/literal/range.rs
+  |
+  |                               $end(false, l.down, lo.num() < 0, scale_in::<Lo, U, P>(), u.as_str())
+  |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | / range_float! {
+  | |     f32 float_end_f32;
+  | |     f64 float_end_f64;
+  | | }
+  | |_- in this macro invocation
+note: inside `exact_units::literal::range::float_end_f32`
+ --> src/literal/range.rs
+  |
+  | /     refuse_range_float_end(
+  | |         upper,
+  | |         neg,
+  | |         m.to_bits() as u128,
+... |
+  | |         unit,
+  | |     )
+  | |_____^
+note: inside `literal::steps::refuse_range_float_end`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/literal/steps.rs
+  |
+  |     panic!("{}", t.as_str())
+  |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+ --> src/literal/range.rs
+  |
+  |                   let (lo, hi) = const {
+  |  ________________________________^
+  | |                     Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, OPEN, FIT)
+  | |                 };
+  | |_________________^
+...
+  | / range_float! {
+  | |     f32 float_end_f32;
+  | |     f64 float_end_f64;
+  | | }
+  | |_- in this macro invocation
+  |
+  = note: this note originates in the macro `range_float` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: the above error was encountered while instantiating `fn <LiteralRange<LiteralIn<1, -1, Volt>, LiteralIn<2, -1, Volt>, false, 0> as Contains<Fixed<Volt, One, f32>>>::contains`
+ --> src/contains.rs
+  |
+  |         set.contains(self)
+  |         ^^^^^^^^^^^^^^^^^^

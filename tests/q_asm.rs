@@ -340,3 +340,39 @@ fn gain_level_is_one_compare() {
         }
     }
 }
+
+/// A `q!` range is the two compares written by hand, `4900 <= t && t <= 5100`, whichever form wrote it; an end past
+/// the storage's range leaves one compare.
+#[test]
+fn range_literal_is_the_hand_written_compares() {
+    let Some(asm) = asm_for("thumbv6m-none-eabi") else {
+        return;
+    };
+    let raw = normalize(&resolve(&asm, "in_range_raw"));
+    assert!(
+        compares(&raw) <= 2,
+        "in_range_raw (4900 <= t && t <= 5100 by hand) should be at most two compares: {raw:#?}"
+    );
+    for name in [
+        "in_range_literal",
+        "in_tolerance_literal",
+        "in_range_inside",
+    ] {
+        assert_eq!(
+            normalize(&resolve(&asm, name)),
+            raw,
+            "{name} should be in_range_raw's body (the hand-written limits), but its asm differs"
+        );
+    }
+    let past = normalize(&resolve(&asm, "in_range_past"));
+    assert_eq!(
+        past,
+        normalize(&resolve(&asm, "at_least_raw")),
+        "in_range_past (q!(4.9 V ..= 40 V), the upper end past i16) should be at_least_raw's body"
+    );
+    assert_eq!(
+        compares(&past),
+        1,
+        "in_range_past should be one compare: {past:#?}"
+    );
+}

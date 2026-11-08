@@ -54,6 +54,8 @@ fn compile_fail_q() {
     t.pass("tests/compile_fail/pass_marker.rs");
     t.compile_fail("tests/compile_fail/q_dim_mismatch.rs");
     t.compile_fail("tests/compile_fail/q_float.rs");
+    t.compile_fail("tests/compile_fail/q_range.rs");
+    t.compile_fail("tests/compile_fail/q_range_grammar.rs");
     t.compile_fail("tests/compile_fail/q_symbols.rs");
     t.compile_fail("tests/compile_fail/q_grammar.rs");
     t.compile_fail("tests/compile_fail/q_point.rs");

@@ -1,5 +1,6 @@
 //! A unit, or a whole literal, written in a string: `q!(90 "°")`, `q!("9.81 m/s²")`. A string takes what Rust's
-//! lexer refuses outside one: `°`, `′`, `″`, `²`, `³`, `⁻¹`, `·`, `µ`, `‰`, `℃`.
+//! lexer refuses outside one: `°`, `′`, `″`, `²`, `³`, `⁻¹`, `·`, `µ`, `‰`, `℃`, and `±` of a tolerance
+//! (`q!("5 V ± 1 %")`), lexed as the `+-` written outside a string.
 
 use super::model::{Delim, Error, Tok};
 
@@ -46,10 +47,15 @@ fn number_len(b: &[u8]) -> usize {
                 .count()
         })
     };
-    let mut n = b
-        .iter()
-        .take_while(|c| c.is_ascii_digit() || **c == b'_' || **c == b'.')
-        .count();
+    // a `.` before another is a range's `..`, not the number's point: `4.9..5.1`
+    let mut n = 0;
+    while let Some(&c) = b.get(n) {
+        let range = c == b'.' && b.get(n.saturating_add(1)) == Some(&b'.');
+        if range || !(c.is_ascii_digit() || c == b'_' || c == b'.') {
+            break;
+        }
+        n = n.saturating_add(1);
+    }
     if matches!(b.get(n), Some(b'e' | b'E')) {
         let sign = usize::from(matches!(b.get(n.saturating_add(1)), Some(b'+' | b'-')));
         let first = n.saturating_add(1).saturating_add(sign);
@@ -92,6 +98,36 @@ fn power(
     }
     out.push(Tok::Lit { text, id });
     Ok(())
+}
+
+/// The punctuation of a range or a tolerance in a string, from its first character `c`: `±` as the `+-` written
+/// outside one, `+`, and `..` or `..=`. `false` for a `.` that starts no `..`.
+fn range_punct(
+    c: char,
+    chars: &mut core::iter::Peekable<core::str::CharIndices<'_>>,
+    out: &mut Vec<Tok>,
+    id: usize,
+) -> bool {
+    let mut punct = |ch: char, joint: bool| out.push(Tok::Punct { ch, joint, id });
+    match c {
+        '±' => {
+            punct('+', true);
+            punct('-', false);
+        }
+        '+' => punct('+', chars.peek().is_some_and(|(_, n)| *n == '-')),
+        '.' if chars.peek().is_some_and(|(_, n)| *n == '.') => {
+            chars.next();
+            let incl = chars.peek().is_some_and(|(_, n)| *n == '=');
+            punct('.', true);
+            punct('.', incl);
+            if incl {
+                chars.next();
+                punct('=', false);
+            }
+        }
+        _ => return false,
+    }
+    true
 }
 
 /// The tokens of string `s`, each with id `id` (the string literal's own): numbers as literals, symbols as
@@ -149,6 +185,7 @@ pub(crate) fn lex(s: &str, id: usize) -> Result<Vec<Tok>, Error> {
                 joint: false,
                 id,
             }),
+            '±' | '+' | '.' if range_punct(c, &mut chars, out, id) => {}
             '/' | '^' | '-' | '@' => out.push(Tok::Punct {
                 ch: c,
                 joint: false,

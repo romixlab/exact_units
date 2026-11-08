@@ -11,9 +11,11 @@ mod pure;
 
 use pure::grammar::{self, At, Unit};
 use pure::model::{Delim, Error, Tok};
+use pure::range::{self, Input};
 
-/// `q!($crate; 100 m/s)`: the literal `exact_units::literal::LiteralIn<N, E, Unit>::NEW`. Called by exact_units'
-/// `q!`, which writes the `$crate;` in front.
+/// `q!($crate; 100 m/s)`: the literal `exact_units::literal::LiteralIn<N, E, Unit>::NEW`; a range `q!($crate; 4.9 V
+/// ..= 5.1 V)` is `LiteralRange<Lo, Hi, OPEN, FIT>::NEW` of two such ends, a tolerance alone `LiteralTolerance<A,
+/// FIT>::NEW`. Called by exact_units' `q!`, which writes the `$crate;` in front.
 #[proc_macro]
 pub fn q(input: TokenStream) -> TokenStream {
     let mut trees = input.into_iter();
@@ -26,14 +28,30 @@ pub fn q(input: TokenStream) -> TokenStream {
     }
     let mut side = Side { trees: vec![None] };
     let toks = side.convert(trees.collect());
-    match grammar::literal(&toks, 0) {
-        Ok(lit) => {
+    match range::input(&toks, 0) {
+        Ok(Input::One(lit)) => {
             let mut out = Out::new(&krate);
             match (&lit.at, &lit.unit) {
                 (None, Unit::Level { marker, .. }) => out.level(&lit, marker),
                 (None, _) => out.literal(&lit, &side),
                 (Some(at), _) => out.point(&lit, at, &side),
             }
+            out.ts
+        }
+        Ok(Input::Range { lo, hi, open, fit }) => {
+            let mut out = Out::new(&krate);
+            out.krate("::literal::LiteralRange::<");
+            out.end_type(&lo, &side);
+            out.text(",");
+            out.end_type(&hi, &side);
+            out.text(&format!(", {open}, {}>::NEW", fit.code()));
+            out.ts
+        }
+        Ok(Input::Tolerance { amount, fit }) => {
+            let mut out = Out::new(&krate);
+            out.krate("::literal::LiteralTolerance::<");
+            out.end_type(&amount, &side);
+            out.text(&format!(", {}>::NEW", fit.code()));
             out.ts
         }
         Err(e) => error(&e, &side, "q!"),
@@ -309,6 +327,31 @@ impl<'a> Out<'a> {
         self.text(",");
         self.unit(&lit.unit, side);
         self.text(">");
+    }
+
+    /// The type of one end of a range: `LiteralIn<N, E, Unit>`, `LiteralAt<N, E, Unit, Origin>` or
+    /// `LevelLiteral<N, E, Db>`, no turbofish and no `::NEW`.
+    fn end_type(&mut self, lit: &grammar::Literal, side: &Side) {
+        match (&lit.at, &lit.unit) {
+            (None, Unit::Level { marker, .. }) => {
+                self.krate("::literal::LevelLiteral<");
+                self.number(lit);
+                self.krate(&format!("::{marker}"));
+                self.text(">");
+            }
+            (None, _) => self.literal_type(lit, side),
+            (Some(at), _) => {
+                self.krate("::literal::LiteralAt<");
+                self.number(lit);
+                self.unit(&lit.unit, side);
+                self.text(",");
+                match at {
+                    At::Symbol { path, group, id } => self.marker(path, group, *id, side),
+                    At::Type(ids) => self.tokens(ids, side),
+                }
+                self.text(">");
+            }
+        }
     }
 
     fn unit(&mut self, u: &Unit, side: &Side) {

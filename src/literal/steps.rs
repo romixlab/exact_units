@@ -792,3 +792,123 @@ const fn refuse(src: &Src, pair: Pair) -> ! {
     }
     panic!("{}", t.as_str())
 }
+
+/// Which end of a `q!` range a message is about.
+#[cfg(feature = "q")]
+const fn end_name(upper: bool) -> &'static str {
+    if upper {
+        "the upper end"
+    } else {
+        "the lower end"
+    }
+}
+
+#[cfg(feature = "q")]
+/// `k = decimal unit`, or `k` alone where its value is no finite decimal; whether it was finite.
+const fn push_step(t: &mut Text, k: i128, step: Magnitude, unit: &str) -> bool {
+    t.int(k);
+    match int_decimal(k, step) {
+        Some((m, f)) => {
+            t.push(" = ");
+            t.decimal(k < 0, &m, f);
+            t.push(" ");
+            t.push(unit);
+            true
+        }
+        None => false,
+    }
+}
+
+#[cfg(feature = "q")]
+/// The opt-ins a range's message ends in.
+const fn push_fits(t: &mut Text) {
+    t.push("; write the range with `, Inside` (each end that is no stored value moves inward: the stored values within it) or `, Outside` (outward: the fewest stored values that cover it), q!(.., Inside)");
+}
+
+#[cfg(feature = "q")]
+/// The compile error for an end of a `q!` range on an integer storage between the steps `floor` and `floor + 1`
+/// (`step` in units of `unit`, the end's own), with no `Inside` or `Outside` named.
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "floor < i128::MAX, as cut_scale checks"
+)]
+pub(crate) const fn refuse_range_end(upper: bool, floor: i128, step: Magnitude, unit: &str) -> ! {
+    let mut t = Text::new();
+    t.push(end_name(upper));
+    t.push(" of this range is no stored value: the stored values around it are ");
+    let a = push_step(&mut t, floor, step, unit);
+    t.push(" and ");
+    let b = push_step(&mut t, floor + 1, step, unit);
+    if !(a && b) {
+        t.push(", whose values aren't finite decimals");
+    }
+    push_fits(&mut t);
+    panic!("{}", t.as_str())
+}
+
+#[cfg(feature = "q")]
+/// The compile error for an end of a `q!` range on a float storage between the floats of bits `lo` and `hi` (of
+/// their magnitudes, `neg` for a negative end), with no `Inside` or `Outside` named.
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented"
+)]
+pub(crate) const fn refuse_range_float_end(
+    upper: bool,
+    neg: bool,
+    lo: u128,
+    hi: u128,
+    f: FloatFormat,
+    step: Magnitude,
+    unit: &str,
+) -> ! {
+    let mut t = Text::new();
+    t.push(end_name(upper));
+    t.push(" of this range is no float of the storage");
+    // lo and hi are of |x|: for a negative end, the one nearer zero is the upper one
+    let (x, y) = if neg { (hi, lo) } else { (lo, hi) };
+    if let (Some((a, fa)), Some((b, fb))) = (float_decimal(x, f, step), float_decimal(y, f, step)) {
+        t.push(": the floats around it are ");
+        t.decimal(neg, &a, fa);
+        t.push(" ");
+        t.push(unit);
+        t.push(" and ");
+        t.decimal(neg, &b, fb);
+        t.push(" ");
+        t.push(unit);
+    }
+    push_fits(&mut t);
+    panic!("{}", t.as_str())
+}
+
+#[cfg(feature = "q")]
+/// The compile error for a `q!` range no stored value is in: between the steps `below` and `below + 1` where it
+/// lies inside the storage's range, else past it.
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "below is a stored value, so below + 1 fits i128"
+)]
+pub(crate) const fn refuse_range_empty(between: Option<i128>, step: Magnitude, unit: &str) -> ! {
+    let mut t = Text::new();
+    match between {
+        Some(below) => {
+            t.push("no stored value is in this range: it lies between the stored values ");
+            let _ = push_step(&mut t, below, step, unit);
+            t.push(" and ");
+            let _ = push_step(&mut t, below + 1, step, unit);
+            t.push(", so the check would never pass");
+        }
+        None => t.push(
+            "no stored value is in this range: it lies past the range of the storage and its bounds, so the check would never pass",
+        ),
+    }
+    panic!("{}", t.as_str())
+}

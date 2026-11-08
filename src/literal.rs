@@ -840,12 +840,16 @@ pub mod point;
 #[cfg(feature = "q")]
 pub mod quantity;
 #[cfg(feature = "q")]
+pub mod range;
+#[cfg(feature = "q")]
 pub use level::{Db, LevelLiteral, LevelSymbol, Np};
 #[cfg(feature = "q")]
 pub use point::{LiteralAt, PointUnit, Steps};
 #[cfg(feature = "q")]
 #[doc(hidden)]
 pub use quantity::Unitless;
+#[cfg(feature = "q")]
+pub use range::{LiteralRange, LiteralTolerance};
 
 #[cfg(test)]
 mod tests;

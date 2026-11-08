@@ -280,3 +280,122 @@ pub(crate) fn order_exp(
     }
     panic!("e^y and a too close for 10000 terms")
 }
+
+/// The reference of `q!` ranges (property 31, `q_range.rs`): which stored values a range holds, and when it is
+/// refused.
+#[cfg(all(feature = "q", feature = "electrical"))]
+pub(crate) mod range {
+    /// `t` steps of `num_s / den_s` against `num · 10^exp`, by sign of `t · num_s · 10^-exp − num · den_s` in `i128`;
+    /// `None` where the products don't fit.
+    pub(crate) fn steps_order(
+        t: i128,
+        num_s: i128,
+        den_s: i128,
+        num: i64,
+        exp: i16,
+    ) -> Option<core::cmp::Ordering> {
+        let ten = 10i128.checked_pow(u32::from(exp.unsigned_abs()))?;
+        let (left, right) = if exp >= 0 {
+            (
+                t.checked_mul(num_s)?,
+                i128::from(num).checked_mul(ten)?.checked_mul(den_s)?,
+            )
+        } else {
+            (
+                t.checked_mul(num_s)?.checked_mul(ten)?,
+                i128::from(num).checked_mul(den_s)?,
+            )
+        };
+        Some(left.cmp(&right))
+    }
+
+    /// Whether `num · 10^exp` is a whole number of steps of `num_s / den_s`: `num · 10^exp · den_s / num_s` an integer.
+    pub(crate) fn on_step(num_s: i128, den_s: i128, num: i64, exp: i16) -> Option<bool> {
+        let ten = 10i128.checked_pow(u32::from(exp.unsigned_abs()))?;
+        Some(if exp >= 0 {
+            i128::from(num).checked_mul(ten)?.checked_mul(den_s)? % num_s == 0
+        } else {
+            i128::from(num).checked_mul(den_s)? % ten.checked_mul(num_s)? == 0
+        })
+    }
+
+    /// A `q!` range as the reference reads it: ends `num · 10^exp`, the upper one out for `open`, `fit` 0 (an end off
+    /// the steps refused), 1 (`Inside`) or 2 (`Outside`).
+    #[derive(Copy, Clone, Debug)]
+    pub(crate) struct RangeCase {
+        pub(crate) lo: (i64, i16),
+        pub(crate) hi: (i64, i16),
+        pub(crate) open: bool,
+        pub(crate) fit: u8,
+    }
+
+    /// Whether stored value `t` (steps of `num_s / den_s`) is in range `c`, from its real ends: `Inside` and an end on a
+    /// step are the real interval itself; `Outside` moves an end off the steps to the step past it, so `t` is in where
+    /// `t + 1` is above the lower end (`t − 1` below the upper one). `None` where the reference doesn't fit `i128`.
+    pub(crate) fn range_member(t: i128, num_s: i128, den_s: i128, c: RangeCase) -> Option<bool> {
+        Some(above_lower(t, num_s, den_s, c)? && below_upper(t, num_s, den_s, c)?)
+    }
+
+    /// Whether `t` passes the lower end of `c`, as [range_member] reads it.
+    fn above_lower(t: i128, num_s: i128, den_s: i128, c: RangeCase) -> Option<bool> {
+        use core::cmp::Ordering::{Greater, Less};
+        Some(if c.fit == 2 && !on_step(num_s, den_s, c.lo.0, c.lo.1)? {
+            steps_order(t + 1, num_s, den_s, c.lo.0, c.lo.1)? == Greater
+        } else {
+            steps_order(t, num_s, den_s, c.lo.0, c.lo.1)? != Less
+        })
+    }
+
+    /// Whether `t` passes the upper end of `c`, as [range_member] reads it.
+    fn below_upper(t: i128, num_s: i128, den_s: i128, c: RangeCase) -> Option<bool> {
+        use core::cmp::Ordering::{Greater, Less};
+        let o = steps_order(t, num_s, den_s, c.hi.0, c.hi.1)?;
+        Some(if on_step(num_s, den_s, c.hi.0, c.hi.1)? {
+            if c.open { o == Less } else { o != Greater }
+        } else if c.fit == 2 {
+            steps_order(t - 1, num_s, den_s, c.hi.0, c.hi.1)? == Less
+        } else {
+            o == Less
+        })
+    }
+
+    /// Whether range `c` over the stored values `min ..= max` is refused: an end off the steps strictly inside the
+    /// storage's range with no fit named, no value in it, or every value in it. `None` where the reference doesn't fit.
+    pub(crate) fn range_refused(
+        min: i128,
+        max: i128,
+        num_s: i128,
+        den_s: i128,
+        c: RangeCase,
+    ) -> Option<bool> {
+        use core::cmp::Ordering::{Greater, Less};
+        let inside = |(num, exp): (i64, i16)| -> Option<bool> {
+            Some(
+                !on_step(num_s, den_s, num, exp)?
+                    && steps_order(min, num_s, den_s, num, exp)? == Less
+                    && steps_order(max, num_s, den_s, num, exp)? == Greater,
+            )
+        };
+        let off = c.fit == 0 && (inside(c.lo)? || inside(c.hi)?);
+        // the members are one run of stored values, `first .. past`: below it the lower end fails, from `past` on the
+        // upper one, so a binary search finds both ends
+        let first = first_true(min, max, |t| above_lower(t, num_s, den_s, c))?;
+        let past = first_true(min, max, |t| Some(!below_upper(t, num_s, den_s, c)?))?;
+        let any = first < past;
+        let all = first == min && past == max + 1;
+        Some(off || !any || all)
+    }
+
+    /// The least `t` of `min ..= max` where `p` holds, for a `p` false then true; `max + 1` where it never holds.
+    fn first_true(min: i128, max: i128, p: impl Fn(i128) -> Option<bool>) -> Option<i128> {
+        if !p(max)? {
+            return Some(max + 1);
+        }
+        let (mut lo, mut hi) = (min, max);
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            if p(mid)? { hi = mid } else { lo = mid + 1 }
+        }
+        Some(lo)
+    }
+}

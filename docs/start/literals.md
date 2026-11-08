@@ -374,6 +374,67 @@ assert!(g == q!("9.81 m/s²")); // the whole literal quoted: Rust's lexer refuse
 # }
 ```
 
+### Ranges and tolerances
+
+A limit check is two compares against two numbers that belong together. `q!` writes the pair as one range, so the limits can't drift apart, and `is_in` (or `contains`) checks a value against it:
+
+```rust
+# #[cfg(feature = "electrical")] {
+use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+
+let v = Fixed::<Volt, Milli, i16>::new(4_950); // 4.95 V
+assert!(v.is_in(q!(4.9 V ..= 5.1 V)));   // both ends in
+assert!(v.is_in(q!(4.9 ..= 5.1 V)));     // the unit once, after the last number
+assert!(v.is_in(q!(5 V +- 1 %)));        // 4.95 V ..= 5.05 V: 1 % of the nominal
+assert!(v.is_in(q!(5 V +- 50 mV)));      // the same ends
+assert!(v.is_in(q!(5 V +2 % -1 %)));     // 4.95 V ..= 5.1 V: one amount each way
+assert!(!v.is_in(q!(4.8 V .. 4.95 V)));  // `..`: the upper end out, as in Rust
+assert!(q!(4.9 V ..= 5.1 V).contains(&v));
+# }
+```
+
+- **`+-`, not `±`.** Rust's lexer refuses `±` before any macro sees it, so the tokens spell it `+-`. Inside a string `±` works: `q!("5 V ± 1 %")`.
+- **A tolerance is of the nominal.** `%`, `‰`, `ppm` and `ppb` are parts of the nominal's magnitude; any other amount is in the nominal's unit, up to a prefix (`50 mV` of `5 V`). The macro works the two ends out exactly, as decimals: `5 V +- 1 %` is `4.95 V ..= 5.05 V`.
+- **Two compares on the device.** Each end is folded at compile time to a stored value, so `v.is_in(q!(4.9 V ..= 5.1 V))` is `4900 <= t && t <= 5100`, the same instructions as the limits written by hand. An end past the storage's range drops its compare.
+
+An end that is a stored value is that value. An end that is no stored value doesn't compile, and the error names the stored values around it with their decimals: 4.9005 V lies between `4900 = 4.9 V` and `4901 = 4.901 V` of a storage in mV. The literal then says which way the end moves, as [rule 3](exact.md#3-every-lossy-step-is-named) asks of every lossy step:
+
+```rust
+# #[cfg(feature = "electrical")] {
+use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+
+let v = Fixed::<Volt, Milli, i16>::new(4_900);
+// Inside: each such end moves inward, so the range holds the stored values within the real one
+assert!(!v.is_in(q!(4.9005 V ..= 5.1 V, Inside)));
+// Outside: each such end moves outward, the fewest stored values that cover the real range
+assert!(v.is_in(q!(4.9005 V ..= 5.1 V, Outside)));
+# }
+```
+
+```rust,compile_fail
+# #[cfg(feature = "electrical")] {
+use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+let _ = Fixed::<Volt, Milli, i16>::new(4_900).is_in(q!(4.9005 V ..= 5.1 V)); // Inside or Outside?
+# }
+# #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+```
+
+A float storage works the same way, with the floats around an end that is no float of it. An `Exact` needs neither word: every decimal is a fraction of it, so its ends are always exact.
+
+A range no stored value is in, and one every value of the type is in, don't compile either: a check that can never pass or never fail is almost always a wrong unit or scale. A `u8` of mV ends at 255 mV, so every one of its values is in `0 V ..= 5 V`:
+
+```rust,compile_fail
+# #[cfg(feature = "electrical")] {
+use exact_units::{Fixed, q, prefix::Milli, units::Volt};
+let _ = Fixed::<Volt, Milli, u8>::new(100).is_in(q!(0 V ..= 5 V)); // always true
+# }
+# #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+```
+
+The macro refuses what reads two ways. `q!(5 % +- 1 %)` could be 1 % of 5 % or one percentage point, so it asks for the ends. A part of a point means nothing (1 % of 25 °C depends on the origin), nor does a part of a level. Write `q!(4 % ..= 6 %)` or `q!(25 degC +- 0.5)` instead.
+
+NaN is in no range. "Not in it" is the safe answer whichever way a check branches, so a float that may be NaN has `is_in` too, and it gives `false` for NaN.
+
 ### Refused symbols
 
 A symbol that reads two ways doesn't compile, and names both readings so the fix is one copy-paste away: see

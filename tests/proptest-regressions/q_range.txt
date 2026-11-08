@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 8a9c25db06fc4352a2247cbb41047673ef3937f622cb474a9923f63f45fde5b9 # shrinks to t = 0, u = 0, c = RangeCase { lo: (-1, 0), hi: (-1, -2), open: false, fit: 2 }

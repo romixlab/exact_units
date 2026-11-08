@@ -99,3 +99,43 @@ pub fn gain_f32_below_level(gain: GainF32) -> bool {
 pub fn gain_f32_at_most_raw(gain: GainF32) -> bool {
     gain.get() <= f32::from_bits(0x3f35_3bef)
 }
+
+/// A voltage in steps of 1 mV.
+pub type MilliVolt = Fixed<Volt, exact_units::prefix::Milli, i16>;
+
+/// `v.is_in(q!(4.9 V ..= 5.1 V))`: `4900 <= v && v <= 5100`.
+#[unsafe(no_mangle)]
+pub fn in_range_literal(v: MilliVolt) -> bool {
+    v.is_in(q!(4.9 V ..= 5.1 V))
+}
+
+/// `v.is_in(q!(5 V +- 2 %))`: the same two ends, worked out by the macro.
+#[unsafe(no_mangle)]
+pub fn in_tolerance_literal(v: MilliVolt) -> bool {
+    v.is_in(q!(5 V +- 2 %))
+}
+
+/// Ends between two steps moved inward: 4.8995 V and 5.1005 V are the same two stored values again.
+#[unsafe(no_mangle)]
+pub fn in_range_inside(v: MilliVolt) -> bool {
+    v.is_in(q!(4.8995 V ..= 5.1005 V, Inside))
+}
+
+/// The limits written by hand on the stored value, `4900 <= t && t <= 5100`.
+#[unsafe(no_mangle)]
+pub fn in_range_raw(v: MilliVolt) -> bool {
+    let t = v.get();
+    (4900..=5100).contains(&t)
+}
+
+/// An upper end past `i16`'s range (32.767 V): only the lower compare is left.
+#[unsafe(no_mangle)]
+pub fn in_range_past(v: MilliVolt) -> bool {
+    v.is_in(q!(4.9 V ..= 40 V))
+}
+
+/// `v >= 4900` by hand.
+#[unsafe(no_mangle)]
+pub fn at_least_raw(v: MilliVolt) -> bool {
+    v.get() >= 4900
+}
