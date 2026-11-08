@@ -81,7 +81,7 @@ pub(crate) fn prefix(
     }
     match fit {
         Fit::Exact => {}
-        Fit::Inside | Fit::Outside => {
+        Fit::Inside | Fit::Outside | Fit::Prefix => {
             return Err(Error::at(
                 fit_id,
                 "a prefix holds exactly the stored values whose digits start so, nothing to move: drop the `, Inside` or `, Outside`",
@@ -126,7 +126,7 @@ pub(crate) fn prefix(
             hi: near,
             lo_open: true,
             open: false,
-            fit: Fit::Inside,
+            fit: Fit::Prefix,
         }
     } else {
         Input::Range {
@@ -134,7 +134,7 @@ pub(crate) fn prefix(
             hi: far,
             lo_open: false,
             open: true,
-            fit: Fit::Inside,
+            fit: Fit::Prefix,
         }
     })
 }

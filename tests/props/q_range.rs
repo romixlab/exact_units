@@ -10,7 +10,7 @@
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
 
-use crate::reference::range::{RangeCase, prefix_member, range_member, range_refused};
+use crate::reference::range::{RangeCase, cut_decimal, prefix_member, range_member, range_refused};
 use exact_units::literal::Decimal;
 use exact_units::prefix::{Centi, Deci, Milli, Rational};
 use exact_units::units::Meter;
@@ -248,7 +248,122 @@ mod tests {
         }
     }
 
-    /// Every stored value of an `i16` of mV against `q!` ranges, each form, by the reference.
+    /// Stored values of an `i16` of mV through `assert_in!`'s check against `q!` prefixes (its `const fn`, at
+    /// run time, where its refusal is a panic): it passes exactly the members, and the message of every other names
+    /// the value's decimal and the prefix of the same places it has, which holds it. Against a range that is no
+    /// prefix, the message names the stored values it holds.
+    #[test]
+    fn assert_in_prefix_walks_i16() {
+        type Mv = Fixed<Volt, Milli, i16>;
+        // every value from -13 V to 13 V, around every prefix's ends, and every 61st past them: a refusal unwinds,
+        // and 400 000 of them in a debug build take half a minute
+        let near = -13_000..=13_000;
+        let far = (i16::MIN..=i16::MAX)
+            .step_by(61)
+            .filter(|t| !near.contains(t));
+        for t in near.clone().chain(far).chain([i16::MIN, i16::MAX]) {
+            let v = Mv::new(t);
+            let t = i128::from(t);
+            assert_in_prefix(t, 1, 1000, (495, 2, false), "V", move || {
+                v.assert_in_const(q!(4.95...V))
+            });
+            assert_in_prefix(t, 1, 1000, (495, 2, true), "V", move || {
+                v.assert_in_const(q!(-4.95...V))
+            });
+            assert_in_prefix(t, 1, 1000, (5, 1, false), "V", move || {
+                v.assert_in_const(q!(0.5...V))
+            });
+            assert_in_prefix(t, 1, 1000, (12_345, 3, false), "V", move || {
+                v.assert_in_const(q!(12.345...V))
+            });
+            let range =
+                crate::panics::outcome(move || v.assert_in_const(q!(4.9 V .. 5.1 V, Inside)));
+            match range {
+                Ok(_) => assert!((4900..5100).contains(&t), "{t}"),
+                Err(msg) => assert!(
+                    !(4900..5100).contains(&t)
+                        && msg.contains("it holds 4900 = 4.9 V ..= 5099 = 5.099 V"),
+                    "{t}: {msg}"
+                ),
+            }
+            // q! takes the SI prefix into the decimal: the message names volts, 4 places
+            assert_in_prefix(t, 1, 1000, (49_500, 4, false), "V", move || {
+                v.assert_in_const(q!(4950.0...mV))
+            });
+        }
+    }
+
+    /// Every stored value of an `i8` of thirds of a metre, whose decimals don't end: the message cuts the value
+    /// after 12 more places than the prefix's, `…` after it.
+    #[test]
+    fn assert_in_prefix_walks_every_third() {
+        type Thirds = Fixed<Meter, Rational<1, 3>, i8>;
+        for t in i8::MIN..=i8::MAX {
+            let v = Thirds::new(t);
+            let t = i128::from(t);
+            assert_in_prefix(t, 1, 3, (3, 1, false), "m", move || {
+                v.assert_in_const(q!(0.3...m))
+            });
+            assert_in_prefix(t, 1, 3, (1666, 2, true), "m", move || {
+                v.assert_in_const(q!(-16.66...m))
+            });
+        }
+    }
+
+    /// `check()` passes where stored value `t` (steps of `num_s / den_s`) has the prefix `(digits, places,
+    /// negative)` by the reference; elsewhere it fails, its message naming `t`'s decimal (cut 12 places past the
+    /// prefix's, `…` where that cut anything) and the prefix of `places` places that `t` has, unless that one is
+    /// `-0.0..`, which reads two ways.
+    fn assert_in_prefix<F>(
+        t: i128,
+        num_s: i128,
+        den_s: i128,
+        (digits, places, negative): (i64, u32, bool),
+        unit: &str,
+        check: impl FnOnce() -> F + core::panic::UnwindSafe,
+    ) {
+        let want = prefix_member(t, num_s, den_s, digits, places, negative).unwrap_or_default();
+        let Err(msg) = crate::panics::outcome(check) else {
+            assert!(
+                want,
+                "{t} passed, the reference has no prefix {digits} there"
+            );
+            return;
+        };
+        assert!(
+            !want,
+            "{t} failed, the reference has the prefix {digits}: {msg}"
+        );
+        let (value, exact) = cut_decimal(t, num_s, den_s, places + 12).unwrap_or_default();
+        let value = if exact {
+            let v = value.trim_end_matches('0');
+            v.strip_suffix('.').unwrap_or(v).to_string()
+        } else {
+            format!("{value}…")
+        };
+        assert!(
+            msg.contains(&format!("it is {value} {unit},")),
+            "{t}: {msg}"
+        );
+        let (cut, _) = cut_decimal(t, num_s, den_s, places).unwrap_or_default();
+        let negative = cut.starts_with('-');
+        if negative && cut.chars().all(|c| matches!(c, '-' | '0' | '.')) {
+            assert!(msg.contains("nearer 0 than a prefix"), "{t}: {msg}");
+        } else {
+            assert!(msg.contains(&format!(" q!({cut}... {unit})")), "{t}: {msg}");
+            let n: i64 = cut
+                .trim_start_matches('-')
+                .replace('.', "")
+                .parse()
+                .unwrap_or_default();
+            assert_eq!(
+                prefix_member(t, num_s, den_s, n, places, negative),
+                Some(true),
+                "{t}: {msg}"
+            );
+        }
+    }
+
     #[test]
     fn q_walks_every_i16() {
         type Mv = Fixed<Volt, Milli, i16>;

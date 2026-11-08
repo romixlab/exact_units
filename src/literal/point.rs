@@ -68,7 +68,8 @@ use core::cmp::Ordering;
 use core::marker::PhantomData;
 
 use super::quantity::{AtMost, Cut, cut_scale};
-use super::range::LiteralRange;
+use super::range::{About, Folded, LiteralRange, prefix_places};
+use super::steps::Shown;
 use super::{Decimal, scale_in};
 use crate::conv_error::Symbol;
 use crate::point::{Linear, Modulus, Origin, Point};
@@ -445,6 +446,53 @@ macro_rules! point_range {
                     fit,
                 )
             }
+
+            /// What [assert_in](crate::assert_in) calls in its `const` block: `self` where it is in `range`, else a
+            /// panic that names it and the range's ends in the point's own frame, a compile error there.
+            #[doc(hidden)]
+            #[must_use]
+            #[expect(clippy::allow_attributes, reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact")]
+            #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable")]
+            pub const fn assert_in_const<R: Folded<Self, T = $ty> + Copy>(self, range: R) -> Self {
+                let _ = range;
+                let (lo, hi) = R::ENDS;
+                let t = self.raw();
+                if !(lo <= t && t <= hi) {
+                    #[allow(clippy::cast_lossless, reason = "every integer storage widens into i128")]
+                    R::ABOUT.refuse(Shown::Steps(t as i128), Shown::Steps(lo as i128), Shown::Steps(hi as i128));
+                }
+                self
+            }
+        }
+
+        impl<O, U, P, B, S1, L1, S2, L2, const N1: i64, const E1: i16, const N2: i64, const E2: i16, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8>
+            Folded<Point<O, Fixed<U, P, $ty, B>>>
+            for LiteralRange<LiteralAt<N1, E1, S1, L1>, LiteralAt<N2, E2, S2, L2>, LO_OPEN, HI_OPEN, FIT>
+        where
+            O: Origin<Unit = U, Modulus = Linear>,
+            L1: Origin<Unit = U, Reference = O::Reference, Modulus = Linear>,
+            L2: Origin<Unit = U, Reference = O::Reference, Modulus = Linear>,
+            U: Unit,
+            P: FixedScale,
+            B: Bounds<$ty>,
+            S1: PointUnit<L1>,
+            S2: PointUnit<L2>,
+        {
+            type T = $ty;
+
+            const ENDS: ($ty, $ty) = Point::<O, Fixed<U, P, $ty, B>>::fold_range_at::<S1, L1, S2, L2>(
+                Decimal::new(N1, E1),
+                Decimal::new(N2, E2),
+                [LO_OPEN, HI_OPEN],
+                FIT,
+            );
+
+            // named in the point's own frame, as the messages of the fold are
+            const ABOUT: About = About::of(
+                P::SCALE,
+                Symbol::at(U::EXPR, O::NAME),
+                prefix_places(FIT, Decimal::new(N1, E1), Decimal::new(N2, E2)),
+            );
         }
 
         impl<O, U, P, B, S1, L1, S2, L2, const N1: i64, const E1: i16, const N2: i64, const E2: i16, const LO_OPEN: bool, const HI_OPEN: bool, const FIT: u8>
@@ -462,14 +510,7 @@ macro_rules! point_range {
         {
             #[inline]
             fn contains(&self, p: &Point<O, Fixed<U, P, $ty, B>>) -> bool {
-                let (lo, hi) = const {
-                    Point::<O, Fixed<U, P, $ty, B>>::fold_range_at::<S1, L1, S2, L2>(
-                        Decimal::new(N1, E1),
-                        Decimal::new(N2, E2),
-                        [LO_OPEN, HI_OPEN],
-                        FIT,
-                    )
-                };
+                let (lo, hi) = <Self as Folded<Point<O, Fixed<U, P, $ty, B>>>>::ENDS;
                 let t = p.raw();
                 lo <= t && t <= hi
             }

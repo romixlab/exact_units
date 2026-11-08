@@ -490,6 +490,39 @@ let _ = Fixed::<Volt, Milli, i16>::new(5_000).is_in(q!(5... V)); // 5 to 6, or 5
 # #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
 ```
 
+### Checked at compile time
+
+`is_in` runs at run time, so against a wrong prefix it is just `false`. Where the value is a constant, as in an example or a doctest, `assert_in!` checks it in a `const` block instead: a value outside the range doesn't compile, and the error says what the value is. It gives the value back, so it can build a `const` too:
+
+```rust
+# #[cfg(feature = "electrical")] {
+use exact_units::{Exact, Fixed, assert_in, q, prefix::Milli, units::Volt};
+
+const V: Fixed<Volt, Milli, i32> = Fixed::new(9_542);
+assert_in!(V, q!(9.54... V));
+assert_in!(V, q!(9.5 V ..= 9.6 V));
+type MilliVolts = Fixed<Volt, Milli, i32>;
+const SUPPLY: MilliVolts = assert_in!(MilliVolts::new(4_950), q!(5 V +- 1 %)); // the type named: a method picks the storage
+assert_in!(Exact::<Volt>::new(1, 3), q!(0.333... V)); // an exact fraction too
+# let _ = SUPPLY;
+# }
+```
+
+- **A wrong prefix shows the digits.** `assert_in!(V, q!(9.55... V))` fails with `assert_in!: the value is not in this prefix of digits: it is 9.542 V, its first 2 decimals are q!(9.54... V)`, ready to paste. A value whose decimal goes on is cut 12 places past the prefix's own and ends in `…`.
+- **Any other range shows its ends.** `assert_in!(V, q!(9.6 V ..= 10 V))` fails with `assert_in!: the value 9542 = 9.542 V is not in this range: it holds 9600 = 9.6 V ..= 10000 = 10 V`: the stored values the range holds once folded, so an `Inside` or `Outside` that moved an end shows where to.
+- **The digits are in the literal's unit.** `q!` takes an SI prefix into the number, so `q!(4950.0... mV)` is named in volts, with 4 places. A point is named in its own frame, as the fold's other errors name it.
+- **For every value kind.** `Fixed` of each storage, integer and float, `Exact` and `Point` values. A level range, `q!(9.54... dB)` against a gain, shows the gains it holds and the value's gain, not its digits in dB: those take a logarithm, which isn't worked out at compile time.
+- **Only constants.** A value known at run time doesn't compile in `assert_in!`; that is `is_in`'s job.
+
+```rust,compile_fail
+# #[cfg(feature = "electrical")] {
+use exact_units::{Fixed, assert_in, q, prefix::Milli, units::Volt};
+const V: Fixed<Volt, Milli, i32> = Fixed::new(9_542);
+assert_in!(V, q!(9.55... V)); // it is 9.542 V, its first 2 decimals are q!(9.54... V)
+# }
+# #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
+```
+
 ### Refused symbols
 
 A symbol that reads two ways doesn't compile, and names both readings so the fix is one copy-paste away: see

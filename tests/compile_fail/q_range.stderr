@@ -1,8 +1,8 @@
 error[E0080]: evaluation panicked: the lower end of this range is no stored value: the stored values around it are 4900 = 4.9 V and 4901 = 4.901 V; write the range with `, Inside` (each end that is no stored value moves inward: the stored values within it) or `, Outside` (outward: the fewest stored values that cover it), q!(.., Inside)
  --> src/literal/range.rs
   |
-  |                     Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT)
-  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<49005, -4, exact_units::units::Volt>, exact_units::literal::LiteralIn<5, 0, exact_units::units::Volt>, false, false, 0> as exact_units::Contains<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Milli, i16>>>::contains::{constant#0}` failed inside this call
+  |                 Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT);
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<49005, -4, exact_units::units::Volt>, exact_units::literal::LiteralIn<5, 0, exact_units::units::Volt>, false, false, 0> as exact_units::literal::range::Folded<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Milli, i16>>>::ENDS` failed inside this call
 ...
   | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
   | ----------------------------------------- in this macro invocation
@@ -46,14 +46,11 @@ note: inside `literal::steps::refuse_range_end`
 note: erroneous constant encountered
  --> src/literal/range.rs
   |
-  |                   let (lo, hi) = const {
-  |  ________________________________^
-  | |                     Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT)
-  | |                 };
-  | |_________________^
+  |                 let (lo, hi) = <Self as Folded<Fixed<U, P, $ty, B>>>::ENDS;
+  |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-  |   range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
-  |   ----------------------------------------- in this macro invocation
+  | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+  | ----------------------------------------- in this macro invocation
   |
   = note: this note originates in the macro `range_int` (in Nightly builds, run with -Z macro-backtrace for more info)
 
@@ -66,8 +63,8 @@ note: the above error was encountered while instantiating `fn <LiteralRange<Lite
 error[E0080]: evaluation panicked: the upper end of this range is no stored value: the stored values around it are 5000 = 5 V and 5001 = 5.001 V; write the range with `, Inside` (each end that is no stored value moves inward: the stored values within it) or `, Outside` (outward: the fewest stored values that cover it), q!(.., Inside)
  --> src/literal/range.rs
   |
-  |                     Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT)
-  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<49, -1, exact_units::units::Volt>, exact_units::literal::LiteralIn<50005, -4, exact_units::units::Volt>, false, false, 0> as exact_units::Contains<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Milli, i16>>>::contains::{constant#0}` failed inside this call
+  |                 Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT);
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<49, -1, exact_units::units::Volt>, exact_units::literal::LiteralIn<50005, -4, exact_units::units::Volt>, false, false, 0> as exact_units::literal::range::Folded<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Milli, i16>>>::ENDS` failed inside this call
 ...
   | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
   | ----------------------------------------- in this macro invocation
@@ -117,8 +114,8 @@ note: the above error was encountered while instantiating `fn <LiteralRange<Lite
 error[E0080]: evaluation panicked: no stored value is in this range: it lies between the stored values 49 = 4.9 V and 50 = 5 V, so the check would never pass
  --> src/literal/range.rs
   |
-  |                     Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT)
-  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<491, -2, exact_units::units::Volt>, exact_units::literal::LiteralIn<499, -2, exact_units::units::Volt>, false, false, 1> as exact_units::Contains<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Deci, i16>>>::contains::{constant#0}` failed inside this call
+  |                 Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT);
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<491, -2, exact_units::units::Volt>, exact_units::literal::LiteralIn<499, -2, exact_units::units::Volt>, false, false, 1> as exact_units::literal::range::Folded<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Deci, i16>>>::ENDS` failed inside this call
 ...
   | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
   | ----------------------------------------- in this macro invocation
@@ -168,8 +165,8 @@ note: the above error was encountered while instantiating `fn <LiteralRange<Lite
 error[E0080]: evaluation panicked: every value of this storage and its bounds is in this range, so the check would never fail: check the unit and the scale, or drop the check
  --> src/literal/range.rs
   |
-  |                     Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT)
-  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<0, 0, exact_units::units::Volt>, exact_units::literal::LiteralIn<5, 0, exact_units::units::Volt>, false, false, 0> as exact_units::Contains<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Milli, u8>>>::contains::{constant#0}` failed inside this call
+  |                 Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT);
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<0, 0, exact_units::units::Volt>, exact_units::literal::LiteralIn<5, 0, exact_units::units::Volt>, false, false, 0> as exact_units::literal::range::Folded<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::Milli, u8>>>::ENDS` failed inside this call
 ...
   | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
   | ----------------------------------------- in this macro invocation
@@ -217,12 +214,12 @@ note: the above error was encountered while instantiating `fn <LiteralRange<Lite
 error[E0080]: evaluation panicked: the lower end of this range is no float of the storage: the floats around it are 0.0999999940395355224609375 V and 0.100000001490116119384765625 V; write the range with `, Inside` (each end that is no stored value moves inward: the stored values within it) or `, Outside` (outward: the fewest stored values that cover it), q!(.., Inside)
  --> src/literal/range.rs
   |
-  |                       Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT)
-  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<1, -1, exact_units::units::Volt>, exact_units::literal::LiteralIn<2, -1, exact_units::units::Volt>, false, false, 0> as exact_units::Contains<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::One, f32>>>::contains::{constant#0}` failed inside this call
+  |                   Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT);
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `<exact_units::literal::LiteralRange<exact_units::literal::LiteralIn<1, -1, exact_units::units::Volt>, exact_units::literal::LiteralIn<2, -1, exact_units::units::Volt>, false, false, 0> as exact_units::literal::range::Folded<exact_units::Fixed<exact_units::units::Volt, exact_units::prefix::One, f32>>>::ENDS` failed inside this call
 ...
   | / range_float! {
-  | |     f32 float_end_f32;
-  | |     f64 float_end_f64;
+  | |     f32 float_end_f32 shown_f32;
+  | |     f64 float_end_f64 shown_f64;
   | | }
   | |_- in this macro invocation
   |
@@ -239,8 +236,8 @@ note: inside `exact_units::literal::range::<impl Fixed<Volt, One, f32>>::fold_ra
   | |_________________^
 ...
   | / range_float! {
-  | |     f32 float_end_f32;
-  | |     f64 float_end_f64;
+  | |     f32 float_end_f32 shown_f32;
+  | |     f64 float_end_f64 shown_f64;
   | | }
   | |_- in this macro invocation
 note: inside `exact_units::literal::range::<impl Fixed<Volt, One, f32>>::fold_floats`
@@ -250,8 +247,8 @@ note: inside `exact_units::literal::range::<impl Fixed<Volt, One, f32>>::fold_fl
   |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
   | / range_float! {
-  | |     f32 float_end_f32;
-  | |     f64 float_end_f64;
+  | |     f32 float_end_f32 shown_f32;
+  | |     f64 float_end_f64 shown_f64;
   | | }
   | |_- in this macro invocation
 note: inside `exact_units::literal::range::float_end_f32`
@@ -279,15 +276,12 @@ note: inside `literal::steps::refuse_range_float_end`
 note: erroneous constant encountered
  --> src/literal/range.rs
   |
-  |                   let (lo, hi) = const {
-  |  ________________________________^
-  | |                     Fixed::<U, P, $ty, B>::fold_range::<Lo::S, Hi::S>(Lo::VALUE, Hi::VALUE, [LO_OPEN, HI_OPEN], FIT)
-  | |                 };
-  | |_________________^
+  |                   let (lo, hi) = <Self as Folded<Fixed<U, P, $ty, B>>>::ENDS;
+  |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
   | / range_float! {
-  | |     f32 float_end_f32;
-  | |     f64 float_end_f64;
+  | |     f32 float_end_f32 shown_f32;
+  | |     f64 float_end_f64 shown_f64;
   | | }
   | |_- in this macro invocation
   |

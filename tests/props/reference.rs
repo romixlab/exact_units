@@ -410,6 +410,29 @@ pub(crate) mod range {
         Some(d.checked_mul(den_s)? <= scaled && scaled < d.checked_add(1)?.checked_mul(den_s)?)
     }
 
+    /// The decimal of stored value `t` (steps of `num_s / den_s`, both above 0), cut after `places` digits past the
+    /// point: `-` for a value below 0, then `|x| · 10^places` cut to an integer with the point put back, and whether
+    /// nothing was cut. `None` where the products don't fit `i128`.
+    pub(crate) fn cut_decimal(
+        t: i128,
+        num_s: i128,
+        den_s: i128,
+        places: u32,
+    ) -> Option<(String, bool)> {
+        let x = t.checked_mul(num_s)?;
+        let scaled = x.checked_abs()?.checked_mul(10i128.checked_pow(places)?)?;
+        let (q, r) = (scaled / den_s, scaled % den_s);
+        let digits = format!("{q:0>width$}", width = places as usize + 1);
+        let (whole, frac) = digits.split_at(digits.len() - places as usize);
+        let sign = if x < 0 { "-" } else { "" };
+        let text = if places == 0 {
+            format!("{sign}{whole}")
+        } else {
+            format!("{sign}{whole}.{frac}")
+        };
+        Some((text, r == 0))
+    }
+
     /// The least `t` of `min ..= max` where `p` holds, for a `p` false then true; `max + 1` where it never holds.
     fn first_true(min: i128, max: i128, p: impl Fn(i128) -> Option<bool>) -> Option<i128> {
         if !p(max)? {

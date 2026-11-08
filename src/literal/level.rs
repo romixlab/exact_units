@@ -78,7 +78,7 @@ use core::marker::PhantomData;
 
 use super::Decimal;
 use super::quantity::{AtMost, Below, Cut, cut_scale};
-use super::range::LiteralRange;
+use super::range::{About, Folded, LiteralRange};
 use crate::conv_error::Symbol;
 use crate::decibel::exact::Interval;
 use crate::{Bounds, Contains, Fixed, FixedScale, LevelForm, Magnitude, NanFree, Unit};
@@ -658,17 +658,46 @@ macro_rules! level_range_contains {
             /// `false` for NaN.
             #[inline]
             fn contains(&self, v: &Fixed<U, P, $ty, B>) -> bool {
-                let (lo, hi) = const {
-                    Fixed::<U, P, $ty, B>::fold_level_range::<L1, L2>(
-                        Decimal::new(N1, E1),
-                        Decimal::new(N2, E2),
-                        [LO_OPEN, HI_OPEN],
-                        FIT,
-                    )
-                };
+                let (lo, hi) = <Self as Folded<Fixed<U, P, $ty, B>>>::ENDS;
                 let t = v.get();
                 lo <= t && t <= hi
             }
+        }
+
+        impl<
+            U: Unit,
+            P: FixedScale,
+            B: Bounds<$ty>,
+            L1: LevelSymbol,
+            L2: LevelSymbol,
+            const N1: i64,
+            const E1: i16,
+            const N2: i64,
+            const E2: i16,
+            const LO_OPEN: bool,
+            const HI_OPEN: bool,
+            const FIT: u8,
+        > Folded<Fixed<U, P, $ty, B>>
+            for LiteralRange<
+                LevelLiteral<N1, E1, L1>,
+                LevelLiteral<N2, E2, L2>,
+                LO_OPEN,
+                HI_OPEN,
+                FIT,
+            >
+        {
+            type T = $ty;
+
+            const ENDS: ($ty, $ty) = Fixed::<U, P, $ty, B>::fold_level_range::<L1, L2>(
+                Decimal::new(N1, E1),
+                Decimal::new(N2, E2),
+                [LO_OPEN, HI_OPEN],
+                FIT,
+            );
+
+            // named as the gain it is, in its own unit: a level's digits would take a logarithm at compile time,
+            // so a prefix of them shows the gains it holds, as any range does
+            const ABOUT: About = About::of(P::SCALE, Symbol::of(U::EXPR), None);
         }
     };
 }

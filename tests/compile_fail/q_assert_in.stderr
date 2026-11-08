@@ -1,0 +1,385 @@
+error[E0080]: evaluation panicked: assert_in!: the value is not in this prefix of digits: it is 9.542 V, its first 2 decimals are q!(9.54... V)
+  --> tests/compile_fail/q_assert_in.rs:19:13
+   |
+19 |     let _ = assert_in!(MV, q!(9.55... V));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `main::{constant#0}` failed inside this call
+   |
+note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Milli, i32>>::assert_in_const::<LiteralRange<LiteralIn<955, -2, Volt>, LiteralIn<956, -2, Volt>, false, true, 3>>`
+  --> src/literal/range.rs
+   |
+   |                     R::ABOUT.refuse(Shown::Steps(t as i128), Shown::Steps(lo as i128), Shown::Steps(hi as i128));
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+   | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+   | ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::About::refuse`
+  --> src/literal/range.rs
+   |
+   | /         refuse_not_in(
+   | |             v,
+   | |             [lo, hi],
+   | |             [false, false],
+...  |
+   | |             self.prefix,
+   | |         )
+   | |_________^
+note: inside `literal::steps::refuse_not_in`
+  --> $RUST/core/src/panic.rs
+   |
+   |         $crate::panicking::panic_display(&$arg);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+   |
+  ::: src/literal/steps.rs
+   |
+   |         panic!("{}", t.as_str())
+   |         ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/q_assert_in.rs:19:13
+   |
+19 |     let _ = assert_in!(MV, q!(9.55... V));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `assert_in` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: assert_in!: the value is not in this prefix of digits: it is -9.542 V, its first 2 decimals are q!(-9.54... V)
+  --> tests/compile_fail/q_assert_in.rs:20:13
+   |
+20 |     let _ = assert_in!(Fixed::<Volt, Milli, i32>::new(-9_542), q!(-9.55... V));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `main::{constant#1}` failed inside this call
+   |
+note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Milli, i32>>::assert_in_const::<LiteralRange<LiteralIn<-956, -2, Volt>, LiteralIn<-955, -2, Volt>, true, false, 3>>`
+  --> src/literal/range.rs
+   |
+   |                     R::ABOUT.refuse(Shown::Steps(t as i128), Shown::Steps(lo as i128), Shown::Steps(hi as i128));
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+   | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+   | ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::About::refuse`
+  --> src/literal/range.rs
+   |
+   | /         refuse_not_in(
+   | |             v,
+   | |             [lo, hi],
+   | |             [false, false],
+...  |
+   | |             self.prefix,
+   | |         )
+   | |_________^
+note: inside `literal::steps::refuse_not_in`
+  --> $RUST/core/src/panic.rs
+   |
+   |         $crate::panicking::panic_display(&$arg);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+   |
+  ::: src/literal/steps.rs
+   |
+   |         panic!("{}", t.as_str())
+   |         ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/q_assert_in.rs:20:13
+   |
+20 |     let _ = assert_in!(Fixed::<Volt, Milli, i32>::new(-9_542), q!(-9.55... V));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `assert_in` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: assert_in!: the value 9542 = 9.542 V is not in this range: it holds 9600 = 9.6 V ..= 10000 = 10 V
+  --> tests/compile_fail/q_assert_in.rs:21:13
+   |
+21 |     let _ = assert_in!(MV, q!(9.6 V ..= 10 V));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `main::{constant#2}` failed inside this call
+   |
+note: inside `exact_units::literal::range::<impl Fixed<Volt, exact_units::prefix::Milli, i32>>::assert_in_const::<LiteralRange<LiteralIn<96, -1, Volt>, LiteralIn<1, 1, Volt>, false, false, 0>>`
+  --> src/literal/range.rs
+   |
+   |                     R::ABOUT.refuse(Shown::Steps(t as i128), Shown::Steps(lo as i128), Shown::Steps(hi as i128));
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+   | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+   | ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::About::refuse`
+  --> src/literal/range.rs
+   |
+   | /         refuse_not_in(
+   | |             v,
+   | |             [lo, hi],
+   | |             [false, false],
+...  |
+   | |             self.prefix,
+   | |         )
+   | |_________^
+note: inside `literal::steps::refuse_not_in`
+  --> $RUST/core/src/panic.rs
+   |
+   |         $crate::panicking::panic_display(&$arg);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+   |
+  ::: src/literal/steps.rs
+   |
+   |     panic!("{}", t.as_str())
+   |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/q_assert_in.rs:21:13
+   |
+21 |     let _ = assert_in!(MV, q!(9.6 V ..= 10 V));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `assert_in` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: assert_in!: the value is not in this prefix of digits: it is 0.1000000000000000055… V, its first 7 decimals are q!(0.1000000... V)
+  --> tests/compile_fail/q_assert_in.rs:22:13
+   |
+22 |     let _ = assert_in!(F, q!(0.1000001... V));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `main::{constant#3}` failed inside this call
+   |
+note: inside `exact_units::literal::range::<impl Fixed<Volt, One, f64>>::assert_in_const::<LiteralRange<LiteralIn<1000001, -7, Volt>, LiteralIn<1000002, -7, Volt>, false, true, 3>>`
+  --> src/literal/range.rs
+   |
+   |                       R::ABOUT.refuse($shown(t), $shown(lo), $shown(hi));
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+   | / range_float! {
+   | |     f32 float_end_f32 shown_f32;
+   | |     f64 float_end_f64 shown_f64;
+   | | }
+   | |_- in this macro invocation
+note: inside `exact_units::literal::range::About::refuse`
+  --> src/literal/range.rs
+   |
+   | /         refuse_not_in(
+   | |             v,
+   | |             [lo, hi],
+   | |             [false, false],
+...  |
+   | |             self.prefix,
+   | |         )
+   | |_________^
+note: inside `literal::steps::refuse_not_in`
+  --> $RUST/core/src/panic.rs
+   |
+   |         $crate::panicking::panic_display(&$arg);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+   |
+  ::: src/literal/steps.rs
+   |
+   |         panic!("{}", t.as_str())
+   |         ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/q_assert_in.rs:22:13
+   |
+22 |     let _ = assert_in!(F, q!(0.1000001... V));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `assert_in` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: assert_in!: the value 0.100000000000000005551115… V is not in this range: it holds 0.200000000000000011102230… V ..= 0.299999999999999988897769… V
+  --> tests/compile_fail/q_assert_in.rs:23:13
+   |
+23 |     let _ = assert_in!(F, q!(0.2 V ..= 0.3 V, Inside));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `main::{constant#4}` failed inside this call
+   |
+note: inside `exact_units::literal::range::<impl Fixed<Volt, One, f64>>::assert_in_const::<LiteralRange<LiteralIn<2, -1, Volt>, LiteralIn<3, -1, Volt>, false, false, 1>>`
+  --> src/literal/range.rs
+   |
+   |                       R::ABOUT.refuse($shown(t), $shown(lo), $shown(hi));
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+   | / range_float! {
+   | |     f32 float_end_f32 shown_f32;
+   | |     f64 float_end_f64 shown_f64;
+   | | }
+   | |_- in this macro invocation
+note: inside `exact_units::literal::range::About::refuse`
+  --> src/literal/range.rs
+   |
+   | /         refuse_not_in(
+   | |             v,
+   | |             [lo, hi],
+   | |             [false, false],
+...  |
+   | |             self.prefix,
+   | |         )
+   | |_________^
+note: inside `literal::steps::refuse_not_in`
+  --> $RUST/core/src/panic.rs
+   |
+   |         $crate::panicking::panic_display(&$arg);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+   |
+  ::: src/literal/steps.rs
+   |
+   |     panic!("{}", t.as_str())
+   |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/q_assert_in.rs:23:13
+   |
+23 |     let _ = assert_in!(F, q!(0.2 V ..= 0.3 V, Inside));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `assert_in` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: assert_in!: the value is not in this prefix of digits: it is 0.333333333333333… V, its first 3 decimals are q!(0.333... V)
+  --> tests/compile_fail/q_assert_in.rs:24:13
+   |
+24 |     let _ = assert_in!(THIRD, q!(0.334... V));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `main::{constant#5}` failed inside this call
+   |
+note: inside `exact_units::literal::range::<impl exact_units::Exact<Volt>>::assert_in_const::<LiteralIn<334, -3, Volt>, LiteralIn<335, -3, Volt>, false, true, 3>`
+  --> src/literal/range.rs
+   |
+   | /             refuse_not_in(
+   | |                 shown_fraction(t),
+   | |                 [shown_fraction(lo), shown_fraction(hi)],
+   | |                 open,
+...  |
+   | |                 prefix_places(FIT, Lo::VALUE, Hi::VALUE),
+   | |             );
+   | |_____________^
+note: inside `literal::steps::refuse_not_in`
+  --> $RUST/core/src/panic.rs
+   |
+   |         $crate::panicking::panic_display(&$arg);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+   |
+  ::: src/literal/steps.rs
+   |
+   |         panic!("{}", t.as_str())
+   |         ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/q_assert_in.rs:24:13
+   |
+24 |     let _ = assert_in!(THIRD, q!(0.334... V));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `assert_in` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: assert_in!: the value 0.333333333333333333333333… V is not in this range: it holds 0.4 V .. 0.5 V
+  --> tests/compile_fail/q_assert_in.rs:25:13
+   |
+25 |     let _ = assert_in!(THIRD, q!(400 mV .. 500 mV));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `main::{constant#6}` failed inside this call
+   |
+note: inside `exact_units::literal::range::<impl exact_units::Exact<Volt>>::assert_in_const::<LiteralIn<4, -1, Volt>, LiteralIn<5, -1, Volt>, false, true, 0>`
+  --> src/literal/range.rs
+   |
+   | /             refuse_not_in(
+   | |                 shown_fraction(t),
+   | |                 [shown_fraction(lo), shown_fraction(hi)],
+   | |                 open,
+...  |
+   | |                 prefix_places(FIT, Lo::VALUE, Hi::VALUE),
+   | |             );
+   | |_____________^
+note: inside `literal::steps::refuse_not_in`
+  --> $RUST/core/src/panic.rs
+   |
+   |         $crate::panicking::panic_display(&$arg);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+   |
+  ::: src/literal/steps.rs
+   |
+   |     panic!("{}", t.as_str())
+   |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/q_assert_in.rs:25:13
+   |
+25 |     let _ = assert_in!(THIRD, q!(400 mV .. 500 mV));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `assert_in` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: assert_in!: the value is not in this prefix of digits: it is 21.53 K @ Celsius, its first 2 decimals are q!(21.53... K @ Celsius)
+  --> tests/compile_fail/q_assert_in.rs:26:13
+   |
+26 |     let _ = assert_in!(T, q!(21.54... degC));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `main::{constant#7}` failed inside this call
+   |
+note: inside `point::<impl Point<Celsius, Fixed<Kelvin, exact_units::prefix::Centi, i16>>>::assert_in_const::<LiteralRange<LiteralAt<2154, -2, Steps, Celsius>, LiteralAt<2155, -2, Steps, Celsius>, false, true, 3>>`
+  --> src/literal/point.rs
+   |
+   |                     R::ABOUT.refuse(Shown::Steps(t as i128), Shown::Steps(lo as i128), Shown::Steps(hi as i128));
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+   | point_range!(u8 u16 u32 u64 i8 i16 i32 i64);
+   | ------------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::About::refuse`
+  --> src/literal/range.rs
+   |
+   | /         refuse_not_in(
+   | |             v,
+   | |             [lo, hi],
+   | |             [false, false],
+...  |
+   | |             self.prefix,
+   | |         )
+   | |_________^
+note: inside `literal::steps::refuse_not_in`
+  --> $RUST/core/src/panic.rs
+   |
+   |         $crate::panicking::panic_display(&$arg);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+   |
+  ::: src/literal/steps.rs
+   |
+   |         panic!("{}", t.as_str())
+   |         ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/q_assert_in.rs:26:13
+   |
+26 |     let _ = assert_in!(T, q!(21.54... degC));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `assert_in` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0080]: evaluation panicked: assert_in!: the value 1000 = 1 V/V is not in this range: it holds 1123 = 1.123 V/V ..= 1412 = 1.412 V/V
+  --> tests/compile_fail/q_assert_in.rs:27:13
+   |
+27 |     let _ = assert_in!(GAIN, q!(1 dB ..= 3 dB, Inside));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `main::{constant#8}` failed inside this call
+   |
+note: inside `exact_units::literal::range::<impl Fixed<Per<Volt, Volt>, exact_units::prefix::Milli, u16>>::assert_in_const::<LiteralRange<LevelLiteral<1, 0, Db>, LevelLiteral<3, 0, Db>, false, false, 1>>`
+  --> src/literal/range.rs
+   |
+   |                     R::ABOUT.refuse(Shown::Steps(t as i128), Shown::Steps(lo as i128), Shown::Steps(hi as i128));
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+   | range_int!(u8 u16 u32 u64 i8 i16 i32 i64);
+   | ----------------------------------------- in this macro invocation
+note: inside `exact_units::literal::range::About::refuse`
+  --> src/literal/range.rs
+   |
+   | /         refuse_not_in(
+   | |             v,
+   | |             [lo, hi],
+   | |             [false, false],
+...  |
+   | |             self.prefix,
+   | |         )
+   | |_________^
+note: inside `literal::steps::refuse_not_in`
+  --> $RUST/core/src/panic.rs
+   |
+   |         $crate::panicking::panic_display(&$arg);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+   |
+  ::: src/literal/steps.rs
+   |
+   |     panic!("{}", t.as_str())
+   |     ------------------------ in this macro invocation
+
+note: erroneous constant encountered
+  --> tests/compile_fail/q_assert_in.rs:27:13
+   |
+27 |     let _ = assert_in!(GAIN, q!(1 dB ..= 3 dB, Inside));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this note originates in the macro `assert_in` (in Nightly builds, run with -Z macro-backtrace for more info)

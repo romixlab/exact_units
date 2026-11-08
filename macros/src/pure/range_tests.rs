@@ -266,41 +266,41 @@ fn prefix(s: &str) -> ((i64, i16), (i64, i16), bool, bool, Fit) {
 fn prefixes() {
     assert_eq!(
         prefix("9.542425 ... dB"),
-        ((9_542_425, -6), (9_542_426, -6), false, true, Fit::Inside)
+        ((9_542_425, -6), (9_542_426, -6), false, true, Fit::Prefix)
     );
     assert_eq!(
         prefix("- 9.54 ... dB"),
-        ((-955, -2), (-954, -2), true, false, Fit::Inside)
+        ((-955, -2), (-954, -2), true, false, Fit::Prefix)
     );
     // the digits count, trailing zeros too: 9.540... is 9.540 ..< 9.541
     assert_eq!(
         prefix("9.540 ... V"),
-        ((954, -2), (9541, -3), false, true, Fit::Inside)
+        ((954, -2), (9541, -3), false, true, Fit::Prefix)
     );
     assert_eq!(
         prefix("9.99 ... V"),
-        ((999, -2), (1, 1), false, true, Fit::Inside)
+        ((999, -2), (1, 1), false, true, Fit::Prefix)
     );
     assert_eq!(
         prefix("0.0 ... V"),
-        ((0, 0), (1, -1), false, true, Fit::Inside)
+        ((0, 0), (1, -1), false, true, Fit::Prefix)
     );
     assert_eq!(
         prefix("1_000.5 ... V"),
-        ((10005, -1), (10006, -1), false, true, Fit::Inside)
+        ((10005, -1), (10006, -1), false, true, Fit::Prefix)
     );
     // the unit's prefix scales the step: 1.2... mV is 1.2 mV ..< 1.3 mV
     assert_eq!(
         prefix("1.2 ... mV"),
-        ((12, -4), (13, -4), false, true, Fit::Inside)
+        ((12, -4), (13, -4), false, true, Fit::Prefix)
     );
     assert_eq!(
         prefix("\"9.54... dB\""),
-        ((954, -2), (955, -2), false, true, Fit::Inside)
+        ((954, -2), (955, -2), false, true, Fit::Prefix)
     );
     assert_eq!(
         prefix("\"-9.54… dB\""),
-        ((-955, -2), (-954, -2), true, false, Fit::Inside)
+        ((-955, -2), (-954, -2), true, false, Fit::Prefix)
     );
     let (lo, hi) = range("25.3 ... degC");
     assert!(lo.at.is_some() && hi.at.is_some());

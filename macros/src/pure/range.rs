@@ -30,6 +30,9 @@ pub(crate) enum Fit {
     Inside,
     /// Each such end moves outward, to the nearest stored value past it.
     Outside,
+    /// A prefix of digits, `9.54... V`: its ends move inward, as `Inside`, and a const check
+    /// (`assert_in!`) names the value's own leading digits when it fails.
+    Prefix,
 }
 
 impl Fit {
@@ -39,6 +42,7 @@ impl Fit {
             Fit::Exact => 0,
             Fit::Inside => 1,
             Fit::Outside => 2,
+            Fit::Prefix => 3,
         }
     }
 }

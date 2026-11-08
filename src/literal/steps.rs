@@ -940,3 +940,237 @@ pub(crate) const fn refuse_range_empty(between: Option<i128>, step: Magnitude, u
     }
     panic!("{}", t.as_str())
 }
+
+/// A value or an end of a range in the message of a failed `assert_in!`, as its storage holds it.
+#[cfg(feature = "q")]
+#[derive(Copy, Clone)]
+pub(crate) enum Shown {
+    /// `k` stored steps.
+    Steps(i128),
+    /// A float: the bits of its magnitude, and its sign.
+    Float {
+        bits: u128,
+        neg: bool,
+        f: FloatFormat,
+    },
+    /// An exact fraction `±num / den`, in the unit the message names.
+    Frac { neg: bool, num: u128, den: u128 },
+    /// NaN, in no range.
+    Nan,
+}
+
+/// A value exactly, `±num / den` in the unit a message names: for the digits of a failed `assert_in!`.
+#[cfg(feature = "q")]
+struct Ratio {
+    neg: bool,
+    num: Big,
+    den: Big,
+}
+
+#[cfg(feature = "q")]
+impl Ratio {
+    /// `x` times `step`, where both are fractions of integers and fit; `None` for NaN, an infinity and a scale with
+    /// π or a root in it.
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable; a shift is a few thousand at most"
+    )]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "e and -e are taken where non-negative, at most 1075 + 52"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "bits is 24 or 53 and max_exp 127 or 1023: the exponents are a few thousand at most"
+    )]
+    const fn of(x: Shown, step: Magnitude) -> Option<Ratio> {
+        let Some((snum, sden)) = step.to_ratio() else {
+            return None;
+        };
+        let (neg, num, den) = match x {
+            Shown::Steps(k) => (k < 0, Big::of(k.unsigned_abs()), Big::of(1)),
+            Shown::Frac { neg, num, den } => (neg, Big::of(num), Big::of(den)),
+            Shown::Float { bits, neg, f } => {
+                let frac = f.bits - 1;
+                let field = (bits >> frac) as i64;
+                // all ones: an infinity or NaN
+                if field == 2 * f.max_exp + 1 {
+                    return None;
+                }
+                let mant = bits & ((1 << frac) - 1);
+                // a subnormal (field 0) has no leading 1, and the exponent of the smallest normal
+                let (m, e) = if field == 0 {
+                    (mant, 1 - f.max_exp - frac as i64)
+                } else {
+                    (mant | (1 << frac), field - f.max_exp - frac as i64)
+                };
+                let (num, den) = if e >= 0 {
+                    (Big::of(m).shl(e as u32), Some(Big::of(1)))
+                } else {
+                    (Some(Big::of(m)), Big::of(1).shl((-e) as u32))
+                };
+                let (Some(num), Some(den)) = (num, den) else {
+                    return None;
+                };
+                (neg, num, den)
+            }
+            Shown::Nan => return None,
+        };
+        let (Some(num), Some(den)) = (num.mul(&Big::of(snum)), den.mul(&Big::of(sden))) else {
+            return None;
+        };
+        Some(Ratio { neg, num, den })
+    }
+
+    /// `floor(|self| · 10^places)` and whether nothing was cut, where it fits.
+    const fn scaled(&self, places: u32) -> Option<(Big, bool)> {
+        let Some(p) = Big::pow10(places) else {
+            return None;
+        };
+        let Some(n) = self.num.mul(&p) else {
+            return None;
+        };
+        let (q, r) = n.div_rem(&self.den);
+        Some((q, r.is_zero()))
+    }
+}
+
+#[cfg(feature = "q")]
+impl Text {
+    /// `x` in decimal, cut (never rounded) after `places` digits past the point and `…` after a cut, trailing
+    /// zeros dropped where nothing was cut. `false` where it doesn't fit.
+    #[expect(clippy::arithmetic_side_effects, reason = "frac > 0 in the loop")]
+    const fn exactly(&mut self, x: &Ratio, places: u32) -> bool {
+        let Some((mut q, exact)) = x.scaled(places) else {
+            return false;
+        };
+        let mut frac = places;
+        while exact && frac > 0 {
+            let (d, r) = q.div_rem_small(10);
+            if r != 0 {
+                break;
+            }
+            q = d;
+            frac -= 1;
+        }
+        self.decimal(x.neg, &q, frac);
+        if !exact {
+            self.push("…");
+        }
+        true
+    }
+}
+
+/// How many digits past the point a value is shown with beyond a prefix's own: enough to see where a rounded
+/// prefix went wrong.
+#[cfg(feature = "q")]
+const MORE: u32 = 12;
+
+/// How many digits past the point a float or a fraction is shown with in a range's message: every digit of an
+/// `f32`'s decimal near 1, enough of the rest to tell two values apart.
+#[cfg(feature = "q")]
+const SHOWN: u32 = 24;
+
+/// One end or the value of a failed `assert_in!`: `k = decimal unit` for stored steps, the decimal and unit for a
+/// float or a fraction.
+#[cfg(feature = "q")]
+const fn push_shown(t: &mut Text, x: Shown, step: Magnitude, unit: &str) {
+    match x {
+        Shown::Steps(k) => {
+            if !push_step(t, k, step, unit) {
+                t.push(" steps");
+            }
+        }
+        Shown::Nan => t.push("NaN"),
+        Shown::Float { .. } | Shown::Frac { .. } => {
+            let shown = match Ratio::of(x, step) {
+                Some(r) => t.exactly(&r, SHOWN),
+                None => false,
+            };
+            if shown {
+                t.push(" ");
+                t.push(unit);
+            } else if let Shown::Float { bits, neg, f } = x {
+                // an infinity, or a scale whose decimals aren't finite: the float as stored
+                if neg {
+                    t.push("-");
+                }
+                t.push(if bits > f.max_bits() {
+                    "inf"
+                } else {
+                    "a float"
+                });
+                t.push(" (stored)");
+            } else {
+                t.push("a fraction whose decimal isn't worked out here");
+            }
+        }
+    }
+}
+
+/// The compile error of `assert_in!` for a value not in a range: the value, and the range as the stored values it
+/// holds (`lo ..= hi`, or `..` and `<..` where an end is out, for an exact fraction), in units of `unit`, `step` a
+/// stored step in it. For a prefix of `places` digits past the point (`q!(9.542426... V)`), the value's own digits
+/// instead, and the prefix it has, ready to paste.
+#[cfg(feature = "q")]
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented"
+)]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable; a u32 widens into i128"
+)]
+pub(crate) const fn refuse_not_in(
+    v: Shown,
+    ends: [Shown; 2],
+    open: [bool; 2],
+    step: Magnitude,
+    unit: &str,
+    prefix: Option<u32>,
+) -> ! {
+    let mut t = Text::new();
+    t.push("assert_in!: ");
+    if let (Some(places), Shown::Steps(_) | Shown::Float { .. } | Shown::Frac { .. }) = (prefix, v)
+        && let Some(r) = Ratio::of(v, step)
+    {
+        t.push("the value is not in this prefix of digits: it is ");
+        let _ = t.exactly(&r, places.saturating_add(MORE));
+        t.push(" ");
+        t.push(unit);
+        match r.scaled(places) {
+            // -0.00... reads two ways, as q! refuses it
+            Some((q, _)) if !(r.neg && q.is_zero()) => {
+                t.push(", its first ");
+                t.int(places as i128);
+                t.push(if places == 1 {
+                    " decimal is "
+                } else {
+                    " decimals are "
+                });
+                t.push("q!(");
+                t.decimal(r.neg, &q, places);
+                t.push("... ");
+                t.push(unit);
+                t.push(")");
+            }
+            _ => t.push(", nearer 0 than a prefix of that many decimals can say: write its range"),
+        }
+        panic!("{}", t.as_str())
+    }
+    t.push("the value ");
+    push_shown(&mut t, v, step, unit);
+    t.push(" is not in this range: it holds ");
+    let [lo, hi] = ends;
+    let [lo_open, hi_open] = open;
+    push_shown(&mut t, lo, step, unit);
+    t.push(match (lo_open, hi_open) {
+        (false, false) => " ..= ",
+        (false, true) => " .. ",
+        (true, false) => " <..= ",
+        (true, true) => " <.. ",
+    });
+    push_shown(&mut t, hi, step, unit);
+    panic!("{}", t.as_str())
+}
