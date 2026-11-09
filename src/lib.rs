@@ -82,6 +82,7 @@ pub mod notation;
 pub mod num;
 mod point;
 mod products;
+pub mod registry;
 #[cfg(feature = "serde")]
 pub mod serde;
 #[cfg(feature = "shrink_wrap")]
@@ -136,6 +137,7 @@ pub use point::{
     PointDiff, Reference, ReferenceDef, ReferenceHow, TimeCounting, TimeScaleDef, TimeZero,
     UnitZero, origins,
 };
+pub use registry::Registry;
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use si_expr::SIExprOwned;
 #[cfg(feature = "shrink_wrap")]

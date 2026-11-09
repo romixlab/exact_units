@@ -79,6 +79,7 @@ pub use fraction::{Fraction, Fraction8};
 #[cfg(feature = "serde")]
 pub(crate) use text::read as read_text;
 pub use text::{ParseExactError, ParseFractionError};
+pub(crate) use text::{number, scale};
 #[cfg(feature = "dimensionless")]
 pub use tolerance::{OffTarget, Tolerance};
 
