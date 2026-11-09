@@ -34,9 +34,9 @@ const MAX_NESTING: usize = 4;
 /// settles it: text that goes into a [Fixed](crate::Fixed) of bytes reads a byte.
 ///
 /// ```
-/// # #[cfg(all(feature = "electrical", feature = "time", feature = "mechanical", feature = "information", feature =
-/// "levels"))] { use exact_units::units::{self, Byte, Minute, Ohm, Second}; use exact_units::{Exact, Fixed, Registry,
-/// prefix::{Kilo, One}};
+/// # #[cfg(all(feature = "electrical", feature = "time", feature = "mechanical", feature = "information", feature = "levels"))] {
+/// use exact_units::units::{self, Byte, Minute, Ohm, Second};
+/// use exact_units::{Exact, Fixed, Registry, prefix::{Kilo, One}};
 ///
 /// let tables = [units::ALL];
 /// let r = Registry::new(&tables);

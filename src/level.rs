@@ -23,8 +23,8 @@
 //!   numbers only.
 //!
 //! ```
-//! # #[cfg(all(feature = "levels", feature = "electrical", feature = "mechanical"))] { use exact_units::{Fixed,
-//! Rounding, fixed, prefix::{Centi, Micro, One}, q, units::{Decibel, Loss, Meter, Neper, Per, Volt}};
+//! # #[cfg(all(feature = "levels", feature = "electrical", feature = "mechanical"))] {
+//! use exact_units::{Fixed, Rounding, fixed, prefix::{Centi, Micro, One}, q, units::{Decibel, Loss, Meter, Neper, Per, Volt}};
 //!
 //! // a cable's 17.7 dB/100 m, positive as the datasheet writes it, in nepers per meter exactly rounded
 //! type Alpha = Fixed<Per<Loss<Neper>, Meter>, Micro, u32>;
@@ -156,21 +156,21 @@
 //! ```
 //!
 //! ```compile_fail
-//! # #[cfg(not(all(feature = "levels", feature = "angle", feature = "time")))] compile_error!("needs levels, angle,
-//! time"); use exact_units::{Fixed, prefix::One, units::{AngularVelocity, Neper, Per, Second}}; let _ =
-//! Fixed::<Per<Neper, Second>, One, f32>::bounded(3.0).convert::<AngularVelocity, One, f32>();
+//! # #[cfg(not(all(feature = "levels", feature = "angle", feature = "time")))] compile_error!("needs levels, angle, time");
+//! use exact_units::{Fixed, prefix::One, units::{AngularVelocity, Neper, Per, Second}};
+//! let _ = Fixed::<Per<Neper, Second>, One, f32>::bounded(3.0).convert::<AngularVelocity, One, f32>();
 //! ```
 //!
 //! α(f) = α₀·f takes a frequency in hertz, not an angular velocity (a factor 2π lost, and cm·MHz / (rad/s) isn't a
 //! length):
 //!
 //! ```compile_fail
-//! # #[cfg(not(all(feature = "levels", feature = "mechanical", feature = "angle")))] compile_error!("needs levels,
-//! mechanical, angle"); use exact_units::{Fixed, Rounding, prefix::One, units::{AngularVelocity, CentimetreMegahertz,
-//! Decibel, Loss, Meter, Per}}; let alpha0 = Fixed::<Per<Loss<Decibel>, CentimetreMegahertz>, One, i32>::new(5); let
-//! omega = Fixed::<AngularVelocity, One, i32>::new(5); let product = alpha0.times_into::<AngularVelocity, One, _, One,
-//! i32>(omega, Rounding::NearestEven).unwrap(); let _: Option<Fixed<Per<Loss<Decibel>, Meter>, One, i32>> =
-//! product.convert();
+//! # #[cfg(not(all(feature = "levels", feature = "mechanical", feature = "angle")))] compile_error!("needs levels, mechanical, angle");
+//! use exact_units::{Fixed, Rounding, prefix::One, units::{AngularVelocity, CentimetreMegahertz, Decibel, Loss, Meter, Per}};
+//! let alpha0 = Fixed::<Per<Loss<Decibel>, CentimetreMegahertz>, One, i32>::new(5);
+//! let omega = Fixed::<AngularVelocity, One, i32>::new(5);
+//! let product = alpha0.times_into::<AngularVelocity, One, _, One, i32>(omega, Rounding::NearestEven).unwrap();
+//! let _: Option<Fixed<Per<Loss<Decibel>, Meter>, One, i32>> = product.convert();
 //! ```
 //!
 //! An absorbance is a loss, and ln 10 isn't a fraction of integers, so an integer conversion to a depth names its
@@ -409,9 +409,9 @@ impl<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>> Fixe
     /// ```
     ///
     /// ```compile_fail
-    /// # #[cfg(not(feature = "levels"))] compile_error!("needs levels"); use exact_units::{Fixed, prefix::One,
-    /// units::{Decibel, Ratio}}; let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_level::<Decibel, One,
-    /// f64>(exact_units::Rounding::NearestEven);
+    /// # #[cfg(not(feature = "levels"))] compile_error!("needs levels");
+    /// use exact_units::{Fixed, prefix::One, units::{Decibel, Ratio}};
+    /// let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_level::<Decibel, One, f64>(exact_units::Rounding::NearestEven);
     /// ```
     #[must_use]
     pub fn to_level<L: Unit, P2: crate::FixedScale, T2: crate::Storage>(
@@ -507,8 +507,8 @@ impl<L: Unit, X: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds
     /// `None` where it doesn't fit `T2`. Feature `std` or `libm`.
     ///
     /// ```
-    /// # #[cfg(all(feature = "levels", feature = "mechanical"))] { use exact_units::{Fixed, Rounding::NearestEven,
-    /// prefix::{Deci, One}, q, units::{Decibel, Feet100, Loss, Metres100, Per}};
+    /// # #[cfg(all(feature = "levels", feature = "mechanical"))] {
+    /// use exact_units::{Fixed, Rounding::NearestEven, prefix::{Deci, One}, q, units::{Decibel, Feet100, Loss, Metres100, Per}};
     ///
     /// // Belden 8259: 5.4 dB/100 ft, over 820 ft (8.2 "100 ft" units) of cable
     /// let alpha = Fixed::<Per<Loss<Decibel>, Feet100>, Deci, i32>::new(54);

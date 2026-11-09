@@ -13,11 +13,14 @@
 //! # #[cfg(feature = "electrical")] {
 //! use exact_units::{Complex, Fixed, Saturating, db, prefix::{Pow2, Product}, units::{Per, Times, Volt}};
 //!
-//! // a reflection coefficient in Q15 type Gamma = Complex<Per<Volt, Volt>, Pow2<-15>, i16, Saturating>; type GammaSqr
-//! = Fixed<Times<Per<Volt, Volt>, Per<Volt, Volt>>, Product<Pow2<-15>, Pow2<-15>>, u32>; // −15 dB of a voltage ratio:
-//! |Γ|² ≤ 10^(−1.5) = 0.0316.. in steps of 2⁻³⁰ const MATCHED: GammaSqr = db!(norm_sqr -15, NearestEven);
-//! assert_eq!(MATCHED.get(), 33_954_698); let at = Gamma::norm_sqr_at_rounded(exact_units::decibel::Decibels::new(-15,
-//! 0), exact_units::Rounding::NearestEven); assert_eq!(MATCHED, at);
+//! // a reflection coefficient in Q15
+//! type Gamma = Complex<Per<Volt, Volt>, Pow2<-15>, i16, Saturating>;
+//! type GammaSqr = Fixed<Times<Per<Volt, Volt>, Per<Volt, Volt>>, Product<Pow2<-15>, Pow2<-15>>, u32>;
+//! // −15 dB of a voltage ratio: |Γ|² ≤ 10^(−1.5) = 0.0316.. in steps of 2⁻³⁰
+//! const MATCHED: GammaSqr = db!(norm_sqr -15, NearestEven);
+//! assert_eq!(MATCHED.get(), 33_954_698);
+//! let at = Gamma::norm_sqr_at_rounded(exact_units::decibel::Decibels::new(-15, 0), exact_units::Rounding::NearestEven);
+//! assert_eq!(MATCHED, at);
 //!
 //! let g = Gamma::of(4000, -3000); // |Γ| = 0.1526, −16.3 dB
 //! assert!(g.norm_sqr() <= MATCHED);
