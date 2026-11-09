@@ -25,6 +25,31 @@
 //!   [RatioOf](QuantityExpr::RatioOf) that dimension (V/V is a voltage gain) and a dimension-one factor keeps the
 //!   other side's quantity (Ω · (V/V) is a resistance) ([mul](QuantityExpr::mul), [div](QuantityExpr::div)).
 //!
+//! A count per second becomes an activity by a named step, never by `convert`:
+//!
+//! ```
+//! # #[cfg(all(feature = "time", feature = "radiation"))] {
+//! use exact_units::{Fixed, prefix::One, quantities::Activity, units::{Becquerel, Hertz}};
+//!
+//! let rate = Fixed::<Hertz, One, u32>::new(370);
+//! let a: Option<Fixed<Becquerel, One, u32>> = rate.as_quantity::<Activity>().convert();
+//! assert_eq!(a, Some(Fixed::new(370)));
+//! # }
+//! ```
+//!
+//! ```compile_fail
+//! use exact_units::{Fixed, prefix::One, units::{Becquerel, Hertz}};
+//! let _ = Fixed::<Hertz, One, u32>::new(370).convert::<Becquerel, One, u32>();
+//! ```
+//!
+//! An absorbed dose is not a dose equivalent, though Gy and Sv are both J/kg: no step joins them, as a dose
+//! equivalent takes a radiation's weighting factor.
+//!
+//! ```compile_fail
+//! use exact_units::{Fixed, prefix::Milli, units::{Gray, Sievert}};
+//! let _ = Fixed::<Gray, Milli, u32>::new(20).convert::<Sievert, Milli, u32>();
+//! ```
+//!
 //! The rules follow ISO 80000-1's quantities and kinds as mp-units implements them, without its matching of
 //! recipes: a product is never recognised as a named quantity by itself.
 

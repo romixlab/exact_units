@@ -11,7 +11,7 @@
 //!   factor.
 //! - Electrical: [Resistance] (`Ohm`) and [Conductance] (`Siemens`), apart from V/A and A/V; [Power] with
 //!   [ApparentPower] (`VoltAmpere`) and [ReactivePower] (`Var`).
-//! - [Pressure] and [EnergyDensity], [HeatCapacity] and [Entropy]: one dimension each pair, two quantities.
+//! - [Pressure] and [EnergyDensity] (one dimension, two quantities); [Entropy], apart from J/K's own quantity.
 //! - Dimension one: [DampingRatio] and [QualityFactor].
 //! - Angles: [PlaneAngle] and [PhaseAngle], the angle of a phasor or of a motor's electrical rotation.
 //!
@@ -77,9 +77,8 @@ crate::quantity! {
     pub struct Pressure = [kg 1, m -1, s -2];
     /// Energy density, w: energy per volume, not a pressure.
     pub struct EnergyDensity = kind [kg 1, m -1, s -2];
-    /// Heat capacity, C: the open root of J/K.
-    pub struct HeatCapacity = [kg 1, m 2, s -2, k -1];
-    /// Entropy, S: not a heat capacity, though both are J/K.
+    /// Entropy, S: not a heat capacity, though both are J/K ([HeatCapacity](crate::units::HeatCapacity) measures
+    /// the dimension's own quantity, a heat capacity).
     pub struct Entropy = kind [kg 1, m 2, s -2, k -1];
 
     /// Damping ratio, ζ, of a second-order system: a number of its own, not a plain ratio.
