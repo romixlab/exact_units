@@ -38,7 +38,7 @@ A line is `<attributes> <visibility> struct <Name> = "<symbol>" [(<names>)], <di
 
 - **Names**, in parentheses after the symbol, all optional: an `ascii` form, the English `long` name and its `plural`, `aliases`, a `ucum` code and the `prefixes` the unit takes. Text reads and writes the unit through them; [Unit names and text](names.md) has the details.
 
-- **Dimension**: exponents of `s`, `m`, `kg`, `a`, `k`, `mol`, `cd`, `rad`, `bit`, whole or a half (`[kg 1, m 2, s -3, a -1]` is a volt, `[s -1/2]` a half, `[]` a plain number, each exponent ±63½), or `base` for a distinguished base of its own, named by your crate and the marker ([Distinguished bases from other crates](#distinguished-bases-from-other-crates)), or `base(Other)` for a scaled unit on another base of your crate (the decibel on the neper). A true base named twice is a compile error.
+- **Dimension**: exponents of `s`, `m`, `kg`, `a`, `k`, `mol`, `cd`, `rad`, `bit`, whole or a half (`[kg 1, m 2, s -3, a -1]` is a volt, `[s -1/2]` a half, `[]` a plain number, each exponent ±63½), or `base` for a distinguished base of its own, named by your crate and the marker ([Distinguished bases from other crates](#distinguished-bases-from-other-crates)), or `base(Other)` for a scaled unit on another base of your crate (the decibel on the neper). A true base named twice is a compile error. A unit of another system than SI names it before the bracket, `System:` then its own base symbols: `[Gaussian: g 1/2, cm -1/2, s -1]` for the gauss ([Systems of units](../maths/systems.md)); the scale that follows is then the factor to that system's own coherent unit, not SI's. `System` is any marker in scope that implements the [`System`](../maths/systems.md#declaring-your-own-system) trait, this crate's three included, so a crate's own system (and its units) joins the same way.
 - **Scale**, an exact [`Magnitude`](../nomicon/magnitude.md), one when left out: `Pow10(-3)`, or `Exact(num / den, pow10 e, pow2 e, pi e)`. A unit has no offset: a scale with a zero of its own, like °C, is an [origin](../points/points.md) of points.
 - **Quantity**, after the dimension: `quantity Resistance` names the [quantity](../maths/quantities.md) the unit measures by default, in place of its dimension's open root (`Ohm` is a resistance, not a plain V/A). A line without one measures its dimension's own quantity.
 - **Provenance**, after the scale: `conventional("NIST SP 811", 2008)` marks a unit fixed by a measured property (inHg at 32 °F) rather than a definition.
@@ -67,8 +67,8 @@ let _ = <Of<CableLength, Meter>>::DIM;
 
 A line is `<attributes> <visibility> struct <Name>` and then:
 
-- `= [<base> <exponent>, ..]`: a root of its dimension, written as on a `unit!` line. It is that dimension's *open* root, the quantity a unit without one measures; a dimension has at most one.
-- `= kind [..]`: a root that is a kind of its own, which converts with no other quantity of its dimension.
+- `= [<base> <exponent>, ..]`: a root of its dimension, written as on a `unit!` line, a system named before the bracket too (`[Gaussian: g 1/2, cm -1/2, s -1]`). It is that dimension's *open* root, the quantity a unit without one measures; a dimension has at most one.
+- `= kind [..]`: a root that is a kind of its own, which converts with no other quantity of its dimension. Gaussian's B, H and the rest of its electromagnetic quantities are all `kind` roots of the one dimension, since the dimension alone can't tell them apart ([Systems of units](../maths/systems.md)).
 - `: Parent`: a child of the quantity `Parent`, of its dimension; it converts up to `Parent` and is reached from it only by a named step.
 - `: kind Parent`: a child that is a kind of its own: reached from `Parent` and back only by a named step.
 

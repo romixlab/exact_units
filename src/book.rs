@@ -31,6 +31,8 @@ pages! {
     Rounding = "maths/rounding.md";
     Overflow = "maths/overflow.md";
     Quantities = "maths/quantities.md";
+    #[cfg(feature = "systems")]
+    Systems = "maths/systems.md";
     Niches = "maths/niches.md";
     QFormats = "fixed_point/q_formats.md";
     Bam = "fixed_point/bam.md";

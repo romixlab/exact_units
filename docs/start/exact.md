@@ -186,6 +186,22 @@ let _ = oe.convert_rounded::<Per<Ampere, Meter>, One, f64>(Rounding::NearestEven
 
 [Measured constants](../nomicon/constants.md) has the sets, the uncertainty and the half powers Gaussian units need.
 
+The oersted above is a stand-in: this crate ships the real [Gaussian system](../maths/systems.md), where almost
+every unit's own factor into SI carries μ₀ the same way, and the named step is `Fixed::to_system`, not a plain
+`convert`:
+
+```rust
+# #[cfg(feature = "systems")] {
+use exact_units::{Fixed, Rounding, prefix::{Micro, One}, units::MagneticFieldStrength};
+use exact_units::constants::Codata2022;
+use exact_units::systems::{Si, gaussian::Oersted};
+
+let h = Fixed::<Oersted, One, i32>::new(1);
+let a = h.to_system::<Si>().convert_rounded_with::<Codata2022, MagneticFieldStrength, Micro, i64>(Rounding::NearestEven);
+assert_eq!(a, Some(Fixed::new(79_577_472))); // 1000/(4π) A/m, to the µA/m
+# }
+```
+
 ## 5. Conventions are opt-ins
 
 Where there is more than one sensible answer, the crate gives each its own name and makes you pick. An ADC step is $V_{ref}/2^N$ in one convention and $V_{ref}/(2^N - 1)$ in another; they are two markers:

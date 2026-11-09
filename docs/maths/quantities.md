@@ -216,6 +216,38 @@ let gain: Fixed<Per<Volt, Volt>, One, f32> = Fixed::bounded(4.0);
 let _ = gain.convert::<Ratio, One, f32>();
 ```
 
+## Some dimensions have no open root at all
+
+A unit whose line names no quantity measures its dimension's open root — except where a dimension has none.
+C/m² is the SI dimension of three quantities at once: the displacement field D, the polarization P and the
+surface density of charge σ; A/m is the dimension of the magnetizing field H, the magnetization M and a linear
+current density. None of the three is the dimension's "default" meaning, because [Gaussian units](systems.md)
+count two of each trio 4π apart (D and P, H and M) even though SI's own numbers for them agree: picking one as
+open would let the other cross silently wrong. So this crate declares `ElectricFluxDensity` (D),
+`ElectricPolarization` (P, a kind under D) and `SurfaceChargeDensity`, and `MagnetizingField` (H),
+`Magnetization` (M, a kind under H) and `LinearCurrentDensity`, every one a kind, and `Derived` of C/m² or A/m is
+none of them.
+
+The unit lines `ElectricDisplacement` and `MagneticFieldStrength` still name their quantity (`quantity
+ElectricFluxDensity`, `quantity MagnetizingField`), so a value typed in one of them is already D or H. Building
+the dimension from scratch, `Per<Ampere, Meter>`, gives the plain derived quantity instead, and reaching H from it
+is the same named step as Ohm's:
+
+```rust
+# #[cfg(all(feature = "electrical", feature = "fields"))] {
+use exact_units::{Fixed, prefix::One, quantities::MagnetizingField, units::{Ampere, Meter, Of, Per}};
+
+let raw = Fixed::<Per<Ampere, Meter>, One, i32>::new(500); // a plain A/m: not H until named
+let h: Fixed<Of<MagnetizingField, Per<Ampere, Meter>>, One, i32> = raw.as_quantity::<MagnetizingField>();
+assert_eq!(h.get(), 500);
+# }
+```
+
+```rust,compile_fail
+use exact_units::{Fixed, prefix::One, units::{Ampere, MagneticFieldStrength, Meter, Per}};
+let _ = Fixed::<Per<Ampere, Meter>, One, f32>::bounded(500.0).convert::<MagneticFieldStrength, One, f32>();
+```
+
 ## Named steps this crate ships
 
 | From | Step | To |

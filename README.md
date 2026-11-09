@@ -78,6 +78,7 @@ The API reference is on [docs.rs](https://docs.rs/exact_units).
 |---------------|------------------------------------------------------------------------------------------------------|
 | none          | `Dim`, `Magnitude`, `Fixed`, `Point`, `Exact` and their ops as plain Rust types, no dependencies     |
 | unit groups   | `time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`, `radiometric`, `radiation`, `fields`, `dimensionless`, `information`, `counting`, `levels`; `quantities` for all |
+| `systems`     | `Natural` (ħ = c = 1) and `Gaussian` (cm, g, s) beside SI, and the named step `Fixed::to_system` that bridges them; in `quantities` |
 | `q`           | `q!(100 m/s)`, the literal that names its unit, compared exactly with a `Fixed`; a proc-macro of this repository without dependencies (default) |
 | `customary`   | imperial, US customary and other units outside the SI (opt-in only)                                  |
 | `leap_seconds` | the leap-second table and `Point::across` between POSIX time and TAI (opt-in only)                  |
