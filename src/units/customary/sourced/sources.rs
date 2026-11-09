@@ -20,13 +20,16 @@ pub(crate) enum Src {
     Eec80181,
     /// 21 CFR 101.9(b)(5)(viii): household measures for US nutrition labeling.
     Cfr21_101_9,
+    /// Council Directive 71/354/EEC (units of measurement), Annex Chapter III, the English special edition (read
+    /// 9 Nov 2026): torr, conventional mmHg and mH2O, metric horsepower.
+    Eec71354,
     /// No fetched primary source states this definition; the `at` text says what is missing.
     Unsourced,
 }
 
 impl Src {
     /// Every document cited (all but `Unsourced`), in the order of the docs page.
-    pub(crate) const CITED: [Src; 9] = [
+    pub(crate) const CITED: [Src; 10] = [
         Src::Yd1959,
         Src::Sp811,
         Src::Hb44,
@@ -36,6 +39,7 @@ impl Src {
         Src::Fr2020,
         Src::Eec80181,
         Src::Cfr21_101_9,
+        Src::Eec71354,
     ];
 
     pub(crate) fn title(self) -> &'static str {
@@ -59,6 +63,9 @@ impl Src {
                 "Council Directive 80/181/EEC of 20 December 1979 on units of measurement"
             }
             Src::Cfr21_101_9 => "21 CFR 101.9 Nutrition labeling of food",
+            Src::Eec71354 => {
+                "Council Directive 71/354/EEC of 18 October 1971 on units of measurement, Annex Chapter III"
+            }
             Src::Unsourced => "unsourced",
         }
     }
@@ -76,6 +83,9 @@ impl Src {
             Src::Fr2020 => "https://www.govinfo.gov/content/pkg/FR-2020-10-05/pdf/2020-21902.pdf",
             Src::Eec80181 => "https://www.legislation.gov.uk/eudr/1980/181/annex",
             Src::Cfr21_101_9 => "https://www.ecfr.gov/current/title-21/section-101.9",
+            Src::Eec71354 => {
+                "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:31971L0354"
+            }
             Src::Unsourced => "",
         }
     }

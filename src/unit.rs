@@ -1131,6 +1131,13 @@ mod owned_defs {
 
 /// Where a named unit's scale comes from. On the wire (in an API model's `UnitDef`) an evolvable enum, so a later
 /// kind of source can be added.
+///
+/// There is no `Default`: a unit read from data says where its scale comes from, and one that doesn't is refused
+/// rather than taken for a definition.
+///
+/// ```compile_fail
+/// let p = exact_units::Provenance::default();
+/// ```
 #[cfg_attr(
     feature = "shrink_wrap",
     derive_shrink_wrap(
@@ -1148,8 +1155,7 @@ mod owned_defs {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Provenance<'i> {
-    /// The scale is the unit's definition: exact by law or by the SI (a foot is 0.3048 m). The default: what a
-    /// unit read from data without a provenance has.
+    /// The scale is the unit's definition: exact by law or by the SI (a foot is 0.3048 m).
     Defined,
     /// The unit is fixed by a physical property (mercury at 32 °F, a calorie at 15 °C): its scale is the value a
     /// source prints, exact in this crate but only by convention, and a newer measurement may differ.
@@ -1159,25 +1165,6 @@ pub enum Provenance<'i> {
         /// Its edition.
         year: u16,
     },
-}
-
-// written out: derive_shrink_wrap drops a variant's `#[default]`, so `derive(Default)` can't see it
-#[expect(
-    clippy::derivable_impls,
-    reason = "derive_shrink_wrap drops a variant's #[default]"
-)]
-impl Default for Provenance<'_> {
-    fn default() -> Self {
-        Provenance::Defined
-    }
-}
-
-#[cfg(all(feature = "std", feature = "shrink_wrap"))]
-#[expect(clippy::derivable_impls, reason = "the owned mirror of the impl above")]
-impl Default for ProvenanceOwned {
-    fn default() -> Self {
-        ProvenanceOwned::Defined
-    }
 }
 
 /// A unit as a tree: named units, and products and quotients of them (`Per<Torque, AngularVelocity>` is

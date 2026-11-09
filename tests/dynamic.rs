@@ -761,3 +761,22 @@ fn ref_bytes() {
     assert_eq!(owned.to_ww_bytes_owned().unwrap(), bytes);
     assert_eq!(SIExprOwned::from_ww_bytes_owned(&bytes).unwrap(), owned);
 }
+
+/// A unit read with serde says where its scale comes from: one without a provenance is refused, never taken for a
+/// definition (`Provenance` has no `Default`).
+#[cfg(feature = "serde")]
+#[test]
+fn serde_def_without_provenance_is_refused() {
+    let Some(volt) = <units::Volt as Unit>::EXPR.def() else {
+        panic!("Volt is a named unit")
+    };
+    let Ok(serde_json::Value::Object(mut json)) = serde_json::to_value(UnitDefOwned::from(*volt))
+    else {
+        panic!("a UnitDefOwned is a JSON object")
+    };
+    let full = serde_json::Value::Object(json.clone());
+    assert!(serde_json::from_value::<UnitDefOwned>(full).is_ok());
+    assert!(json.remove("provenance").is_some());
+    let without = serde_json::Value::Object(json);
+    assert!(serde_json::from_value::<UnitDefOwned>(without).is_err());
+}

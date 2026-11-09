@@ -239,6 +239,18 @@ fn literals_the_sources_state() {
     // SP 811 bold: gon = 0.9°, NATO mil = 0.056 25°
     assert_eq!(unit("gon").mag, DEG.mul(Mag::dec(9, -1)));
     assert_eq!(unit("mil_nato").mag, DEG.mul(Mag::dec(5625, -5)));
+    // 71/354/EEC Ch. III: torr = 101 325/760 Pa, PS = 735.498 75 W, mmHg (conv) = 13.5951 mmH2O, mH2O = 9 806.65 Pa
+    assert_eq!(unit("torr").mag, Mag::ratio(101325, 760));
+    eq(unit("horsepower_metric").mag, 73549875, -5);
+    let mm_h2o = Mag::dec(980665, -5);
+    assert_eq!(
+        unit("millimetre_of_mercury_conventional").mag,
+        mm_h2o.mul(Mag::dec(135951, -4))
+    );
+    assert_eq!(
+        unit("inch_of_mercury_conventional").mag,
+        IN.mul(Mag::int(1000)).mul(mm_h2o.mul(Mag::dec(135951, -4)))
+    );
     // SI 8 Table 6: 1′ = π/10 800 rad, 1″ = π/648 000 rad
     assert_eq!(unit("arcminute").mag, Mag::PI.over(10800));
     assert_eq!(unit("arcsecond").mag, Mag::PI.over(648000));
@@ -458,7 +470,7 @@ fn no_bare_ambiguous_name() {
 #[test]
 fn unsourced_definitions_are_deliberate() {
     // Definitions no fetched primary source states. SP 811 prints a value for most of them, which the tests above
-    // check, but the defining relation itself is from ISO 80000, DIN 66036 or tradition: add to this list only
+    // check, but the defining relation itself is from ISO 80000 or tradition: add to this list only
     // with a reason in the unit's `Unsourced` cite.
     let unsourced: Vec<_> = UNITS
         .iter()
@@ -474,12 +486,7 @@ fn unsourced_definitions_are_deliberate() {
             "ton_register",
             "slug",
             "poundal",
-            "inch_of_mercury_conventional",
-            "foot_of_mercury_conventional",
-            "millimetre_of_mercury_conventional",
-            "torr",
             "foot_poundal",
-            "horsepower_metric",
             "mil_warsaw_pact",
             "streck_swedish",
         ]

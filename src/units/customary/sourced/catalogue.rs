@@ -86,7 +86,7 @@ pub(super) const BTU_IT: Mag = CAL_IT.times(1000).mul(LB).mul(DEG_F);
 
 pub(super) const BTU_TH: Mag = CAL_TH.times(1000).mul(LB).mul(DEG_F);
 
-/// Conventional mercury density, 13 595.1 kg/m³ (ISO 80000-4, not fetched).
+/// Conventional mercury density, 13 595.1 kg/m³: 71/354/EEC's conventional 1 mmHg = 13.5951 mmH2O, water at 1000 kg/m³.
 pub(super) const HG: Mag = Mag::dec(135951, -1);
 
 /// Conventional water density, 1000 kg/m³ (SP 811 B.8 prints mmH2O conventional = 9.80665 Pa, bold).
@@ -135,6 +135,10 @@ const C_SP_B8: Cite = Cite(Sp811, "B.8 row of this unit");
 const C_SP_FN12: Cite = Cite(
     Sp811,
     "B.8 footnote 12: manometer units from g_n and the liquid's density; conventional ones per ISO 80000",
+);
+const C_EEC71_HG: Cite = Cite(
+    Eec71354,
+    "Ch. III 8.3: conventional 1 mmHg = 13.5951 mmH2O, 1 mH2O = 9 806.65 Pa",
 );
 const C_WMA4: Cite = Cite(Wma1985, "Sch. 1 Pt IV (imperial units of volume)");
 const C_WMA5: Cite = Cite(Wma1985, "Sch. 1 Pt V (imperial units of mass)");
@@ -284,11 +288,11 @@ pub(crate) static UNITS: &[Unit] = &[
     Unit::new("psi", "pound-force per square inch", "psi", PRESSURE, LBF.div(IN2), "lbf/in²", &[C_SP_B8]).sp("6.894757", 3),
     Unit::new("ksi", "kip per square inch", "ksi", PRESSURE, LBF.div(IN2).times(1000), "kip/in²", &[C_SP_B8]).sp("6.894757", 6),
     Unit::new("psf", "pound-force per square foot", "psf", PRESSURE, LBF.div(FT2), "lbf/ft²", &[C_SP_B8]).sp("4.788026", 1),
-    Unit::new("inch_of_mercury_conventional", "inch of mercury (conventional)", "inHg (conv)", PRESSURE, IN.mul(HG).mul(GN), "1 in · 13 595.1 kg/m³ · g_n", &[C_SP_FN12, Cite(Unsourced, "conventional mercury density 13 595.1 kg/m³ is ISO 80000-4, not fetched"), C_SP_B8]).sp("3.386389", 3),
-    Unit::new("foot_of_mercury_conventional", "foot of mercury (conventional)", "ftHg (conv)", PRESSURE, FT.mul(HG).mul(GN), "1 ft · 13 595.1 kg/m³ · g_n", &[C_SP_FN12, Cite(Unsourced, "conventional mercury density 13 595.1 kg/m³ is ISO 80000-4, not fetched"), C_SP_B8]).sp("4.063666", 4),
-    Unit::new("millimetre_of_mercury_conventional", "millimetre of mercury (conventional)", "mmHg (conv)", PRESSURE, Mag::dec(1, -3).mul(HG).mul(GN), "1 mm · 13 595.1 kg/m³ · g_n", &[C_SP_FN12, Cite(Unsourced, "conventional mercury density 13 595.1 kg/m³ is ISO 80000-4, not fetched"), C_SP_B8]).sp("1.333224", 2),
+    Unit::new("inch_of_mercury_conventional", "inch of mercury (conventional)", "inHg (conv)", PRESSURE, IN.mul(HG).mul(GN), "1 in · 13 595.1 kg/m³ · g_n", &[C_SP_FN12, C_EEC71_HG, C_SP_B8]).sp("3.386389", 3),
+    Unit::new("foot_of_mercury_conventional", "foot of mercury (conventional)", "ftHg (conv)", PRESSURE, FT.mul(HG).mul(GN), "1 ft · 13 595.1 kg/m³ · g_n", &[C_SP_FN12, C_EEC71_HG, C_SP_B8]).sp("4.063666", 4),
+    Unit::new("millimetre_of_mercury_conventional", "millimetre of mercury (conventional)", "mmHg (conv)", PRESSURE, Mag::dec(1, -3).mul(HG).mul(GN), "1 mm · 13 595.1 kg/m³ · g_n", &[C_SP_FN12, C_EEC71_HG, C_SP_B8]).sp("1.333224", 2),
     Unit::new("millimetre_of_mercury_eu", "millimetre of mercury (EU legal, blood pressure)", "mmHg (EU)", PRESSURE, Mag::dec(133322, -3), "133.322 Pa", &[Cite(Eec80181, "Annex ch. II: 1 mm Hg = 133,322 Pa (blood pressure)"), Cite(SiBrochure8, "Table 8: 1 mmHg ≈ 133.322 Pa")]),
-    Unit::new("torr", "torr", "Torr", PRESSURE, Mag::ratio(101325, 760), "1/760 atm", &[Cite(Unsourced, "1/760 atm not stated in the fetched texts; SP 811 B.8 prints the matching value"), C_SP_B8]).sp("1.333224", 2),
+    Unit::new("torr", "torr", "Torr", PRESSURE, Mag::ratio(101325, 760), "1/760 atm", &[Cite(Eec71354, "Ch. III 8.3: 1 torr = 101 325/760 Pa"), C_SP_B8]).sp("1.333224", 2),
     Unit::new("inch_of_mercury_32f", "inch of mercury (32 °F)", "inHg (32 °F)", PRESSURE, Mag::dec(338638, -2), "measured: mercury density at 32 °F", &[C_SP_FN12, C_SP_B8]).sp("3.38638", 3).measured(),
     Unit::new("inch_of_mercury_60f", "inch of mercury (60 °F)", "inHg (60 °F)", PRESSURE, Mag::dec(337685, -2), "measured: mercury density at 60 °F", &[C_SP_FN12, C_SP_B8]).sp("3.37685", 3).measured(),
     Unit::new("inch_of_water_conventional", "inch of water (conventional)", "inH2O (conv)", PRESSURE, IN.mul(WATER).mul(GN), "1 in · 1000 kg/m³ · g_n", &[C_SP_FN12, C_SP_B8]).sp("2.490889", 2),
@@ -324,7 +328,7 @@ pub(crate) static UNITS: &[Unit] = &[
     Unit::new("horsepower_hour", "horsepower hour (mechanical)", "hp·h", ENERGY, HP_MECH.mul(HOUR), "hp · 3600 s", &[Cite(Sp811, "B.8 row horsepower (550 ft·lbf/s)")]),
     // ---- power ----
     Unit::new("horsepower_mechanical", "horsepower (mechanical, 550 ft·lbf/s)", "hp (mech)", POWER, HP_MECH, "550 ft·lbf/s", &[Cite(Sp811, "B.8 row label: horsepower (550 ft·lbf/s)")]).sp("7.456999", 2),
-    Unit::new("horsepower_metric", "horsepower (metric, PS)", "PS", POWER, GN.times(75), "75 kgf·m/s", &[Cite(Unsourced, "75 kgf·m/s is DIN 66036, not fetched; SP 811 B.8 prints the matching value"), C_SP_B8]).sp("7.354988", 2),
+    Unit::new("horsepower_metric", "horsepower (metric, PS)", "PS", POWER, GN.times(75), "75 kgf·m/s", &[Cite(Eec71354, "Ch. III 8.4: 1 PS = 735.498 75 W, 1 kgf = 9.806 65 N"), C_SP_B8]).sp("7.354988", 2),
     Unit::new("horsepower_electric", "horsepower (electric)", "hp (elec)", POWER, Mag::int(746), "746 W", &[C_SP_B8]).bold("7.46", 2),
     Unit::new("horsepower_boiler", "horsepower (boiler)", "hp (boiler)", POWER, Mag::dec(980950, -2), "evaporation rate of water; no exact definition fits SP 811's value", &[C_SP_B8]).sp("9.80950", 3).measured(),
     Unit::new("horsepower_water", "horsepower (water)", "hp (water)", POWER, Mag::dec(746043, -3), "measured", &[C_SP_B8]).sp("7.46043", 2).measured(),

@@ -544,7 +544,8 @@ crate::unit! {
     #[cfg(feature = "radiation")]
     pub struct Sievert = "Sv", [m 2, s -2];
 
-    /// Energy in electron-volts, eV (1.602176634·10⁻¹⁹ J).
+    /// Energy in electron-volts, eV: 1.602176634·10⁻¹⁹ J exactly, the elementary charge times a volt (SI Brochure, 9th
+    /// ed., table 8; exact since the 2019 SI fixed e).
     #[cfg(feature = "radiation")]
     pub struct ElectronVolt = "eV", [kg 1, m 2, s -2], Exact(1602176634 / 1, pow10 -28);
 

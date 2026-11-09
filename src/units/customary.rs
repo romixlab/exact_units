@@ -708,21 +708,21 @@ crate::unit! {
     /// Inch of mercury (conventional): 1 in · 13 595.1 kg/m³ · g_n.
     ///
     /// - NIST SP 811: B.8 footnote 12: manometer units from g_n and the liquid's density; conventional ones per ISO 80000
-    /// - Unsourced: conventional mercury density 13 595.1 kg/m³ is ISO 80000-4, not fetched
+    /// - 71/354/EEC: Ch. III 8.3: conventional 1 mmHg = 13.5951 mmH2O, 1 mH2O = 9 806.65 Pa
     /// - NIST SP 811: B.8 row of this unit
     pub struct InchOfMercuryConventional = "inHg (conv)", [s -2, m -1, kg 1], Exact(3386388640341 / 1, pow10 -9);
 
     /// Foot of mercury (conventional): 1 ft · 13 595.1 kg/m³ · g_n.
     ///
     /// - NIST SP 811: B.8 footnote 12: manometer units from g_n and the liquid's density; conventional ones per ISO 80000
-    /// - Unsourced: conventional mercury density 13 595.1 kg/m³ is ISO 80000-4, not fetched
+    /// - 71/354/EEC: Ch. III 8.3: conventional 1 mmHg = 13.5951 mmH2O, 1 mH2O = 9 806.65 Pa
     /// - NIST SP 811: B.8 row of this unit
     pub struct FootOfMercuryConventional = "ftHg (conv)", [s -2, m -1, kg 1], Exact(10159165921023 / 1, pow10 -9, pow2 2);
 
     /// Millimetre of mercury (conventional): 1 mm · 13 595.1 kg/m³ · g_n.
     ///
     /// - NIST SP 811: B.8 footnote 12: manometer units from g_n and the liquid's density; conventional ones per ISO 80000
-    /// - Unsourced: conventional mercury density 13 595.1 kg/m³ is ISO 80000-4, not fetched
+    /// - 71/354/EEC: Ch. III 8.3: conventional 1 mmHg = 13.5951 mmH2O, 1 mH2O = 9 806.65 Pa
     /// - NIST SP 811: B.8 row of this unit
     pub struct MillimetreOfMercuryConventional = "mmHg (conv)", [s -2, m -1, kg 1], Exact(26664477483 / 1, pow10 -8, pow2 -1);
 
@@ -734,7 +734,7 @@ crate::unit! {
 
     /// Torr: 1/760 atm.
     ///
-    /// - Unsourced: 1/760 atm not stated in the fetched texts; SP 811 B.8 prints the matching value
+    /// - 71/354/EEC: Ch. III 8.3: 1 torr = 101 325/760 Pa
     /// - NIST SP 811: B.8 row of this unit
     pub struct Torr = "Torr", [s -2, m -1, kg 1], Exact(4053 / 19, pow10 1, pow2 -4);
 
@@ -925,7 +925,7 @@ crate::unit! {
 
     /// Horsepower (metric, PS): 75 kgf·m/s.
     ///
-    /// - Unsourced: 75 kgf·m/s is DIN 66036, not fetched; SP 811 B.8 prints the matching value
+    /// - 71/354/EEC: Ch. III 8.4: 1 PS = 735.498 75 W, 1 kgf = 9.806 65 N
     /// - NIST SP 811: B.8 row of this unit
     pub struct HorsepowerMetric = "PS", [s -3, m 2, kg 1], Exact(588399 / 1, pow10 -2, pow2 -3);
 

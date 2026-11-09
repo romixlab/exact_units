@@ -118,7 +118,7 @@ Rational<5, 9>, T>`.
 A pressure in inches or millimetres of mercury or of water depends on the density of the liquid, which depends on its
 temperature. The markers say which one they are:
 
-- conventional, a defined density and g_n: `InchOfMercuryConventional` (13 595.1 kg/m³, ISO 80000-4),
+- conventional, a defined density and g_n: `InchOfMercuryConventional` (13 595.1 kg/m³, 71/354/EEC),
   `MillimetreOfMercuryConventional` (133.322 387 415 Pa), `InchOfWaterConventional` (1000 kg/m³); and `Torr`,
   101 325/760 Pa, and the EU's legal `MillimetreOfMercuryEu`, 133.322 Pa;
 - at a stated temperature, `InchOfMercury32f`, `InchOfWater39f`: measured.
@@ -173,11 +173,12 @@ Every definition is from one of these documents, each read in full; a unit's doc
 - [Federal Register 85 FR 62698 (5 Oct 2020), deprecation of the U.S. survey foot](https://www.govinfo.gov/content/pkg/FR-2020-10-05/pdf/2020-21902.pdf)
 - [Council Directive 80/181/EEC of 20 December 1979 on units of measurement](https://www.legislation.gov.uk/eudr/1980/181/annex)
 - [21 CFR 101.9 Nutrition labeling of food](https://www.ecfr.gov/current/title-21/section-101.9)
+- [Council Directive 71/354/EEC of 18 October 1971 on units of measurement, Annex Chapter III](https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:31971L0354)
 
 <!-- end: sources -->
 
 A few definitions are stated by no document above. SP 811 prints a matching value for most of them, which the tests
-check, but the defining relation is from ISO 80000, DIN or tradition:
+check, but the defining relation is from tradition or a document not fetched:
 
 <!-- generated: unsourced -->
 
@@ -189,12 +190,7 @@ check, but the defining relation is from ISO 80000, DIN or tradition:
 | `TonRegister` | 100 ft³ | 100 ft³ (Moorsom) not stated in the fetched texts; SP 811 B.8 prints the matching value |
 | `Slug` | lbf·s²/ft | lbf·s²/ft not stated in the fetched texts; SP 811 B.8 prints the matching value |
 | `Poundal` | lb·ft/s² | lb·ft/s² not stated in the fetched texts; SP 811 B.8 prints the matching value |
-| `InchOfMercuryConventional` | 1 in · 13 595.1 kg/m³ · g_n | conventional mercury density 13 595.1 kg/m³ is ISO 80000-4, not fetched |
-| `FootOfMercuryConventional` | 1 ft · 13 595.1 kg/m³ · g_n | conventional mercury density 13 595.1 kg/m³ is ISO 80000-4, not fetched |
-| `MillimetreOfMercuryConventional` | 1 mm · 13 595.1 kg/m³ · g_n | conventional mercury density 13 595.1 kg/m³ is ISO 80000-4, not fetched |
-| `Torr` | 1/760 atm | 1/760 atm not stated in the fetched texts; SP 811 B.8 prints the matching value |
 | `FootPoundal` | ft · pdl | poundal = lb·ft/s² not stated in the fetched texts |
-| `HorsepowerMetric` | 75 kgf·m/s | 75 kgf·m/s is DIN 66036, not fetched; SP 811 B.8 prints the matching value |
 | `MilWarsawPact` | 1/6000 turn | 1/6000 turn: no primary source fetched |
 | `StreckSwedish` | 1/6300 turn | 1/6300 turn: no primary source fetched |
 
