@@ -13,6 +13,7 @@
 mod arith;
 #[cfg(feature = "levels")]
 mod damping;
+mod dim;
 mod exact;
 #[cfg(not(kani))]
 mod exact_text;
