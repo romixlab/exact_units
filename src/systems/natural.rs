@@ -22,6 +22,12 @@
 //! A frequency doesn't cross: E = hf and E = ħω differ by 2π, so `Hertz` (and any s⁻¹) has no rule. An angular
 //! frequency keeps its radian: rad/s becomes rad·eV by ħ, an energy only once the radian is stripped there.
 //!
+//! ```compile_fail
+//! use exact_units::{Fixed, prefix::One, units::Hertz};
+//! use exact_units::systems::{Natural, natural::NaturalElectronVolt};
+//! let _ = Fixed::<Hertz, One, i64>::new(1).to_system::<Natural>().convert::<NaturalElectronVolt, One, i64>();
+//! ```
+//!
 //! **Dimension one is wider here.** E·L, m·L and an action (J·s) are dimension one in Natural, so the quantity rule
 //! "a dimension-one factor keeps the other's quantity" applies to more products. It names nothing by accident: no
 //! quantity of [quantities](crate::quantities) has a Natural dimension, so every Natural quantity is its

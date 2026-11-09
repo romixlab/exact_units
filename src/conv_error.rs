@@ -13,16 +13,16 @@ use crate::unit::superscript_digit;
 use crate::{Dim, Exp, MarkerId, QuantityExpr, QuantityRef, Unit, UnitExpr};
 
 /// Text written into a buffer on the stack, for a `panic!("{}", msg.as_str())` right after. A push that wouldn't
-/// fit whole is dropped whole (never split a char in half: [as_str](Self::as_str) always decodes); a cut-off
-/// message is still readable, and no message built here comes close to [Msg::CAP] (a unit's name and symbol are a
-/// handful of characters, a `Dim` at most a few dozen).
+/// fit whole is dropped whole (never split a char in half: [as_str](Self::as_str) always decodes), so a cut-off
+/// message is still readable. [Msg::CAP] holds the longest message built here, a missing bridge between two
+/// products of units with its reason last (`tests/compile_fail/no_bridge.stderr` pins it whole).
 struct Msg {
     bytes: [u8; Msg::CAP],
     len: usize,
 }
 
 impl Msg {
-    const CAP: usize = 320;
+    const CAP: usize = 768;
 
     const fn new() -> Self {
         Msg {

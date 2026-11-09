@@ -42,6 +42,7 @@ fn compile_fail() {
     t.compile_fail("tests/compile_fail/kind_mismatch.rs");
     t.compile_fail("tests/compile_fail/literal_mismatch.rs");
     t.compile_fail("tests/compile_fail/fixed_inexact.rs");
+    t.compile_fail("tests/compile_fail/no_bridge.rs");
 }
 
 /// The refusals of `q!`, with the pass fixture so the batch is built, not checked (a wrong dimension panics only

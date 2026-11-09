@@ -31,6 +31,33 @@
 //! let _ = Fixed::<Oersted, One, f64>::try_new(1.0).unwrap().to_system::<Si>().convert::<MagneticFieldStrength, One, f64>();
 //! ```
 //!
+//! A unit with no quantity of its own crosses only where its dimension tells the factor, and in electromagnetism it
+//! doesn't: an unnamed C/m² may be D, P or a surface charge density, whose Gaussian factors are 4π apart.
+//!
+//! ```compile_fail
+//! use exact_units::{Fixed, prefix::One, units::{Coulomb, Meter, Per, Times}};
+//! use exact_units::systems::{Gaussian, gaussian::{GaussianCentimeter, Statcoulomb}};
+//! let d = Fixed::<Per<Coulomb, Times<Meter, Meter>>, One, i64>::new(1);
+//! let _ = d.to_system::<Gaussian>().convert::<Per<Statcoulomb, Times<GaussianCentimeter, GaussianCentimeter>>, One, i64>();
+//! ```
+//!
+//! Nor does a product of units that cross only by rows, either way: an unnamed E×H is no Poynting flux until it is
+//! converted to a named unit within its own system.
+//!
+//! ```compile_fail
+//! use exact_units::{Fixed, prefix::One, units::{MagneticFieldStrength, Meter, Per, Times, Volt}};
+//! use exact_units::systems::{Gaussian, gaussian::{Erg, GaussianCentimeter, GaussianSecond}};
+//! let p = Fixed::<Per<Volt, Meter>, One, i64>::new(1) * Fixed::<MagneticFieldStrength, One, i64>::new(1);
+//! let _ = p.to_system::<Gaussian>().convert::<Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>>, One, i64>();
+//! ```
+//!
+//! ```compile_fail
+//! use exact_units::{Fixed, prefix::One, units::{Meter, Per, Times, Watt}};
+//! use exact_units::systems::{Si, gaussian::{GaussianCentimeter, Oersted, Statvolt}};
+//! let p = Fixed::<Per<Statvolt, GaussianCentimeter>, One, i64>::new(1) * Fixed::<Oersted, One, i64>::new(1);
+//! let _ = p.to_system::<Si>().convert::<Per<Watt, Times<Meter, Meter>>, One, i64>();
+//! ```
+//!
 //! B and H are two kinds of one dimension here, so they don't add:
 //!
 //! ```compile_fail

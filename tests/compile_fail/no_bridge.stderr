@@ -1,0 +1,43 @@
+error[E0080]: evaluation panicked: no bridge from Times<Per<Volt, Meter>, MagneticFieldStrength> (V/m·A/m) (its dimension's quantity, kg·s⁻³) to Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>> (erg/s·cm·cm) (its dimension's quantity, g·s⁻³ (Gaussian)): a product of units that cross only by rows doesn't take the rule (an unnamed E×H): name the quantity or convert to a named unit of its system first
+ --> src/fixed/across.rs
+  |
+  |         let c = const { Conversion::across::<S, U, P, U2, P2, T, T2>(false) };
+  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::Across::<exact_units::systems::Gaussian, exact_units::units::Times<exact_units::units::Per<exact_units::units::Volt, exact_units::units::Meter>, exact_units::units::MagneticFieldStrength>, exact_units::prefix::Product<exact_units::prefix::One, exact_units::prefix::One>, i64, exact_units::Unbounded>::convert::<exact_units::units::Per<exact_units::systems::gaussian::Erg, exact_units::units::Times<exact_units::systems::gaussian::GaussianSecond, exact_units::units::Times<exact_units::systems::gaussian::GaussianCentimeter, exact_units::systems::gaussian::GaussianCentimeter>>>, exact_units::prefix::One, i64>::{constant#0}` failed inside this call
+  |
+note: inside `exact_units::fixed::Conversion::across::<Gaussian, Times<Per<Volt, Meter>, MagneticFieldStrength>, exact_units::prefix::Product<One, One>, Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>>, One, i64, i64>`
+ --> src/fixed.rs
+  |
+  |         Self::by::<T, T2>(Self::across_factor::<S, U, P, U2, P2>(), rounding)
+  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `exact_units::fixed::Conversion::across_factor::<Gaussian, Times<Per<Volt, Meter>, MagneticFieldStrength>, exact_units::prefix::Product<One, One>, Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>>, One>`
+ --> src/fixed.rs
+  |
+  |         let bridge = crate::system::typed_bridge::<U, U2>();
+  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `system::typed_bridge::<Times<Per<Volt, Meter>, MagneticFieldStrength>, Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>>>`
+ --> src/system.rs
+  |
+  |         Err(e) => crate::conv_error::no_bridge::<U, U2>(e),
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `exact_units::conv_error::no_bridge::<Times<Per<Volt, Meter>, MagneticFieldStrength>, Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>>>`
+ --> $RUST/core/src/panic.rs
+  |
+  |         $crate::panicking::panic_display(&$arg);
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the failure occurred here
+  |
+ ::: src/conv_error.rs
+  |
+  |     panic!("{}", msg.as_str())
+  |     -------------------------- in this macro invocation
+
+note: erroneous constant encountered
+ --> src/fixed/across.rs
+  |
+  |         let c = const { Conversion::across::<S, U, P, U2, P2, T, T2>(false) };
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+note: the above error was encountered while instantiating `fn Across::<Gaussian, Times<Per<Volt, Meter>, MagneticFieldStrength>, exact_units::prefix::Product<One, One>, i64, exact_units::Unbounded>::convert::<Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>>, One, i64>`
+  --> tests/compile_fail/no_bridge.rs:10:13
+   |
+10 |     let _ = p.to_system::<Gaussian>().convert::<Flux, One, i64>();
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
