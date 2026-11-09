@@ -198,7 +198,8 @@ pub(crate) fn neutral(rad: i8, bit: i8, e: i8) {
     }
 }
 
-/// A dimension of each system goes through the wire and back, to the same bytes, and its owned mirror writes them too.
+/// A dimension of each system goes through the wire and back, to the same bytes and the same system (SI for one
+/// without true exponents), and its owned mirror writes them too.
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
 pub(crate) fn wire(sys: u8, exps: [i8; MAX_TRUE_BASES], rad: i8, bit: i8) {
@@ -214,7 +215,13 @@ pub(crate) fn wire(sys: u8, exps: [i8; MAX_TRUE_BASES], rad: i8, bit: i8) {
     let bytes = d.to_ww_bytes(&mut buf).expect("encodes").to_vec();
     let decoded = Dim::from_ww_bytes(&bytes).expect("decodes");
     assert_eq!(decoded, d);
-    assert_eq!(decoded.system().id(), d.system().id());
+    // a dimension without true exponents is written as SI's, whichever system it names: one encoding per dimension
+    let system = if d.has_true_exps() {
+        d.system().id()
+    } else {
+        Si::ID
+    };
+    assert_eq!(decoded.system().id(), system);
     let mut buf2 = vec![0u8; 1 << 12];
     assert_eq!(
         decoded.to_ww_bytes(&mut buf2).expect("encodes"),
@@ -225,7 +232,7 @@ pub(crate) fn wire(sys: u8, exps: [i8; MAX_TRUE_BASES], rad: i8, bit: i8) {
     let back = exact_units::DimOwned::from_ww_bytes_owned(&bytes).expect("decodes");
     assert_eq!(back, owned);
     assert_eq!(back.as_dim(), d);
-    assert_eq!(back.as_dim().system().id(), d.system().id());
+    assert_eq!(back.as_dim().system().id(), system);
 }
 
 #[cfg(all(test, feature = "std", feature = "shrink_wrap"))]
