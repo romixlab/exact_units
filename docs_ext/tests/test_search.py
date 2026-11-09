@@ -14,7 +14,7 @@ import pytest
 
 ROOT = Path(__file__).parents[2]
 SITE = os.environ.get("EU_SITE")
-MACROS = ["fixed!", "q!", "db!", "np!", "unit!", "scale!", "origin!", "niches!", "counted!"]
+MACROS = ["fixed!", "q!", "db!", "np!", "unit!", "scale!", "origin!", "niches!", "base!"]
 
 with (ROOT / "zensical.toml").open("rb") as f:
     # tomli, as Zensical reads it: zensical.toml is TOML 1.1 (multi-line inline tables), which tomllib refuses
