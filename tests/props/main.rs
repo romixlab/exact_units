@@ -62,6 +62,8 @@ mod serde_input;
 #[cfg(feature = "serde")]
 mod serde_values;
 mod symbols;
+#[cfg(feature = "systems")]
+mod systems;
 #[cfg(not(kani))]
 mod text;
 #[cfg(all(not(kani), feature = "serde"))]

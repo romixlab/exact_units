@@ -668,3 +668,190 @@ pub(crate) fn tai_to_posix(t: i128, den: i128) -> Leap {
     }
     Leap::At(ntp - 2_208_988_800 * den)
 }
+
+/// The bridges of Natural and Gaussian to SI by dimension, written from the systems' definitions in physics (ħ = c =
+/// 1; 1 m = 100 cm, 1 kg = 1000 g) without the crate's tables: a factor as one exponent in halves per prime and per
+/// symbol, so a product of half powers is exact.
+#[cfg(feature = "systems")]
+pub(crate) mod systems {
+    use std::collections::BTreeMap;
+
+    /// A prime, π or μ₀: what a factor is a product of powers of.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    pub(crate) enum Key {
+        Prime(u64),
+        Pi,
+        Mu0,
+    }
+
+    /// `Π key^(e/2)`, exponents in halves, none 0.
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub(crate) struct Factor(pub(crate) BTreeMap<Key, i32>);
+
+    impl Factor {
+        pub(crate) fn one() -> Self {
+            Factor(BTreeMap::new())
+        }
+
+        /// `num/den · 10^pow10`, by trial division.
+        pub(crate) fn int(num: u64, den: u64, pow10: i32) -> Self {
+            let mut f = Factor::one();
+            for (n, sign) in [(num, 2), (den, -2)] {
+                let mut n = n;
+                let mut p = 2;
+                while p * p <= n {
+                    while n % p == 0 {
+                        f.add(Key::Prime(p), sign);
+                        n /= p;
+                    }
+                    p += 1;
+                }
+                if n > 1 {
+                    f.add(Key::Prime(n), sign);
+                }
+            }
+            f.add(Key::Prime(2), 2 * pow10);
+            f.add(Key::Prime(5), 2 * pow10);
+            f
+        }
+
+        pub(crate) fn add(&mut self, k: Key, e: i32) {
+            let x = self.0.entry(k).or_insert(0);
+            *x += e;
+            if *x == 0 {
+                self.0.remove(&k);
+            }
+        }
+
+        pub(crate) fn mul(&self, o: &Factor) -> Factor {
+            let mut f = self.clone();
+            for (&k, &e) in &o.0 {
+                f.add(k, e);
+            }
+            f
+        }
+
+        pub(crate) fn recip(&self) -> Factor {
+            Factor(self.0.iter().map(|(&k, &e)| (k, -e)).collect())
+        }
+
+        /// Whether a `Magnitude` holds it: twice the exponent of 10 (the 5s), of 2 beyond the 5s, of every other prime
+        /// and of each symbol in an `i8`, and at most `MAX_FACTORS` primes other than 2 and 5.
+        pub(crate) fn representable(&self) -> bool {
+            let e = |k| self.0.get(&k).copied().unwrap_or(0);
+            let (e2, e5) = (e(Key::Prime(2)), e(Key::Prime(5)));
+            let held = |x: i32| i8::try_from(x).is_ok();
+            let others = self
+                .0
+                .iter()
+                .filter(|(k, _)| !matches!(k, Key::Prime(2 | 5)));
+            let primes = others
+                .clone()
+                .filter(|(k, _)| matches!(k, Key::Prime(_)))
+                .count();
+            held(e5)
+                && held(e2 - e5)
+                && others.clone().all(|(_, x)| held(*x))
+                && primes <= exact_units::MAX_FACTORS
+        }
+
+        /// To the power `e_x2/2`: every exponent in halves times `e_x2/2`, which must stay a whole number of halves.
+        pub(crate) fn pow_x2(&self, e_x2: i32) -> Factor {
+            Factor(
+                self.0
+                    .iter()
+                    .map(|(&k, &e)| {
+                        assert_eq!(e * e_x2 % 2, 0, "a quarter power");
+                        (k, e * e_x2 / 2)
+                    })
+                    .filter(|&(_, e)| e != 0)
+                    .collect(),
+            )
+        }
+    }
+
+    /// c in m/s.
+    pub(crate) fn c() -> Factor {
+        Factor::int(299_792_458, 1, 0)
+    }
+
+    /// e in C.
+    pub(crate) fn e() -> Factor {
+        Factor::int(1_602_176_634, 1, -28)
+    }
+
+    /// ħ = h/(2π) in J·s.
+    pub(crate) fn hbar() -> Factor {
+        let mut f = Factor::int(662_607_015, 2, -42);
+        f.add(Key::Pi, -2);
+        f
+    }
+
+    /// Which system.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub(crate) enum Sys {
+        Natural,
+        Gaussian,
+    }
+
+    /// The image of each SI base (s, m, kg, A, K, mol, cd): the exponents of the system's bases it maps to, and the
+    /// factor of 1 SI base unit in the system's coherent units; `None` where the system has none (A in Gaussian).
+    pub(crate) fn rule(sys: Sys) -> [Option<(Vec<i32>, Factor)>; 7] {
+        let unit = |i: usize, n: usize| {
+            let mut v = vec![0; n];
+            if let Some(x) = v.get_mut(i) {
+                *x = 1;
+            }
+            Some((v, Factor::one()))
+        };
+        match sys {
+            // eV, A, K, mol, cd; 1 s = e/ħ eV⁻¹, 1 m = e/(ħc) eV⁻¹, 1 kg = c²/e eV
+            Sys::Natural => [
+                Some((vec![-1], e().mul(&hbar().recip()))),
+                Some((vec![-1], e().mul(&hbar().mul(&c()).recip()))),
+                Some((vec![1], c().mul(&c()).mul(&e().recip()))),
+                unit(1, 5),
+                unit(2, 5),
+                unit(3, 5),
+                unit(4, 5),
+            ],
+            // g, cm, s, K, mol, cd; 1 m = 100 cm, 1 kg = 1000 g
+            Sys::Gaussian => [
+                unit(2, 6),
+                Some((vec![0, 1], Factor::int(1, 1, 2))),
+                Some((vec![1], Factor::int(1, 1, 3))),
+                None,
+                unit(3, 6),
+                unit(4, 6),
+                unit(5, 6),
+            ],
+        }
+    }
+
+    /// The image of an SI dimension (exponents in halves) in `sys`, in halves, the factor of its coherent SI unit in
+    /// the system's coherent units, and whether every step of the product taken base by base (s, m, kg, ..) and each
+    /// base's power is a `Magnitude`; `None` where a base with an exponent has no image.
+    pub(crate) fn project(sys: Sys, exps: [i8; 7]) -> Option<(Vec<i32>, Factor, bool)> {
+        let n = match sys {
+            Sys::Natural => 5,
+            Sys::Gaussian => 6,
+        };
+        let mut out = vec![0; n];
+        let mut f = Factor::one();
+        let mut held = true;
+        for (e, r) in exps.iter().zip(rule(sys)) {
+            let e = i32::from(*e);
+            if e == 0 {
+                continue;
+            }
+            let (img, factor) = r?;
+            for (o, x) in out.iter_mut().zip(img) {
+                *o += e * x;
+            }
+            let pow = factor.pow_x2(e);
+            f = f.mul(&pow);
+            held &= pow.representable() && f.representable();
+        }
+        Some((out, f, held))
+    }
+}
