@@ -262,6 +262,11 @@ impl<'i> SystemDef<'i> {
     pub fn rules(&self) -> impl Iterator<Item = Option<BaseRule<'i>>> + '_ {
         self.by_dim.iter().filter_map(Result::ok)
     }
+
+    /// What the system sets to one ([set_to_one](Self::set_to_one)), each that decodes.
+    pub fn ones(&self) -> impl Iterator<Item = SetToOne<'i>> + '_ {
+        self.set_to_one.iter().filter_map(Result::ok)
+    }
 }
 
 #[cfg(not(feature = "shrink_wrap"))]
@@ -280,6 +285,11 @@ impl<'i> SystemDef<'i> {
     /// The rule by SI base ([by_dim](Self::by_dim)).
     pub fn rules(&self) -> impl Iterator<Item = Option<BaseRule<'i>>> + '_ {
         self.by_dim.iter().copied()
+    }
+
+    /// What the system sets to one ([set_to_one](Self::set_to_one)).
+    pub fn ones(&self) -> impl Iterator<Item = SetToOne<'i>> + '_ {
+        self.set_to_one.iter().copied()
     }
 }
 
