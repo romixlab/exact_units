@@ -100,4 +100,4 @@ assert_eq!(oersted.checked_to_f64(), None);
 
 A `Magnitude` is plain `const` data, 138 bytes, so a firmware can hold a `&'static Magnitude`. `Fixed` uses it only at compile time.
 
-On the wire every exponent is twice the exponent as an `i8`. A decimal prefix is 2 bytes (`Milli` is `fa 00`), `Kibi` 5, a degree 11, the pound 16. A magnitude that isn't canonical is refused on decode.
+On the wire every exponent is twice the exponent as an `i8`. A decimal prefix is 2 bytes (`Milli` is `fa 00`), `Kibi` 6, a degree 13, the pound 17. A magnitude that isn't canonical is refused on decode.

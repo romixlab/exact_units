@@ -216,12 +216,29 @@ impl Offset {
     }
 
     /// The offset as an `f64` (rounded, unlike the offset itself).
+    ///
+    /// # Panics
+    ///
+    /// For a magnitude with μ₀ or G left in it, as [Magnitude::to_f64]: at compile time in a `const`.
+    /// [checked_to_f64](Self::checked_to_f64) is `None` there instead.
     #[must_use]
     pub const fn to_f64(&self) -> f64 {
+        match self.checked_to_f64() {
+            Some(x) => x,
+            None => crate::MagnitudeError::Measured.panic(),
+        }
+    }
+
+    /// The offset as an `f64` (rounded), `None` for a magnitude with μ₀ or G left in it, which has no value without
+    /// a named set ([Magnitude::resolve]).
+    #[must_use]
+    pub const fn checked_to_f64(&self) -> Option<f64> {
         match self.magnitude {
-            None => 0.0,
-            Some(m) if self.negative => -m.to_f64(),
-            Some(m) => m.to_f64(),
+            None => Some(0.0),
+            Some(m) => match m.checked_to_f64() {
+                Some(x) if self.negative => Some(-x),
+                x => x,
+            },
         }
     }
 

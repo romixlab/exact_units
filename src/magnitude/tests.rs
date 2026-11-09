@@ -300,6 +300,10 @@ fn wire() {
     let bytes = |m: Magnitude, buf: &mut [u8]| m.to_ww_bytes(buf).unwrap().to_vec();
     assert_eq!(bytes(Magnitude::pow10(-3), &mut buf), [0xfa, 0x00]);
     assert_eq!(bytes(Magnitude::ONE, &mut buf), [0x00, 0x00]);
+    // the sizes docs/nomicon/magnitude.md gives: Kibi 6, a degree 13, the pound 17
+    assert_eq!(bytes(Magnitude::pow2(10), &mut buf).len(), 6);
+    assert_eq!(bytes(Magnitude::new(1, 180, 0, 0, 1), &mut buf).len(), 13);
+    assert_eq!(bytes(LB, &mut buf).len(), 17);
     for m in [
         Magnitude::ONE,
         Magnitude::pow2(10),

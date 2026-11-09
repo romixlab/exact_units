@@ -587,7 +587,8 @@ pub struct Requantizer {
     to: StorageKind,
     r: Rounding,
     o: Overflow,
-    /// `to` is a float or an integer of 1 to 64 bits; [apply](Requantizer::apply) gives `None` otherwise.
+    /// `to` is a float or an integer of 1 to 64 bits and the factor has a value; [apply](Requantizer::apply) gives
+    /// `None` otherwise.
     to_valid: bool,
 }
 
@@ -607,13 +608,16 @@ enum Exact {
 
 impl Requantizer {
     /// The requantizer by `factor` into `to`, rounded by `r`, overflowing by `o`: [requantize] of each value. A
-    /// [StorageKind::Int] whose `bits` isn't 1 to 64 converts nothing: [apply](Self::apply) gives `None`.
+    /// [StorageKind::Int] whose `bits` isn't 1 to 64 converts nothing: [apply](Self::apply) gives `None`. Nor does a
+    /// factor with μ₀ or G left in it ([Magnitude::has_measured]), which has no value without a named set
+    /// ([Magnitude::resolve]).
     #[must_use]
     pub fn new(factor: &Magnitude, to: StorageKind, r: Rounding, o: Overflow) -> Self {
-        let to_valid = match to {
-            StorageKind::Int { bits, .. } => matches!(bits, 1..=64),
-            StorageKind::F32 | StorageKind::F64 => true,
-        };
+        let to_valid = !factor.has_measured()
+            && match to {
+                StorageKind::Int { bits, .. } => matches!(bits, 1..=64),
+                StorageKind::F32 | StorageKind::F64 => true,
+            };
         let exact = if let Some((num, den)) = factor.to_ratio() {
             Exact::Ratio {
                 num: i128::try_from(num).ok(),
@@ -621,6 +625,9 @@ impl Requantizer {
                 num_low: num.cast_signed(),
                 den,
             }
+        } else if factor.has_measured() {
+            // no value: to_valid is false, so apply gives None before reading this
+            Exact::FixedPoint { m: 0, shift: 0 }
         } else {
             let (m, shift) = factor.fixed_point();
             Exact::FixedPoint { m, shift }
@@ -720,6 +727,30 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// A factor read at run time (the wire, Python) with μ₀ left in it has no value: `None`, never a panic.
+    #[test]
+    fn a_measured_factor_converts_nothing() {
+        let oersted = Magnitude::pow10(-4).div(Magnitude::MU0);
+        for to in [
+            StorageKind::F64,
+            StorageKind::Int {
+                bits: 32,
+                signed: true,
+            },
+        ] {
+            let q = Requantizer::new(&oersted, to, Rounding::NearestEven, Overflow::Checked);
+            assert_eq!(q.apply(Repr::Int(1)), None);
+        }
+        // where μ₀ cancels it is a plain factor
+        let q = Requantizer::new(
+            &oersted.mul(Magnitude::MU0),
+            StorageKind::F64,
+            Rounding::NearestEven,
+            Overflow::Checked,
+        );
+        assert_eq!(q.apply(Repr::Int(1)), Some(Repr::Float(1e-4)));
     }
 
     #[test]
