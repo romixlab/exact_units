@@ -59,11 +59,13 @@ Two units convert only when their dimensions are equal. Besides the seven SI bas
 ```mermaid
 graph LR
   D[Dim] --> SI["SI bases<br/>s, m, kg, A, K, mol, cd"]
-  D --> AN["angle<br/>rad"]
-  D --> IN["information<br/>bit"]
-  D --> CO["counted bases<br/>Sample, Packet, your own"]
+  D --> DB["distinguished bases<br/>rad, Np, bit, Sample, your own"]
   D --> RT["a square root<br/>√Hz"]
 ```
+
+A distinguished base is a dimension the SI counts as one (rad = 1, Np = 1), named by the crate and marker that
+declare it: this crate's `Radian`, `Neper`, `NeperLoss` and `Bit`, and a crate's own count (`Sample`, a sensor's
+`Pixel`). There is no limit on how many a dimension carries at once.
 
 ### Angle is a dimension
 
@@ -85,9 +87,10 @@ use exact_units::{Fixed, prefix::One, units::{AngularVelocity, Hertz}};
 let _ = Fixed::<Hertz, One, u32>::new(50).convert::<AngularVelocity, One, u32>();
 ```
 
-### Counted things are dimensions
+### Samples, bytes and other distinguished bases
 
-Samples, packets, frames and bytes each have a dimension of their own. A buffer sized in samples is not one sized in bytes:
+Samples, packets, frames and bytes are each a distinguished base of their own, like the radian and the bit. A
+buffer sized in samples is not one sized in bytes:
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::One, units::{Byte, Sample}};
@@ -96,7 +99,8 @@ let samples: Fixed<Sample, One, u32> = Fixed::new(256);
 let _ = samples.convert::<Byte, One, u32>();
 ```
 
-An API declares its own counted units too: [Your own units](../units/declare.md).
+An API declares a distinguished base of its own too, with a `base` line:
+[Your own units](../units/declare.md#distinguished-bases-from-other-crates).
 
 ## Kinds
 

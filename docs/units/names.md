@@ -33,7 +33,7 @@ The items are these:
 - `ucum "Ohm"`: the unit's code in UCUM, the Unified Code for Units of Measure.
 - `prefixes none`, `decimal`, `decimal_and_binary` or `only [Milli, Kilo]`: the prefixes the unit takes in text.
 
-The prefixes have a default, so most lines say nothing about them. A coherent unit whose symbol is one word takes the SI prefixes (`m`, `V`, `Pa`). Every other unit takes none: a scaled unit (`min`, `ft`), a counted one (`sample`) and a compound symbol (`m/s`, whose parts take their own). This is what keeps `min` a minute and never a milli-inch, and `cd` a candela and never a centi-day.
+The prefixes have a default, so most lines say nothing about them. A coherent unit whose symbol is one word takes the SI prefixes (`m`, `V`, `Pa`). Every other unit takes none: a scaled unit (`min`, `ft`), a base of its own (`sample`) and a compound symbol (`m/s`, whose parts take their own). This is what keeps `min` a minute and never a milli-inch, and `cd` a candela and never a centi-day.
 
 ```rust,compile_fail
 exact_units::unit! {

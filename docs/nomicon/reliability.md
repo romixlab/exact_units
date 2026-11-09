@@ -85,5 +85,5 @@ Text, wire bytes and serde input come from outside. Their properties take string
 
 Two bugs it found:
 
-- serde read a `DimOwned` with its counted bases out of order, so one dimension had two values that compared unequal. serde now refuses a dimension that isn't canonical, as the wire reader does.
+- serde read a `DimOwned` with its bases out of order, so one dimension had two values that compared unequal. serde now refuses a dimension that isn't canonical, as the wire reader does.
 - A unit tree could be built and written deeper than any reader follows. A typed unit of more than `MAX_UNIT_DEPTH` (32) levels is now a compile error.

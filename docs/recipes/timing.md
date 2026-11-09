@@ -67,7 +67,7 @@ assert!(Millis::<u16>::try_from(Duration::from_secs(70)).is_err());
 
 ## A sample rate is not a frequency
 
-Samples are a counted dimension. 48 000 samples per second is a `Per<Sample, Second>`, and it becomes hertz only through a named step:
+A sample is a distinguished base of its own. 48 000 samples per second is a `Per<Sample, Second>`, and it becomes hertz only through a named step:
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::One, units::{Hertz, Per, Sample, Second}};

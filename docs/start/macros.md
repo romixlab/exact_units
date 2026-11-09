@@ -27,6 +27,6 @@ Each macro here declares markers of your own, with the same lines WireWeaver rea
 | `scale! { .. }` | Scale markers, the `P` of a `Fixed`: a symbol and an exact factor per line. | [`scale!`](../units/declare.md#scale) |
 | `origin! { .. }` | An origin marker for points: a unit, a symbol and an exact offset. | [`origin!`](../units/declare.md#origin) |
 | `niches! { .. }` | The meanings of a storage's niche codes (not available, error) as an enum. | [Declaring codes](../maths/niches.md#declaring-codes) |
-| `counted!(Bucket)` | The dimension of a counted base, named by your crate and the marker's name. | [Counted bases](../units/declare.md#counted-bases-from-other-crates) |
+| `base!(Pixel)` | The `MarkerId` of a distinguished base, named by your crate and the marker's name. | [Distinguished bases](../units/declare.md#distinguished-bases-from-other-crates) |
 
 The API reference on [docs.rs](https://docs.rs/exact_units) has each macro's full syntax.

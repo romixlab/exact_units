@@ -162,16 +162,15 @@ loss base, so the factor of ln 10 between them is a `convert_rounded`, never a f
 
 All three are s⁻¹ in the SI. Here they are three different dimensions, for the same reason the radian is its own
 dimension and not folded into "dimensionless": a hertz, an angular velocity and a damping coefficient answer
-different questions, and conflating them is the easiest way to lose a factor of 2π or a sign. `Dim::strip_radian`
-is the existing, explicit bridge for the first pair; `Dim::strip_neper` is its twin for levels, dropping the gain
-and loss bases alike:
+different questions, and conflating them is the easiest way to lose a factor of 2π or a sign. `Dim::strip` is the
+explicit bridge: it drops one named base, the radian for the first pair, the neper of a loss for levels:
 
 ```rust
 # #[cfg(all(feature = "levels", feature = "time", feature = "angle"))] {
-use exact_units::{Unit, units::{AngularVelocity, DampingCoefficient, Hertz}};
+use exact_units::{MarkerId, Unit, units::{AngularVelocity, DampingCoefficient, Hertz}};
 
-assert_eq!(AngularVelocity::DIM.strip_radian(), Hertz::DIM);
-assert_eq!(DampingCoefficient::DIM.strip_neper(), Hertz::DIM);
+assert_eq!(AngularVelocity::DIM.strip(MarkerId::RADIAN), Hertz::DIM);
+assert_eq!(DampingCoefficient::DIM.strip(MarkerId::NEPER_LOSS), Hertz::DIM);
 assert_ne!(AngularVelocity::DIM, Hertz::DIM); // rad/s stays rad/s until it's stripped
 # }
 ```

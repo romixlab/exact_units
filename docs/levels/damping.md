@@ -96,7 +96,22 @@ use exact_units::{Fixed, prefix::One, units::{DampingRatio, QualityFactor}};
 let _ = Fixed::<DampingRatio, One, f32>::bounded(0.5).convert::<QualityFactor, One, f32>();
 ```
 
-For an export to a system without a level dimension (UCUM, Pint, uom), `Dim::strip_neper` turns Np/s into s⁻¹. It is never applied by itself.
+For an export to a system without a level dimension (UCUM, Pint, uom), `Dim::strip` drops one named base at a
+time and `Dim::true_part` drops every one together. Λ is Np per cycle, with both the loss and the cycle as
+distinguished bases:
+
+```rust
+# #[cfg(all(feature = "levels", feature = "counting"))] {
+use exact_units::{Dim, MarkerId, Unit, units::{Cycle, LogarithmicDecrement, NeperLoss}};
+
+assert_ne!(LogarithmicDecrement::DIM, Dim::ONE);                                     // Np per cycle, not a ratio
+assert_eq!(LogarithmicDecrement::DIM.strip(Cycle::BASE.unwrap().id), NeperLoss::DIM); // strip drops the cycle alone
+assert_ne!(LogarithmicDecrement::DIM.strip(MarkerId::NEPER_LOSS), Dim::ONE);          // the cycle is still there
+assert_eq!(LogarithmicDecrement::DIM.true_part(), Dim::ONE);                         // true_part drops every base
+# }
+```
+
+Neither is ever applied by a conversion.
 
 !!! warning "dBm/Hz is not a rate"
     dBm/Hz and dBc/Hz are levels of a spectral density: 10·lg of a power per hertz against 1 mW/Hz. They are not a level per frequency, and `Per<Decibel, Hertz>` is not their type.
