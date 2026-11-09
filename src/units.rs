@@ -904,7 +904,7 @@ pub fn by_id(id: crate::MarkerId<'_>) -> Option<&'static UnitExpr> {
 }
 
 /// This crate's named units that are enabled, as a [UnitTable]: what [by_id] finds, [ALL] and with `customary` its
-/// units too.
+/// units too, and its quantities, [quantities::ALL](crate::quantities::ALL).
 #[derive(Copy, Clone, Debug)]
 pub struct Table;
 
@@ -914,6 +914,16 @@ pub const TABLE: Table = Table;
 impl UnitTable for Table {
     fn unit(&self, id: crate::MarkerId<'_>) -> Option<UnitDef<'_>> {
         by_id(id).and_then(UnitExpr::def).copied()
+    }
+
+    fn quantity(&self, id: crate::MarkerId<'_>) -> Option<crate::QuantityDef<'_>> {
+        if id.crate_name != env!("CARGO_CRATE_NAME") {
+            return None;
+        }
+        crate::quantities::ALL
+            .iter()
+            .find(|q| q.id.name == id.name)
+            .map(|q| **q)
     }
 }
 
