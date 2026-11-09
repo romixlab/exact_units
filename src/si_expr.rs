@@ -334,6 +334,7 @@ fn ref_node<E>(id: MarkerId<'_>) -> Node<'_, E> {
         crate_name: Some(id.crate_name),
         name: id.name,
         symbol: id.name,
+        names: None,
         dim: None,
         scale: None,
     }
@@ -347,6 +348,7 @@ impl<'i> Tree<'i> for SIExpr<'i> {
                 crate_name: Some(def.id.crate_name),
                 name: def.id.name,
                 symbol: def.names.symbol,
+                names: Some(def.names),
                 dim: Some(def.dim),
                 scale: Some(def.scale),
             },
@@ -393,6 +395,7 @@ mod owned {
                     crate_name: Some(&def.id.crate_name),
                     name: &def.id.name,
                     symbol: &def.names.symbol,
+                    names: Some(def.names.as_names()),
                     dim: Some(def.dim.as_dim()),
                     scale: Some(def.scale),
                 },

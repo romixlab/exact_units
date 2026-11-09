@@ -17,7 +17,7 @@
 //! impl<'a> Tree<'a> for &'a MyUnit {
 //!     fn node(&self) -> Option<Node<'a, Self>> {
 //!         Some(match *self {
-//!             MyUnit::Name(n) => Node::Named { crate_name: None, name: n, symbol: n, dim: None, scale: None },
+//!             MyUnit::Name(n) => Node::Named { crate_name: None, name: n, symbol: n, names: None, dim: None, scale: None },
 //!             MyUnit::Per(a, b) => Node::Div(&**a, &**b),
 //!         })
 //!     }
@@ -30,7 +30,7 @@
 //! ```
 
 use crate::unit::{Dim, write_superscript};
-use crate::{Magnitude, MarkerId, UnitTable};
+use crate::{Magnitude, MarkerId, UnitNames, UnitTable};
 use crate::{Prefix, UnitExpr};
 use core::fmt;
 
@@ -79,6 +79,10 @@ pub enum Node<'a, E> {
         name: &'a str,
         /// As written after a number: `V`; a unit known by name only has its name here.
         symbol: &'a str,
+        /// How it is written in other notations and read from text, `None` for a unit known by name only, or by its
+        /// symbol only (a client's own unit model): [Notation::Ascii](crate::Notation::Ascii) transliterates the
+        /// symbol, [Notation::Ucum](crate::Notation::Ucum) has no code for it.
+        names: Option<UnitNames<'a>>,
         /// The unit's dimension, `None` for a unit known by name only.
         dim: Option<Dim<'a>>,
         /// The exact factor to coherent SI, `None` for a unit known by name only.
@@ -102,12 +106,14 @@ impl<'a, E> Node<'a, E> {
                 crate_name,
                 name,
                 symbol,
+                names,
                 dim,
                 scale,
             } => Node::Named {
                 crate_name,
                 name,
                 symbol,
+                names,
                 dim,
                 scale,
             },
@@ -172,6 +178,7 @@ impl Tree<'static> for &UnitExpr {
                 crate_name: Some(def.id.crate_name),
                 name: def.id.name,
                 symbol: def.names.symbol,
+                names: Some(def.names),
                 dim: Some(def.dim),
                 scale: Some(def.scale),
             },
@@ -239,6 +246,7 @@ impl<'a, E: Tree<'a>, T: UnitTable + ?Sized> Tree<'a> for Resolved<'a, E, T> {
                 crate_name: Some(def.id.crate_name),
                 name: def.id.name,
                 symbol: def.names.symbol,
+                names: Some(def.names),
                 dim: Some(def.dim),
                 scale: Some(def.scale),
             });
@@ -788,6 +796,7 @@ fn same_at<'s, 't, A: Tree<'s>, B: Tree<'t>>(a: &A, b: &B, depth: usize) -> bool
                 crate_name: k1,
                 name: n1,
                 symbol: s1,
+                names: _,
                 dim: d1,
                 scale: c1,
             },
@@ -795,6 +804,7 @@ fn same_at<'s, 't, A: Tree<'s>, B: Tree<'t>>(a: &A, b: &B, depth: usize) -> bool
                 crate_name: k2,
                 name: n2,
                 symbol: s2,
+                names: _,
                 dim: d2,
                 scale: c2,
             },

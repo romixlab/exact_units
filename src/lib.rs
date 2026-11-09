@@ -58,7 +58,6 @@ mod book;
 pub mod complex;
 pub mod constants;
 mod contains;
-mod names;
 mod conv_error;
 pub mod cordic;
 pub mod decibel;
@@ -73,11 +72,13 @@ pub mod leap;
 #[cfg(feature = "levels")]
 pub mod level;
 pub mod literal;
+mod names;
 #[cfg(feature = "q")]
 #[doc(hidden)]
 pub use exact_units_macros as __macros;
 mod magnitude;
 pub mod niche;
+pub mod notation;
 pub mod num;
 mod point;
 mod products;
@@ -129,6 +130,7 @@ pub use fixed::{Duty16, Percent, Permille, Ppb, Ppm, Q15, Q31, UQ16_16};
 pub use index::{Index, IndexFrom1, Seq};
 pub use kind::{Kind, LevelForm};
 pub use magnitude::{MAX_FACTORS, Magnitude, MagnitudeError, MagnitudeRest, PrimePower, Symbols};
+pub use notation::Notation;
 pub use point::{
     AmbientPressure, Linear, Modulo, Modulus, Offset, Origin, OriginDef, Point, PointArith,
     PointDiff, Reference, ReferenceDef, ReferenceHow, TimeCounting, TimeScaleDef, TimeZero,
@@ -143,8 +145,8 @@ pub use tree::MAX_UNIT_DEPTH;
 #[doc(hidden)]
 pub use unit::exp as __dim_exp;
 pub use unit::{
-    Counted, Dim, MAX_COUNTED, MarkerId, PrefixPolicy, PrefixSet, Provenance, Unit, UnitDef, UnitDiv,
-    UnitExpr, UnitMul, UnitNames, UnitTable,
+    Counted, Dim, MAX_COUNTED, MarkerId, PrefixPolicy, PrefixSet, Provenance, Unit, UnitDef,
+    UnitDiv, UnitExpr, UnitMul, UnitNames, UnitTable,
 };
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use unit::{

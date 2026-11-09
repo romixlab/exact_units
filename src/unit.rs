@@ -1,9 +1,9 @@
 //! What a unit is: its dimension, how its values become coherent SI, and how it is written.
 
-use crate::{Kind, Prefix};
 #[cfg(feature = "shrink_wrap")]
 use crate::SIExpr;
 use crate::tree;
+use crate::{Kind, Prefix};
 use core::fmt;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
@@ -1050,12 +1050,18 @@ impl PrefixSet {
         let mut bits = 0u32;
         let mut i = 0;
         while i < prefixes.len() {
-            #[expect(clippy::indexing_slicing, reason = "i < prefixes.len(), the loop's condition")]
+            #[expect(
+                clippy::indexing_slicing,
+                reason = "i < prefixes.len(), the loop's condition"
+            )]
             match Self::bit(prefixes[i]) {
                 Some(b) => bits |= 1 << b,
                 None => panic!("PrefixSet: a prefix without a name"),
             }
-            #[expect(clippy::arithmetic_side_effects, reason = "i < prefixes.len() <= usize::MAX")]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "i < prefixes.len() <= usize::MAX"
+            )]
             {
                 i += 1;
             }

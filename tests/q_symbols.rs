@@ -291,13 +291,16 @@ fn generate() -> Generated {
             PrefixPolicy::Decimal => Prefixes::Si,
             PrefixPolicy::DecimalAndBinary => Prefixes::SiBinary,
             PrefixPolicy::Only(set)
-                if set == PrefixSet::of(&[
-                    Kilo, Mega, Giga, Tera, Peta, Exa, Zetta, Yotta, Ronna, Quetta,
-                ]) =>
+                if set
+                    == PrefixSet::of(&[
+                        Kilo, Mega, Giga, Tera, Peta, Exa, Zetta, Yotta, Ronna, Quetta,
+                    ]) =>
             {
                 Prefixes::SiFromKilo
             }
-            PrefixPolicy::Only(set) => panic!("{}: a prefix set q! has no rule for: {set:?}", line.name),
+            PrefixPolicy::Only(set) => {
+                panic!("{}: a prefix set q! has no rule for: {set:?}", line.name)
+            }
         }
     };
 
