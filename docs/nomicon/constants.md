@@ -96,7 +96,7 @@ use exact_units::constants::Codata2022;
 
 exact_units::unit! {
     /// Nominal solar mass, M☉: (GM)☉/G, (GM)☉ = 1.3271244·10²⁰ m³/s² by IAU 2015 B3.
-    pub struct SolarMass = "M☉", [kg 1], Exact(13271244 / 1, pow10 13, g -1);
+    pub struct SolarMass = "M☉" (ascii "Msun"), [kg 1], Exact(13271244 / 1, pow10 13, g -1);
 }
 
 let scale = SolarMass::EXPR.magnitude().unwrap();
