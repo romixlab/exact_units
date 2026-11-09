@@ -56,6 +56,7 @@ struct ReadmeDoctests;
 mod book;
 
 pub mod complex;
+pub mod constants;
 mod contains;
 mod conv_error;
 pub mod cordic;
@@ -126,9 +127,7 @@ pub use fixed::{Duty16, Percent, Permille, Ppb, Ppm, Q15, Q31, UQ16_16};
 #[cfg(feature = "counting")]
 pub use index::{Index, IndexFrom1, Seq};
 pub use kind::{Kind, LevelForm};
-pub use magnitude::{
-    Irrational, MAX_FACTORS, Magnitude, MagnitudeError, MagnitudeRest, PrimePower,
-};
+pub use magnitude::{MAX_FACTORS, Magnitude, MagnitudeError, MagnitudeRest, PrimePower, Symbols};
 pub use point::{
     AmbientPressure, Linear, Modulo, Modulus, Offset, Origin, OriginDef, Point, PointArith,
     PointDiff, Reference, ReferenceDef, ReferenceHow, TimeCounting, TimeScaleDef, TimeZero,

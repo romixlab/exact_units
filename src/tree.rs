@@ -154,7 +154,8 @@ pub fn dim<'t, E: Tree<'t>>(e: &E) -> Option<Dim<'t>> {
     dim_at(e, 0)
 }
 
-/// Factor to coherent SI of the whole tree, as a float; `None` like [dim].
+/// Factor to coherent SI of the whole tree, as a float; `None` like [dim], and where a scale keeps a measured constant
+/// (μ₀, G), which has no value without a named set ([Magnitude::resolve](crate::Magnitude::resolve)).
 pub fn factor<'t, E: Tree<'t>>(e: &E) -> Option<f64> {
     factor_at(e, 0)
 }
@@ -371,7 +372,7 @@ fn factor_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<f64> {
     }
     let d = depth + 1;
     match e.node()? {
-        Node::Named { scale, .. } => Some(scale?.to_f64()),
+        Node::Named { scale, .. } => scale?.checked_to_f64(),
         Node::Mul(a, b) => Some(factor_at(&a, d)? * factor_at(&b, d)?),
         Node::Div(a, b) => Some(factor_at(&a, d)? / factor_at(&b, d)?),
         Node::Pow(a, n) => Some(crate::num::powi_f64(factor_at(&a, d)?, n)),

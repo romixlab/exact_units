@@ -6,7 +6,7 @@ level: basic
 
 "Exact" in `exact_units` is a promise with seven parts. Each is a rule you can test the crate against, and each has an example below that runs as a test. In short: nothing is hidden, everything that loses information is written down, and the safe way is the short way.
 
-1. **Every scale is exact.** A scale is an exact fraction times powers of exact symbols ($\pi$, $\ln 2$, $\ln 10$), never a float.
+1. **Every scale is exact.** A scale is an exact fraction times powers of exact symbols ($\pi$, $\ln 2$, $\ln 10$, and the measured $\mu_0$ and $G$), never a float.
 2. **Exact, or refused.** A conversion, a literal or a parse gives the exact value, or it refuses: `None`, an error, or a compile error where the compiler can tell.
 3. **Every lossy step is named.** Rounding, saturating, wrapping, truncating and going to a float each happen only in a call or a type that names its policy.
 4. **Measured constants stay symbols.** A constant of nature that is measured is never a number baked into a scale. A number for it appears only at an explicit edge that says where it comes from.
@@ -16,7 +16,7 @@ level: basic
 
 ## 1. Every scale is exact
 
-A scale is a [`Magnitude`](../nomicon/magnitude.md): a product of powers of primes, $\pi$, $\ln 2$ and $\ln 10$. It has no float in it, so every reader, on every target, gets the same value. Two scales are equal however they are spelled, and $\pi$ stays $\pi$:
+A scale is a [`Magnitude`](../nomicon/magnitude.md): a product of powers of primes, $\pi$, $\ln 2$ and $\ln 10$, and of the measured constants $\mu_0$ and $G$ (rule 4). It has no float in it, so every reader, on every target, gets the same value. Two scales are equal however they are spelled, and $\pi$ stays $\pi$:
 
 ```rust
 use exact_units::{FixedScale, Magnitude, prefix::{Milli, Pow10, Rational}};
@@ -151,6 +151,40 @@ assert_eq!(def.provenance, Provenance::Conventional { source: "NIST SP 811", yea
 ```
 
 A client reading the unit off the wire sees the same provenance, so it knows this scale is a convention and not a definition.
+
+The measured constants themselves are symbols of `Magnitude`: $\mu_0$ (`Magnitude::MU0`) and $G$ (`Magnitude::G`). The electric constant $\varepsilon_0 = 1/(\mu_0 c^2)$, the impedance of free space $Z_0 = \mu_0 c$ and the fine-structure constant $\alpha = \mu_0 e^2 c / (2h)$ are exact expressions over $\mu_0$. An oersted is $10^{-4}/\mu_0$ A/m, exactly. A conversion through it needs a value for $\mu_0$, so it names a set: CODATA 2018 or 2022, or the old convention $\mu_0 = 4\pi \cdot 10^{-7}$ as `Ampere1948`. There is no default and no "latest".
+
+```rust
+use exact_units::{Fixed, Magnitude, Rounding, prefix::{Micro, Milli}, units::{Ampere, Meter, Per}};
+use exact_units::constants::{C, Codata2022, EPSILON0};
+
+exact_units::unit! {
+    /// Oersted: (1 G)/μ₀, in A/m.
+    pub struct Oersted = "Oe", [a 1, m -1], Exact(1 / 1, pow10 -4, mu0 -1);
+}
+
+// exact with no set: μ₀ · ε₀ · c² is 1, and μ₀ cancels
+assert_eq!(Magnitude::MU0.mul(EPSILON0).mul(C).mul(C), Magnitude::ONE);
+// a value for μ₀ only from a named set
+let h = Fixed::<Oersted, Milli, i32>::new(1000);
+let a = h.convert_rounded_with::<Codata2022, Per<Ampere, Meter>, Micro, i64>(Rounding::NearestEven);
+assert_eq!(a, Some(Fixed::new(79_577_472))); // 1000/(4π) A/m, to the µA/m
+```
+
+Without a set the same conversion doesn't compile, also into a float:
+
+```rust,compile_fail
+use exact_units::{Fixed, Rounding, prefix::One, units::{Ampere, Meter, Per}};
+
+exact_units::unit! {
+    /// Oersted.
+    pub struct Oersted = "Oe", [a 1, m -1], Exact(1 / 1, pow10 -4, mu0 -1);
+}
+let oe = Fixed::<Oersted, One, f64>::try_new(1.0).unwrap();
+let _ = oe.convert_rounded::<Per<Ampere, Meter>, One, f64>(Rounding::NearestEven);
+```
+
+[Measured constants](../nomicon/constants.md) has the sets, the uncertainty and the half powers Gaussian units need.
 
 ## 5. Conventions are opt-ins
 

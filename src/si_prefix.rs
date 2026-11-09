@@ -499,11 +499,10 @@ impl Prefix {
             return Self::from_pow10(e);
         }
         let (pow10_x2, pow2_x2) = m.pow10_pow2_x2();
-        let irr = m.irrational_x2();
         if pow10_x2 == 0
             && pow2_x2 % 2 == 0
             && m.primes().next().is_none()
-            && (irr.pi, irr.ln2, irr.ln10) == (0, 0, 0)
+            && m.symbols_x2().is_none()
         {
             return Self::from_pow2(pow2_x2 / 2);
         }
@@ -585,12 +584,12 @@ impl Prefix {
 
     /// `x` in units of this prefix as a number in the unit itself: `Prefix::Milli.scale_f64(3300.0)` is 3.3, one
     /// multiplication or division by an exact power of ten (or by the exact fraction of another scale). NaN for
-    /// [Unknown](Prefix::Unknown).
+    /// [Unknown](Prefix::Unknown), and for a scale with μ₀ or G left in it, which has no value without a named set.
     #[must_use]
     pub fn scale_f64(&self, x: f64) -> f64 {
         match (self.si_pow10(), self.magnitude()) {
             (Some(e), _) => crate::num::scale_f64(x, e),
-            (None, Some(m)) => m.apply_f64(x),
+            (None, Some(m)) => m.apply_f64(x).unwrap_or(f64::NAN),
             (None, None) => f64::NAN,
         }
     }

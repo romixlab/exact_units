@@ -102,9 +102,9 @@ fn closed_under_products() {
 #[test]
 fn irrational_and_roots() {
     let deg = Magnitude::new(1, 180, 0, 0, 1);
-    assert_eq!(deg.irrational_x2().pi, 2);
+    assert_eq!(deg.symbols_x2().pi, 2);
     assert!(!deg.is_rational());
-    assert_eq!(Magnitude::PI.powi(-2).irrational_x2().pi, -4);
+    assert_eq!(Magnitude::PI.powi(-2).symbols_x2().pi, -4);
     let sqrt2 = Magnitude::ratio(2, 1).sqrt();
     assert_eq!(sqrt2.mul(sqrt2), Magnitude::ratio(2, 1));
     assert_eq!(sqrt2.to_ratio(), None);
@@ -120,11 +120,11 @@ fn irrational_and_roots() {
     let decade = Magnitude::LN10.div(Magnitude::LN2);
     assert!((decade.to_f64() - LOG2_10).abs() < 1e-15);
     assert_eq!(
-        decade.irrational_x2(),
-        Irrational {
-            pi: 0,
+        decade.symbols_x2(),
+        Symbols {
             ln2: -2,
-            ln10: 2
+            ln10: 2,
+            ..Symbols::NONE
         }
     );
 }
@@ -144,15 +144,16 @@ fn large_and_refused() {
     );
     assert_eq!(Magnitude::checked_ratio(0, 1), Err(MagnitudeError::Zero));
     assert_eq!(Magnitude::checked_ratio(1, 0), Err(MagnitudeError::Zero));
-    // 13 primes other than 2 and 5
+    // 17 primes other than 2 and 5: 13 in one u64, 4 more by a product
     let n: u64 = [3u64, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]
         .iter()
         .product();
+    let m = Magnitude::ratio(n, 1);
     assert_eq!(
-        Magnitude::checked_ratio(n, 1),
+        m.checked_mul(Magnitude::ratio(53 * 59 * 61 * 67, 1)),
         Err(MagnitudeError::TooManyFactors)
     );
-    assert!(Magnitude::checked_ratio(n / 47, 1).is_ok());
+    assert!(m.checked_mul(Magnitude::ratio(53 * 59 * 61, 1)).is_ok());
     assert_eq!(Magnitude::checked_pow10(64), None);
     assert!(Magnitude::checked_pow10(-63).is_some());
     assert_eq!(
@@ -236,9 +237,9 @@ fn apply() {
     assert_eq!(Magnitude::pow10(-3).apply_int(-3000), Some(-3));
     assert_eq!(Magnitude::PI.apply_int(1), None);
     let deg = Magnitude::new(1, 180, 0, 0, 1);
-    assert!((deg.apply_f64(90.0) - FRAC_PI_2).abs() < 1e-15);
+    assert!((deg.apply_f64(90.0).unwrap() - FRAC_PI_2).abs() < 1e-15);
     assert!((deg.to_f64() - PI / 180.0).abs() < 1e-18);
-    assert_eq!(Magnitude::pow10(-1).apply_f64(30.0), 3.0);
+    assert_eq!(Magnitude::pow10(-1).apply_f64(30.0).unwrap(), 3.0);
     assert_eq!(LB.to_ratio(), Some((45359237, 100_000_000)));
     assert_eq!(Magnitude::pow10(-3).as_pow10(), Some(-3));
     assert_eq!(Magnitude::pow2(10).as_pow10(), None);
@@ -285,7 +286,7 @@ fn display_of_a_root_past_u128() {
 fn sizes() {
     // what a `&'static Magnitude` costs a firmware that holds one at run time
     assert_eq!(size_of::<PrimePower>(), 6);
-    assert_eq!(size_of::<Magnitude>(), 104);
+    assert_eq!(size_of::<Magnitude>(), 138);
 }
 
 #[cfg(feature = "shrink_wrap")]
@@ -323,7 +324,7 @@ fn wire() {
     // a rest that is 1
     let one_rest = MagnitudeRest {
         pow2: 0,
-        irrational: None,
+        symbols: None,
         factors,
     };
     refused(
@@ -395,17 +396,13 @@ fn wire() {
         },
         &mut buf,
     );
-    // irrational powers that are all 0
-    let irrational = Some(Irrational {
-        pi: 0,
-        ln2: 0,
-        ln10: 0,
-    });
+    // symbols that are all 0
+    let symbols = Some(Symbols::NONE);
     refused(
         Magnitude {
             pow10: 0,
             rest: Some(MagnitudeRest {
-                irrational,
+                symbols,
                 factors: [None; MAX_FACTORS],
                 ..one_rest
             }),
@@ -417,11 +414,7 @@ fn wire() {
 #[test]
 fn from_parts_refuses_an_exponent_sum_past_i32() {
     // 2³²/127 + 1 entries of 3¹²⁷ᐟ²: the sum of exponents passes i32 (and wraps back into range in release)
-    let none = Irrational {
-        pi: 0,
-        ln2: 0,
-        ln10: 0,
-    };
+    let none = Symbols::NONE;
     let three = PrimePower { prime: 3, exp: 127 };
     let n = (1usize << 32) / 127 + 1;
     assert_eq!(
@@ -435,11 +428,7 @@ fn from_parts_refuses_an_exponent_sum_past_i32() {
 /// the wire's check (found by tests/props/wire.rs).
 #[test]
 fn a_prime_to_the_power_0_is_dropped() {
-    let none = Irrational {
-        pi: 0,
-        ln2: 0,
-        ln10: 0,
-    };
+    let none = Symbols::NONE;
     let zero = PrimePower { prime: 3, exp: 0 };
     assert_eq!(
         Magnitude::from_parts_x2(0, 0, none, [zero]),
@@ -486,13 +475,13 @@ fn reduced_ratios_and_irrationals() {
 #[test]
 fn applied_to_floats_the_exact_path_is_taken_for_small_fractions() {
     // 0.1 · 7 as a fraction is 7/10 = 0.7; the product of the floats is 0.7000000000000001
-    assert_eq!(Magnitude::pow10(-1).apply_f64(7.0), 0.7);
-    assert_eq!(Magnitude::ratio(3, 10).apply_f64(10.0), 3.0);
-    assert_eq!(Magnitude::ratio(1, 3).apply_f64(3.0), 1.0);
+    assert_eq!(Magnitude::pow10(-1).apply_f64(7.0).unwrap(), 0.7);
+    assert_eq!(Magnitude::ratio(3, 10).apply_f64(10.0).unwrap(), 3.0);
+    assert_eq!(Magnitude::ratio(1, 3).apply_f64(3.0).unwrap(), 1.0);
     // a numerator past 2⁵³ takes the float factor and stays finite
     let big = Magnitude::ratio(3u64.pow(40), 7);
-    assert!(big.apply_f64(1e290).is_finite());
-    assert!((big.apply_f64(1.0) / (3f64.powi(40) / 7.0) - 1.0).abs() < 1e-12);
+    assert!(big.apply_f64(1e290).unwrap().is_finite());
+    assert!((big.apply_f64(1.0).unwrap() / (3f64.powi(40) / 7.0) - 1.0).abs() < 1e-12);
 }
 
 /// The kernel's arithmetic by a magnitude: irrational ones and products past its room are refused, never a wrong

@@ -83,7 +83,7 @@ impl Wide {
     /// `m` rounded to nearest at bit `drop` (`m` has `128 + drop` significant bits in `hi`, `lo`).
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "|e| < 2^16 (see fixed_point)"
+        reason = "|e| < 2^17 (see fixed_point)"
     )]
     const fn round_top(hi: u128, lo: u128, e: i32) -> Wide {
         let (mut m, mut e) = if hi & TOP != 0 {
@@ -105,7 +105,7 @@ impl Wide {
     /// `m`, plus one when `up`, carried into the exponent.
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "|e| < 2^16 (see fixed_point)"
+        reason = "|e| < 2^17 (see fixed_point)"
     )]
     const fn bump(m: u128, up: bool, e: i32) -> Wide {
         if !up {
@@ -119,7 +119,7 @@ impl Wide {
 
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "|e| < 2^16 (see fixed_point)"
+        reason = "|e| < 2^17 (see fixed_point)"
     )]
     const fn mul(self, rhs: Wide) -> Wide {
         let (hi, lo) = mul_256(self.m, rhs.m);
@@ -133,7 +133,7 @@ impl Wide {
     )]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "i < 256, the loop bound, and 127 - i only for i < 128; |e| < 2^16 (see fixed_point)"
+        reason = "i < 256, the loop bound, and 127 - i only for i < 128; |e| < 2^17 (see fixed_point)"
     )]
     const fn div(self, rhs: Wide) -> Wide {
         // quotient bits of (self.m · 2¹²⁸) / rhs.m: 128 or 129 of them
@@ -173,7 +173,7 @@ impl Wide {
     )]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "a.e >= b.e; |e| < 2^16 (see fixed_point)"
+        reason = "a.e >= b.e; |e| < 2^17 (see fixed_point)"
     )]
     const fn add(self, rhs: Wide) -> Wide {
         let (a, b) = if self.e >= rhs.e {
@@ -218,7 +218,7 @@ impl Wide {
     /// The square root by Newton's method from a power of two within a factor of 2.
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "i < 10, the loop bound; |e| < 2^16 (see fixed_point)"
+        reason = "i < 10, the loop bound; |e| < 2^17 (see fixed_point)"
     )]
     const fn sqrt(self) -> Wide {
         let exp = self.e + 127; // self is in [2^exp, 2^(exp + 1))
@@ -243,6 +243,11 @@ impl Magnitude {
     /// exponent): the product `x · m` is exact in 128 bits for any `x` of up to 64 bits, so the result differs from
     /// the correctly rounded `x · magnitude` only where that lies within `|x| · 2⁻⁶⁴` of a rounding step, and then by
     /// one step.
+    ///
+    /// # Panics
+    ///
+    /// For a magnitude with μ₀ or G left in it ([has_measured](Self::has_measured)): a measured constant has no
+    /// value without a named set ([resolve](Self::resolve)). At compile time in a `const`, as every caller is.
     #[must_use]
     #[expect(
         clippy::as_conversions,
@@ -251,9 +256,12 @@ impl Magnitude {
     #[expect(clippy::indexing_slicing, reason = "i < MAX_FACTORS, the loop bound")]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "|e| < 2^16: the squared magnitude lies within 2^±50200 (12 primes below 2^32 to at most the 128th, 10^128, π^128), powi's last square within 2^±8192; r.m >> 64 is below 2^64, so + 1 fits; i < w.len, the loop bound"
+        reason = "|e| < 2^17: the squared magnitude lies within 2^±67000 (16 primes below 2^32 to at most the 128th, 10^128, the symbols to the 128th), powi's last square within 2^±8192; r.m >> 64 is below 2^64, so + 1 fits; i < w.len, the loop bound"
     )]
     pub const fn fixed_point(&self) -> (u64, i32) {
+        if self.has_measured() {
+            super::MagnitudeError::Measured.panic();
+        }
         let w = Work::of(self);
         // the doubled exponents give the square of the magnitude
         let mut v = Wide::int(5).powi(w.pow10);

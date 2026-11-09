@@ -1,6 +1,7 @@
-//! [Magnitude]: one canonical exact factor for every scale, a product of prime powers and powers of π, ln 2 and
-//! ln 10, so every reader computes the same value from it and two magnitudes compare equal however they were spelled
-//! (`Milli`, `Pow10<-3>`, `Rational<1, 1000>`).
+//! [Magnitude]: one canonical exact factor for every scale, a product of prime powers and powers of the symbols π,
+//! ln 2, ln 10, μ₀ and G, so every reader computes the same value from it and two magnitudes compare equal however they
+//! were spelled (`Milli`, `Pow10<-3>`, `Rational<1, 1000>`). The measured constants μ₀ and G stay symbols: a number for
+//! them comes only from a named set ([constants](crate::constants)).
 
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
@@ -8,13 +9,17 @@ use shrink_wrap::prelude::*;
 use crate::unit::write_superscript;
 
 /// How many primes other than 2 and 5 a [Magnitude] holds. Every imperial and US customary unit takes at most 7 of
-/// them (the slug: 3, 7, 11, 97, 127, 6073, 28019), any product or quotient of two of them at most 10.
-pub const MAX_FACTORS: usize = 12;
+/// them (the slug: 3, 7, 11, 97, 127, 6073, 28019), any product or quotient of two of them at most 10. The exact SI
+/// constants h, c, e and k_B take 9 together, μ₀ of CODATA 2022 three more and G two: 14, resolved together.
+pub const MAX_FACTORS: usize = 16;
 
-/// An exact positive factor: `10^a · 2^b · π^c · ln2^d · ln10^e · ∏ pᵢ^kᵢ` over primes `pᵢ` other than 2 and 5, every
-/// exponent a whole or half number (`√2`, `10^(3/2)` for √(kHz)). `10⁻⁶` (µ), `2¹⁰` (Ki), `1/65535` (a 16-bit duty,
+/// How many symbols a [Magnitude] holds: π, ln 2, ln 10, μ₀ and G ([Symbols]).
+const SYMBOLS: usize = 5;
+
+/// An exact positive factor: `10^a · 2^b · π^c · ln2^d · ln10^e · μ₀^f · G^g · ∏ pᵢ^kᵢ` over primes `pᵢ` other than 2
+/// and 5, every exponent a whole or half number (`√2`, `10^(3/2)` for √(kHz), `√μ₀`). `10⁻⁶` (µ), `2¹⁰` (Ki), `1/65535` (a 16-bit duty,
 /// `3⁻¹ · 5⁻¹ · 17⁻¹ · 257⁻¹`), `π/180` (°), the pound's `0.45359237` (`7 · 11 · 97 · 6073 · 10⁻⁸`), `ln10/20` (a
-/// decibel in neper). Never an `f64`, so every client reproduces a value bit-exactly, and a scale fixed in a type
+/// decibel in neper), `10⁻⁴/μ₀` (an oersted in A/m). Never an `f64`, so every client reproduces a value bit-exactly, and a scale fixed in a type
 /// ([Fixed](crate::Fixed)'s `P`) converts integers without a rounding step.
 ///
 /// Closed under multiplication and division: a product only fails when it needs more than [MAX_FACTORS] primes or
@@ -22,12 +27,12 @@ pub const MAX_FACTORS: usize = 12;
 /// `None`), never by rounding.
 ///
 /// Always canonical, so equal magnitudes are equal field by field: 2 and 5 only in `pow10` / `pow2` (`5 = 10 · 2⁻¹`),
-/// the other primes sorted with exponents that aren't 0, and `rest` / `irrational` left out when they are 1. Plain
+/// the other primes sorted with exponents that aren't 0, and `rest` / `symbols` left out when they are 1. Plain
 /// `const` data without lifetimes, so a `&'static Magnitude` can be held at run time; [Fixed](crate::Fixed) uses it
 /// only at compile time.
 ///
 /// On the wire every exponent is twice the exponent as an `i8`, the primes as [UNib32]: `pow10` alone is 9 bits
-/// (Milli `fa 00`), the rest behind an option bit, its irrational powers behind one more, an empty prime slot one bit.
+/// (Milli `fa 00`), the rest behind an option bit, its symbols behind one more, an empty prime slot one bit.
 /// `self_describing`: the bytes end by themselves, so a magnitude can be the field of an enum variant
 /// ([Prefix](crate::Prefix)'s `Exact`).
 #[cfg_attr(
@@ -53,27 +58,65 @@ pub struct Magnitude {
 pub struct MagnitudeRest {
     /// Twice the exponent of 2.
     pow2: i8,
-    /// π, ln 2 and ln 10, `None` when all their exponents are 0.
-    irrational: Option<Irrational>,
+    /// π, ln 2, ln 10, μ₀ and G, `None` when all their exponents are 0.
+    symbols: Option<Symbols>,
     /// Primes other than 2 and 5, ascending, used slots first.
     factors: [Option<PrimePower>; MAX_FACTORS],
 }
 
-/// The powers of π, ln 2 and ln 10 in a [Magnitude], each twice the exponent: `π/180` has `pi = 2`, a decibel in
-/// neper (`ln10/20`) `ln10 = 2`. Treated as independent symbols, like the primes.
+/// The powers of the symbols in a [Magnitude], each twice the exponent: `π/180` has `pi = 2`, a decibel in neper
+/// (`ln10/20`) `ln10 = 2`, an oersted in A/m (`10⁻⁴/μ₀`) `mu0 = -2`. Treated as independent symbols, like the primes,
+/// so they cancel exactly: `(T/μ₀)·μ₀` is `T`.
+///
+/// π, ln 2 and ln 10 are mathematics: their value is known, and a factor with them converts by a named rounding. μ₀
+/// (the magnetic constant) and G (the Newtonian constant of gravitation) are measured since the 2019 SI: a factor with
+/// either left in it has no value until a named, versioned set gives one ([resolve](Magnitude::resolve)). ε₀ =
+/// 1/(μ₀c²), Z₀ = μ₀c and α = μ₀e²c/(2h) are expressions over μ₀ with the exact c, e and h, not symbols of their own.
 #[cfg_attr(
     feature = "shrink_wrap",
     derive_shrink_wrap(borrowed, owned(feature = "std"), self_describing)
 )]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Irrational {
+pub struct Symbols {
     /// Twice the exponent of π.
     pub pi: i8,
     /// Twice the exponent of ln 2.
     pub ln2: i8,
     /// Twice the exponent of ln 10.
     pub ln10: i8,
+    /// Twice the exponent of μ₀, the magnetic constant (measured).
+    pub mu0: i8,
+    /// Twice the exponent of G, the Newtonian constant of gravitation (measured).
+    pub g: i8,
+}
+
+impl Symbols {
+    /// Every exponent 0.
+    pub const NONE: Symbols = Symbols {
+        pi: 0,
+        ln2: 0,
+        ln10: 0,
+        mu0: 0,
+        g: 0,
+    };
+
+    /// The doubled exponents in the order of [Magnitude]'s symbols: π, ln 2, ln 10, μ₀, G.
+    const fn to_array(self) -> [i8; SYMBOLS] {
+        [self.pi, self.ln2, self.ln10, self.mu0, self.g]
+    }
+
+    /// Whether every exponent is 0.
+    #[must_use]
+    pub const fn is_none(&self) -> bool {
+        self.pi == 0 && self.ln2 == 0 && self.ln10 == 0 && self.mu0 == 0 && self.g == 0
+    }
+
+    /// Whether a measured constant, μ₀ or G, is left in.
+    #[must_use]
+    pub const fn has_measured(&self) -> bool {
+        self.mu0 != 0 || self.g != 0
+    }
 }
 
 /// `prime^(exp/2)` in a [Magnitude]: a prime other than 2 and 5, and twice its exponent (never 0).
@@ -117,6 +160,11 @@ pub enum MagnitudeError {
     NotSquare,
     /// A prime factor given by its parts that isn't a prime other than 2 and 5 ([Magnitude::from_parts_x2]).
     NotPrime,
+    /// A value asked of a magnitude with a measured constant (μ₀, G) left in it: it has none without a named set
+    /// ([Magnitude::resolve]).
+    Measured,
+    /// A set asked for a measured constant it doesn't give ([Ampere1948](crate::constants::Ampere1948) has no G).
+    NotInSet,
 }
 
 impl MagnitudeError {
@@ -124,7 +172,7 @@ impl MagnitudeError {
         clippy::panic,
         reason = "the compile error of each MagnitudeError, what this function is for"
     )]
-    const fn panic(self) -> ! {
+    pub(crate) const fn panic(self) -> ! {
         match self {
             MagnitudeError::Zero => panic!("a magnitude is not zero"),
             MagnitudeError::PrimeTooLarge => {
@@ -138,6 +186,15 @@ impl MagnitudeError {
                 panic!("the square root of a magnitude with a half exponent")
             }
             MagnitudeError::NotPrime => panic!("a prime factor of a magnitude is not a prime"),
+            MagnitudeError::Measured => panic!(
+                "this factor has a measured constant (μ₀ or G) left in it, so it has no value without a named set: \
+                 resolve it with one (Magnitude::resolve::<Codata2022>(), Fixed::convert_with::<Codata2022, ..>())"
+            ),
+            MagnitudeError::NotInSet => {
+                panic!(
+                    "this constant set doesn't give a measured constant the factor needs (Ampere1948 has no G)"
+                )
+            }
         }
     }
 }
@@ -147,7 +204,7 @@ impl MagnitudeError {
 struct Work {
     pow10: i32,
     pow2: i32,
-    irr: [i32; 3],
+    irr: [i32; SYMBOLS],
     primes: [u32; WORK],
     exps: [i32; WORK],
     len: usize,
@@ -160,7 +217,7 @@ impl Work {
     const ONE: Work = Work {
         pow10: 0,
         pow2: 0,
-        irr: [0; 3],
+        irr: [0; SYMBOLS],
         primes: [0; WORK],
         exps: [0; WORK],
         len: 0,
@@ -172,19 +229,24 @@ impl Work {
     )]
     #[expect(
         clippy::indexing_slicing,
-        reason = "i < MAX_FACTORS; w.len counts the factors written so far, below MAX_FACTORS <= WORK"
+        reason = "i < SYMBOLS, i < MAX_FACTORS; w.len counts the factors written so far, below MAX_FACTORS <= WORK"
     )]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "i < MAX_FACTORS, the loop bound; w.len at most MAX_FACTORS, the factors written"
+        reason = "i < SYMBOLS, i < MAX_FACTORS, the loop bounds; w.len at most MAX_FACTORS, the factors written"
     )]
     const fn of(m: &Magnitude) -> Work {
         let mut w = Work::ONE;
         w.pow10 = m.pow10 as i32;
         if let Some(rest) = &m.rest {
             w.pow2 = rest.pow2 as i32;
-            if let Some(irr) = &rest.irrational {
-                w.irr = [irr.pi as i32, irr.ln2 as i32, irr.ln10 as i32];
+            if let Some(sym) = &rest.symbols {
+                let a = sym.to_array();
+                let mut i = 0;
+                while i < SYMBOLS {
+                    w.irr[i] = a[i] as i32;
+                    i += 1;
+                }
             }
             let mut i = 0;
             while i < MAX_FACTORS {
@@ -330,17 +392,17 @@ impl Work {
     )]
     #[expect(
         clippy::indexing_slicing,
-        reason = "i < 3 for irr, i < rhs.len <= WORK for the primes"
+        reason = "i < SYMBOLS for irr, i < rhs.len <= WORK for the primes"
     )]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "sign is ±1 and both sides hold stored i8 exponents (Work::of), so products and sums fit i32; i < 3, i < rhs.len, the loop bounds"
+        reason = "sign is ±1 and both sides hold stored i8 exponents (Work::of), so products and sums fit i32; i < SYMBOLS, i < rhs.len, the loop bounds"
     )]
     const fn mul(mut self, rhs: &Work, sign: i32) -> Result<Work, MagnitudeError> {
         self.pow10 += sign * rhs.pow10;
         self.pow2 += sign * rhs.pow2;
         let mut i = 0;
-        while i < 3 {
+        while i < SYMBOLS {
             self.irr[i] += sign * rhs.irr[i];
             i += 1;
         }
@@ -357,17 +419,17 @@ impl Work {
     /// Every exponent times `n` (`n` 1 for a square root, after halving).
     #[expect(
         clippy::indexing_slicing,
-        reason = "i < 3 for irr, i < self.len <= WORK for the exponents"
+        reason = "i < SYMBOLS for irr, i < self.len <= WORK for the exponents"
     )]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "n is an i8 (powi) and the exponents stored i8s (Work::of), so the products fit i32; i < 3, i < self.len, the loop bounds"
+        reason = "n is an i8 (powi) and the exponents stored i8s (Work::of), so the products fit i32; i < SYMBOLS, i < self.len, the loop bounds"
     )]
     const fn scale(mut self, n: i32) -> Work {
         self.pow10 *= n;
         self.pow2 *= n;
         let mut i = 0;
-        while i < 3 {
+        while i < SYMBOLS {
             self.irr[i] *= n;
             i += 1;
         }
@@ -379,13 +441,47 @@ impl Work {
         self
     }
 
+    /// Every exponent halved and packed: the square root, [MagnitudeError::NotSquare] where an exponent is odd.
     #[expect(
         clippy::indexing_slicing,
-        reason = "i < 3 for irr, i < self.len <= MAX_FACTORS (checked first) for the factors"
+        reason = "i < SYMBOLS for irr, i < self.len <= WORK for the exponents, the loop bounds"
     )]
     #[expect(
         clippy::arithmetic_side_effects,
-        reason = "i < 3, i < self.len, the loop bounds"
+        reason = "i < SYMBOLS, i < self.len, the loop bounds"
+    )]
+    const fn halve(mut self) -> Result<Magnitude, MagnitudeError> {
+        if self.pow10 % 2 != 0 || self.pow2 % 2 != 0 {
+            return Err(MagnitudeError::NotSquare);
+        }
+        self.pow10 /= 2;
+        self.pow2 /= 2;
+        let mut i = 0;
+        while i < SYMBOLS {
+            if self.irr[i] % 2 != 0 {
+                return Err(MagnitudeError::NotSquare);
+            }
+            self.irr[i] /= 2;
+            i += 1;
+        }
+        let mut i = 0;
+        while i < self.len {
+            if self.exps[i] % 2 != 0 {
+                return Err(MagnitudeError::NotSquare);
+            }
+            self.exps[i] /= 2;
+            i += 1;
+        }
+        self.pack()
+    }
+
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "i < SYMBOLS for irr, i < self.len <= MAX_FACTORS (checked first) for the factors"
+    )]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "i < SYMBOLS, i < self.len, the loop bounds"
     )]
     const fn pack(&self) -> Result<Magnitude, MagnitudeError> {
         if self.len > MAX_FACTORS {
@@ -399,9 +495,9 @@ impl Work {
             Ok(e) => e,
             Err(e) => return Err(e),
         };
-        let mut irr = [0i8; 3];
+        let mut irr = [0i8; SYMBOLS];
         let mut i = 0;
-        while i < 3 {
+        while i < SYMBOLS {
             irr[i] = match exp(self.irr[i]) {
                 Ok(e) => e,
                 Err(e) => return Err(e),
@@ -420,21 +516,20 @@ impl Work {
             });
             i += 1;
         }
-        let irrational = if irr[0] == 0 && irr[1] == 0 && irr[2] == 0 {
-            None
-        } else {
-            Some(Irrational {
-                pi: irr[0],
-                ln2: irr[1],
-                ln10: irr[2],
-            })
+        let sym = Symbols {
+            pi: irr[0],
+            ln2: irr[1],
+            ln10: irr[2],
+            mu0: irr[3],
+            g: irr[4],
         };
-        let rest = if pow2 == 0 && irrational.is_none() && self.len == 0 {
+        let symbols = if sym.is_none() { None } else { Some(sym) };
+        let rest = if pow2 == 0 && symbols.is_none() && self.len == 0 {
             None
         } else {
             Some(MagnitudeRest {
                 pow2,
-                irrational,
+                symbols,
                 factors,
             })
         };
@@ -650,20 +745,44 @@ impl Magnitude {
     };
 
     /// π.
-    pub const PI: Magnitude = Self::irrational(2, 0, 0);
+    pub const PI: Magnitude = Self::symbol(Symbols {
+        pi: 2,
+        ..Symbols::NONE
+    });
 
     /// ln 2: a shannon (bit) in nat is ln 2, an octave in neper-like units too.
-    pub const LN2: Magnitude = Self::irrational(0, 2, 0);
+    pub const LN2: Magnitude = Self::symbol(Symbols {
+        ln2: 2,
+        ..Symbols::NONE
+    });
 
     /// ln 10: a decibel is ln10/20 Np, a hartley ln 10 nat.
-    pub const LN10: Magnitude = Self::irrational(0, 0, 2);
+    pub const LN10: Magnitude = Self::symbol(Symbols {
+        ln10: 2,
+        ..Symbols::NONE
+    });
 
-    const fn irrational(pi: i8, ln2: i8, ln10: i8) -> Magnitude {
+    /// μ₀, the magnetic constant: measured since the 2019 SI, so a symbol with no value until a named set gives one
+    /// ([resolve](Self::resolve)). `10⁻⁴/μ₀` is an oersted in A/m, exactly; ε₀ is `1/(μ₀c²)`.
+    pub const MU0: Magnitude = Self::symbol(Symbols {
+        mu0: 2,
+        ..Symbols::NONE
+    });
+
+    /// G, the Newtonian constant of gravitation: measured, a symbol as [MU0](Self::MU0) is. The solar mass is the
+    /// IAU's exact nominal (GM)☉ over G.
+    pub const G: Magnitude = Self::symbol(Symbols {
+        g: 2,
+        ..Symbols::NONE
+    });
+
+    /// One symbol's power alone.
+    const fn symbol(symbols: Symbols) -> Magnitude {
         Magnitude {
             pow10: 0,
             rest: Some(MagnitudeRest {
                 pow2: 0,
-                irrational: Some(Irrational { pi, ln2, ln10 }),
+                symbols: Some(symbols),
                 factors: [None; MAX_FACTORS],
             }),
         }
@@ -829,38 +948,35 @@ impl Magnitude {
     }
 
     /// `√self`, [MagnitudeError::NotSquare] when an exponent is already a half (`√√2` is not a magnitude).
-    #[expect(
-        clippy::indexing_slicing,
-        reason = "i < 3 for irr, i < MAX_FACTORS for the factors, the loop bounds"
-    )]
-    #[expect(
-        clippy::arithmetic_side_effects,
-        reason = "i < 3, i < w.len, the loop bounds"
-    )]
     pub const fn checked_sqrt(self) -> Result<Self, MagnitudeError> {
-        let mut w = Work::of(&self);
-        if w.pow10 % 2 != 0 || w.pow2 % 2 != 0 {
-            return Err(MagnitudeError::NotSquare);
-        }
-        w.pow10 /= 2;
-        w.pow2 /= 2;
-        let mut i = 0;
-        while i < 3 {
-            if w.irr[i] % 2 != 0 {
-                return Err(MagnitudeError::NotSquare);
-            }
-            w.irr[i] /= 2;
-            i += 1;
-        }
-        let mut i = 0;
-        while i < w.len {
-            if w.exps[i] % 2 != 0 {
-                return Err(MagnitudeError::NotSquare);
-            }
-            w.exps[i] /= 2;
-            i += 1;
-        }
-        w.pack()
+        Work::of(&self).halve()
+    }
+
+    /// `self^(e_x2 / 2)`: a whole or half power, `MU0.pow_x2(1)` is `√μ₀`. Panics (at compile time in a `const`)
+    /// where [checked_pow_x2](Self::checked_pow_x2) is an error.
+    #[must_use]
+    pub const fn pow_x2(self, e_x2: i8) -> Self {
+        unwrap(self.checked_pow_x2(e_x2))
+    }
+
+    /// `self^(e_x2 / 2)`: a whole or half power (`MU0.checked_pow_x2(1)` is `√μ₀`). [MagnitudeError::NotSquare]
+    /// where that is a quarter power, [MagnitudeError::ExponentRange] where an exponent leaves ±63½ (only the result
+    /// is checked, so `(10⁻³⁴)^½` works).
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable"
+    )]
+    pub const fn checked_pow_x2(self, e_x2: i8) -> Result<Self, MagnitudeError> {
+        Work::of(&self).scale(e_x2 as i32).halve()
+    }
+
+    /// The magnitude with μ₀ and G taken out: the part whose value is known.
+    #[must_use]
+    pub(crate) const fn without_measured(&self) -> Magnitude {
+        let mut w = Work::of(self);
+        (w.irr[3], w.irr[4]) = (0, 0);
+        // fewer factors than self, the other exponents its own: packs
+        unwrap(w.pack())
     }
 
     /// Twice the exponent of `prime` (2 and 5 included: `Milli` is 2⁻³ · 5⁻³, so -6 for both). 0 for a number that
@@ -897,20 +1013,22 @@ impl Magnitude {
         }
     }
 
-    /// Twice the exponents of π, ln 2 and ln 10.
+    /// Twice the exponents of π, ln 2, ln 10, μ₀ and G.
     #[must_use]
-    pub const fn irrational_x2(&self) -> Irrational {
+    pub const fn symbols_x2(&self) -> Symbols {
         match &self.rest {
             Some(MagnitudeRest {
-                irrational: Some(irr),
-                ..
-            }) => *irr,
-            _ => Irrational {
-                pi: 0,
-                ln2: 0,
-                ln10: 0,
-            },
+                symbols: Some(sym), ..
+            }) => *sym,
+            _ => Symbols::NONE,
         }
+    }
+
+    /// Whether a measured constant, μ₀ or G, is left in: then the magnitude has no value ([to_f64](Self::to_f64)
+    /// and [fixed_point](Self::fixed_point) refuse) until a named set [resolves](Self::resolve) it.
+    #[must_use]
+    pub const fn has_measured(&self) -> bool {
+        self.symbols_x2().has_measured()
     }
 
     /// Twice the exponent of 10 and of 2 as stored (`10^a · 2^b`, the 5s are in `a`).
@@ -939,7 +1057,8 @@ impl Magnitude {
         }
     }
 
-    /// Whether the magnitude is a fraction of integers: no power of π, ln 2 or ln 10, no half exponent.
+    /// Whether the magnitude is a fraction of integers: no power of a symbol (π, ln 2, ln 10, μ₀, G), no half
+    /// exponent.
     #[must_use]
     pub const fn is_rational(&self) -> bool {
         self.to_ratio().is_some()
@@ -958,7 +1077,7 @@ impl Magnitude {
     )]
     pub const fn to_ratio(&self) -> Option<(u128, u128)> {
         let w = Work::of(self);
-        if w.irr[0] != 0 || w.irr[1] != 0 || w.irr[2] != 0 {
+        if !self.symbols_x2().is_none() {
             return None;
         }
         let (mut num, mut den) = (1u128, 1u128);
@@ -1001,6 +1120,22 @@ impl Magnitude {
     }
 
     /// The factor as an `f64` (rounded, unlike the magnitude itself).
+    ///
+    /// # Panics
+    ///
+    /// For a magnitude with μ₀ or G left in it ([has_measured](Self::has_measured)), which has no value without a
+    /// named set: at compile time in a `const`, so a float conversion through μ₀ doesn't compile.
+    /// [checked_to_f64](Self::checked_to_f64) is `None` there instead.
+    #[must_use]
+    pub const fn to_f64(&self) -> f64 {
+        match self.checked_to_f64() {
+            Some(x) => x,
+            None => MagnitudeError::Measured.panic(),
+        }
+    }
+
+    /// The factor as an `f64` (rounded), `None` with μ₀ or G left in it: a measured constant has no value without a
+    /// named set ([resolve](Self::resolve)).
     #[must_use]
     #[expect(
         clippy::as_conversions,
@@ -1008,8 +1143,11 @@ impl Magnitude {
     )]
     #[expect(clippy::indexing_slicing, reason = "i < MAX_FACTORS, the loop bound")]
     #[expect(clippy::arithmetic_side_effects, reason = "i < w.len, the loop bound")]
-    pub const fn to_f64(&self) -> f64 {
+    pub const fn checked_to_f64(&self) -> Option<f64> {
         use core::f64::consts::{LN_2, LN_10, PI};
+        if self.has_measured() {
+            return None;
+        }
         let w = Work::of(self);
         let mut x = pow_half(10.0, w.pow10) * pow_half(2.0, w.pow2);
         x *= pow_half(PI, w.irr[0]);
@@ -1020,7 +1158,7 @@ impl Magnitude {
             x *= pow_half(w.primes[i] as f64, w.exps[i]);
             i += 1;
         }
-        x
+        Some(x)
     }
 
     /// `x · self` in integers, exactly: `None` when the result is not whole, doesn't fit `i128`, or the magnitude
@@ -1040,10 +1178,10 @@ impl Magnitude {
         (x / den).checked_mul(num)
     }
 
-    /// `x · self` in floats.
+    /// `x · self` in floats, `None` with μ₀ or G left in the magnitude ([checked_to_f64](Self::checked_to_f64)).
     #[must_use]
-    pub fn apply_f64(&self, x: f64) -> f64 {
-        match self.to_ratio() {
+    pub fn apply_f64(&self, x: f64) -> Option<f64> {
+        Some(match self.to_ratio() {
             // exact factors through the integers, so 0.3 · 10 is 3.0 and not 3.0000000000000004
             #[expect(
                 clippy::as_conversions,
@@ -1051,28 +1189,24 @@ impl Magnitude {
                 reason = "both at most 2^53, exact in f64"
             )]
             Some((num, den)) if num <= 1 << 53 && den <= 1 << 53 => x * num as f64 / den as f64,
-            _ => x * self.to_f64(),
-        }
+            _ => x * self.checked_to_f64()?,
+        })
     }
 
-    /// The magnitude of the parts [pow10_pow2_x2](Self::pow10_pow2_x2), [irrational_x2](Self::irrational_x2) and
-    /// [primes](Self::primes) give: twice the exponents of 10 and 2, of π, ln 2 and ln 10, and primes other than 2
+    /// The magnitude of the parts [pow10_pow2_x2](Self::pow10_pow2_x2), [symbols_x2](Self::symbols_x2) and
+    /// [primes](Self::primes) give: twice the exponents of 10 and 2, of the symbols, and primes other than 2
     /// and 5 with twice their exponents. In any order and with the same prime more than once; an error for a
     /// number in `primes` that isn't a prime, a result out of range, or a quarter power.
     pub fn from_parts_x2(
         pow10_x2: i8,
         pow2_x2: i8,
-        irrational_x2: Irrational,
+        symbols_x2: Symbols,
         primes: impl IntoIterator<Item = PrimePower>,
     ) -> Result<Self, MagnitudeError> {
         let mut w = Work::ONE;
         w.pow10 = i32::from(pow10_x2);
         w.pow2 = i32::from(pow2_x2);
-        w.irr = [
-            i32::from(irrational_x2.pi),
-            i32::from(irrational_x2.ln2),
-            i32::from(irrational_x2.ln10),
-        ];
+        w.irr = symbols_x2.to_array().map(i32::from);
         for f in primes {
             if f.prime == 2 || f.prime == 5 || !is_prime_u32(f.prime) {
                 return Err(MagnitudeError::NotPrime);
@@ -1089,7 +1223,7 @@ impl Magnitude {
         if self.primes().any(|f| f.exp == 0) {
             return Err(shrink_wrap::Error::SubtypeOutOfRange);
         }
-        match Self::from_parts_x2(pow10, pow2, self.irrational_x2(), self.primes()) {
+        match Self::from_parts_x2(pow10, pow2, self.symbols_x2(), self.primes()) {
             Ok(m) if m == *self => Ok(()),
             _ => Err(shrink_wrap::Error::SubtypeOutOfRange),
         }
@@ -1110,6 +1244,10 @@ struct MagnitudeParts {
     ln2: i8,
     #[serde(default, skip_serializing_if = "is_zero")]
     ln10: i8,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    mu0: i8,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    g: i8,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     primes: Vec<(u32, i8)>,
 }
@@ -1127,13 +1265,15 @@ fn is_zero(x: &i8) -> bool {
 impl serde::Serialize for Magnitude {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let (pow10, pow2) = self.pow10_pow2_x2();
-        let irr = self.irrational_x2();
+        let sym = self.symbols_x2();
         MagnitudeParts {
             pow10,
             pow2,
-            pi: irr.pi,
-            ln2: irr.ln2,
-            ln10: irr.ln10,
+            pi: sym.pi,
+            ln2: sym.ln2,
+            ln10: sym.ln10,
+            mu0: sym.mu0,
+            g: sym.g,
             primes: self.primes().map(|f| (f.prime, f.exp)).collect(),
         }
         .serialize(serializer)
@@ -1147,10 +1287,12 @@ impl<'de> serde::Deserialize<'de> for Magnitude {
         Magnitude::from_parts_x2(
             p.pow10,
             p.pow2,
-            Irrational {
+            Symbols {
                 pi: p.pi,
                 ln2: p.ln2,
                 ln10: p.ln10,
+                mu0: p.mu0,
+                g: p.g,
             },
             p.primes
                 .into_iter()
@@ -1194,6 +1336,7 @@ impl Default for Magnitude {
 }
 
 /// `·10⁻⁴`, `·2¹⁰`, `·1/65535`, `·π/180`, `·2π`, `·√2`, `·ln10/20`: the factor as written after a number. Empty for 1.
+/// The measured symbols come last, each a factor of its own: `·10⁻⁴·μ₀⁻¹`, `·√μ₀`, `·6·G⁻¹`.
 impl core::fmt::Display for Magnitude {
     #[expect(
         clippy::arithmetic_side_effects,
@@ -1204,6 +1347,27 @@ impl core::fmt::Display for Magnitude {
         if *self == Self::ONE {
             return Ok(());
         }
+        let sym = self.symbols_x2();
+        if sym.has_measured() {
+            // the known part as usual, then each measured symbol as a factor of its own
+            let mut w = Work::of(self);
+            (w.irr[3], w.irr[4]) = (0, 0);
+            if let Ok(known) = w.pack() {
+                known.fmt(f)?;
+            }
+            for (name, e) in [("μ₀", sym.mu0), ("G", sym.g)] {
+                match e {
+                    0 => {}
+                    1 => write!(f, "·√{name}")?,
+                    2 => write!(f, "·{name}")?,
+                    _ => {
+                        write!(f, "·{name}")?;
+                        write_exp_x2(f, i32::from(e))?;
+                    }
+                }
+            }
+            return Ok(());
+        }
         // a power alone: 10⁻⁴, 2¹⁰
         if let Some(e) = self.as_pow10() {
             f.write_str("·10")?;
@@ -1211,7 +1375,7 @@ impl core::fmt::Display for Magnitude {
         }
         if self
             .rest
-            .is_some_and(|r| r.irrational.is_none() && r.factors[0].is_none())
+            .is_some_and(|r| r.symbols.is_none() && r.factors[0].is_none())
             && p10 == 0
             && p2 % 2 == 0
         {
@@ -1252,8 +1416,9 @@ impl core::fmt::Display for Magnitude {
         }
         if !fits || num > u128::from(u64::MAX) || den > u128::from(u64::MAX) {
             // too long as a fraction: the prime powers
-            return write_powers(&bases, &exps, &w.irr, f);
+            return write_powers(&bases, &exps, &[w.irr[0], w.irr[1], w.irr[2]], f);
         }
+        // the measured symbols are 0 here: written apart above
         let irr = [("π", w.irr[0]), ("ln2", w.irr[1]), ("ln10", w.irr[2])];
         let has_num_symbol = root_num != 1 || irr.iter().any(|(_, e)| *e > 0);
         if num != 1 || !has_num_symbol {

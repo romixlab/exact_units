@@ -32,9 +32,10 @@
 ///   ([counted!](crate::counted)), or `counted(Other)`: the counted base of the marker `Other` of the same crate, a
 ///   scaled unit of it (the decibel of the neper).
 /// - The scale, an exact [Magnitude](crate::Magnitude), one when left out: `Pow10(-3)`, `Exact(1 / 180, pi 1)`
-///   (`num / den`, then optionally `pow10 e`, `pow2 e`, `pi e`, `ln2 e`, `ln10 e` in that order, see
+///   (`num / den`, then optionally `pow10 e`, `pow2 e`, `pi e`, `ln2 e`, `ln10 e`, `mu0 e`, `g e` in that order, see
 ///   [Magnitude::new](crate::Magnitude::new); the decibel is `Exact(1 / 20, ln10 1)` of the neper), so every reader
-///   computes the same value. A unit has no offset: a scale with a zero of its own is an origin of points
+///   computes the same value. The measured constants μ₀ and G stay symbols ([constants](crate::constants)), their
+///   exponent whole or a half (`mu0 1 / 2`): an oersted is `Exact(1 / 1, pow10 -4, mu0 -1)` A/m. A unit has no offset: a scale with a zero of its own is an origin of points
 ///   ([origin!](crate::origin)), and a float factor isn't a unit's scale.
 ///
 ///   ```compile_fail
@@ -294,13 +295,14 @@ macro_rules! __scale_runtime {
     };
 }
 
-/// `num / den, pow10 a, pow2 b, pi c, ln2 d, ln10 e` as a [Magnitude](crate::Magnitude).
+/// `num / den, pow10 a, pow2 b, pi c, ln2 d, ln10 e, mu0 f, g h` as a [Magnitude](crate::Magnitude).
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __magnitude {
     (
         $num:literal / $den:literal $(, pow10 $p10:literal)? $(, pow2 $p2:literal)? $(, pi $pi:literal)?
-            $(, ln2 $ln2:literal)? $(, ln10 $ln10:literal)? $(,)?
+            $(, ln2 $ln2:literal)? $(, ln10 $ln10:literal)? $(, mu0 $mu0:literal $(/ $mu0d:literal)?)?
+            $(, g $g:literal $(/ $gd:literal)?)? $(,)?
     ) => {
         $crate::Magnitude::new(
             $num,
@@ -311,6 +313,23 @@ macro_rules! __magnitude {
         )
         .mul($crate::Magnitude::LN2.powi($crate::__or_zero!($($ln2)?)))
         .mul($crate::Magnitude::LN10.powi($crate::__or_zero!($($ln10)?)))
+        .mul($crate::__symbol_pow!(MU0 $(, $mu0 $(/ $mu0d)?)?))
+        .mul($crate::__symbol_pow!(G $(, $g $(/ $gd)?)?))
+    };
+}
+
+/// A symbol of [Magnitude](crate::Magnitude) to a whole power `e` or a half one `e / 2`; 1 without an exponent.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __symbol_pow {
+    ($s:ident) => {
+        $crate::Magnitude::ONE
+    };
+    ($s:ident, $e:literal) => {
+        $crate::Magnitude::$s.powi($e)
+    };
+    ($s:ident, $e:literal / 2) => {
+        $crate::Magnitude::$s.pow_x2($e)
     };
 }
 

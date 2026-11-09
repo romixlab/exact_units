@@ -670,6 +670,74 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
             .and_then(Fixed::from_number)
     }
 
+    /// The same value in another unit `U2`, as [convert](Self::convert), with the measured constants μ₀ and G of the
+    /// factor taken from the named set `S` ([constants](crate::constants)): an oersted in A/m, a solar mass in kg.
+    /// Exact or `None` as `convert`; under a CODATA set such a factor has half powers of large primes, so between
+    /// integer storages it needs [convert_rounded_with](Self::convert_rounded_with) and a named rounding. A factor
+    /// where the symbols cancel converts as with `convert`, whatever the set.
+    ///
+    /// ```
+    /// use exact_units::{Fixed, Rounding, prefix::{Micro, Milli}, units::{Ampere, Meter, Per}};
+    /// use exact_units::constants::{Ampere1948, Codata2022};
+    ///
+    /// exact_units::unit! {
+    ///     /// Oersted, Oe: (1 G)/μ₀, 10⁻⁴ T over μ₀ in A/m.
+    ///     pub struct Oersted = "Oe", [a 1, m -1], Exact(1 / 1, pow10 -4, mu0 -1);
+    /// }
+    /// let h = Fixed::<Oersted, Milli, i32>::new(1000);
+    /// // under the 1948 ampere 1 Oe is 1000/(4π) A/m: still π, so rounded
+    /// let a = h.convert_rounded_with::<Ampere1948, Per<Ampere, Meter>, Micro, i64>(Rounding::NearestEven);
+    /// assert_eq!(a, Some(Fixed::new(79_577_472)));
+    /// // under CODATA 2022 a touch more: μ₀ is 4π·10⁻⁷ · (1 − 1.3·10⁻¹⁰)... at µA/m the same
+    /// let b = h.convert_rounded_with::<Codata2022, Per<Ampere, Meter>, Micro, i64>(Rounding::NearestEven);
+    /// assert_eq!(b, Some(Fixed::new(79_577_472)));
+    /// ```
+    ///
+    /// Without a set, a factor that keeps μ₀ doesn't compile, floats included:
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Fixed, Rounding, prefix::One, units::{Ampere, Meter, Per}};
+    /// exact_units::unit! {
+    ///     /// Oersted.
+    ///     pub struct Oersted = "Oe", [a 1, m -1], Exact(1 / 1, pow10 -4, mu0 -1);
+    /// }
+    /// let oe = Fixed::<Oersted, One, f64>::try_new(1.0).unwrap();
+    /// let _ = oe.convert_rounded::<Per<Ampere, Meter>, One, f64>(Rounding::NearestEven);
+    /// ```
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Fixed, prefix::Micro, units::{Ampere, Meter, Per}};
+    /// exact_units::unit! {
+    ///     /// Oersted.
+    ///     pub struct Oersted = "Oe", [a 1, m -1], Exact(1 / 1, pow10 -4, mu0 -1);
+    /// }
+    /// let _ = Fixed::<Oersted, Micro, i32>::new(1).convert::<Per<Ampere, Meter>, Micro, i32>();
+    /// ```
+    #[inline(always)]
+    pub fn convert_with<S: crate::constants::Constants, U2: Unit, P2: FixedScale, T2: Storage>(
+        self,
+    ) -> Option<Fixed<U2, P2, T2>> {
+        let c = const { Conversion::between_with::<S, U, P, U2, P2, T, T2>(false) };
+        c.apply::<T, T2>(self.value).and_then(Fixed::from_number)
+    }
+
+    /// [convert_with](Self::convert_with) rounded by `r`, as [convert_rounded](Self::convert_rounded) is
+    /// [convert](Self::convert): `None` only when it doesn't fit `T2`.
+    #[inline(always)]
+    pub fn convert_rounded_with<
+        S: crate::constants::Constants,
+        U2: Unit,
+        P2: FixedScale,
+        T2: Storage,
+    >(
+        self,
+        r: Rounding,
+    ) -> Option<Fixed<U2, P2, T2>> {
+        let c = const { Conversion::between_with::<S, U, P, U2, P2, T, T2>(true) };
+        c.apply_rounded(self.value, r, Overflow::Checked)
+            .and_then(Fixed::from_number)
+    }
+
     /// The value `x · scale` (in the unit `U` itself) in this prefix and storage, if it is exact (as [to](Self::to))
     /// and within `B`: how a number with a run-time scale becomes a `Fixed`, `Repr::Int(3)` with `Pow10(-3)` is
     /// 3000 of `Micro`. Into a float storage too the value must be a float exactly: `Repr::Int(1)` with `Pow10(-3)`
@@ -1258,6 +1326,31 @@ impl Conversion {
         Self::by::<T, T2>(from.mul(P::SCALE).div(to.mul(P2::SCALE)), rounding)
     }
 
+    /// As [between](Self::between), with μ₀ and G in the factor replaced by the values of the set `S`.
+    const fn between_with<
+        S: crate::constants::Constants,
+        U: Unit,
+        P: FixedScale,
+        U2: Unit,
+        P2: FixedScale,
+        T: Storage,
+        T2: Storage,
+    >(
+        rounding: bool,
+    ) -> Self {
+        if !U::DIM.same(U2::DIM) {
+            crate::conv_error::dim_mismatch::<U, U2>("a Fixed");
+        }
+        if !U::KIND.same(U2::KIND) {
+            crate::conv_error::kind_mismatch::<U, U2>("a Fixed");
+        }
+        let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
+            crate::conv_error::no_exact_factor::<U, U2>("a Fixed")
+        };
+        let m = from.mul(P::SCALE).div(to.mul(P2::SCALE));
+        Self::by::<T, T2>(m.resolve::<S>().value, rounding)
+    }
+
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
@@ -1272,6 +1365,10 @@ impl Conversion {
                   error; max_abs is at least 1 for an integer storage"
     )]
     const fn by<T: Storage, T2: Storage>(m: Magnitude, rounding: bool) -> Self {
+        if m.has_measured() {
+            // μ₀ or G left in the factor: no value without a named set, also for floats (convert_with)
+            crate::MagnitudeError::Measured.panic();
+        }
         let ratio = m.to_ratio();
         let float = T::IS_FLOAT || T2::IS_FLOAT;
         let fixed_point = if ratio.is_none() && rounding {

@@ -123,6 +123,7 @@ nav = [
     },
     { "Nomicon" = [
             "nomicon/magnitude.md",
+            "nomicon/constants.md",
             "nomicon/compile_time.md",
             "nomicon/reliability.md",
         ]

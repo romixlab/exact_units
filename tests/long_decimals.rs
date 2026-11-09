@@ -21,6 +21,22 @@ const LONG: usize = 10;
 /// The long decimals that are exact digits and stay, each with the reason.
 const ALLOWED: &[(&str, &str)] = &[
     (
+        "1.25663706212",
+        "μ₀ as CODATA 2018 prints it: the set's exact value (constants::Codata2018)",
+    ),
+    (
+        "1.25663706127",
+        "μ₀ as CODATA 2022 prints it: the set's exact value (constants::Codata2022)",
+    ),
+    (
+        "7.2973525693",
+        "α as CODATA 2018 prints it, what α from μ₀ is checked against",
+    ),
+    (
+        "7.2973525643",
+        "α as CODATA 2022 prints it, what α from μ₀ is checked against",
+    ),
+    (
         "0.09999999962747097015380859375",
         "the 2⁻³⁰ step below 0.1, exactly: fixed!(0.1)'s error names it",
     ),

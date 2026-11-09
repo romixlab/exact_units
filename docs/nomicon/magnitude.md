@@ -22,7 +22,7 @@ assert_eq!(LB.to_ratio(), Some((45_359_237, 100_000_000)));
 A magnitude is a product of powers:
 
 $$
-m = 10^{a} \cdot 2^{b} \cdot \pi^{c} \cdot (\ln 2)^{d} \cdot (\ln 10)^{e} \cdot \prod_i p_i^{k_i}
+m = 10^{a} \cdot 2^{b} \cdot \pi^{c} \cdot (\ln 2)^{d} \cdot (\ln 10)^{e} \cdot \mu_0^{f} \cdot G^{g} \cdot \prod_i p_i^{k_i}
 $$
 
 over primes $p_i$ other than 2 and 5, every exponent a whole or a half number. It is kept canonical, so equal magnitudes are equal field by field:
@@ -55,10 +55,10 @@ assert_eq!(Magnitude::PI.div(Magnitude::ratio(180, 1)).to_ratio(), None);
 
 Two things are refused: a compile error in a `const`, a `MagnitudeError` from the `checked_` forms at run time.
 
-- More than `MAX_FACTORS` (12) primes other than 2 and 5.
+- More than `MAX_FACTORS` (16) primes other than 2 and 5.
 - An exponent outside $\pm 63\tfrac12$.
 
-The 171 imperial and US customary units take at most 7 such primes, and any product or quotient of two of them at most 10. Plain fractions of integers can't do this: psi² takes 87 bits, (lbf·s)³ 130.
+The 171 imperial and US customary units take at most 7 such primes, and any product or quotient of two of them at most 10. The exact SI constants $h$, $c$, $e$ and $k_B$ take 9 together, and $\mu_0$ and $G$ resolved by CODATA 2022 five more. Plain fractions of integers can't do this: psi² takes 87 bits, (lbf·s)³ 130.
 
 ## π, ln 2 and ln 10
 
@@ -69,6 +69,21 @@ They are exact symbols beside the primes:
 - $\ln 2$: a shannon is $\ln 2$ nat, a decade $\frac{\ln 10}{\ln 2}$ octaves.
 
 A root halves the exponents: $\sqrt{\mathrm{mHz}} = 10^{-3/2}\ \mathrm{Hz}^{1/2}$. The root of a half power is refused (`MagnitudeError::NotSquare`).
+
+## μ₀ and G, measured symbols
+
+The magnetic constant $\mu_0$ and the gravitational constant $G$ are symbols too, and cancel the same way: $(T/\mu_0)\cdot\mu_0$ is T. They differ from π in one thing: their value is measured, so a magnitude with $\mu_0$ or $G$ left in it has no number. `to_f64` and `fixed_point` refuse it (a compile error in a `const`), `checked_to_f64` is `None`, and a conversion over such a factor doesn't compile. A named set gives the number: see [Measured constants](constants.md).
+
+The display writes them last, each a factor of its own: `·10⁻⁴·μ₀⁻¹`, `·√μ₀`.
+
+```rust
+use exact_units::Magnitude;
+
+let oersted = Magnitude::pow10(-4).div(Magnitude::MU0);
+assert_eq!(oersted.to_string(), "·10⁻⁴·μ₀⁻¹");
+assert_eq!(oersted.mul(Magnitude::MU0), Magnitude::pow10(-4));
+assert_eq!(oersted.checked_to_f64(), None);
+```
 
 ## Factoring at compile time
 
@@ -83,6 +98,6 @@ A root halves the exponents: $\sqrt{\mathrm{mHz}} = 10^{-3/2}\ \mathrm{Hz}^{1/2}
 
 ## In memory and on the wire
 
-A `Magnitude` is plain `const` data, 104 bytes, so a firmware can hold a `&'static Magnitude`. `Fixed` uses it only at compile time.
+A `Magnitude` is plain `const` data, 138 bytes, so a firmware can hold a `&'static Magnitude`. `Fixed` uses it only at compile time.
 
 On the wire every exponent is twice the exponent as an `i8`. A decimal prefix is 2 bytes (`Milli` is `fa 00`), `Kibi` 5, a degree 11, the pound 16. A magnitude that isn't canonical is refused on decode.

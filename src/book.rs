@@ -63,4 +63,5 @@ pages! {
     Sensors = "recipes/sensors.md";
     Timing = "recipes/timing.md";
     Magnitude = "nomicon/magnitude.md";
+    Constants = "nomicon/constants.md";
 }

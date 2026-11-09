@@ -15,9 +15,9 @@ use exact_units::origins::Celsius;
 use exact_units::prefix::{Centi, Milli, One};
 use exact_units::units::{Kelvin, Ratio, Sample, Volt};
 use exact_units::{
-    CompactError, Complex, Counted, Dim, Fixed, FullScaleBits, Index, IndexFrom1, Irrational,
-    Magnitude, Offset, Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, SIExpr, SIExprOwned,
-    Seq, UnitDef, UnitDefOwned, UnitTable, tree,
+    CompactError, Complex, Counted, Dim, Fixed, FullScaleBits, Index, IndexFrom1, Magnitude,
+    Offset, Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, SIExpr, SIExprOwned, Seq, Symbols,
+    UnitDef, UnitDefOwned, UnitTable, tree,
 };
 use shrink_wrap::max_size::MaxSize;
 use shrink_wrap::prelude::*;
@@ -137,22 +137,25 @@ pub(crate) struct Row {
 
 /// A magnitude from its parts ([Magnitude::from_parts_x2], what serde and a hand-edited file go through) is an error
 /// or a magnitude that round-trips, shows, and is rebuilt from its own parts.
-pub(crate) fn magnitude(pow10: i8, pow2: i8, irr: [i8; 3], primes: &[(u32, i8)]) {
-    let irrational = Irrational {
+pub(crate) fn magnitude(pow10: i8, pow2: i8, irr: [i8; 5], primes: &[(u32, i8)]) {
+    let symbols = Symbols {
         pi: irr[0],
         ln2: irr[1],
         ln10: irr[2],
+        mu0: irr[3],
+        g: irr[4],
     };
     let parts = primes.iter().map(|&(prime, exp)| PrimePower { prime, exp });
-    let Ok(m) = Magnitude::from_parts_x2(pow10, pow2, irrational, parts) else {
+    let Ok(m) = Magnitude::from_parts_x2(pow10, pow2, symbols, parts) else {
         return;
     };
     round_trip(&m);
     let _ = m.to_string();
-    let _ = (m.to_f64(), m.to_ratio());
+    let _ = (m.checked_to_f64(), m.to_ratio());
+    assert_eq!(m.checked_to_f64().is_none(), m.has_measured());
     let (p10, p2) = m.pow10_pow2_x2();
     assert_eq!(
-        Magnitude::from_parts_x2(p10, p2, m.irrational_x2(), m.primes()),
+        Magnitude::from_parts_x2(p10, p2, m.symbols_x2(), m.primes()),
         Ok(m)
     );
     for neg in [false, true] {
@@ -632,7 +635,7 @@ mod tests {
         fn magnitudes(
             pow10: i8,
             pow2: i8,
-            irr in any::<[i8; 3]>(),
+            irr in any::<[i8; 5]>(),
             primes in vec((prop_oneof![
                 proptest::sample::select(&[3u32, 7, 11, 13, 2, 5, 9, 65_521, 4_294_967_291][..]),
                 any::<u32>(),

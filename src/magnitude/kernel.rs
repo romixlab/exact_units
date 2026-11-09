@@ -11,7 +11,7 @@ use crate::{Overflow, Rounding};
 use core::cmp::Ordering;
 
 /// A rational magnitude as the kernel applies it: `5^(pow10/2) · 2^((pow10 + pow2)/2) · ∏ prime^(exp/2)`, read from the
-/// magnitude in place (a copy of one is 104 bytes). Made by [Exact::of], which checks that every exponent is whole.
+/// magnitude in place (a copy of one is 138 bytes). Made by [Exact::of], which checks that every exponent is whole.
 #[derive(Copy, Clone)]
 pub(crate) struct Exact<'a>(&'a Magnitude);
 
@@ -39,7 +39,7 @@ fn prime(f: Option<PrimePower>) -> Option<(u32, i32)> {
     f.map(|f| (f.prime, i32::from(f.exp) / 2))
 }
 
-/// Whether `m` is a fraction of integers: no power of π, ln 2 or ln 10, every exponent whole (its doubled form even).
+/// Whether `m` is a fraction of integers: no power of a symbol (π, ln 2, ln 10, μ₀, G), every exponent whole (its doubled form even).
 #[expect(
     clippy::indexing_slicing,
     reason = "i < MAX_FACTORS, the loop bound and the array's length"
@@ -55,7 +55,7 @@ pub(crate) const fn whole(m: &Magnitude) -> bool {
     let Some(rest) = &m.rest else {
         return true;
     };
-    if rest.pow2 % 2 != 0 || rest.irrational.is_some() {
+    if rest.pow2 % 2 != 0 || rest.symbols.is_some() {
         return false;
     }
     let mut i = 0;

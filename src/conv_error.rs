@@ -442,7 +442,7 @@ pub(crate) const fn no_exact_factor<A: Unit, B: Unit>(what: &str) -> ! {
     msg = push_unit(msg, A::EXPR);
     msg = msg.push(" and ");
     msg = push_unit(msg, B::EXPR);
-    msg = msg.push(" (one leaves what a Magnitude holds: more than 12 primes, or past ±63½)");
+    msg = msg.push(" (one leaves what a Magnitude holds: more than 16 primes, or past ±63½)");
     panic!("{}", msg.as_str())
 }
 

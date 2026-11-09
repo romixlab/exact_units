@@ -1222,6 +1222,11 @@ impl UnitExpr {
     }
 
     /// The factor to coherent SI of the whole expression, as a float: [magnitude](Self::magnitude) is the exact one.
+    ///
+    /// # Panics
+    ///
+    /// Where a unit's scale keeps μ₀ or G ([Magnitude::to_f64](crate::Magnitude::to_f64)): at compile time in a
+    /// `const`, which is where the crate asks for it.
     #[must_use]
     pub const fn factor(&self) -> f64 {
         match self {
