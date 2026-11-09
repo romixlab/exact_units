@@ -1664,11 +1664,11 @@ pub(crate) fn write_prefix_unit<P: FixedScale>(
     }
     match unit {
         UnitExpr::Named(UnitDef {
-            names: UnitNames { symbol: "" },
+            names: UnitNames { symbol: "", .. },
             ..
         }) => write!(f, " {}", P::SYMBOL),
         UnitExpr::Named(UnitDef {
-            names: UnitNames { symbol },
+            names: UnitNames { symbol, .. },
             ..
         }) if crate::tree::prefix_binds(symbol) => {
             write!(f, " {}{symbol}", P::SYMBOL)
@@ -1720,7 +1720,7 @@ impl<U: Unit, P: FixedScale, T: Storage + defmt::Format, B: Bounds<T>> defmt::Fo
             }
             (
                 UnitExpr::Named(UnitDef {
-                    names: UnitNames { symbol },
+                    names: UnitNames { symbol, .. },
                     ..
                 }),
                 Some(crate::tree::Moved::Inside(p)),
@@ -1734,26 +1734,26 @@ impl<U: Unit, P: FixedScale, T: Storage + defmt::Format, B: Bounds<T>> defmt::Fo
         }
         match U::EXPR {
             UnitExpr::Named(UnitDef {
-                names: UnitNames { symbol: "" },
+                names: UnitNames { symbol: "", .. },
                 ..
             }) if P::RUNTIME.is_some() => {
                 defmt::write!(f, "{}", self.value);
                 Prefix::defmt_ratio(P::RUNTIME.unwrap_or(Prefix::Unit), f);
             }
             UnitExpr::Named(UnitDef {
-                names: UnitNames { symbol },
+                names: UnitNames { symbol, .. },
                 ..
             }) if P::SYMBOL.is_empty() && P::RUNTIME.is_none() => {
                 defmt::write!(f, "{} ·{} {=str}", self.value, P::SCALE, symbol);
             }
             UnitExpr::Named(UnitDef {
-                names: UnitNames { symbol },
+                names: UnitNames { symbol, .. },
                 ..
             }) if crate::tree::prefix_binds(symbol) => {
                 defmt::write!(f, "{} {=str}{=str}", self.value, P::SYMBOL, symbol);
             }
             UnitExpr::Named(UnitDef {
-                names: UnitNames { symbol },
+                names: UnitNames { symbol, .. },
                 ..
             }) => {
                 defmt::write!(f, "{} {=str}({=str})", self.value, P::SYMBOL, symbol);
@@ -1903,7 +1903,7 @@ mod tests {
                 crate_name: "test",
                 name: "Huge",
             },
-            names: UnitNames { symbol: "m~" },
+            names: UnitNames::new("m~", crate::PrefixPolicy::Decimal),
             dim: Dim::new(0, 1, 0, 0, 0, 0, 0),
             quantity: None,
             scale: Magnitude::pow10(60),

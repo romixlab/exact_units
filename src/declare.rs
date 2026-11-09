@@ -23,7 +23,7 @@
 /// assert_eq!(Bucket::DIM, exact_units::counted!(Bucket));
 /// ```
 ///
-/// Each line is `<attributes> <visibility> struct <Name> = "<symbol>", <dimension>[, <scale>];`:
+/// Each line is `<attributes> <visibility> struct <Name> = "<symbol>" [(<names>)], <dimension>[, <scale>];`:
 ///
 /// - The attributes are the marker's (docs, `#[cfg(..)]`); its derives are `Copy, Clone, Debug, Default, PartialEq,
 ///   Eq, Hash`. A `#[cfg(..)]` applies to its impl too.
@@ -44,6 +44,35 @@
 ///       pub struct DegC = "°C", [k 1], Affine { factor: 1.0, offset: 273.15 };
 ///   }
 ///   ```
+/// - The names in parentheses after the symbol ([UnitNames](crate::UnitNames)) say how text writes and reads the unit,
+///   each optional, in any order, separated by commas: `ascii "Ohm"` where the transliteration of the symbol (`µ` as
+///   `u`, `Ω` as `Ohm`, `²` as `^2`) isn't its ASCII form, `long "ohm"` (the plural adds an s) or `long "foot" plural
+///   "feet"`, `aliases ["nit", "nt"]`, `ucum "Ohm"`, and `prefixes none`, `decimal`, `decimal_and_binary` or `only
+///   [Milli, Kilo]` ([PrefixPolicy](crate::PrefixPolicy)). Without `prefixes`, a coherent unit whose symbol is one
+///   word takes the SI prefixes and every other unit none (a scaled one, `min`; a counted one; a compound symbol,
+///   whose parts take theirs).
+///
+///   ```
+///   exact_units::unit! {
+///       /// Shaft speed, rpm, with its names: `krpm` reads, `rpm` is written in ASCII as it is.
+///       pub struct Rpm = "rpm" (long "revolution per minute" plural "revolutions per minute", prefixes only [Kilo]),
+///           [rad 1, s -1], Exact(1 / 30, pi 1);
+///   }
+///   use exact_units::{Prefix, Unit};
+///
+///   let names = Rpm::EXPR.def().unwrap().names;
+///   assert_eq!(names.plural, "revolutions per minute");
+///   assert!(names.prefixes.allows(Prefix::Kilo) && !names.prefixes.allows(Prefix::Milli));
+///   ```
+///
+///   A symbol with a character that has no ASCII form, and no `ascii`, doesn't compile:
+///
+///   ```compile_fail
+///   exact_units::unit! {
+///       /// Optical depth, τ: needs `("τ" (ascii "tau"), ..)`.
+///       pub struct Tau = "τ", [];
+///   }
+///   ```
 /// - The marker's identity is the crate that declares it (`CARGO_CRATE_NAME`) and its name
 ///   ([MarkerId](crate::MarkerId)): two crates' `Rpm` are two units.
 /// - After the dimension, `kind "resistance"` names a kind of quantity of its own ([Kind::Named](crate::Kind)):
@@ -60,14 +89,14 @@ macro_rules! unit {
         @table $(#[$all_attr:meta])* $all_vis:vis static $all:ident;
         $(
             $(#[$($attr:tt)*])*
-            $vis:vis struct $name:ident = $symbol:literal, $dim:tt $(($base:ident))? $(kind $qkind:literal)?
+            $vis:vis struct $name:ident = $symbol:literal $(($($names:tt)*))?, $dim:tt $(($base:ident))? $(kind $qkind:literal)?
                 $(, $kind:ident $args:tt $(, conventional($source:literal, $year:literal))?)?;
         )*
     ) => {
         $crate::unit! {
             $(
                 $(#[$($attr)*])*
-                $vis struct $name = $symbol, $dim $(($base))? $(kind $qkind)? $(, $kind $args $(, conventional($source, $year))?)?;
+                $vis struct $name = $symbol $(($($names)*))?, $dim $(($base))? $(kind $qkind)? $(, $kind $args $(, conventional($source, $year))?)?;
             )*
         }
 
@@ -84,7 +113,7 @@ macro_rules! unit {
     (
         $(
             $(#[$($attr:tt)*])*
-            $vis:vis struct $name:ident = $symbol:literal, $dim:tt $(($base:ident))? $(kind $qkind:literal)?
+            $vis:vis struct $name:ident = $symbol:literal $(($($names:tt)*))?, $dim:tt $(($base:ident))? $(kind $qkind:literal)?
                 $(, $kind:ident $args:tt $(, conventional($source:literal, $year:literal))?)?;
         )*
     ) => {
@@ -106,13 +135,19 @@ macro_rules! unit {
                             crate_name: env!("CARGO_CRATE_NAME"),
                             name: stringify!($name),
                         },
-                        names: $crate::UnitNames { symbol: $symbol },
+                        names: $crate::__unit_names!([$symbol] [$dim] [$($kind)?] $($($names)*)?),
                         dim: Self::DIM,
                         quantity: $crate::__unit_quantity!($($qkind)?),
                         scale: $crate::__unit_scale!($($kind $args)?),
                         provenance: $crate::__unit_provenance!($($($source $year)?)?),
                     });
                 }
+            }
+
+            // the names are checked where the line is, not only where the unit is used
+            $crate::__with_cfgs! {
+                [] $(#[$($attr)*])* =>
+                const _: &$crate::UnitExpr = <$name as $crate::Unit>::EXPR;
             }
         )*
     };
@@ -214,6 +249,67 @@ macro_rules! __unit_quantity {
     };
     ($name:literal) => {
         Some($name)
+    };
+}
+
+/// The names of a [unit!] line: the symbol, the dimension (a counted unit takes no prefix by default), the scale's
+/// kind (none for a coherent unit, which takes the SI prefixes by default) and the items of its `( .. )`.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __unit_names {
+    ([$symbol:literal] [counted] [$($kind:ident)?] $($items:tt)*) => {
+        $crate::__unit_names!(@munch [] $crate::UnitNames::new($symbol, $crate::PrefixPolicy::None); $($items)*)
+    };
+    ([$symbol:literal] [$dim:tt] [] $($items:tt)*) => {
+        $crate::__unit_names!(@munch [] $crate::UnitNames::new($symbol, $crate::PrefixPolicy::Decimal); $($items)*)
+    };
+    ([$symbol:literal] [$dim:tt] [$kind:ident] $($items:tt)*) => {
+        $crate::__unit_names!(@munch [] $crate::UnitNames::new($symbol, $crate::PrefixPolicy::None); $($items)*)
+    };
+    (@munch [$($done:tt)*] $base:expr; ) => {
+        $crate::UnitNames { $($done)* ..$base }.checked()
+    };
+    (@munch [$($done:tt)*] $base:expr; , $($rest:tt)*) => {
+        $crate::__unit_names!(@munch [$($done)*] $base; $($rest)*)
+    };
+    (@munch [$($done:tt)*] $base:expr; ascii $s:literal $($rest:tt)*) => {
+        $crate::__unit_names!(@munch [$($done)* ascii: Some($s),] $base; $($rest)*)
+    };
+    (@munch [$($done:tt)*] $base:expr; long $s:literal plural $p:literal $($rest:tt)*) => {
+        $crate::__unit_names!(@munch [$($done)* long: $s, plural: $p,] $base; $($rest)*)
+    };
+    (@munch [$($done:tt)*] $base:expr; long $s:literal $($rest:tt)*) => {
+        $crate::__unit_names!(@munch [$($done)* long: $s, plural: concat!($s, "s"),] $base; $($rest)*)
+    };
+    (@munch [$($done:tt)*] $base:expr; aliases [$first:literal $(, $more:literal)* $(,)?] $($rest:tt)*) => {
+        $crate::__unit_names!(@munch [$($done)* aliases: concat!($first $(, "|", $more)*),] $base; $($rest)*)
+    };
+    (@munch [$($done:tt)*] $base:expr; ucum $s:literal $($rest:tt)*) => {
+        $crate::__unit_names!(@munch [$($done)* ucum: Some($s),] $base; $($rest)*)
+    };
+    (@munch [$($done:tt)*] $base:expr; prefixes none $($rest:tt)*) => {
+        $crate::__unit_names!(@munch [$($done)* prefixes: $crate::PrefixPolicy::None,] $base; $($rest)*)
+    };
+    (@munch [$($done:tt)*] $base:expr; prefixes decimal $($rest:tt)*) => {
+        $crate::__unit_names!(@munch [$($done)* prefixes: $crate::PrefixPolicy::Decimal,] $base; $($rest)*)
+    };
+    (@munch [$($done:tt)*] $base:expr; prefixes decimal_and_binary $($rest:tt)*) => {
+        $crate::__unit_names!(
+            @munch [$($done)* prefixes: $crate::PrefixPolicy::DecimalAndBinary,] $base; $($rest)*
+        )
+    };
+    (@munch [$($done:tt)*] $base:expr; prefixes only [$($p:ident),* $(,)?] $($rest:tt)*) => {
+        $crate::__unit_names!(
+            @munch [$($done)* prefixes: $crate::PrefixPolicy::Only($crate::PrefixSet::of(&[$($crate::Prefix::$p),*])),]
+            $base; $($rest)*
+        )
+    };
+    (@munch [$($done:tt)*] $base:expr; $($other:tt)*) => {
+        compile_error!(concat!(
+            "unknown item in a unit's names: ", stringify!($($other)*),
+            "; expected ascii \"..\", long \"..\" [plural \"..\"], aliases [\"..\", ..], ucum \"..\", \
+             prefixes none | decimal | decimal_and_binary | only [Milli, ..]"
+        ))
     };
 }
 

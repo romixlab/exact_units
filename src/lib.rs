@@ -58,6 +58,7 @@ mod book;
 pub mod complex;
 pub mod constants;
 mod contains;
+mod names;
 mod conv_error;
 pub mod cordic;
 pub mod decibel;
@@ -142,8 +143,8 @@ pub use tree::MAX_UNIT_DEPTH;
 #[doc(hidden)]
 pub use unit::exp as __dim_exp;
 pub use unit::{
-    Counted, Dim, MAX_COUNTED, MarkerId, Provenance, Unit, UnitDef, UnitDiv, UnitExpr, UnitMul,
-    UnitNames, UnitTable,
+    Counted, Dim, MAX_COUNTED, MarkerId, PrefixPolicy, PrefixSet, Provenance, Unit, UnitDef, UnitDiv,
+    UnitExpr, UnitMul, UnitNames, UnitTable,
 };
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use unit::{

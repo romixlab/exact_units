@@ -381,7 +381,7 @@ mod owned {
         CompactError, Dim, Node, RefBox, Resolved, SIExpr, SIExprOwned, Tree, UnitExpr, UnitTable,
         fmt, ref_node, tree,
     };
-    use crate::unit::{MarkerIdOwned, UnitDefOwned, UnitNamesOwned};
+    use crate::unit::{MarkerIdOwned, UnitDefOwned};
     use std::boxed::Box;
     use std::string::ToString;
 
@@ -552,9 +552,7 @@ mod owned {
                             crate_name: "?".to_string(),
                             name: "?".to_string(),
                         },
-                        names: UnitNamesOwned {
-                            symbol: "?".to_string(),
-                        },
+                        names: crate::UnitNames::new("?", crate::PrefixPolicy::None).into(),
                         dim: Dim::ONE.into(),
                         quantity: None,
                         scale: crate::Magnitude::ONE,

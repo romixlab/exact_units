@@ -413,14 +413,18 @@ fn derived_names() {
     ] {
         assert!(units::by_name(name).is_some(), "{name}");
     }
-    assert_eq!(units::spellings("Nit"), ["nit", "nt"]);
-    assert_eq!(units::spellings("Volt"), [""; 0]);
+    let aliases = |name| match units::by_name(name) {
+        Some(exact_units::UnitExpr::Named(def)) => def.names.aliases().collect::<Vec<_>>(),
+        _ => panic!("{name} is no named unit"),
+    };
+    assert_eq!(aliases("Nit"), ["nit", "nt"]);
+    assert_eq!(aliases("Volt"), [""; 0]);
 }
 
 /// No two named units share a symbol but the pairs that are one unit of two quantities (SI Brochure table 6 lists each
 /// pair on one line): W/m² of heat flux and irradiance, J/K of heat capacity and entropy, m²·s⁻² of absorbed and
 /// equivalent dose differ in their symbols. A loss shares its gain's symbol (dB, Np): their dimensions tell them
-/// apart. A damping ratio and a quality factor are numbers like a ratio, told apart by their kinds.
+/// apart, and so do the bel's and the byte's B. A damping ratio and a quality factor are numbers like a ratio, told apart by their kinds.
 #[test]
 fn symbols_are_unique_but_for_shared_units() {
     use exact_units::UnitExpr;
@@ -446,6 +450,8 @@ fn symbols_are_unique_but_for_shared_units() {
             ("Neper", "NeperLoss"),
             #[cfg(feature = "levels")]
             ("Decibel", "DecibelLoss"),
+            #[cfg(all(feature = "levels", feature = "information"))]
+            ("Bel", "Byte"),
             #[cfg(feature = "levels")]
             ("DampingRatio", "QualityFactor"),
             #[cfg(all(feature = "levels", feature = "dimensionless"))]

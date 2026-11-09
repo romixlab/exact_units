@@ -102,7 +102,7 @@ fn counted_bases() {
         Dim::counted("dynamic", "Bucket")
     );
 
-    let mut buf = [0u8; 128];
+    let mut buf = [0u8; 256];
     let bytes = d.to_ww_bytes(&mut buf).unwrap().to_vec();
     assert_eq!(Dim::from_ww_bytes(&bytes).unwrap(), d);
     // out of order: refused on decode
@@ -131,7 +131,7 @@ const fn def(name: &'static str, symbol: &'static str, dim: Dim<'static>) -> Uni
             crate_name: "dynamic",
             name,
         },
-        names: UnitNames { symbol },
+        names: UnitNames::new(symbol, exact_units::PrefixPolicy::Decimal),
         dim,
         quantity: None,
         scale: Magnitude::ONE,
@@ -163,11 +163,13 @@ fn scale_is_a_magnitude() {
     }
 }
 
-/// `Volt` as a run-time unit: the `Def` tag, then its `UnitDef`: the crate, the name, the symbol, the dimension, no
-/// kind of its own, the scale one and the provenance `Defined`.
-const VOLT_BYTES: [u8; 31] = [
+/// `Volt` as a run-time unit: the `Def` tag, then its `UnitDef`: the crate, the name, its names (the symbol, no ASCII
+/// form of its own, the long names, no aliases, the UCUM code, the SI prefixes), the dimension, no kind of its own,
+/// the scale one and the provenance `Defined`.
+const VOLT_BYTES: [u8; 45] = [
     0x00, b'e', b'x', b'a', b'c', b't', b'_', b'u', b'n', b'i', b't', b's', b'V', b'o', b'l', b't',
-    b'V', 0x01, 0xd2, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x24, 0x39, 0x5b,
+    b'V', 0x00, b'v', b'o', b'l', b't', b'v', b'o', b'l', b't', b's', 0x80, b'V', 0x11, 0x05, b'A',
+    0xd2, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0xa4, 0x39, 0x3d,
 ];
 
 #[test]
@@ -186,10 +188,10 @@ fn named_bytes() {
 
 #[test]
 fn compound_round_trip() {
-    let mut buf = [0u8; 256];
+    let mut buf = [0u8; 512];
     let si = <Viscous as Unit>::SI_EXPR;
     let bytes = si.to_ww_bytes(&mut buf).unwrap().to_vec();
-    assert_eq!(bytes.len(), 85);
+    assert_eq!(bytes.len(), 167);
     assert_eq!(&bytes[..2], [0x30, 0x00]);
     let back = SIExpr::from_ww_bytes(&bytes).unwrap();
     assert_eq!(&back, si);
@@ -218,7 +220,7 @@ fn owned_and_unit_expr() {
     let owned = SIExprOwned::from(<Viscous as Unit>::EXPR);
     assert_eq!(owned, *<Viscous as Unit>::EXPR);
     let bytes = owned.to_ww_bytes_owned().unwrap();
-    let mut buf = [0u8; 128];
+    let mut buf = [0u8; 256];
     assert_eq!(
         bytes,
         <Viscous as Unit>::SI_EXPR.to_ww_bytes(&mut buf).unwrap()
@@ -302,7 +304,7 @@ fn typed_depth_up_to_the_limit() {
 #[test]
 fn bad_bytes() {
     // `Mul` whose children don't decode: shown as `?`, no dimension
-    let mut buf = [0u8; 128];
+    let mut buf = [0u8; 256];
     let si = <Viscous as Unit>::SI_EXPR;
     let mut bytes = si.to_ww_bytes(&mut buf).unwrap().to_vec();
     bytes[2] = 0xf0; // a Named child's tag turned into an unknown variant
@@ -399,7 +401,7 @@ fn sqrt_marker() {
     }
     assert!(exact_units::num::sqrt_f64(-1.0).is_nan());
 
-    let mut buf = [0u8; 128];
+    let mut buf = [0u8; 256];
     let bytes = <Density as Unit>::SI_EXPR
         .to_ww_bytes(&mut buf)
         .unwrap()
@@ -723,7 +725,7 @@ fn validate_refuses() {
     long.root = true;
     for bad in [unsorted, long] {
         assert!(!bad.is_canonical());
-        let mut buf = [0u8; 128];
+        let mut buf = [0u8; 256];
         let bytes = bad.to_ww_bytes(&mut buf).unwrap().to_vec();
         assert_eq!(Dim::from_ww_bytes(&bytes).err(), Some(err), "{bad:?}");
         assert_eq!(
@@ -738,7 +740,7 @@ fn validate_refuses() {
         assert!(SIExprOwned::from_ww_bytes_owned(&bytes).is_err(), "{bad:?}");
         assert!(SIExpr::from_ww_bytes(&bytes).is_err(), "{bad:?}");
     }
-    let mut buf = [0u8; 128];
+    let mut buf = [0u8; 256];
     let bytes = counted.to_ww_bytes(&mut buf).unwrap().to_vec();
     assert_eq!(DimOwned::from_ww_bytes_owned(&bytes), Ok(counted.into()));
 }
@@ -750,7 +752,7 @@ fn ref_bytes() {
     let id = <units::Volt as Unit>::EXPR.def().unwrap().id;
     let bytes = SIExpr::Ref(id).to_ww_bytes(&mut buf).unwrap().to_vec();
     assert_eq!(bytes.first().map(|b| b >> 4), Some(1), "{bytes:02x?}");
-    assert_eq!((bytes.len(), VOLT_BYTES.len()), (18, 31));
+    assert_eq!((bytes.len(), VOLT_BYTES.len()), (18, 45));
     let back = SIExpr::from_ww_bytes(&bytes).unwrap();
     assert_eq!(back, SIExpr::Ref(id));
     assert_eq!(back.known(), Some(<units::Volt as Unit>::EXPR));

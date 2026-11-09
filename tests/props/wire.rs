@@ -301,6 +301,12 @@ impl Expr {
                 },
                 names: exact_units::UnitNamesOwned {
                     symbol: symbol.clone(),
+                    ascii: None,
+                    long: String::new(),
+                    plural: String::new(),
+                    aliases: String::new(),
+                    ucum: None,
+                    prefixes: exact_units::PrefixPolicy::None,
                 },
                 dim: Dim::new(*s % 8, *m % 8, *kg % 8, 0, 0, 0, 0).into(),
                 quantity: None,

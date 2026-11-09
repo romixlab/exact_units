@@ -80,7 +80,7 @@ pub(crate) fn prefix_of<U: Unit>(t: &str) -> Option<TextPrefix> {
     }
     let spelled = |t: &str| {
         writes_as(&unit, t)
-            || matches!(U::EXPR, UnitExpr::Named(def) if def.id.crate_name == env!("CARGO_CRATE_NAME") && crate::units::spellings(def.id.name).contains(&t))
+            || matches!(U::EXPR, UnitExpr::Named(def) if def.names.aliases().any(|a| a == t))
     };
     if spelled(t) {
         return Some(TextPrefix::UNIT);

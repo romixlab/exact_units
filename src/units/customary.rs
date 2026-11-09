@@ -595,7 +595,7 @@ crate::unit! {
     ///
     /// - UK WMA 1985: Sch. 1 Pt VI (supplementary and other units)
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Tonne = "t", [kg 1], Exact(1 / 1, pow10 3);
+    pub struct Tonne = "t" (long "tonne", ucum "t", prefixes only [Kilo, Mega, Giga, Tera, Peta, Exa, Zetta, Yotta, Ronna, Quetta]), [kg 1], Exact(1 / 1, pow10 3);
 
     /// Ounce (US nutrition labeling, 28 g): 28 g.
     ///

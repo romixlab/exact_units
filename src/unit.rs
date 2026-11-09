@@ -1,6 +1,6 @@
 //! What a unit is: its dimension, how its values become coherent SI, and how it is written.
 
-use crate::Kind;
+use crate::{Kind, Prefix};
 #[cfg(feature = "shrink_wrap")]
 use crate::SIExpr;
 use crate::tree;
@@ -901,7 +901,9 @@ impl fmt::Display for MarkerId<'_> {
     }
 }
 
-/// How a unit is written. Only the symbol for now; spellings, an ASCII form and the prefixes it takes join it (IO-9).
+/// How a unit is written and read: its symbol, an ASCII form, its English name, other spellings text input takes, its
+/// UCUM code and the prefixes it takes. [unit!](crate::unit) fills it from the line's `( .. )` after the symbol, with
+/// short defaults; a [Registry](crate::Registry) reads text through it and [Notation](crate::Notation) writes it.
 #[cfg_attr(
     feature = "shrink_wrap",
     derive_shrink_wrap(
@@ -914,8 +916,215 @@ impl fmt::Display for MarkerId<'_> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct UnitNames<'i> {
-    /// As written after a number: `V`, empty for [Ratio](crate::units::Ratio).
+    /// As written after a number, in Unicode: `Ω`, `m/s²`; empty for [Ratio](crate::units::Ratio).
     pub symbol: &'i str,
+    /// The symbol in ASCII where the plain transliteration of [symbol](Self::symbol) isn't it, `None` where it is:
+    /// `m/s²` is `m/s^2` and `Ω` is `Ohm` by [ascii](Self::ascii)'s rules, a unit with a character they don't know
+    /// names its own (`"tau"`).
+    pub ascii: Option<&'i str>,
+    /// The English name in the singular, `"ohm"`, empty for a unit without one.
+    pub long: &'i str,
+    /// The English name in the plural, `"ohms"`, `"hertz"`; empty with [long](Self::long).
+    pub plural: &'i str,
+    /// Other spellings text input takes next to the symbol, the ASCII form and the names, separated by `|`:
+    /// `"nit|nt"` for cd/m², empty for none ([aliases](Self::aliases) splits them). A prefix goes before an alias as
+    /// before the symbol.
+    pub aliases: &'i str,
+    /// The unit's code in UCUM (`"Ohm"`, `"m/s2"`, `"By"`), `None` where it has none or none is recorded: such a unit
+    /// isn't written in [Notation::Ucum](crate::Notation::Ucum).
+    pub ucum: Option<&'i str>,
+    /// Which prefixes the unit takes in text: `km` is a kilometre, but `min` is no milli-inch.
+    pub prefixes: PrefixPolicy,
+}
+
+impl<'i> UnitNames<'i> {
+    /// A unit written `symbol`, without other names, taking `prefixes` where its symbol is one word (`V`, not `m/s`
+    /// or `m²`: a compound unit takes none as a whole, its parts take theirs).
+    #[must_use]
+    pub const fn new(symbol: &'i str, prefixes: PrefixPolicy) -> Self {
+        // a prefix written before a compound symbol binds to its first factor (`km²` is (km)²): such a unit is
+        // read as its factors, each with its own prefix, so it takes none as a whole
+        let prefixes = if crate::names::is_atom(symbol) {
+            prefixes
+        } else {
+            PrefixPolicy::None
+        };
+        UnitNames {
+            symbol,
+            ascii: None,
+            long: "",
+            plural: "",
+            aliases: "",
+            ucum: None,
+            prefixes,
+        }
+    }
+
+    /// The same names, checked: a symbol with a character [ascii](Self::ascii) can't transliterate and no ASCII form
+    /// of its own, or an ASCII form that isn't ASCII, panics: in a `const` item, as [unit!](crate::unit) builds it, a
+    /// compile error that asks for the line's `ascii`.
+    #[must_use]
+    pub const fn checked(self) -> Self {
+        match self.ascii {
+            Some(a) => assert!(
+                a.is_ascii(),
+                "a unit's `ascii` form with a character that isn't ASCII"
+            ),
+            None => assert!(
+                crate::names::transliterates(self.symbol),
+                "a unit symbol with a character without an ASCII form: give the unit! line `ascii \"..\"`"
+            ),
+        }
+        self
+    }
+
+    /// The other spellings, [aliases](Self::aliases) split at `|`.
+    pub fn aliases(&self) -> impl Iterator<Item = &'i str> + use<'i> {
+        self.aliases.split('|').filter(|a| !a.is_empty())
+    }
+
+    /// The symbol in ASCII: [ascii](Self::ascii) where the unit names one, else the symbol transliterated (`µ` as
+    /// `u`, `Ω` as `Ohm`, `°` as `deg`, `·` as `*`, `²` as `^2`, `m⁻¹` as `m^-1`). `None` for a symbol with a
+    /// character those rules don't know and no ASCII form of its own (a run-time unit from data).
+    #[must_use]
+    pub fn write_ascii(&self, f: &mut impl fmt::Write) -> Option<fmt::Result> {
+        match self.ascii {
+            Some(a) => Some(f.write_str(a)),
+            None => crate::names::write_ascii(self.symbol, f),
+        }
+    }
+}
+
+/// The prefixes a unit takes in text ([UnitNames::prefixes]): a parser tries only these, so `min` is a minute and
+/// never a milli-inch, `Pa` a pascal and never a peta-annum.
+///
+/// [unit!](crate::unit) gives a coherent unit (a line without a scale: `m`, `V`, `Pa`) `Decimal` and a scaled one
+/// (`min`, `ft`, `eV`) `None`; a line says otherwise with `prefixes ..`.
+#[cfg_attr(
+    feature = "shrink_wrap",
+    derive_shrink_wrap(borrowed, owned(feature = "std"), self_describing, ww_repr = unib32)
+)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    all(feature = "serde", feature = "shrink_wrap"),
+    expect(
+        clippy::unsafe_derive_deserialize,
+        reason = "the unsafe is shrink_wrap's, in its generated impls"
+    )
+)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum PrefixPolicy {
+    /// No prefix: `in`, `min`, `°`.
+    None,
+    /// The SI prefixes, quecto to quetta: `m`, `V`.
+    Decimal,
+    /// The SI prefixes and the binary ones (kibi to tebi): `B`, `bit`.
+    DecimalAndBinary,
+    /// These prefixes only: `mmHg` takes milli and nothing else.
+    Only(PrefixSet),
+}
+
+/// A set of the named prefixes (the SI ones and kibi to tebi), one bit each: [PrefixPolicy::Only].
+#[cfg_attr(
+    feature = "shrink_wrap",
+    derive_shrink_wrap(borrowed, owned(feature = "std"), self_describing)
+)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct PrefixSet {
+    /// One bit per prefix, by [PrefixSet::bit].
+    pub bits: u32,
+}
+
+impl PrefixSet {
+    /// The set of `prefixes`; one that isn't named (`Pow10`, [Prefix::Unit]) panics: in a `const` item, as
+    /// [unit!](crate::unit) builds it, a compile error.
+    #[must_use]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in unit!'s const items, the set is written on the line"
+    )]
+    pub const fn of(prefixes: &[Prefix]) -> Self {
+        let mut bits = 0u32;
+        let mut i = 0;
+        while i < prefixes.len() {
+            #[expect(clippy::indexing_slicing, reason = "i < prefixes.len(), the loop's condition")]
+            match Self::bit(prefixes[i]) {
+                Some(b) => bits |= 1 << b,
+                None => panic!("PrefixSet: a prefix without a name"),
+            }
+            #[expect(clippy::arithmetic_side_effects, reason = "i < prefixes.len() <= usize::MAX")]
+            {
+                i += 1;
+            }
+        }
+        PrefixSet { bits }
+    }
+
+    /// Whether `p` is in the set.
+    #[must_use]
+    pub const fn contains(self, p: Prefix) -> bool {
+        match Self::bit(p) {
+            Some(b) => self.bits & (1 << b) != 0,
+            None => false,
+        }
+    }
+
+    /// The bit of a named prefix: the SI ones by exponent, quecto 0 to quetta 23, then kibi to tebi 24 to 27.
+    #[must_use]
+    pub const fn bit(p: Prefix) -> Option<u32> {
+        Some(match p {
+            Prefix::Quecto => 0,
+            Prefix::Ronto => 1,
+            Prefix::Yocto => 2,
+            Prefix::Zepto => 3,
+            Prefix::Atto => 4,
+            Prefix::Femto => 5,
+            Prefix::Pico => 6,
+            Prefix::Nano => 7,
+            Prefix::Micro => 8,
+            Prefix::Milli => 9,
+            Prefix::Centi => 10,
+            Prefix::Deci => 11,
+            Prefix::Deca => 12,
+            Prefix::Hecto => 13,
+            Prefix::Kilo => 14,
+            Prefix::Mega => 15,
+            Prefix::Giga => 16,
+            Prefix::Tera => 17,
+            Prefix::Peta => 18,
+            Prefix::Exa => 19,
+            Prefix::Zetta => 20,
+            Prefix::Yotta => 21,
+            Prefix::Ronna => 22,
+            Prefix::Quetta => 23,
+            Prefix::Kibi => 24,
+            Prefix::Mebi => 25,
+            Prefix::Gibi => 26,
+            Prefix::Tebi => 27,
+            _ => return None,
+        })
+    }
+}
+
+impl PrefixPolicy {
+    /// Whether the unit takes `p` in text. [Prefix::Unit], no prefix, it always takes.
+    #[must_use]
+    pub fn allows(&self, p: Prefix) -> bool {
+        if p == Prefix::Unit {
+            return true;
+        }
+        let si = p.si_pow10().is_some();
+        let binary = matches!(p, Prefix::Kibi | Prefix::Mebi | Prefix::Gibi | Prefix::Tebi);
+        match self {
+            PrefixPolicy::None => false,
+            PrefixPolicy::Decimal => si,
+            PrefixPolicy::DecimalAndBinary => si || binary,
+            PrefixPolicy::Only(set) => set.contains(p),
+        }
+    }
 }
 
 /// A named unit as data: who it is, how it is written, its dimension, its kind of quantity, its exact factor to
@@ -1089,15 +1298,43 @@ mod owned_defs {
         }
     }
 
+    impl UnitNamesOwned {
+        /// The same names, borrowed.
+        #[must_use]
+        pub fn as_names(&self) -> UnitNames<'_> {
+            UnitNames {
+                symbol: &self.symbol,
+                ascii: self.ascii.as_deref(),
+                long: &self.long,
+                plural: &self.plural,
+                aliases: &self.aliases,
+                ucum: self.ucum.as_deref(),
+                prefixes: self.prefixes,
+            }
+        }
+    }
+
+    impl From<UnitNames<'_>> for UnitNamesOwned {
+        fn from(n: UnitNames<'_>) -> Self {
+            UnitNamesOwned {
+                symbol: n.symbol.into(),
+                ascii: n.ascii.map(Into::into),
+                long: n.long.into(),
+                plural: n.plural.into(),
+                aliases: n.aliases.into(),
+                ucum: n.ucum.map(Into::into),
+                prefixes: n.prefixes,
+            }
+        }
+    }
+
     impl UnitDefOwned {
         /// The same definition, borrowed.
         #[must_use]
         pub fn as_def(&self) -> UnitDef<'_> {
             UnitDef {
                 id: self.id.as_id(),
-                names: UnitNames {
-                    symbol: &self.names.symbol,
-                },
+                names: self.names.as_names(),
                 dim: self.dim.as_dim(),
                 quantity: self.quantity.as_deref(),
                 scale: self.scale,
@@ -1117,9 +1354,7 @@ mod owned_defs {
         fn from(d: UnitDef<'_>) -> Self {
             UnitDefOwned {
                 id: d.id.into(),
-                names: UnitNamesOwned {
-                    symbol: d.names.symbol.into(),
-                },
+                names: d.names.into(),
                 dim: d.dim.into(),
                 quantity: d.quantity.map(Into::into),
                 scale: d.scale,

@@ -44,7 +44,8 @@ mod table;
 
 use core::fmt::Write as _;
 use entry::Prefixes;
-use exact_units::{Dim, Magnitude, UnitExpr, units};
+use exact_units::Prefix::{Exa, Giga, Kilo, Mega, Peta, Quetta, Ronna, Tera, Yotta, Zetta};
+use exact_units::{Dim, Magnitude, PrefixPolicy, PrefixSet, UnitExpr, units};
 use prefix::{PREFIXES, Prefix};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -77,21 +78,12 @@ const ORIGIN_SYMBOLS: &[(&str, &str)] = &[
 /// gain whose kind picks 20·lg or 10·lg; inside a unit they stay refused. `(symbol, marker under literal::)`.
 const LEVEL_SYMBOLS: &[(&str, &str)] = &[("Np", "Np"), ("dB", "Db")];
 
-/// Scaled units the SI lets take a prefix (SI Brochure, 9th ed., tables 8 and 4.1): gram, litre, electronvolt.
-const SCALED_WITH_PREFIX: &[&str] = &["Gram", "Litre", "ElectronVolt"];
-
-/// Units that take the SI prefixes from kilo up only: the tonne (`kt`, `Mt`), whose smaller multiples are grams.
-const FROM_KILO: &[&str] = &["Tonne"];
-
 /// Words before a symbol that qualify it like a parenthesis does: `liq qt (US)` and `dry qt (US)` share the stem
 /// `qt` with `qt (imp)`.
 const QUALIFIER_WORDS: &[&str] = &["liq", "dry"];
 
 /// Words after a symbol that name its system, as a parenthesis does: `oz avdp`, `lb t`, `dr ap`.
 const TRAILING_QUALIFIER_WORDS: &[&str] = &["avdp", "t", "ap"];
-
-/// The units that take the binary prefixes of IEC 80000-13 as well as the SI ones.
-const BINARY: &[&str] = &["Bit", "Byte"];
 
 /// A `unit!` line as the source writes it.
 #[derive(Clone, Debug)]
@@ -289,26 +281,23 @@ fn generate() -> Generated {
             far: None,
         }
     };
+    // the prefixes a unit takes are its line's (UnitNames::prefixes): the SI's rules, written there
     let prefixes = |line: &Line| {
         let Some(UnitExpr::Named(def)) = units::by_name(&line.name) else {
             panic!("{} is no named unit", line.name);
         };
-        let (dim, scale) = (def.dim, def.scale);
-        if BINARY.contains(&line.name.as_str()) {
-            Prefixes::SiBinary
-        } else if FROM_KILO.contains(&line.name.as_str()) {
-            Prefixes::SiFromKilo
-        } else if SCALED_WITH_PREFIX.contains(&line.name.as_str())
-            || (scale == Magnitude::ONE
-                && dim.counted_bases().next().is_none()
-                && !matches!(
-                    line.group.as_str(),
-                    "customary" | "levels" | "dimensionless"
-                ))
-        {
-            Prefixes::Si
-        } else {
-            Prefixes::None
+        match def.names.prefixes {
+            PrefixPolicy::None => Prefixes::None,
+            PrefixPolicy::Decimal => Prefixes::Si,
+            PrefixPolicy::DecimalAndBinary => Prefixes::SiBinary,
+            PrefixPolicy::Only(set)
+                if set == PrefixSet::of(&[
+                    Kilo, Mega, Giga, Tera, Peta, Exa, Zetta, Yotta, Ronna, Quetta,
+                ]) =>
+            {
+                Prefixes::SiFromKilo
+            }
+            PrefixPolicy::Only(set) => panic!("{}: a prefix set q! has no rule for: {set:?}", line.name),
         }
     };
 
@@ -365,11 +354,10 @@ fn generate() -> Generated {
     let line_of = |name: &str| lines.iter().find(|l| l.name == name).unwrap();
     let mut aliases: Vec<(&str, &str, i8)> = ALIASES.to_vec();
     for line in &lines {
-        aliases.extend(
-            units::spellings(&line.name)
-                .iter()
-                .map(|s| (*s, line.name.as_str(), 0)),
-        );
+        let Some(UnitExpr::Named(def)) = units::by_name(&line.name) else {
+            panic!("{} is no named unit", line.name);
+        };
+        aliases.extend(def.names.aliases().map(|s| (s, line.name.as_str(), 0)));
     }
     for (symbol, marker, pow10) in aliases {
         let line = line_of(marker);

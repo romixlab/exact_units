@@ -72,6 +72,7 @@ pub(crate) static UNITS: &[Entry] = &[
     Entry { symbol: "kip", marker: "units::Kip", group: "customary", prefixes: Prefixes::None, pow10: 0 },
     Entry { symbol: "kn", marker: "units::Knot", group: "customary", prefixes: Prefixes::None, pow10: 0 },
     Entry { symbol: "ksi", marker: "units::Ksi", group: "customary", prefixes: Prefixes::None, pow10: 0 },
+    Entry { symbol: "l", marker: "units::Litre", group: "mechanical", prefixes: Prefixes::Si, pow10: 0 },
     Entry { symbol: "lbf", marker: "units::PoundForce", group: "customary", prefixes: Prefixes::None, pow10: 0 },
     Entry { symbol: "line", marker: "units::Line", group: "counting", prefixes: Prefixes::None, pow10: 0 },
     Entry { symbol: "lm", marker: "units::Lumen", group: "photometric", prefixes: Prefixes::Si, pow10: 0 },
@@ -125,6 +126,7 @@ pub(crate) static UNITS: &[Entry] = &[
 /// The symbols refused, as they read two ways, sorted.
 #[rustfmt::skip]
 pub(crate) static REFUSED: &[Refused] = &[
+    Refused { symbol: "B", readings: &["Bel", "Byte"] },
     Refused { symbol: "Np", readings: &["Neper", "NeperLoss"] },
     Refused { symbol: "PS", readings: &["HorsepowerMetric", "peta Siemens"] },
     Refused { symbol: "RT", readings: &["TonRegister", "ronna Tesla"] },

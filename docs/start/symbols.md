@@ -111,6 +111,7 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `kip` | `Kip` | `customary` | none |
 | `kn` | `Knot` | `customary` | none |
 | `ksi` | `Ksi` | `customary` | none |
+| `l` | `Litre` | `mechanical` | SI |
 | `lbf` | `PoundForce` | `customary` | none |
 | `line` | `Line` | `counting` | none |
 | `lm` | `Lumen` | `photometric` | SI |
@@ -182,6 +183,7 @@ Each reads more than one way, so `q!` refuses it and names the readings. Write t
 
 | Symbol | Reads as | Write instead |
 |---|---|---|
+| `B` | `Bel`, `Byte` | `q!(1 Bel)`, `q!(1 Byte)` |
 | `Np` | `Neper`, `NeperLoss` | `q!(1 Neper)`, `q!(1 NeperLoss)` |
 | `PS` | `HorsepowerMetric`, peta `Siemens` | `q!(1 HorsepowerMetric)` |
 | `RT` | `TonRegister`, ronna `Tesla` | `q!(1 TonRegister)` |
