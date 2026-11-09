@@ -396,6 +396,13 @@ pub trait UnitTable: Sync {
         let _ = id;
         None
     }
+
+    /// The definition of the system `id`, `None` when the table doesn't list it (the default). This crate's
+    /// systems need no table: a [SystemRef](crate::SystemRef) of one resolves by itself.
+    fn system(&self, id: MarkerId<'_>) -> Option<crate::SystemDef<'_>> {
+        let _ = id;
+        None
+    }
 }
 
 /// The table that lists nothing: a walk over [SIExpr](crate::SIExpr) whose `Ref` leaves stay unresolved.
@@ -413,6 +420,10 @@ impl<T: UnitTable + ?Sized> UnitTable for &T {
     fn quantity(&self, id: MarkerId<'_>) -> Option<crate::QuantityDef<'_>> {
         (**self).quantity(id)
     }
+
+    fn system(&self, id: MarkerId<'_>) -> Option<crate::SystemDef<'_>> {
+        (**self).system(id)
+    }
 }
 
 /// Tables chained: the first that lists `id` answers.
@@ -424,6 +435,10 @@ impl<T: UnitTable> UnitTable for [T] {
     fn quantity(&self, id: MarkerId<'_>) -> Option<crate::QuantityDef<'_>> {
         self.iter().find_map(|t| t.quantity(id))
     }
+
+    fn system(&self, id: MarkerId<'_>) -> Option<crate::SystemDef<'_>> {
+        self.iter().find_map(|t| t.system(id))
+    }
 }
 
 /// Tables chained, like the slice.
@@ -434,6 +449,10 @@ impl<T: UnitTable, const N: usize> UnitTable for [T; N] {
 
     fn quantity(&self, id: MarkerId<'_>) -> Option<crate::QuantityDef<'_>> {
         self.as_slice().quantity(id)
+    }
+
+    fn system(&self, id: MarkerId<'_>) -> Option<crate::SystemDef<'_>> {
+        self.as_slice().system(id)
     }
 }
 

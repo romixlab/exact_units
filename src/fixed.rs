@@ -18,6 +18,8 @@ pub use prefix::{DecimalPrefix, FixedScale, ScaleDef};
 pub use rounding::{Overflow, Requantizer, Rounding, StorageKind, requantize};
 pub use storage::{Repr, Storage, StorageOrd, UnsignedStorage};
 
+mod across;
+pub use across::Across;
 mod bounds;
 pub mod prefix;
 mod product;
@@ -1349,6 +1351,53 @@ impl Conversion {
         };
         let m = from.mul(P::SCALE).div(to.mul(P2::SCALE));
         Self::by::<T, T2>(m.resolve::<S>().value, rounding)
+    }
+
+    /// From unit `U` of one system to `U2` of `S` by the bridge between them ([Fixed::to_system]): `U2` of `S`, a
+    /// bridge, both units' exact factors, else a compile error.
+    const fn across<
+        S: crate::System,
+        U: Unit,
+        P: FixedScale,
+        U2: Unit,
+        P2: FixedScale,
+        T: Storage,
+        T2: Storage,
+    >(
+        rounding: bool,
+    ) -> Self {
+        Self::by::<T, T2>(Self::across_factor::<S, U, P, U2, P2>(), rounding)
+    }
+
+    /// As [across](Self::across), with μ₀ and G in the factor replaced by the values of the set `C`.
+    const fn across_with<
+        C: crate::constants::Constants,
+        S: crate::System,
+        U: Unit,
+        P: FixedScale,
+        U2: Unit,
+        P2: FixedScale,
+        T: Storage,
+        T2: Storage,
+    >(
+        rounding: bool,
+    ) -> Self {
+        let m = Self::across_factor::<S, U, P, U2, P2>();
+        Self::by::<T, T2>(m.resolve::<C>().value, rounding)
+    }
+
+    /// The exact factor of [across](Self::across).
+    const fn across_factor<S: crate::System, U: Unit, P: FixedScale, U2: Unit, P2: FixedScale>()
+    -> Magnitude {
+        assert!(
+            !U2::DIM.has_true_exps() || U2::DIM.system().same(&crate::SystemRef::Id(S::ID)),
+            "to_system::<S>() converts into a unit of S: the target unit is of another system"
+        );
+        let bridge = crate::system::typed_bridge::<U, U2>();
+        let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
+            crate::conv_error::no_exact_factor::<U, U2>("a Fixed")
+        };
+        from.mul(P::SCALE).mul(bridge).div(to.mul(P2::SCALE))
     }
 
     #[expect(

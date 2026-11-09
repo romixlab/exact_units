@@ -171,8 +171,44 @@ pub(crate) fn symbol_of<'t, E: Tree<'t>>(e: E) -> impl fmt::Display {
 /// `None` when an exponent leaves ±63½ or a root isn't whole halves, a part is known by name only or doesn't decode,
 /// or the tree is deeper than [MAX_UNIT_DEPTH]. [exp_of] and [each_base] implement [BaseSource] for a tree of one's
 /// own.
-pub fn dim<'e, 't, E: Tree<'t> + BaseSource + Sync>(e: &'e E) -> Option<Dim<'e>> {
-    Dim::of_source(exps_at(e, 0)?, e)
+pub fn dim<'e, 't: 'e, E: Tree<'t> + BaseSource + Sync>(e: &'e E) -> Option<Dim<'e>> {
+    let system = system_at(e, 0)?.unwrap_or(crate::SystemRef::SI);
+    Dim::of_source(system, exps_at(e, 0)?, e)
+}
+
+/// The system of the tree's true exponents: `Some(None)` where it has none (a ratio, an angle), `None` where two
+/// parts count in two systems or a part can't be read.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "depth < MAX_UNIT_DEPTH, checked first"
+)]
+#[expect(
+    clippy::option_option,
+    reason = "the outer None: two systems or a part unread; the inner None: no true exponent, any system"
+)]
+fn system_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<Option<crate::SystemRef<'t>>> {
+    if depth >= MAX_UNIT_DEPTH {
+        return None;
+    }
+    let d = depth + 1;
+    let part = |x: &E| -> Option<Option<crate::SystemRef<'t>>> {
+        if exps_at(x, d)?.iter().all(|e| *e == 0) {
+            Some(None)
+        } else {
+            system_at(x, d)
+        }
+    };
+    match e.node()? {
+        Node::Named { dim, .. } => {
+            let dim = dim?;
+            Some(dim.has_true_exps().then(|| dim.system()))
+        }
+        Node::Mul(a, b) | Node::Div(a, b) => match (part(&a)?, part(&b)?) {
+            (None, x) | (x, None) => Some(x),
+            (Some(x), Some(y)) => x.same(&y).then_some(Some(x)),
+        },
+        Node::Pow(a, _) | Node::Sqrt(a) => system_at(&a, d),
+    }
 }
 
 /// The exponent in halves of the distinguished base `base` in the tree, `None` like [dim]: what

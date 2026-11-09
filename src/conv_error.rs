@@ -136,19 +136,41 @@ const fn push_exp_digits(mut msg: Msg, e: u32, superscript: bool) -> Msg {
 /// read at run time, which a unit type's dimension never has.
 #[expect(
     clippy::indexing_slicing,
-    reason = "i < TRUE_ORDER.len(), the loop bound, and its indices are below MAX_TRUE_BASES"
+    reason = "i < TRUE_ORDER.len() or exps.len(), the loop bounds, TRUE_ORDER's indices below MAX_TRUE_BASES, and \
+              b[i] where i < b.len()"
 )]
-#[expect(clippy::arithmetic_side_effects, reason = "i < TRUE_ORDER.len()")]
+#[expect(clippy::arithmetic_side_effects, reason = "i below a loop bound")]
 const fn push_dim(mut msg: Msg, d: Dim<'_>) -> Msg {
     let exps = d.exps();
     let mut first = true;
     let mut i = 0;
-    while i < TRUE_ORDER.len() {
-        let (symbol, at) = TRUE_ORDER[i];
-        if !exps[at].is_zero() {
-            (msg, first) = push_dim_part(msg, first, symbol, exps[at]);
+    let system = d.system();
+    match system.def() {
+        Some(def) if !def.is_si() => {
+            let bases = crate::system::slice_of(&def.bases);
+            while i < exps.len() {
+                if !exps[i].is_zero() {
+                    let symbol = match bases {
+                        Some(b) if i < b.len() => b[i],
+                        _ => "?",
+                    };
+                    (msg, first) = push_dim_part(msg, first, symbol, exps[i]);
+                }
+                i += 1;
+            }
+            if !first {
+                msg = msg.push(" (").push(def.id.name).push(")");
+            }
         }
-        i += 1;
+        _ => {
+            while i < TRUE_ORDER.len() {
+                let (symbol, at) = TRUE_ORDER[i];
+                if !exps[at].is_zero() {
+                    (msg, first) = push_dim_part(msg, first, symbol, exps[at]);
+                }
+                i += 1;
+            }
+        }
     }
     let mut after = None;
     loop {
@@ -409,6 +431,29 @@ pub(crate) const fn dim_mismatch<A: Unit, B: Unit>(what: &str) -> ! {
         msg = push_dim(msg, diff);
         msg = push_angle_hint::<A, B>(msg, diff);
     }
+    panic!("{}", msg.as_str())
+}
+
+/// The panic for a crossing between systems with no bridge ([Fixed::to_system](crate::Fixed::to_system)): the two
+/// units, their quantities and dimensions, and the reason.
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (a panic at run time), as documented at every call site"
+)]
+pub(crate) const fn no_bridge<A: Unit, B: Unit>(e: crate::BridgeError) -> ! {
+    let mut msg = Msg::new().push("no bridge from ");
+    msg = push_unit(msg, A::EXPR);
+    msg = msg.push(" (");
+    msg = push_quantity(msg, A::QUANTITY);
+    msg = msg.push(", ");
+    msg = push_dim(msg, A::DIM);
+    msg = msg.push(") to ");
+    msg = push_unit(msg, B::EXPR);
+    msg = msg.push(" (");
+    msg = push_quantity(msg, B::QUANTITY);
+    msg = msg.push(", ");
+    msg = push_dim(msg, B::DIM);
+    msg = msg.push("): ").push(e.reason());
     panic!("{}", msg.as_str())
 }
 

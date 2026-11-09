@@ -31,7 +31,9 @@
 ///   `bit` (`[kg 1, m 2, s -3, a -1]` for a volt, `[]` for a ratio), each whole or a half (`[s -1/2]`, -64..=63½), or
 ///   `base`: a distinguished base of its own named by the crate and the marker ([base!](crate::base),
 ///   [BaseDef](crate::BaseDef)), or `base(Other)`: the base of the marker `Other` of the same crate, a scaled unit of it
-///   (the decibel of the neper). A true base named twice is a compile error.
+///   (the decibel of the neper). A true base named twice is a compile error. A unit of another system than SI names
+///   the [System](crate::System) marker (in scope) and its bases by their symbols: `[Gaussian: g 1/2, cm -1/2, s -1]`
+///   for the gauss ([systems](crate::systems)); its scale is then the factor to that system's coherent unit.
 /// - The scale, an exact [Magnitude](crate::Magnitude), one when left out: `Pow10(-3)`, `Exact(1 / 180, pi 1)`
 ///   (`num / den`, then optionally `pow10 e`, `pow2 e`, `pi e`, `ln2 e`, `ln10 e`, `mu0 e`, `g e` in that order, see
 ///   [Magnitude::new](crate::Magnitude::new); the decibel is `Exact(1 / 20, ln10 1)` of the neper), so every reader
@@ -252,8 +254,37 @@ macro_rules! __unit_dim {
     ($name:ident base($base:ident)) => {
         $crate::Dim::base($crate::base!($base))
     };
+    ($name:ident [$sys:ident : $($parts:tt)*]) => {
+        $crate::__unit_dim!(@sys $sys [] [] $($parts)*)
+    };
     ($name:ident [$($parts:tt)*]) => {
         $crate::__unit_dim!(@split [] [] $($parts)*)
+    };
+    (@sys $sys:ident [$($t:tt)*] [$($b:tt)*] $(,)?) => {
+        $crate::Dim::in_system(
+            <$sys as $crate::System>::ID,
+            <$sys as $crate::System>::BASES,
+            &[$($t)*],
+            &[$($b)*],
+        )
+    };
+    (@sys $sys:ident [$($t:tt)*] [$($b:tt)*] rad $n:literal $(/ $den:literal)? $(, $($rest:tt)*)?) => {
+        $crate::__unit_dim!(@sys $sys [$($t)*] [$($b)* $crate::BaseExp {
+            base: $crate::MarkerId { crate_name: "exact_units", name: "Radian" },
+            exp: $crate::__dim_exp($n, $crate::__dim_den!($($den)?)),
+        },] $($($rest)*)?)
+    };
+    (@sys $sys:ident [$($t:tt)*] [$($b:tt)*] bit $n:literal $(/ $den:literal)? $(, $($rest:tt)*)?) => {
+        $crate::__unit_dim!(@sys $sys [$($t)*] [$($b)* $crate::BaseExp {
+            base: $crate::MarkerId { crate_name: "exact_units", name: "Bit" },
+            exp: $crate::__dim_exp($n, $crate::__dim_den!($($den)?)),
+        },] $($($rest)*)?)
+    };
+    (@sys $sys:ident [$($t:tt)*] [$($b:tt)*] $d:ident $n:literal $(/ $den:literal)? $(, $($rest:tt)*)?) => {
+        $crate::__unit_dim!(@sys $sys [$($t)* (
+            stringify!($d),
+            $crate::__dim_exp($n, $crate::__dim_den!($($den)?))
+        ),] [$($b)*] $($($rest)*)?)
     };
     (@split [$($t:tt)*] [$($b:tt)*] $(,)?) => {
         $crate::Dim::with_list(

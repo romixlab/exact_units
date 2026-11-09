@@ -11,6 +11,11 @@
 //!   factor.
 //! - Electrical: [Resistance] (`Ohm`) and [Conductance] (`Siemens`), apart from V/A and A/V; [Power] with
 //!   [ApparentPower] (`VoltAmpere`) and [ReactivePower] (`Var`).
+//! - Electromagnetic, the SI side of Gaussian's rows ([systems](crate::systems)): [ElectricCurrent],
+//!   [ElectricCharge], [Voltage], [ElectricField], [MagneticFlux], [MagneticFluxDensity], [Capacitance],
+//!   [Inductance] as open roots; at C/m² and A/m, whose quantities Gaussian counts 4π apart, no open root:
+//!   [ElectricFluxDensity] (D) with [ElectricPolarization] under it, [SurfaceChargeDensity]; [MagnetizingField] (H)
+//!   with [Magnetization] under it, [LinearCurrentDensity]. [MagnetomotiveForce] apart from a current.
 //! - [Pressure] and [EnergyDensity] (one dimension, two quantities); [Entropy], apart from J/K's own quantity.
 //! - Dimension one: [DampingRatio] and [QualityFactor].
 //! - Angles: [PlaneAngle] and [PhaseAngle], the angle of a phasor or of a motor's electrical rotation.
@@ -85,6 +90,40 @@ crate::quantity! {
     pub struct DampingRatio = kind [];
     /// Quality factor, Q = 1/(2ζ): a number of its own.
     pub struct QualityFactor = kind [];
+
+    /// Electric current, I (ISO 80000-6): the open root of A.
+    pub struct ElectricCurrent = [a 1];
+    /// Magnetomotive force, F_m: ampere-turns around a magnetic circuit, not a current (Gaussian's gilbert is
+    /// another unit than its statampere).
+    pub struct MagnetomotiveForce = kind [a 1];
+    /// Electric charge, Q: the open root of C.
+    pub struct ElectricCharge = [s 1, a 1];
+    /// Voltage, U: a potential difference or an electromotive force, the open root of V.
+    pub struct Voltage = [kg 1, m 2, s -3, a -1];
+    /// Electric field strength, E: the open root of V/m.
+    pub struct ElectricField = [kg 1, m 1, s -3, a -1];
+    /// Electric flux density, D (the displacement field): a kind of its own, as C/m² is also a polarization and a
+    /// surface charge density, which Gaussian units count 4π apart.
+    pub struct ElectricFluxDensity = kind [s 1, a 1, m -2];
+    /// Electric polarization, P: a kind of its own under D (D = ε₀E + P, after `as_quantity`).
+    pub struct ElectricPolarization: kind ElectricFluxDensity;
+    /// Surface density of charge, σ: a kind of its own, not a flux density.
+    pub struct SurfaceChargeDensity = kind [s 1, a 1, m -2];
+    /// Magnetic flux, Φ: the open root of Wb.
+    pub struct MagneticFlux = [kg 1, m 2, s -2, a -1];
+    /// Magnetic flux density, B: the open root of T.
+    pub struct MagneticFluxDensity = [kg 1, s -2, a -1];
+    /// Magnetic field strength, H (the magnetizing field): a kind of its own, as A/m is also a magnetization and a
+    /// linear current density, which Gaussian units count 4π apart.
+    pub struct MagnetizingField = kind [a 1, m -1];
+    /// Magnetization, M: a kind of its own under H (B = μ₀(H + M), after `as_quantity`).
+    pub struct Magnetization: kind MagnetizingField;
+    /// Linear current density, A_s: current per width of a sheet, a kind of its own.
+    pub struct LinearCurrentDensity = kind [a 1, m -1];
+    /// Capacitance, C: the open root of F.
+    pub struct Capacitance = [kg -1, m -2, s 4, a 2];
+    /// Inductance, L: the open root of H.
+    pub struct Inductance = [kg 1, m 2, s -2, a -2];
 
     /// Plane angle, the open root of rad.
     pub struct PlaneAngle = [rad 1];

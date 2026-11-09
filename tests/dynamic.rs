@@ -33,6 +33,7 @@ fn dim_bytes() {
     // the same bytes as the wire shape written from a slice
     let exps = volt.exps();
     let wire = DimWire {
+        system: exact_units::SystemRef::SI,
         exps: RefVec::Slice { slice: &exps },
         bases: RefVec::Slice { slice: &[] },
     };
@@ -61,6 +62,7 @@ fn dim_bytes() {
     }];
     let exps = rate.exps();
     let wire = DimWire {
+        system: exact_units::SystemRef::SI,
         exps: RefVec::Slice { slice: &exps },
         bases: RefVec::Slice { slice: &sample },
     };
@@ -153,6 +155,7 @@ fn non_canonical_dims() {
         (&six[..], &[][..]),
     ] {
         let wire = DimWire {
+            system: exact_units::SystemRef::SI,
             exps: RefVec::Slice { slice: exps },
             bases: RefVec::Slice { slice: bases },
         };
@@ -221,16 +224,17 @@ fn scale_is_a_magnitude() {
 
 /// `Volt` as a run-time unit: the `Def` tag, then its `UnitDef`: the crate, the name, its names (the symbol, no ASCII
 /// form of its own, the long names, no aliases, the UCUM code, the SI prefixes), the dimension, no kind of its own,
-/// the scale one and the provenance `Defined`.
-const VOLT_BYTES: [u8; 45] = [
+/// the scale one and the provenance `Defined`. The dimension starts with its system's id, `exact_units::Si`.
+const VOLT_BYTES: [u8; 60] = [
     0x00, b'e', b'x', b'a', b'c', b't', b'_', b'u', b'n', b'i', b't', b's', b'V', b'o', b'l', b't',
     b'V', 0x00, b'v', b'o', b'l', b't', b'v', b'o', b'l', b't', b's', 0x80, b'V', 0x11, 0x05, b'A',
-    0xb1, 0x81, 0x43, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x70, 0xa4, 0x39, 0x3d,
+    b'e', b'x', b'a', b'c', b't', b'_', b'u', b'n', b'i', b't', b's', b'S', b'i', 0xb1, 0x81, 0x43,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x07, 0x23, 0x90, 0xa4, 0x39, 0x2f,
 ];
 
 #[test]
 fn named_bytes() {
-    let mut buf = [0u8; 64];
+    let mut buf = [0u8; 128];
     let volt = <units::Volt as Unit>::SI_EXPR;
     assert_eq!(volt.to_ww_bytes(&mut buf).unwrap(), VOLT_BYTES);
     let back = SIExpr::from_ww_bytes(&VOLT_BYTES).unwrap();
@@ -247,7 +251,7 @@ fn compound_round_trip() {
     let mut buf = [0u8; 512];
     let si = <Viscous as Unit>::SI_EXPR;
     let bytes = si.to_ww_bytes(&mut buf).unwrap().to_vec();
-    assert_eq!(bytes.len(), 204);
+    assert_eq!(bytes.len(), 233);
     assert_eq!(&bytes[..2], [0x30, 0x00]);
     let back = SIExpr::from_ww_bytes(&bytes).unwrap();
     assert_eq!(&back, si);
@@ -783,7 +787,7 @@ fn ref_bytes() {
     let id = <units::Volt as Unit>::EXPR.def().unwrap().id;
     let bytes = SIExpr::Ref(id).to_ww_bytes(&mut buf).unwrap().to_vec();
     assert_eq!(bytes.first().map(|b| b >> 4), Some(1), "{bytes:02x?}");
-    assert_eq!((bytes.len(), VOLT_BYTES.len()), (18, 45));
+    assert_eq!((bytes.len(), VOLT_BYTES.len()), (18, 60));
     let back = SIExpr::from_ww_bytes(&bytes).unwrap();
     assert_eq!(back, SIExpr::Ref(id));
     assert_eq!(back.known(), Some(<units::Volt as Unit>::EXPR));

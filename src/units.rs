@@ -134,7 +134,7 @@ crate::unit! {
 
     /// Magnetic field strength in amperes per meter, A/m (SI Brochure, 9th ed., table 5).
     #[cfg(feature = "fields")]
-    pub struct MagneticFieldStrength = "A/m" (long "ampere per metre" plural "amperes per metre", ucum "A/m"), [m -1, a 1];
+    pub struct MagneticFieldStrength = "A/m" (long "ampere per metre" plural "amperes per metre", ucum "A/m"), [m -1, a 1] quantity crate::quantities::MagnetizingField;
 
     /// Current density in amperes per square meter, A/m² (SI Brochure, 9th ed., table 5): a trace's or a wire's A/mm²
     /// is `Fixed<CurrentDensity, Mega, T>`.
@@ -148,7 +148,7 @@ crate::unit! {
     /// Electric displacement (electric flux density) or surface charge density in coulombs per square meter, C/m²
     /// (m⁻²·s·A, SI Brochure, 9th ed., table 6).
     #[cfg(feature = "fields")]
-    pub struct ElectricDisplacement = "C/m²" (long "coulomb per square metre" plural "coulombs per square metre", ucum "C/m2"), [m -2, s 1, a 1];
+    pub struct ElectricDisplacement = "C/m²" (long "coulomb per square metre" plural "coulombs per square metre", ucum "C/m2"), [m -2, s 1, a 1] quantity crate::quantities::ElectricFluxDensity;
 
     /// Permittivity in farads per meter, F/m (kg⁻¹·m⁻³·s⁴·A², SI Brochure, 9th ed., table 6); also a cable's
     /// capacitance per length.

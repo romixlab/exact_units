@@ -3,12 +3,16 @@
 #[cfg(feature = "std")]
 use super::BaseExpOwned;
 use super::{BaseExp, Bases, Dim, Exp, MAX_TRUE_BASES, walk};
+use crate::system::SystemRef;
+#[cfg(feature = "std")]
+use crate::system::SystemRefOwned;
 use shrink_wrap::prelude::*;
 
-/// The wire shape of a [Dim]: the exponents of the true bases (SI's seven), then the distinguished bases sorted by
+/// The wire shape of a [Dim]: its system, the exponents of the system's true bases (SI's seven), then the distinguished bases sorted by
 /// crate and name, each once, with an exponent that isn't 0. A `Dim` is written in this shape from any tree of bases
 /// and reads back as one with a [Bases::List]; a reader refuses another count of exponents, an unsorted or repeated
-/// base and an exponent of 0, so one dimension has one encoding.
+/// base and an exponent of 0, so one dimension has one encoding. A system of this crate must have its own count of
+/// exponents; one known by its id only, at most [MAX_TRUE_BASES].
 #[derive_shrink_wrap(
     borrowed,
     owned(feature = "std"),
@@ -18,7 +22,9 @@ use shrink_wrap::prelude::*;
 )]
 #[derive(Copy, Clone)]
 pub struct DimWire<'i> {
-    /// The exponents of s, m, kg, A, K, mol, cd.
+    /// The system the exponents count in.
+    pub system: SystemRef<'i>,
+    /// The exponents of the system's true bases: SI's s, m, kg, A, K, mol, cd.
     pub exps: RefVec<'i, Exp>,
     /// The distinguished bases.
     pub bases: RefVec<'i, BaseExp<'i>>,
@@ -29,7 +35,9 @@ impl<'i> DimWire<'i> {
     #[must_use]
     pub fn to_dim(&self) -> Option<Dim<'i>> {
         let mut exps = [Exp::ZERO; MAX_TRUE_BASES];
-        if self.exps.len() != MAX_TRUE_BASES {
+        let count = self.exps.len();
+        let known = self.system.def().is_some();
+        if (known && count != self.system.base_count()) || count > MAX_TRUE_BASES {
             return None;
         }
         for (slot, e) in exps.iter_mut().zip(self.exps.iter()) {
@@ -43,10 +51,7 @@ impl<'i> DimWire<'i> {
             }
             prev = Some(b);
         }
-        Some(Dim {
-            exps,
-            bases: Bases::List(self.bases),
-        })
+        Some(Dim::of_parts(self.system, exps, Bases::List(self.bases)))
     }
 }
 
@@ -55,7 +60,11 @@ impl SerializeShrinkWrap for Dim<'_> {
     const ELEMENT_SIZE: ElementSize = <DimWire<'_> as SerializeShrinkWrap>::ELEMENT_SIZE;
 
     fn ser_shrink_wrap(&self, wr: &mut BufWriter<'_>) -> Result<(), ShrinkWrapError> {
-        wr.write(&RefVec::Slice { slice: &self.exps })?;
+        wr.write(&self.system)?;
+        let count = self.system.base_count().min(MAX_TRUE_BASES);
+        wr.write(&RefVec::Slice {
+            slice: self.exps.get(..count).unwrap_or(&self.exps),
+        })?;
         let mut list = RefVecBuilder::<BaseExp<'_>>::new(wr)?;
         let mut out = Ok(());
         let whole = walk::each_canonical(&self.bases, &mut |b| {

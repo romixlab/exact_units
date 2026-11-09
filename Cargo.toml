@@ -124,6 +124,7 @@ quantities = [
     "information",
     "counting",
     "levels",
+    "systems",
 ]
 # Second, Minute, Hour, Day, Week, Hertz, HertzPerSecond, Baud; the time scales (TAI, POSIX time, a device's
 # monotonic clock) and their origins (TaiEpoch1958, GpsEpoch, PtpEpoch, UnixEpoch, NtpEpoch, DeviceBoot)
@@ -143,6 +144,9 @@ fields = []
 mechanical = []
 # Radian, Degree, Turn, Steradian, AngularVelocity, AngularAcceleration: angle is a base dimension of its own
 angle = []
+# the systems Natural (ħ = c = 1, eV) and Gaussian (cm, g, s) with their units and quantities, and the bridges to
+# SI by quantity and by dimension: Fixed::to_system
+systems = ["electrical", "fields", "mechanical", "time"]
 # Kelvin, DegreeCelsius; HeatFluxDensity (W/m²), HeatCapacity and Entropy (J/K), SpecificHeatCapacity,
 # ThermalConductivity, ThermalConductance (W/K), ThermalResistance (K/W), HeatTransferCoefficient
 thermal = []

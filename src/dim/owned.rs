@@ -1,6 +1,7 @@
 //! [DimOwned]: a dimension with its bases in a `Vec`, for run-time arithmetic and data that outlives a buffer.
 
 use super::{BaseExpOwned, Bases, Dim, DimWireOwned, Exp, MAX_TRUE_BASES};
+use crate::system::SystemRef;
 use crate::unit::MarkerIdOwned;
 use core::fmt;
 use shrink_wrap::prelude::*;
@@ -16,6 +17,7 @@ use shrink_wrap::prelude::*;
     serde(try_from = "DimWireOwned", into = "DimWireOwned")
 )]
 pub struct DimOwned {
+    system: MarkerIdOwned,
     exps: [Exp; MAX_TRUE_BASES],
     bases: Vec<BaseExpOwned>,
 }
@@ -24,10 +26,20 @@ impl DimOwned {
     /// The same dimension, borrowing the names of the bases.
     #[must_use]
     pub fn as_dim(&self) -> Dim<'_> {
-        Dim::of_parts(self.exps, Bases::Owned(&self.bases))
+        Dim::of_parts(
+            SystemRef::of_id(self.system.as_id()),
+            self.exps,
+            Bases::Owned(&self.bases),
+        )
     }
 
-    /// The exponents of s, m, kg, A, K, mol, cd.
+    /// The system the exponents count in, by its id.
+    #[must_use]
+    pub fn system(&self) -> &MarkerIdOwned {
+        &self.system
+    }
+
+    /// The exponents of the system's true bases: SI's s, m, kg, A, K, mol, cd.
     #[must_use]
     pub fn exps(&self) -> [Exp; MAX_TRUE_BASES] {
         self.exps
@@ -90,6 +102,13 @@ impl DimOwned {
 
     /// `self · o^sign`, both sorted lists merged.
     fn combine(&self, o: &DimOwned, sign: i32, times: i32) -> Option<DimOwned> {
+        let system = if !self.as_dim().has_true_exps() {
+            o.system.clone()
+        } else if !o.as_dim().has_true_exps() || self.system == o.system {
+            self.system.clone()
+        } else {
+            return None;
+        };
         let mut exps = [Exp::ZERO; MAX_TRUE_BASES];
         for ((e, a), b) in exps.iter_mut().zip(self.exps).zip(o.exps) {
             *e = Exp::of_i32(
@@ -136,7 +155,11 @@ impl DimOwned {
                 });
             }
         }
-        Some(DimOwned { exps, bases })
+        Some(DimOwned {
+            system,
+            exps,
+            bases,
+        })
     }
 }
 
@@ -151,6 +174,7 @@ impl From<Dim<'_>> for DimOwned {
             });
         });
         DimOwned {
+            system: MarkerIdOwned::from(d.system().id()),
             exps: d.exps(),
             bases,
         }
@@ -189,7 +213,7 @@ pub struct NotCanonical;
 impl fmt::Display for NotCanonical {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(
-            "a dimension that isn't canonical: 7 exponents, bases sorted by crate and name without repeats, \
+            "a dimension that isn't canonical: as many exponents as its system has, bases sorted by crate and name without repeats, \
              exponents not 0",
         )
     }
@@ -199,7 +223,15 @@ impl TryFrom<DimWireOwned> for DimOwned {
     type Error = NotCanonical;
 
     fn try_from(w: DimWireOwned) -> Result<Self, NotCanonical> {
-        let exps: [Exp; MAX_TRUE_BASES] = w.exps.try_into().map_err(|_| NotCanonical)?;
+        let system = SystemRef::of_id(w.system.as_id());
+        let count = w.exps.len();
+        if (system.def().is_some() && count != system.base_count()) || count > MAX_TRUE_BASES {
+            return Err(NotCanonical);
+        }
+        let mut exps = [Exp::ZERO; MAX_TRUE_BASES];
+        for (slot, e) in exps.iter_mut().zip(&w.exps) {
+            *slot = *e;
+        }
         let sorted = w
             .bases
             .windows(2)
@@ -208,6 +240,7 @@ impl TryFrom<DimWireOwned> for DimOwned {
             return Err(NotCanonical);
         }
         Ok(DimOwned {
+            system: w.system,
             exps,
             bases: w.bases,
         })
@@ -216,8 +249,12 @@ impl TryFrom<DimWireOwned> for DimOwned {
 
 impl From<DimOwned> for DimWireOwned {
     fn from(d: DimOwned) -> Self {
+        let count = SystemRef::of_id(d.system.as_id())
+            .base_count()
+            .min(MAX_TRUE_BASES);
         DimWireOwned {
-            exps: d.exps.to_vec(),
+            exps: d.exps.get(..count).unwrap_or(&d.exps).to_vec(),
+            system: d.system,
             bases: d.bases,
         }
     }

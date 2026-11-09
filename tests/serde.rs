@@ -470,7 +470,11 @@ fn dim_reads_only_canonical() {
             .collect();
         all.join(",")
     };
-    let json = |exps: &str, bases: &str| format!(r#"{{"exps":[{exps}],"bases":[{bases}]}}"#);
+    let json = |exps: &str, bases: &str| {
+        format!(
+            r#"{{"system":{{"crate_name":"exact_units","name":"Si"}},"exps":[{exps}],"bases":[{bases}]}}"#
+        )
+    };
     let base = |name: &str, halves: i8| {
         format!(
             r#"{{"base":{{"crate_name":"exact_units","name":"{name}"}},"exp":{{"halves":{halves}}}}}"#

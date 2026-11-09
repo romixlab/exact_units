@@ -68,12 +68,27 @@ const TREE: &[(&str, &[&str], &[&str])] = &[
     ("Entropy", &[], &[]),
     ("DampingRatio", &[], &[]),
     ("QualityFactor", &[], &[]),
+    ("ElectricCurrent", &["D"], &[]),
+    ("MagnetomotiveForce", &[], &[]),
+    ("ElectricCharge", &["D"], &[]),
+    ("Voltage", &["D"], &[]),
+    ("ElectricField", &["D"], &[]),
+    ("ElectricFluxDensity", &[], &[]),
+    ("ElectricPolarization", &[], &["ElectricFluxDensity"]),
+    ("SurfaceChargeDensity", &[], &[]),
+    ("MagneticFlux", &["D"], &[]),
+    ("MagneticFluxDensity", &["D"], &[]),
+    ("MagnetizingField", &[], &[]),
+    ("Magnetization", &[], &["MagnetizingField"]),
+    ("LinearCurrentDensity", &[], &[]),
+    ("Capacitance", &["D"], &[]),
+    ("Inductance", &["D"], &[]),
     ("PlaneAngle", &["D"], &[]),
     ("PhaseAngle", &[], &["PlaneAngle"]),
 ];
 
 /// The quantities as `const` data, in [TREE]'s order.
-const DEFS: [&QuantityDef<'static>; 29] = [
+const DEFS: [&QuantityDef<'static>; 44] = [
     Length::DEF,
     Height::DEF,
     Width::DEF,
@@ -101,13 +116,28 @@ const DEFS: [&QuantityDef<'static>; 29] = [
     Entropy::DEF,
     DampingRatio::DEF,
     QualityFactor::DEF,
+    quantities::ElectricCurrent::DEF,
+    quantities::MagnetomotiveForce::DEF,
+    quantities::ElectricCharge::DEF,
+    quantities::Voltage::DEF,
+    quantities::ElectricField::DEF,
+    quantities::ElectricFluxDensity::DEF,
+    quantities::ElectricPolarization::DEF,
+    quantities::SurfaceChargeDensity::DEF,
+    quantities::MagneticFlux::DEF,
+    quantities::MagneticFluxDensity::DEF,
+    quantities::MagnetizingField::DEF,
+    quantities::Magnetization::DEF,
+    quantities::LinearCurrentDensity::DEF,
+    quantities::Capacitance::DEF,
+    quantities::Inductance::DEF,
     PlaneAngle::DEF,
     PhaseAngle::DEF,
 ];
 
 /// The expressions walked: each quantity, then the derived quantity of each of their dimensions and of a velocity,
 /// then ratios of length and of energy.
-const EXPRS: [QuantityExpr<'static>; 49] = {
+const EXPRS: [QuantityExpr<'static>; 64] = {
     let dims: [Dim<'static>; 17] = [
         Length::DEF.dim,
         Energy::DEF.dim,
@@ -128,7 +158,7 @@ const EXPRS: [QuantityExpr<'static>; 49] = {
         AbsorbedDose::DEF.dim,
         Resistance::DEF.dim,
     ];
-    let mut out = [QuantityExpr::RatioOf(Dim::ONE); 49];
+    let mut out = [QuantityExpr::RatioOf(Dim::ONE); 64];
     let mut i = 0;
     while i < DEFS.len() {
         out[i] = QuantityExpr::Spec(QuantityRef::Def(DEFS[i]));

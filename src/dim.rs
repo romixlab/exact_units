@@ -1,6 +1,7 @@
 //! The dimension of a unit: exponents of a system's true bases (SI's seven) and a list of distinguished bases with
 //! no count limit (rad, Np, bit, a crate's own `Pixel`), each exponent counted in halves.
 
+use crate::system::SystemRef;
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 use crate::unit::MarkerIdOwned;
 use crate::unit::{MarkerId, UnitExpr, write_superscript};
@@ -307,6 +308,7 @@ impl fmt::Debug for Bases<'_> {
 /// below never meet one that doesn't.
 #[derive(Copy, Clone)]
 pub struct Dim<'i> {
+    system: SystemRef<'i>,
     exps: [Exp; MAX_TRUE_BASES],
     bases: Bases<'i>,
 }
@@ -352,6 +354,7 @@ impl<'i> Dim<'i> {
     #[must_use]
     pub const fn of_exps(exps: [Exp; MAX_TRUE_BASES]) -> Dim<'i> {
         Dim {
+            system: SystemRef::SI,
             exps,
             bases: Bases::Empty,
         }
@@ -362,6 +365,7 @@ impl<'i> Dim<'i> {
     #[must_use]
     pub const fn base(base: MarkerId<'i>) -> Dim<'i> {
         Dim {
+            system: SystemRef::SI,
             exps: [Exp::ZERO; MAX_TRUE_BASES],
             bases: Bases::Single(BaseExp {
                 base,
@@ -392,6 +396,7 @@ impl<'i> Dim<'i> {
         list: &'i [BaseExp<'i>],
     ) -> Option<Dim<'i>> {
         let d = Dim {
+            system: SystemRef::SI,
             exps,
             bases: Bases::list(list),
         };
@@ -402,9 +407,110 @@ impl<'i> Dim<'i> {
         }
     }
 
+    /// A dimension of another system than SI, the system `system` whose true bases are written `symbols` (a
+    /// [System](crate::System)'s `ID` and `BASES`): `parts` names its true bases by their symbols
+    /// (`("cm", Exp::from_halves(-1))`), in any order and with repeats,
+    /// `list` its distinguished bases as [with_list](Self::with_list)'s. A `unit!` line's `[Gaussian: g 1/2, cm -1/2,
+    /// s -1]` builds it. Panics (a compile error in `const` code) on a symbol the system doesn't have, an exponent
+    /// past ±63½ or a system without its bases in `const` data; [checked_in_system](Self::checked_in_system) doesn't.
+    #[must_use]
+    #[expect(
+        clippy::panic,
+        reason = "a compile error in const code (a panic at run time), as documented: a base the system doesn't have"
+    )]
+    pub const fn in_system(
+        system: MarkerId<'i>,
+        symbols: &[&str],
+        parts: &[(&str, Exp)],
+        list: &'i [BaseExp<'i>],
+    ) -> Dim<'i> {
+        match Self::checked_in_system(system, symbols, parts, list) {
+            Some(d) => d,
+            None => panic!(
+                "a base the system doesn't have, an exponent past ±63½, or a system read at run time"
+            ),
+        }
+    }
+
+    /// [in_system](Self::in_system), `None` where it panics.
+    #[must_use]
+    pub const fn checked_in_system(
+        system: MarkerId<'i>,
+        symbols: &[&str],
+        parts: &[(&str, Exp)],
+        list: &'i [BaseExp<'i>],
+    ) -> Option<Dim<'i>> {
+        let mut wide = [0i32; MAX_TRUE_BASES];
+        let mut i = 0;
+        while i < parts.len() {
+            #[expect(clippy::indexing_slicing, reason = "i < parts.len(), the loop bound")]
+            let (symbol, exp) = parts[i];
+            let Some(at) = crate::system::index_in(symbols, symbol) else {
+                return None;
+            };
+            if at >= MAX_TRUE_BASES {
+                return None;
+            }
+            #[expect(clippy::indexing_slicing, reason = "at < MAX_TRUE_BASES, checked")]
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "at most a few i8s summed in an i32"
+            )]
+            {
+                wide[at] += exp.wide();
+            }
+            #[expect(clippy::arithmetic_side_effects, reason = "i < parts.len()")]
+            {
+                i += 1;
+            }
+        }
+        let mut exps = [Exp::ZERO; MAX_TRUE_BASES];
+        let mut j = 0;
+        while j < MAX_TRUE_BASES {
+            #[expect(
+                clippy::indexing_slicing,
+                reason = "j < MAX_TRUE_BASES, the arrays' length"
+            )]
+            match Exp::of_i32(wide[j]) {
+                Some(e) => exps[j] = e,
+                None => return None,
+            }
+            #[expect(clippy::arithmetic_side_effects, reason = "j < MAX_TRUE_BASES")]
+            {
+                j += 1;
+            }
+        }
+        let d = Dim {
+            // by id: a system's definition lists quantities whose dimensions are of the system
+            system: SystemRef::Id(system),
+            exps,
+            bases: Bases::list(list),
+        };
+        if walk::c_adds_up(&d.bases) {
+            Some(d)
+        } else {
+            None
+        }
+    }
+
+    /// The system its true exponents count in: SI for every dimension of SI's units, Natural's or Gaussian's for
+    /// theirs. A dimension without true exponents ([has_true_exps](Self::has_true_exps) false: a ratio, an angle, a
+    /// count) is the same in every system, whichever it names.
+    #[must_use]
+    pub const fn system(&self) -> SystemRef<'i> {
+        self.system
+    }
+
+    /// Whether a true exponent isn't 0: a dimension without one belongs to every system.
+    #[must_use]
+    pub const fn has_true_exps(&self) -> bool {
+        !same_exps(self.exps, [Exp::ZERO; MAX_TRUE_BASES])
+    }
+
     /// The dimension of exponents in halves and a run-time source of bases, `None` when an exponent leaves ±63½ or
     /// the source's bases don't add up.
     pub(crate) fn of_source(
+        system: SystemRef<'i>,
         wide: [i32; MAX_TRUE_BASES],
         src: &'i (dyn BaseSource + Sync + 'i),
     ) -> Option<Dim<'i>> {
@@ -413,6 +519,7 @@ impl<'i> Dim<'i> {
             *e = Exp::of_i32(w)?;
         }
         let d = Dim {
+            system,
             exps,
             bases: Bases::Of(src),
         };
@@ -467,9 +574,17 @@ impl<'i> Dim<'i> {
     }
 
     /// A dimension of parts the caller has checked: they add up.
-    #[cfg(all(feature = "std", feature = "shrink_wrap"))]
-    pub(crate) const fn of_parts(exps: [Exp; MAX_TRUE_BASES], bases: Bases<'i>) -> Dim<'i> {
-        Dim { exps, bases }
+    #[cfg(feature = "shrink_wrap")]
+    pub(crate) const fn of_parts(
+        system: SystemRef<'i>,
+        exps: [Exp; MAX_TRUE_BASES],
+        bases: Bases<'i>,
+    ) -> Dim<'i> {
+        Dim {
+            system,
+            exps,
+            bases,
+        }
     }
 
     /// The exponents of s, m, kg, A, K, mol, cd, in that order (the [S](Self::S), [M](Self::M), .. index
@@ -505,6 +620,7 @@ impl<'i> Dim<'i> {
         'i: 'a,
     {
         Dim {
+            system: self.system,
             exps: self.exps,
             bases: Bases::Without(&self.bases, base),
         }
@@ -513,8 +629,12 @@ impl<'i> Dim<'i> {
     /// The exponents of the true bases alone, without any distinguished base: what UCUM, Pint and uom write for the
     /// unit (torque as N·m, rad/s as s⁻¹).
     #[must_use]
-    pub const fn true_part(&self) -> Dim<'static> {
-        Dim::of_exps(self.exps)
+    pub const fn true_part(&self) -> Dim<'i> {
+        Dim {
+            system: self.system,
+            exps: self.exps,
+            bases: Bases::Empty,
+        }
     }
 
     /// The exponent of the distinguished base `base`, 0 when the dimension doesn't have it.
@@ -566,14 +686,16 @@ impl<'i> Dim<'i> {
     /// whichever way each is written.
     #[must_use]
     pub fn same(&self, o: Dim<'_>) -> bool {
-        same_exps(self.exps, o.exps) && walk::same(&self.bases, &o.bases)
+        same_exps(self.exps, o.exps)
+            && (!self.has_true_exps() || self.system.same(&o.system))
+            && walk::same(&self.bases, &o.bases)
     }
 
     /// [same](Self::same) in `const` code, as the type checks of conversions use it: `None` where the bases are
     /// read at run time (from the wire, [Bases::Of]), which `const` code can't walk.
     #[must_use]
     pub const fn const_same(&self, o: Dim<'_>) -> Option<bool> {
-        if !same_exps(self.exps, o.exps) {
+        if !same_exps(self.exps, o.exps) || (self.has_true_exps() && !self.system.same(&o.system)) {
             return Some(false);
         }
         walk::c_same(&self.bases, &o.bases)
@@ -605,6 +727,7 @@ impl<'i> Dim<'i> {
         'i: 'a,
     {
         let d = Dim {
+            system: self.joint_system(o)?,
             exps: combine_exps(self.exps, o.exps, 1)?,
             bases: Bases::Mul(&self.bases, &o.bases),
         };
@@ -618,6 +741,7 @@ impl<'i> Dim<'i> {
         'i: 'a,
     {
         let d = Dim {
+            system: self.joint_system(o)?,
             exps: combine_exps(self.exps, o.exps, -1)?,
             bases: Bases::Div(&self.bases, &o.bases),
         };
@@ -635,7 +759,11 @@ impl<'i> Dim<'i> {
         let Some(exps) = combine_exps(self.exps, o.exps, 1) else {
             return None;
         };
+        let Some(system) = self.joint_system(o) else {
+            return None;
+        };
         let d = Dim {
+            system,
             exps,
             bases: Bases::Mul(&self.bases, &o.bases),
         };
@@ -655,12 +783,31 @@ impl<'i> Dim<'i> {
         let Some(exps) = combine_exps(self.exps, o.exps, -1) else {
             return None;
         };
+        let Some(system) = self.joint_system(o) else {
+            return None;
+        };
         let d = Dim {
+            system,
             exps,
             bases: Bases::Div(&self.bases, &o.bases),
         };
         if walk::c_adds_up(&d.bases) {
             Some(d)
+        } else {
+            None
+        }
+    }
+
+    /// The system of a product with `o`: the one of the side with true exponents, `None` when both have some and
+    /// count in two systems (a metre times a gauss).
+    pub(crate) const fn joint_system<'a>(&self, o: &Dim<'a>) -> Option<SystemRef<'a>>
+    where
+        'i: 'a,
+    {
+        if !self.has_true_exps() {
+            Some(o.system)
+        } else if !o.has_true_exps() || self.system.same(&o.system) {
+            Some(self.system)
         } else {
             None
         }
@@ -703,6 +850,11 @@ pub(crate) const fn of_expr(e: &'static UnitExpr) -> Option<Dim<'static>> {
             i += 1;
         }
     }
+    let system = match expr_system(e) {
+        Ok(Some(s)) => s,
+        Ok(None) => SystemRef::SI,
+        Err(()) => return None,
+    };
     let bases = Bases::Unit(e);
     if !walk::c_adds_up(&bases) {
         return None;
@@ -712,7 +864,65 @@ pub(crate) const fn of_expr(e: &'static UnitExpr) -> Option<Dim<'static>> {
         Some(None) => Bases::Empty,
         _ => bases,
     };
-    Some(Dim { exps, bases })
+    Some(Dim {
+        system,
+        exps,
+        bases,
+    })
+}
+
+/// The system of a unit expression's true exponents: `None` where it has none (a ratio, an angle), `Err` where two
+/// parts count in two systems.
+const fn expr_system(e: &'static UnitExpr) -> Result<Option<SystemRef<'static>>, ()> {
+    match e {
+        UnitExpr::Named(def) => Ok(if def.dim.has_true_exps() {
+            Some(def.dim.system)
+        } else {
+            None
+        }),
+        UnitExpr::Mul(a, b) | UnitExpr::Div(a, b) => {
+            let (sa, sb) = (part_system(a), part_system(b));
+            match (sa, sb) {
+                (Err(()), _) | (_, Err(())) => Err(()),
+                (Ok(None), x) | (x, Ok(None)) => x,
+                (Ok(Some(x)), Ok(Some(y))) => {
+                    if x.same(&y) {
+                        Ok(Some(x))
+                    } else {
+                        Err(())
+                    }
+                }
+            }
+        }
+        UnitExpr::Pow(a, _) | UnitExpr::Sqrt(a) => expr_system(a),
+    }
+}
+
+/// [expr_system] of a part, `None` where its exponents cancel (m/m is a ratio in any system).
+const fn part_system(e: &'static UnitExpr) -> Result<Option<SystemRef<'static>>, ()> {
+    match expr_exps(e) {
+        Some(x) if is_zero_wide(x) => Ok(None),
+        _ => expr_system(e),
+    }
+}
+
+/// Whether every exponent in halves is 0.
+const fn is_zero_wide(x: [i32; MAX_TRUE_BASES]) -> bool {
+    let mut i = 0;
+    while i < MAX_TRUE_BASES {
+        #[expect(
+            clippy::indexing_slicing,
+            reason = "i < MAX_TRUE_BASES, the array's length"
+        )]
+        if x[i] != 0 {
+            return false;
+        }
+        #[expect(clippy::arithmetic_side_effects, reason = "i < MAX_TRUE_BASES")]
+        {
+            i += 1;
+        }
+    }
+    true
 }
 
 /// The true exponents of a unit expression in halves.
@@ -837,6 +1047,9 @@ impl Eq for Dim<'_> {}
 impl core::hash::Hash for Dim<'_> {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.exps.hash(state);
+        if self.has_true_exps() {
+            self.system.hash(state);
+        }
         self.for_each_base(|b| b.hash(state));
     }
 }
@@ -927,11 +1140,37 @@ impl fmt::Display for Dim<'_> {
             f.write_str(symbol)?;
             exp.write_after(f)
         };
-        for (symbol, i) in TRUE_ORDER {
-            if let Some(&exp) = self.exps.get(i)
-                && !exp.is_zero()
-            {
-                part(f, symbol, exp)?;
+        match self.system.def() {
+            Some(d) if !d.is_si() => {
+                for (i, &exp) in self.exps.iter().enumerate() {
+                    if !exp.is_zero() {
+                        match d.symbol(i) {
+                            Some(symbol) => part(f, symbol, exp)?,
+                            None => part(f, "?", exp)?,
+                        }
+                    }
+                }
+            }
+            Some(_) => {
+                for (symbol, i) in TRUE_ORDER {
+                    if let Some(&exp) = self.exps.get(i)
+                        && !exp.is_zero()
+                    {
+                        part(f, symbol, exp)?;
+                    }
+                }
+            }
+            None => {
+                // a system known by its id only: its bases by index
+                let mut buf = [0u8; 2];
+                for (i, &exp) in self.exps.iter().enumerate() {
+                    if !exp.is_zero() {
+                        let digit = u8::try_from(i).unwrap_or(9).min(9);
+                        buf[0] = b'b';
+                        buf[1] = b'0'.saturating_add(digit);
+                        part(f, core::str::from_utf8(&buf).unwrap_or("b"), exp)?;
+                    }
+                }
             }
         }
         let mut out = Ok(());

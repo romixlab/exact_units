@@ -206,6 +206,7 @@ pub(crate) fn dim(exps: &[i8], bases: &[(String, i8)]) {
         })
         .collect();
     let w = DimWire {
+        system: exact_units::SystemRef::SI,
         exps: RefVec::Slice { slice: &exps },
         bases: RefVec::Slice { slice: &list },
     };

@@ -93,6 +93,8 @@ pub mod serde;
 #[cfg(feature = "shrink_wrap")]
 mod si_expr;
 mod si_prefix;
+pub mod system;
+pub mod systems;
 mod text;
 pub mod tree;
 mod unit;
@@ -125,14 +127,14 @@ pub use exact::order_parts as __order_parts;
 pub use exact::{Exact, Fraction, InPrefix, ParseExactError, ParseFractionError};
 #[cfg(feature = "dimensionless")]
 pub use exact::{OffTarget, Tolerance};
+pub use fixed::{
+    Across, Bounds, Count, DecimalPrefix, Finite, Fixed, FixedScale, MaybeNan, NanFree,
+    OutOfBounds, Overflow, Range, RangeDec, RangeU64, Repr, Requantizer, Rounding, Saturating,
+    ScaleDef, Storage, StorageKind, StorageOrd, Unbounded, Unlimited, UnsignedStorage, Wrapping,
+    prefix, requantize,
+};
 #[cfg(feature = "angle")]
 pub use fixed::{Bam16, Bam32, PhaseBam16, PhaseBam32};
-pub use fixed::{
-    Bounds, Count, DecimalPrefix, Finite, Fixed, FixedScale, MaybeNan, NanFree, OutOfBounds,
-    Overflow, Range, RangeDec, RangeU64, Repr, Requantizer, Rounding, Saturating, ScaleDef,
-    Storage, StorageKind, StorageOrd, Unbounded, Unlimited, UnsignedStorage, Wrapping, prefix,
-    requantize,
-};
 #[cfg(feature = "information")]
 pub use fixed::{Bytes, Gibibytes, Kibibytes, Mebibytes};
 #[cfg(feature = "time")]
@@ -157,6 +159,9 @@ pub use si_expr::SIExprOwned;
 #[cfg(feature = "shrink_wrap")]
 pub use si_expr::{CompactError, SIExpr};
 pub use si_prefix::{FullScaleBits, Pow2Exp, Pow10Exp, Prefix, PrefixDecimal, PrefixRatio};
+pub use system::{BaseRule, BridgeDef, BridgeError, SetToOne, System, SystemDef, SystemRef};
+#[cfg(all(feature = "std", feature = "shrink_wrap"))]
+pub use system::{BaseRuleOwned, BridgeDefOwned, SetToOneOwned, SystemDefOwned, SystemRefOwned};
 pub use tree::MAX_UNIT_DEPTH;
 pub use unit::{
     MarkerId, PrefixPolicy, PrefixSet, Provenance, Unit, UnitDef, UnitDiv, UnitExpr, UnitMul,
