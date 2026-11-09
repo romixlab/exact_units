@@ -63,10 +63,10 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   powers (2 and 5 as powers of 10 and 2) with powers of π, ln 2 and ln 10, whole or half exponents: every scale
   (prefixes, `Pow10<E>`, `Pow2<E>`, `Rational<N, D>` with `u64` parameters factored at compile time, `Kibi`..,
   `FullScale<V, BITS>`, `FullScaleMax<V, BITS>`) is one, equal however it is written (`Milli` = `Pow10<-3>` =
-  `Rational<1, 1000>`); closed under `*`, `/`, powers and roots, a product that needs more than 12 primes or leaves
+  `Rational<1, 1000>`); closed under `*`, `/`, powers and roots, a product that needs more than 16 primes or leaves
   ±63½ is a compile error. `Fixed::to` computes its factor at compile time: not a fraction of integers, or a multiply
   that doesn't fit 64 bits (storages up to 32 bits) / 128 bits, doesn't compile, never a rounding. Q formats `Q15`,
-  `Q31`, `UQ16_16`, binary angles `Bam16`, `Bam32`. Replaces `ExactScale` in `Scale::Exact` (104 bytes in memory, a
+  `Q31`, `UQ16_16`, binary angles `Bam16`, `Bam32`. Replaces `ExactScale` in `Scale::Exact` (138 bytes in memory, a
   decimal prefix 2 bytes on the wire). [Exact magnitudes](docs/nomicon/magnitude.md), conformance
   `stdlib.si.magnitude.*` (derive, dynamic, Python; C waits on API-26).
 - ✅ **NUM-4 Named rounding and overflow policies** (was STD-63) · `v0.5` — `to()` stays exact or `None`; lossy conversions name
@@ -185,10 +185,16 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   instructions of the typed-const and hand-written compares, a literal past the storage's range a bare `true`;
   skipped where that target isn't installed). The generated symbol table (UNIT-11), float storages (NUM-16),
   `fixed!(100 m/s)` (NUM-17), points (PT-5), `Exact` and levels (NUM-18) are in.
-- 📋 **NUM-10 Measured constants as exact symbols** · `foundations` — μ₀ and G in `Magnitude` beside π, ln 2 and ln 10
-  (ε₀, Z₀ and α follow from μ₀); a number only at an explicit edge from a named set (`Codata2018`, `Codata2022`), the
-  old 4π·10⁻⁷ only as the opt-in `Ampere1948`; a conversion that needs a symbol doesn't compile without a set, floats
-  included.
+- ✅ **NUM-10 Measured constants as exact symbols** · `foundations` — `Magnitude::MU0` and `Magnitude::G` beside π,
+  ln 2 and ln 10 in `Symbols`, whole or half powers, cancelling exactly (`(T/μ₀)·μ₀` is T, μ₀·ε₀·c² is 1, S·S is
+  μ₀/(4π·10⁻⁷)); ε₀, Z₀ and α are exact expressions over μ₀ (`constants::EPSILON0`, `Z0`, `ALPHA`). A factor with μ₀
+  or G left has no value: `to_f64` and `fixed_point` refuse, and `to`, `convert` and `convert_rounded` over it don't
+  compile, floats included. A number only at an explicit edge from a named set, `trait Constants` with
+  `Measured { value, rel_u, source, year }`: `Codata2018`, `Codata2022`, no `Latest`, and the old 4π·10⁻⁷ only as
+  the opt-in `Ampere1948`, which has no G. `Magnitude::resolve::<Set>()` gives the value with the uncertainty each
+  constant brings in; `Fixed::convert_with` and `convert_rounded_with` convert through a set. `unit!`/`scale!` take
+  `mu0 e` and `g e`. `MAX_FACTORS` 16. [Measured constants](docs/nomicon/constants.md), `tests/props/symbols.rs`.
+  The WireWeaver walker and schema side is wire_weaver's.
 - ✅ **NUM-11 An exact rational quantity** — `exact_units::Exact<U>`: the unit in the type, the value an exact
   fraction chosen at run time (`Fraction`: a sign and a `u128` num/den, always reduced), for values a host works out
   that no fixed scale holds (an STM32H7 PLL output, 519.999755859375 MHz or 80/3 MHz). Not napier's job, which is

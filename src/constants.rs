@@ -229,10 +229,14 @@ impl Magnitude {
     }
 
     /// As [resolve](Self::resolve): [MagnitudeError::NotInSet] where `S` has no value for a constant left in the
-    /// magnitude, [MagnitudeError::TooManyFactors] or [MagnitudeError::ExponentRange] where the product doesn't fit
+    /// magnitude (checked before anything else), [MagnitudeError::TooManyFactors] or [MagnitudeError::ExponentRange] where the product doesn't fit
     /// a magnitude, [MagnitudeError::NotSquare] where a half power of a value with a half exponent is asked for.
     pub const fn checked_resolve<S: Constants>(&self) -> Result<Resolved, MagnitudeError> {
         let sym = self.symbols_x2();
+        // a constant the set lacks first, whatever else would fail
+        if (sym.mu0 != 0 && S::MU0.is_none()) || (sym.g != 0 && S::G.is_none()) {
+            return Err(MagnitudeError::NotInSet);
+        }
         let (mu0, mu0_rel_u) = match power(S::MU0.as_ref(), sym.mu0) {
             Ok(p) => p,
             Err(e) => return Err(e),

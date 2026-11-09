@@ -56,6 +56,7 @@ mod rounding;
 mod serde_input;
 #[cfg(feature = "serde")]
 mod serde_values;
+mod symbols;
 #[cfg(not(kani))]
 mod text;
 #[cfg(all(not(kani), feature = "serde"))]
