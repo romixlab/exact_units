@@ -309,19 +309,24 @@ counted units, and the kinds that keep look-alike quantities apart.
   field too, with its unit in the dynamic client (CLT-54). [Imperial and US customary](docs/customary.md),
   conformance `stdlib.si.fixed.customary`, `stdlib.si.si_expr.pound_force` (derive, dynamic, Python; C waits on
   API-26).
-- 🚧 **UNIT-2 Kinds that share a dimension** (was STD-68) · `v0.5` — first piece done (gain kinds): `exact_units::Kind` as
-  `Unit::KIND` next to `DIM`, checked by `Fixed::convert` at compile time (rules after ISO 80000-1 / mp-units: a
-  quotient of one dimension keeps what cancelled, V/V ≠ A/A ≠ W/W ≠ `Ratio`; a dimension-one factor keeps the other's
-  kind; any other product plain, V/V · V = V); `Ohm` `resistance` and `Siemens` `conductance` (`kind ".."` on a
-  `unit!` line), apart from V/A and A/V; named steps `as_ratio` / `as_gain`, `as_resistance` / `as_transimpedance`,
-  `as_conductance` / `as_transconductance`; in the model as `MarkerDef::KindUnit` and
-  `ww_self::units::CanonicalUnit::kind`, compared by the evolution check (EVO-17), conformance case
-  `model.marker_def.unit_kind`. Missing: the rest below. relative humidity, duty cycle, state of charge, strain,
-  volume fraction; Hz vs Bq vs rad/s; electrical vs mechanical angle through pole pairs; colour vs thermodynamic
-  temperature; explicit casts between siblings. W / VA / var and their energies, Gy / Sv; a kind survives a product
-  with plain units (var·h stays reactive energy, never kW·h). Kinds with arguments: gas volume and density at stated
-  reference conditions (`StandardVolume<Ref>`: DIN 1343, ISO 13443, US SCF), with an opt-in exact ideal-gas bridge to
-  mol.
+- 🚧 **UNIT-2 Kinds that share a dimension** (was STD-68) · `v0.5` — now built on quantity specs (UNIT-8), which
+  supersede the first piece (gain kinds, `exact_units::Kind` / `Unit::KIND`, now gone): a kind is
+  `QuantityDef::is_kind`, reached by `QuantityExpr`'s rules (a quotient of one dimension keeps what cancelled,
+  V/V ≠ A/A ≠ W/W ≠ `Ratio`; a dimension-one factor keeps the other side's quantity; any other product `Derived`,
+  V/V · V = V), named on a `unit!` line with `quantity ..`. Done this way: `Ohm` a `Resistance` and `Siemens` a
+  `Conductance`, apart from V/A and A/V; `Power` apart from `ApparentPower` (VA) and `ReactivePower` (var);
+  `Pressure` apart from `EnergyDensity`; `Entropy` apart from a plain heat capacity (J/K); `Frequency` (Hz) apart
+  from `Activity` (Bq) and `SymbolRate` (Bd); `AbsorbedDose` (Gy) apart from `DoseEquivalent` (Sv); `PlaneAngle`
+  apart from `PhaseAngle`, crossed through pole pairs (`electrical`); named steps `as_ratio` / `as_gain`,
+  `as_resistance` / `as_transimpedance`, `as_conductance` / `as_transconductance`, `as_energy_density` /
+  `as_joule_per_volume`, `as_entropy` / `as_heat_capacity`, `as_phase` / `as_plane_angle`. In the model, still as
+  `MarkerDef::KindUnit` and `ww_self::units::CanonicalUnit::kind` as of this note (wire_weaver's own `FEATURES.md`
+  tracks whether that side has moved to quantities too), compared by the evolution check (EVO-17), conformance case
+  `model.marker_def.unit_kind`. Missing: relative humidity, duty cycle, state of charge, strain, volume fraction
+  (dimensionless kinds of their own); colour vs thermodynamic temperature; explicit casts between siblings; a kind
+  surviving a product with a plain unit of another dimension (var·h should stay a reactive energy; today it falls
+  to a plain `Derived` one); kinds with arguments: gas volume and density at stated reference conditions
+  (`StandardVolume<Ref>`: DIN 1343, ISO 13443, US SCF), with an opt-in exact ideal-gas bridge to mol.
 - ✅ **UNIT-3 `Minute`, `Hour`, `Day` and `Week` units** (was STD-84) — `exact_units` 8584aad: `Secs<T>`, `Minutes<T>`,
   `Hours<T>`, `Days<T>` (`Fixed<Second|Minute|Hour|Day, One, T>`). `ww_si` re-exports `Secs`, `Minutes`, `Hours`,
   `Days` next to `Micros`, `Millis`, `Nanos`; `units::{Minute, Hour, Day, Week}` reach `ww_si::..` through its
@@ -378,10 +383,33 @@ counted units, and the kinds that keep look-alike quantities apart.
   (`identity_is_crate_and_name`, `one_marker_per_name`), `tests/two_crates.rs` (fixtures `rpm_a`, `rpm_b`),
   `tests/dynamic.rs`; in wire_weaver, `tests/quantities` (two crates' `Rpm` by reference, a ww_tape file decoded from
   its bundle alone).
-- 📋 **UNIT-8 Quantity specs: the ISQ hierarchy** · `foundations` — `QuantitySpec` / `QuantityDef` (system, parent, kind
-  root, character), `quantity!`, `Of<Q, U>` in the unit slot, `QuantityExpr` replacing `Kind`: up the tree implicit,
-  down by a named step, siblings and other kinds refused, `+` to the nearest common ancestor, products `Derived`. The
-  foundation of UNIT-2.
+- ✅ **UNIT-8 Quantity specs: the ISQ hierarchy** · `foundations` — `QuantitySpec` / `QuantityDef` (`id: MarkerId`,
+  `parent: Option<QuantityRef>`, `dim`, `is_kind`, `character: Character` — scalar, complex or vector, data only),
+  built by `quantity!` (`= [m 1]` a root at its dimension's open root, `= kind [s -1]` a root that is a kind of its
+  own, `: Parent` a child, `: kind Parent` a child that is a kind, `@table static ALL;` for a `&[&QuantityDef]` as
+  `unit!`'s does). `units::Of<Q, U>` puts a quantity in the unit slot (`Fixed<Of<Height, Meter>, Milli, u16>`);
+  `QuantityExpr` (`Spec`, `RatioOf`, `Derived`) replaces `Kind` (UNIT-2's first piece), the same rules in `const`
+  code and at run time, each with a `const_` twin: up the tree is implicit (`Fixed::up`, height to length), down is
+  the named step `Fixed::as_quantity::<Q>()` (a derived `kg·m²/s²` to a kinetic energy, `reaches`), siblings and
+  other kinds refused (`converts`), a sum is the nearest common ancestor (`add`, `quantities::Common<Q1, Q2>`, so
+  `h.up() + w.up()` is a length), a product or quotient is `Derived` except that cancelling a dimension keeps a
+  `RatioOf` it (V/V) and a dimension-one factor that is a ratio or derived keeps the other side's quantity
+  (Ω · (V/V) is a resistance) (`mul`, `div`). `exact_units::quantities` ships Length → Height / Width / Radius /
+  Distance → PathLength; Energy → MechanicalEnergy → KineticEnergy / PotentialEnergy, Energy → Work / Heat;
+  Frequency apart from the kinds Activity (Bq) and SymbolRate (Bd); AbsorbedDose apart from DoseEquivalent;
+  Resistance and Conductance apart from V/A and A/V; Power apart from ApparentPower and ReactivePower; Pressure
+  apart from EnergyDensity; Entropy apart from a plain heat capacity (J/K, `units::HeatCapacity`'s own quantity);
+  DampingRatio and QualityFactor; PlaneAngle apart from PhaseAngle (`Phase<A>`, `as_phase` / `as_plane_angle` /
+  `electrical`), listed in `quantities::ALL`. A `unit!` line names its quantity with `quantity Name`, checked
+  against the line's own dimension at compile time; `UnitTable::quantity` and `units::TABLE` resolve a quantity by
+  id at run time, so a `QuantityRef::Id` read from data (an API model) can walk its parents. No quantity shares a
+  unit's own `MarkerId` (`quantities::HeatCapacity` was dropped for exactly this). The foundation of UNIT-2. Tests:
+  `tests/quantities.rs` walks every pair of `quantities::ALL`, their dimensions' own quantities and ratios of
+  length and energy through `converts`, `reaches` and `add`, four ways (a `const` item, the `const_` twins, by id
+  through `units::TABLE`, and by id with every parent an id too, as an API model's data reads), each checked
+  against the rules written out by hand; also a cycle of parents, one open root per dimension, and the wire
+  round-trip of a `QuantityDef` with its parent as an id. Book: [Quantities](docs/maths/quantities.md),
+  [`quantity!`](docs/units/declare.md#quantity).
 - 📋 **UNIT-9 Dimension systems** · `foundations` — `SystemDef` with a rule by dimension and a bridge table by quantity,
   because Gaussian's D and P share a dimension and differ by a factor; `Natural` (ħ = c = 1) and `Gaussian` together,
   exact, with μ₀ as a symbol (NUM-10); distinguished bases pass through untouched.
