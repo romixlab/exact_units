@@ -19,7 +19,7 @@ pub use rounding::{Overflow, Requantizer, Rounding, StorageKind, requantize};
 pub use storage::{Repr, Storage, StorageOrd, UnsignedStorage};
 
 mod across;
-pub use across::Across;
+pub use across::Crossing;
 mod bounds;
 pub mod prefix;
 mod product;

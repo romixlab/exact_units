@@ -18,6 +18,8 @@ use shrink_wrap::prelude::*;
 )]
 pub struct DimOwned {
     system: MarkerIdOwned,
+    /// How many of `exps` the system has, as [Dim::true_count].
+    count: u8,
     exps: [Exp; MAX_TRUE_BASES],
     bases: Vec<BaseExpOwned>,
 }
@@ -27,7 +29,7 @@ impl DimOwned {
     #[must_use]
     pub fn as_dim(&self) -> Dim<'_> {
         Dim::of_parts(
-            SystemRef::of_id(self.system.as_id()),
+            (SystemRef::of_id(self.system.as_id()), self.count),
             self.exps,
             Bases::Owned(&self.bases),
         )
@@ -74,7 +76,7 @@ impl DimOwned {
             b.exp = Exp::of_i32(b.exp.wide().checked_mul(i32::from(n))?)?;
         }
         out.bases.retain(|b| !b.exp.is_zero());
-        Some(out)
+        Some(out.neutral_as_si())
     }
 
     /// The dimension of a square root, `None` when an exponent is an odd count of halves (a fourth root isn't a
@@ -100,12 +102,22 @@ impl DimOwned {
         out
     }
 
+    /// The same, counted in SI where it has no true exponent (a ratio belongs to every system): one dimension, one
+    /// value, so `==` and `Hash` are the dimension's, as the wire writes it.
+    fn neutral_as_si(mut self) -> DimOwned {
+        if !self.as_dim().has_true_exps() {
+            self.system = MarkerIdOwned::from(SystemRef::SI.id());
+            self.count = DimOwned::from(Dim::ONE).count;
+        }
+        self
+    }
+
     /// `self · o^sign`, both sorted lists merged.
     fn combine(&self, o: &DimOwned, sign: i32, times: i32) -> Option<DimOwned> {
-        let system = if !self.as_dim().has_true_exps() {
-            o.system.clone()
+        let (system, count) = if !self.as_dim().has_true_exps() {
+            (o.system.clone(), o.count)
         } else if !o.as_dim().has_true_exps() || self.system == o.system {
-            self.system.clone()
+            (self.system.clone(), self.count)
         } else {
             return None;
         };
@@ -155,11 +167,15 @@ impl DimOwned {
                 });
             }
         }
-        Some(DimOwned {
-            system,
-            exps,
-            bases,
-        })
+        Some(
+            DimOwned {
+                system,
+                count,
+                exps,
+                bases,
+            }
+            .neutral_as_si(),
+        )
     }
 }
 
@@ -173,8 +189,14 @@ impl From<Dim<'_>> for DimOwned {
                 exp: b.exp,
             });
         });
+        let (system, count) = if d.has_true_exps() {
+            d.counted_system()
+        } else {
+            Dim::ONE.counted_system()
+        };
         DimOwned {
-            system: MarkerIdOwned::from(d.system().id()),
+            system: MarkerIdOwned::from(system.id()),
+            count,
             exps: d.exps(),
             bases,
         }
@@ -214,7 +236,7 @@ impl fmt::Display for NotCanonical {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(
             "a dimension that isn't canonical: as many exponents as its system has, bases sorted by crate and name without repeats, \
-             exponents not 0",
+             exponents not 0, a dimension without true exponents counted in SI",
         )
     }
 }
@@ -232,6 +254,10 @@ impl TryFrom<DimWireOwned> for DimOwned {
         for (slot, e) in exps.iter_mut().zip(&w.exps) {
             *slot = *e;
         }
+        let count = u8::try_from(count).map_err(|_| NotCanonical)?;
+        if !system.is_si() && exps.iter().all(|e| e.is_zero()) {
+            return Err(NotCanonical);
+        }
         let sorted = w
             .bases
             .windows(2)
@@ -241,6 +267,7 @@ impl TryFrom<DimWireOwned> for DimOwned {
         }
         Ok(DimOwned {
             system: w.system,
+            count,
             exps,
             bases: w.bases,
         })
@@ -249,9 +276,7 @@ impl TryFrom<DimWireOwned> for DimOwned {
 
 impl From<DimOwned> for DimWireOwned {
     fn from(d: DimOwned) -> Self {
-        let count = SystemRef::of_id(d.system.as_id())
-            .base_count()
-            .min(MAX_TRUE_BASES);
+        let count = usize::from(d.count).min(MAX_TRUE_BASES);
         DimWireOwned {
             exps: d.exps.get(..count).unwrap_or(&d.exps).to_vec(),
             system: d.system,

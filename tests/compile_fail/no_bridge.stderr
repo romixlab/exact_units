@@ -2,7 +2,7 @@ error[E0080]: evaluation panicked: no bridge from Times<Per<Volt, Meter>, Magnet
  --> src/fixed/across.rs
   |
   |         let c = const { Conversion::across::<S, U, P, U2, P2, T, T2>(false) };
-  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::Across::<exact_units::systems::Gaussian, exact_units::units::Times<exact_units::units::Per<exact_units::units::Volt, exact_units::units::Meter>, exact_units::units::MagneticFieldStrength>, exact_units::prefix::Product<exact_units::prefix::One, exact_units::prefix::One>, i64, exact_units::Unbounded>::convert::<exact_units::units::Per<exact_units::systems::gaussian::Erg, exact_units::units::Times<exact_units::systems::gaussian::GaussianSecond, exact_units::units::Times<exact_units::systems::gaussian::GaussianCentimeter, exact_units::systems::gaussian::GaussianCentimeter>>>, exact_units::prefix::One, i64>::{constant#0}` failed inside this call
+  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `exact_units::Crossing::<exact_units::systems::Gaussian, exact_units::units::Times<exact_units::units::Per<exact_units::units::Volt, exact_units::units::Meter>, exact_units::units::MagneticFieldStrength>, exact_units::prefix::Product<exact_units::prefix::One, exact_units::prefix::One>, i64, exact_units::Unbounded>::convert::<exact_units::units::Per<exact_units::systems::gaussian::Erg, exact_units::units::Times<exact_units::systems::gaussian::GaussianSecond, exact_units::units::Times<exact_units::systems::gaussian::GaussianCentimeter, exact_units::systems::gaussian::GaussianCentimeter>>>, exact_units::prefix::One, i64>::{constant#0}` failed inside this call
   |
 note: inside `exact_units::fixed::Conversion::across::<Gaussian, Times<Per<Volt, Meter>, MagneticFieldStrength>, exact_units::prefix::Product<One, One>, Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>>, One, i64, i64>`
  --> src/fixed.rs
@@ -36,7 +36,7 @@ note: erroneous constant encountered
   |         let c = const { Conversion::across::<S, U, P, U2, P2, T, T2>(false) };
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-note: the above error was encountered while instantiating `fn Across::<Gaussian, Times<Per<Volt, Meter>, MagneticFieldStrength>, exact_units::prefix::Product<One, One>, i64, exact_units::Unbounded>::convert::<Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>>, One, i64>`
+note: the above error was encountered while instantiating `fn Crossing::<Gaussian, Times<Per<Volt, Meter>, MagneticFieldStrength>, exact_units::prefix::Product<One, One>, i64, exact_units::Unbounded>::convert::<Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>>, One, i64>`
   --> tests/compile_fail/no_bridge.rs:10:13
    |
 10 |     let _ = p.to_system::<Gaussian>().convert::<Flux, One, i64>();

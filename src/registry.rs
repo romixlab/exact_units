@@ -126,20 +126,24 @@ impl<'a> ParsedUnit<'a> {
     #[must_use]
     pub fn dim(&self) -> Option<Dim<'_>> {
         let mut exps = [0i32; crate::MAX_TRUE_BASES];
-        let mut system: Option<crate::SystemRef<'_>> = None;
+        let mut system: Option<(crate::SystemRef<'_>, u8)> = None;
         for f in self.factors() {
             let d = f.reading.def.dim;
             if d.has_true_exps() {
                 match system {
-                    Some(s) if !s.same(&d.system()) => return None,
-                    _ => system = Some(d.system()),
+                    Some((s, _)) if !s.same(&d.system()) => return None,
+                    _ => system = Some(d.counted_system()),
                 }
             }
             for (e, x) in exps.iter_mut().zip(d.exps()) {
                 *e = e.checked_add(x.wide().checked_mul(i32::from(f.exp))?)?;
             }
         }
-        Dim::of_source(system.unwrap_or(crate::SystemRef::SI), exps, self)
+        Dim::of_source(
+            system.unwrap_or_else(|| Dim::ONE.counted_system()),
+            exps,
+            self,
+        )
     }
 
     /// The exact factor to coherent SI, prefixes and all; `None` past what a [Magnitude] holds.

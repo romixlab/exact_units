@@ -837,9 +837,10 @@ mod tests {
 
     #[test]
     fn push_past_the_cap_stays_a_valid_whole_prefix() {
-        // "·" is 2 bytes; CAP (320) is a multiple of 2, so this lands exactly on the cap with no partial char.
+        // "·" is 2 bytes; CAP is a multiple of 2, so this lands exactly on the cap with no partial char.
+        const { assert!(Msg::CAP.is_multiple_of(2)) };
         let mut msg = Msg::new();
-        for _ in 0..200 {
+        for _ in 0..Msg::CAP {
             msg = msg.push("·");
         }
         let s = msg.as_str();

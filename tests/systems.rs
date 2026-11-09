@@ -347,3 +347,97 @@ fn systems_by_id() {
     assert_ne!(GaussianSecond::DIM, Second::DIM);
     let _ = (gaussian::ALL, def_list::<u8>(&[]));
 }
+
+/// A dimension and a system on the wire: a system known by its id only keeps the count of exponents it was read
+/// with, a dimension without true exponents is written as SI's, and a system's definition becomes owned whole.
+#[cfg(all(feature = "std", feature = "shrink_wrap"))]
+mod wire {
+    use exact_units::systems::Gaussian;
+    use exact_units::systems::gaussian::GaussianCentimeter;
+    use exact_units::{
+        Dim, DimOwned, DimWire, Exp, MarkerId, System, SystemDefOwned, SystemRef, Unit,
+    };
+    use shrink_wrap::prelude::*;
+
+    const ELSEWHERE: MarkerId<'static> = MarkerId {
+        crate_name: "other_crate",
+        name: "Planck",
+    };
+
+    #[test]
+    fn unknown_system_keeps_its_count() {
+        let exps = [
+            Exp::ONE,
+            Exp::ZERO,
+            Exp::from_halves(-1),
+            Exp::ZERO,
+            Exp::ZERO,
+        ];
+        let wire = DimWire {
+            system: SystemRef::Id(ELSEWHERE),
+            exps: RefVec::Slice { slice: &exps },
+            bases: RefVec::Slice { slice: &[] },
+        };
+        let bytes = wire.to_ww_bytes(&mut [0u8; 64]).expect("fits").to_vec();
+        let d = Dim::from_ww_bytes(&bytes).expect("an unknown system of five bases");
+        assert_eq!(d.true_count(), 5);
+        assert_eq!(d.to_string(), "b0·b2⁻¹ᐟ²");
+        assert_eq!(d.to_ww_bytes(&mut [0u8; 64]).expect("fits"), bytes);
+        let owned = DimOwned::from_ww_bytes_owned(&bytes).expect("as borrowed");
+        assert_eq!(owned.to_ww_bytes_owned().expect("fits"), bytes);
+        assert_eq!(DimOwned::from(d).to_ww_bytes_owned().expect("fits"), bytes);
+        // a product keeps it too
+        let sq = owned.checked_mul(&owned).expect("in range");
+        assert_eq!(sq.as_dim().true_count(), 5);
+        // more than a Dim holds is refused
+        let eight = [Exp::ONE; 8];
+        let wire = DimWire {
+            exps: RefVec::Slice { slice: &eight },
+            ..wire
+        };
+        let bytes = wire.to_ww_bytes(&mut [0u8; 64]).expect("fits").to_vec();
+        assert!(Dim::from_ww_bytes(&bytes).is_err());
+        assert!(DimOwned::from_ww_bytes_owned(&bytes).is_err());
+    }
+
+    #[test]
+    fn a_ratio_is_written_as_si() {
+        let cm = DimOwned::from(GaussianCentimeter::DIM);
+        let ratio = cm.checked_div(&cm).expect("in range");
+        assert_eq!(ratio, DimOwned::from(Dim::ONE));
+        let si = Dim::ONE.to_ww_bytes(&mut [0u8; 64]).expect("fits").to_vec();
+        assert_eq!(ratio.to_ww_bytes_owned().expect("fits"), si);
+        let zero = cm.checked_pow(0).expect("in range");
+        assert_eq!(zero, ratio);
+        // the borrowed quotient names Gaussian, and is written as SI's all the same
+        let (a, b) = (GaussianCentimeter::DIM, GaussianCentimeter::DIM);
+        let q = a.checked_div(&b).expect("in range");
+        assert!(q.system().same(&SystemRef::Id(Gaussian::ID)));
+        assert_eq!(q.to_ww_bytes(&mut [0u8; 64]).expect("fits"), si);
+        assert_eq!(DimOwned::from(q), ratio);
+        // Gaussian's id with no true exponent is a second encoding of one dimension: refused
+        let zeros = [Exp::ZERO; 6];
+        let wire = DimWire {
+            system: SystemRef::Id(Gaussian::ID),
+            exps: RefVec::Slice { slice: &zeros },
+            bases: RefVec::Slice { slice: &[] },
+        };
+        let bytes = wire.to_ww_bytes(&mut [0u8; 64]).expect("fits").to_vec();
+        assert!(Dim::from_ww_bytes(&bytes).is_err());
+        assert!(DimOwned::from_ww_bytes_owned(&bytes).is_err());
+    }
+
+    #[test]
+    fn system_def_owned() {
+        let owned = SystemDefOwned::try_from(*Gaussian::DEF).expect("const data decodes");
+        let bytes = Gaussian::DEF
+            .to_ww_bytes(&mut [0u8; 4096])
+            .expect("fits")
+            .to_vec();
+        assert_eq!(owned.to_ww_bytes_owned().expect("fits"), bytes);
+        assert_eq!(owned.bases.len(), Gaussian::BASES.len());
+        // and from bytes, borrowed
+        let read = exact_units::SystemDef::from_ww_bytes(&bytes).expect("decodes");
+        assert_eq!(SystemDefOwned::try_from(read).expect("decodes"), owned);
+    }
+}

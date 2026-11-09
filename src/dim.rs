@@ -27,6 +27,14 @@ pub use wire::DimWireOwned;
 /// more (UNIT-9) raises it.
 pub const MAX_TRUE_BASES: usize = 7;
 
+/// [MAX_TRUE_BASES] as a [Dim]'s count: SI's.
+#[expect(
+    clippy::as_conversions,
+    clippy::cast_possible_truncation,
+    reason = "7 fits u8; From is not const"
+)]
+const SI_COUNT: u8 = MAX_TRUE_BASES as u8;
+
 /// An exponent of a dimension, counted in halves: m² is 4 halves, the s⁻⁵ᐟ² of V/√Hz is -5. From -64 to 63½.
 ///
 /// On the wire an `INib32` of the halves (a signed nibble varint), so no range comes from the wire format.
@@ -309,6 +317,8 @@ impl fmt::Debug for Bases<'_> {
 #[derive(Copy, Clone)]
 pub struct Dim<'i> {
     system: SystemRef<'i>,
+    /// How many of `exps` the system has: its definition's count, or as read for a system known by its id only.
+    count: u8,
     exps: [Exp; MAX_TRUE_BASES],
     bases: Bases<'i>,
 }
@@ -355,6 +365,7 @@ impl<'i> Dim<'i> {
     pub const fn of_exps(exps: [Exp; MAX_TRUE_BASES]) -> Dim<'i> {
         Dim {
             system: SystemRef::SI,
+            count: SI_COUNT,
             exps,
             bases: Bases::Empty,
         }
@@ -366,6 +377,7 @@ impl<'i> Dim<'i> {
     pub const fn base(base: MarkerId<'i>) -> Dim<'i> {
         Dim {
             system: SystemRef::SI,
+            count: SI_COUNT,
             exps: [Exp::ZERO; MAX_TRUE_BASES],
             bases: Bases::Single(BaseExp {
                 base,
@@ -397,6 +409,7 @@ impl<'i> Dim<'i> {
     ) -> Option<Dim<'i>> {
         let d = Dim {
             system: SystemRef::SI,
+            count: SI_COUNT,
             exps,
             bases: Bases::list(list),
         };
@@ -440,6 +453,15 @@ impl<'i> Dim<'i> {
         parts: &[(&str, Exp)],
         list: &'i [BaseExp<'i>],
     ) -> Option<Dim<'i>> {
+        if symbols.len() > MAX_TRUE_BASES {
+            return None;
+        }
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            reason = "at most MAX_TRUE_BASES, checked just above; From is not const"
+        )]
+        let count = symbols.len() as u8;
         let mut wide = [0i32; MAX_TRUE_BASES];
         let mut i = 0;
         while i < parts.len() {
@@ -483,6 +505,7 @@ impl<'i> Dim<'i> {
         let d = Dim {
             // by id: a system's definition lists quantities whose dimensions are of the system
             system: SystemRef::Id(system),
+            count,
             exps,
             bases: Bases::list(list),
         };
@@ -501,6 +524,23 @@ impl<'i> Dim<'i> {
         self.system
     }
 
+    /// How many true exponents its system has, of the [MAX_TRUE_BASES] in [exps](Self::exps) (the rest are 0): the
+    /// system's count, or for a system known by its id only the count its wire form had, so it is written back the
+    /// same.
+    #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "u8 to usize is lossless; From is not const"
+    )]
+    pub const fn true_count(&self) -> usize {
+        self.count as usize
+    }
+
+    /// The system and its count, as [of_parts](Self::of_parts) takes them.
+    pub(crate) const fn counted_system(&self) -> (SystemRef<'i>, u8) {
+        (self.system, self.count)
+    }
+
     /// Whether a true exponent isn't 0: a dimension without one belongs to every system.
     #[must_use]
     pub const fn has_true_exps(&self) -> bool {
@@ -510,7 +550,7 @@ impl<'i> Dim<'i> {
     /// The dimension of exponents in halves and a run-time source of bases, `None` when an exponent leaves ±63½ or
     /// the source's bases don't add up.
     pub(crate) fn of_source(
-        system: SystemRef<'i>,
+        (system, count): (SystemRef<'i>, u8),
         wide: [i32; MAX_TRUE_BASES],
         src: &'i (dyn BaseSource + Sync + 'i),
     ) -> Option<Dim<'i>> {
@@ -520,6 +560,7 @@ impl<'i> Dim<'i> {
         }
         let d = Dim {
             system,
+            count,
             exps,
             bases: Bases::Of(src),
         };
@@ -576,12 +617,13 @@ impl<'i> Dim<'i> {
     /// A dimension of parts the caller has checked: they add up.
     #[cfg(feature = "shrink_wrap")]
     pub(crate) const fn of_parts(
-        system: SystemRef<'i>,
+        (system, count): (SystemRef<'i>, u8),
         exps: [Exp; MAX_TRUE_BASES],
         bases: Bases<'i>,
     ) -> Dim<'i> {
         Dim {
             system,
+            count,
             exps,
             bases,
         }
@@ -621,6 +663,7 @@ impl<'i> Dim<'i> {
     {
         Dim {
             system: self.system,
+            count: self.count,
             exps: self.exps,
             bases: Bases::Without(&self.bases, base),
         }
@@ -632,6 +675,7 @@ impl<'i> Dim<'i> {
     pub const fn true_part(&self) -> Dim<'i> {
         Dim {
             system: self.system,
+            count: self.count,
             exps: self.exps,
             bases: Bases::Empty,
         }
@@ -726,8 +770,10 @@ impl<'i> Dim<'i> {
     where
         'i: 'a,
     {
+        let (system, count) = self.joint_system(o)?;
         let d = Dim {
-            system: self.joint_system(o)?,
+            system,
+            count,
             exps: combine_exps(self.exps, o.exps, 1)?,
             bases: Bases::Mul(&self.bases, &o.bases),
         };
@@ -740,8 +786,10 @@ impl<'i> Dim<'i> {
     where
         'i: 'a,
     {
+        let (system, count) = self.joint_system(o)?;
         let d = Dim {
-            system: self.joint_system(o)?,
+            system,
+            count,
             exps: combine_exps(self.exps, o.exps, -1)?,
             bases: Bases::Div(&self.bases, &o.bases),
         };
@@ -759,11 +807,12 @@ impl<'i> Dim<'i> {
         let Some(exps) = combine_exps(self.exps, o.exps, 1) else {
             return None;
         };
-        let Some(system) = self.joint_system(o) else {
+        let Some((system, count)) = self.joint_system(o) else {
             return None;
         };
         let d = Dim {
             system,
+            count,
             exps,
             bases: Bases::Mul(&self.bases, &o.bases),
         };
@@ -783,11 +832,12 @@ impl<'i> Dim<'i> {
         let Some(exps) = combine_exps(self.exps, o.exps, -1) else {
             return None;
         };
-        let Some(system) = self.joint_system(o) else {
+        let Some((system, count)) = self.joint_system(o) else {
             return None;
         };
         let d = Dim {
             system,
+            count,
             exps,
             bases: Bases::Div(&self.bases, &o.bases),
         };
@@ -798,16 +848,16 @@ impl<'i> Dim<'i> {
         }
     }
 
-    /// The system of a product with `o`: the one of the side with true exponents, `None` when both have some and
-    /// count in two systems (a metre times a gauss).
-    pub(crate) const fn joint_system<'a>(&self, o: &Dim<'a>) -> Option<SystemRef<'a>>
+    /// The system of a product with `o` and its count: the one of the side with true exponents, `None` when both
+    /// have some and count in two systems (a metre times a gauss).
+    pub(crate) const fn joint_system<'a>(&self, o: &Dim<'a>) -> Option<(SystemRef<'a>, u8)>
     where
         'i: 'a,
     {
         if !self.has_true_exps() {
-            Some(o.system)
+            Some(o.counted_system())
         } else if !o.has_true_exps() || self.system.same(&o.system) {
-            Some(self.system)
+            Some(self.counted_system())
         } else {
             None
         }
@@ -850,9 +900,9 @@ pub(crate) const fn of_expr(e: &'static UnitExpr) -> Option<Dim<'static>> {
             i += 1;
         }
     }
-    let system = match expr_system(e) {
+    let (system, count) = match expr_system(e) {
         Ok(Some(s)) => s,
-        Ok(None) => SystemRef::SI,
+        Ok(None) => (SystemRef::SI, SI_COUNT),
         Err(()) => return None,
     };
     let bases = Bases::Unit(e);
@@ -866,6 +916,7 @@ pub(crate) const fn of_expr(e: &'static UnitExpr) -> Option<Dim<'static>> {
     };
     Some(Dim {
         system,
+        count,
         exps,
         bases,
     })
@@ -873,10 +924,10 @@ pub(crate) const fn of_expr(e: &'static UnitExpr) -> Option<Dim<'static>> {
 
 /// The system of a unit expression's true exponents: `None` where it has none (a ratio, an angle), `Err` where two
 /// parts count in two systems.
-const fn expr_system(e: &'static UnitExpr) -> Result<Option<SystemRef<'static>>, ()> {
+const fn expr_system(e: &'static UnitExpr) -> Result<Option<(SystemRef<'static>, u8)>, ()> {
     match e {
         UnitExpr::Named(def) => Ok(if def.dim.has_true_exps() {
-            Some(def.dim.system)
+            Some(def.dim.counted_system())
         } else {
             None
         }),
@@ -886,7 +937,7 @@ const fn expr_system(e: &'static UnitExpr) -> Result<Option<SystemRef<'static>>,
                 (Err(()), _) | (_, Err(())) => Err(()),
                 (Ok(None), x) | (x, Ok(None)) => x,
                 (Ok(Some(x)), Ok(Some(y))) => {
-                    if x.same(&y) {
+                    if x.0.same(&y.0) {
                         Ok(Some(x))
                     } else {
                         Err(())
@@ -899,7 +950,7 @@ const fn expr_system(e: &'static UnitExpr) -> Result<Option<SystemRef<'static>>,
 }
 
 /// [expr_system] of a part, `None` where its exponents cancel (m/m is a ratio in any system).
-const fn part_system(e: &'static UnitExpr) -> Result<Option<SystemRef<'static>>, ()> {
+const fn part_system(e: &'static UnitExpr) -> Result<Option<(SystemRef<'static>, u8)>, ()> {
     match expr_exps(e) {
         Some(x) if is_zero_wide(x) => Ok(None),
         _ => expr_system(e),
@@ -1163,7 +1214,7 @@ impl fmt::Display for Dim<'_> {
             None => {
                 // a system known by its id only: its bases by index
                 let mut buf = [0u8; 2];
-                for (i, &exp) in self.exps.iter().enumerate() {
+                for (i, &exp) in self.exps.iter().take(self.true_count()).enumerate() {
                     if !exp.is_zero() {
                         let digit = u8::try_from(i).unwrap_or(9).min(9);
                         buf[0] = b'b';

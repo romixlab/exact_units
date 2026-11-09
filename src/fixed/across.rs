@@ -10,7 +10,7 @@ use core::marker::PhantomData;
 /// so no value of no system stands in a type.
 #[must_use = "a crossing is finished by a convert"]
 #[derive(Copy, Clone)]
-pub struct Across<S, U, P, T: Storage, B: Bounds<T>> {
+pub struct Crossing<S, U, P, T: Storage, B: Bounds<T>> {
     value: Fixed<U, P, T, B>,
     _system: PhantomData<S>,
 }
@@ -18,7 +18,7 @@ pub struct Across<S, U, P, T: Storage, B: Bounds<T>> {
 impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// The value crossing into the system `S`, by its bridge to SI ([system](mod@crate::system)): a row of `S`'s
     /// table where the quantity has one, else the rule by dimension. One side must be SI. Finished by
-    /// [convert](Across::convert) (or its rounded and `_with` forms) into a unit of `S`, whose quantity says what the
+    /// [convert](Crossing::convert) (or its rounded and `_with` forms) into a unit of `S`, whose quantity says what the
     /// value is there: 0.511 MeV in Natural becomes a mass as a `Kilogram`, an energy as a `Joule`. Where no bridge
     /// exists the conversion is a compile error that names the reason.
     ///
@@ -43,15 +43,15 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// const D: Dim<'static> = <Times<Meter, Gauss> as Unit>::DIM;
     /// ```
     #[inline(always)]
-    pub fn to_system<S: System>(self) -> Across<S, U, P, T, B> {
-        Across {
+    pub fn to_system<S: System>(self) -> Crossing<S, U, P, T, B> {
+        Crossing {
             value: self,
             _system: PhantomData,
         }
     }
 }
 
-impl<S: System, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Across<S, U, P, T, B> {
+impl<S: System, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Crossing<S, U, P, T, B> {
     /// The value in the unit `U2` of `S`, scale `P2` and storage `T2`, if it is exact there: as
     /// [Fixed::convert], with the bridge's factor between. A factor that keeps μ₀ (most of Gaussian's rows) has no
     /// number without a set: [convert_with](Self::convert_with).
@@ -104,9 +104,9 @@ impl<S: System, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Across<S, U, P
 
 /// The value and the system it is crossing into.
 impl<S: System, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> fmt::Debug
-    for Across<S, U, P, T, B>
+    for Crossing<S, U, P, T, B>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Across({:?} to {})", self.value, S::ID)
+        write!(f, "Crossing({:?} to {})", self.value, S::ID)
     }
 }

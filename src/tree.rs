@@ -172,7 +172,7 @@ pub(crate) fn symbol_of<'t, E: Tree<'t>>(e: E) -> impl fmt::Display {
 /// or the tree is deeper than [MAX_UNIT_DEPTH]. [exp_of] and [each_base] implement [BaseSource] for a tree of one's
 /// own.
 pub fn dim<'e, 't: 'e, E: Tree<'t> + BaseSource + Sync>(e: &'e E) -> Option<Dim<'e>> {
-    let system = system_at(e, 0)?.unwrap_or(crate::SystemRef::SI);
+    let system = system_at(e, 0)?.unwrap_or_else(|| Dim::ONE.counted_system());
     Dim::of_source(system, exps_at(e, 0)?, e)
 }
 
@@ -186,12 +186,12 @@ pub fn dim<'e, 't: 'e, E: Tree<'t> + BaseSource + Sync>(e: &'e E) -> Option<Dim<
     clippy::option_option,
     reason = "the outer None: two systems or a part unread; the inner None: no true exponent, any system"
 )]
-fn system_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<Option<crate::SystemRef<'t>>> {
+fn system_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<Option<(crate::SystemRef<'t>, u8)>> {
     if depth >= MAX_UNIT_DEPTH {
         return None;
     }
     let d = depth + 1;
-    let part = |x: &E| -> Option<Option<crate::SystemRef<'t>>> {
+    let part = |x: &E| -> Option<Option<(crate::SystemRef<'t>, u8)>> {
         if exps_at(x, d)?.iter().all(|e| *e == 0) {
             Some(None)
         } else {
@@ -201,11 +201,11 @@ fn system_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<Option<crate::Syste
     match e.node()? {
         Node::Named { dim, .. } => {
             let dim = dim?;
-            Some(dim.has_true_exps().then(|| dim.system()))
+            Some(dim.has_true_exps().then(|| dim.counted_system()))
         }
         Node::Mul(a, b) | Node::Div(a, b) => match (part(&a)?, part(&b)?) {
             (None, x) | (x, None) => Some(x),
-            (Some(x), Some(y)) => x.same(&y).then_some(Some(x)),
+            (Some(x), Some(y)) => x.0.same(&y.0).then_some(Some(x)),
         },
         Node::Pow(a, _) | Node::Sqrt(a) => system_at(&a, d),
     }

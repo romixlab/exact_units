@@ -436,6 +436,66 @@ impl<'i> DeserializeShrinkWrap<'i> for SystemRef<'i> {
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub type SystemRefOwned = MarkerIdOwned;
 
+/// Each list read whole, `Err` where an item of one read from bytes doesn't decode. There is no `as_def` back: the
+/// borrowed form holds slices of `&str` and of borrowed rows, which an owned one has no place for, so a borrowed
+/// [SystemDef] of an owned one is read from its bytes.
+#[cfg(all(feature = "std", feature = "shrink_wrap"))]
+impl TryFrom<SystemDef<'_>> for SystemDefOwned {
+    type Error = ShrinkWrapError;
+
+    fn try_from(d: SystemDef<'_>) -> Result<Self, ShrinkWrapError> {
+        Ok(SystemDefOwned {
+            id: d.id.into(),
+            bases: d
+                .bases
+                .iter()
+                .map(|b| b.map(Into::into))
+                .collect::<Result<_, _>>()?,
+            set_to_one: d
+                .set_to_one
+                .iter()
+                .map(|x| {
+                    x.map(|x| SetToOneOwned {
+                        symbol: x.symbol.into(),
+                        si: x.si,
+                    })
+                })
+                .collect::<Result<_, _>>()?,
+            by_dim: d
+                .by_dim
+                .iter()
+                .map(|r| {
+                    r.and_then(|r| {
+                        r.map(|r| {
+                            Ok(BaseRuleOwned {
+                                exps: r.exps.iter().collect::<Result<_, _>>()?,
+                                factor: r.factor,
+                            })
+                        })
+                        .transpose()
+                    })
+                })
+                .collect::<Result<_, _>>()?,
+            by_quantity: d
+                .by_quantity
+                .iter()
+                .map(|r| {
+                    r.map(|r| BridgeDefOwned {
+                        si: r.si.id().into(),
+                        here: r.here.id().into(),
+                        factor: r.factor,
+                    })
+                })
+                .collect::<Result<_, _>>()?,
+            no_rule: d
+                .no_rule
+                .iter()
+                .map(|q| q.map(|q| q.id().into()))
+                .collect::<Result<_, _>>()?,
+        })
+    }
+}
+
 /// A system marker: a zero-size type with its definition. This crate's are in [systems](crate::systems).
 pub trait System: Copy + Default + 'static {
     /// Who it is.

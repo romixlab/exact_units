@@ -12,7 +12,9 @@ use shrink_wrap::prelude::*;
 /// crate and name, each once, with an exponent that isn't 0. A `Dim` is written in this shape from any tree of bases
 /// and reads back as one with a [Bases::List]; a reader refuses another count of exponents, an unsorted or repeated
 /// base and an exponent of 0, so one dimension has one encoding. A system of this crate must have its own count of
-/// exponents; one known by its id only, at most [MAX_TRUE_BASES].
+/// exponents; one known by its id only, at most [MAX_TRUE_BASES], kept as read ([Dim::true_count]) so it is written
+/// back the same. A dimension without true exponents (a ratio, an angle) belongs to every system and is written as
+/// SI's; a reader refuses it under another system.
 #[derive_shrink_wrap(
     borrowed,
     owned(feature = "std"),
@@ -43,6 +45,10 @@ impl<'i> DimWire<'i> {
         for (slot, e) in exps.iter_mut().zip(self.exps.iter()) {
             *slot = e.ok()?;
         }
+        let count = u8::try_from(count).ok()?;
+        if !self.system.is_si() && exps.iter().all(|e| e.is_zero()) {
+            return None;
+        }
         let mut prev: Option<BaseExp<'i>> = None;
         for b in self.bases.iter() {
             let b = b.ok()?;
@@ -51,7 +57,11 @@ impl<'i> DimWire<'i> {
             }
             prev = Some(b);
         }
-        Some(Dim::of_parts(self.system, exps, Bases::List(self.bases)))
+        Some(Dim::of_parts(
+            (self.system, count),
+            exps,
+            Bases::List(self.bases),
+        ))
     }
 }
 
@@ -60,8 +70,12 @@ impl SerializeShrinkWrap for Dim<'_> {
     const ELEMENT_SIZE: ElementSize = <DimWire<'_> as SerializeShrinkWrap>::ELEMENT_SIZE;
 
     fn ser_shrink_wrap(&self, wr: &mut BufWriter<'_>) -> Result<(), ShrinkWrapError> {
-        wr.write(&self.system)?;
-        let count = self.system.base_count().min(MAX_TRUE_BASES);
+        let (system, count) = if self.has_true_exps() {
+            (self.system, self.true_count().min(MAX_TRUE_BASES))
+        } else {
+            (SystemRef::SI, MAX_TRUE_BASES)
+        };
+        wr.write(&system)?;
         wr.write(&RefVec::Slice {
             slice: self.exps.get(..count).unwrap_or(&self.exps),
         })?;
