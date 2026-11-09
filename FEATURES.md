@@ -349,8 +349,8 @@ counted units, and the kinds that keep look-alike quantities apart.
   `MagneticFieldStrength`, `CurrentDensity`, `ChargeDensity`, `ElectricDisplacement`, `Permittivity`,
   `Permeability`, `Resistivity`, `Conductivity`) and `radiometric` (`Irradiance`, `RadiantIntensity`, `Radiance`),
   both in `quantities`. The named markers are plain, so their compounds convert to them, except where a named
-  marker of the same dimension is another kind (`EnergyDensity`, `Entropy`); `units::spellings(name)` gives a
-  unit's other spellings (`nit`, `nt`), read by `serde::with_unit` too (42d53d7).
+  marker of the same dimension is another kind (`EnergyDensity`, `Entropy`); a unit's other spellings (`nit`, `nt`)
+  are read by `serde::with_unit` too (42d53d7), now from its `UnitNames::aliases` (IO-9).
 - ✅ **UNIT-11 `q!`'s symbol table, generated** — `macros/src/pure/table.rs` is written from the `unit!` and `origin!`
   lines and the catalogue they declare by `tests/q_symbols.rs` (`just q-symbols`), and `just test` fails when it or
   the book's page is stale. A symbol that reads two ways is refused with what to write instead: its own lines, the
@@ -574,11 +574,21 @@ the command line, databases, Arrow.
   refusing what IO-5 refuses. Later, optional feature.
 - 📋 **IO-8 Unit metadata in Arrow and Polars** (was STD-82) — a column's unit and scale as Arrow field metadata, read back
   exactly, Polars through it. Later, optional feature.
-- 📋 **IO-9 Unit names, a registry and notations** · `foundations` — `UnitNames` (Unicode and ASCII symbol, long name,
-  aliases, UCUM code, `PrefixPolicy`), a `Registry` over static tables without a global, parsing with an expected
-  dimension that refuses an ambiguous reading, `Notation` (Unicode, ASCII, UCUM, Typst). The foundation of IO-4, IO-2,
-  IO-5, IO-7.
-
+- ✅ **IO-9 Unit names, a registry and notations** · `foundations` — `UnitNames` on every `UnitDef`: Unicode
+  symbol, `ascii` form (else the transliteration, checked at compile time), English `long` name and `plural`,
+  `aliases`, `ucum` code and `prefixes: PrefixPolicy` (`None`, `Decimal`, `DecimalAndBinary`, `Only(PrefixSet)`),
+  written in a `( .. )` after the `unit!` line's symbol with short defaults; `q!`'s generator reads the prefixes from
+  there. `Registry` over tables of named units, no global, no alloc: `parse::<U>` (number and unit into an `Exact<U>`)
+  and `parse_unit` / `parse_unit_of` (with an expected dimension, and kind); the longest match first, then factors;
+  an ambiguous word without an expectation is an error naming two readings (`B`: bel or byte, `units::Bel` added).
+  `Notation::{Unicode, Ascii, Ucum, Typst}` through `notation::unit_in` / `symbol_in`, `None` where a notation has no
+  form. Tests: `tests/names.rs`, `tests/props/registry.rs` (any text, and a whole walk of every unit, prefix and
+  notation reading back at its exact scale), fuzz target `registry`; book page `docs/units/names.md`.
+- 📋 **IO-10 Names for the customary units, and ratio words in text** — long names and UCUM codes (`[in_i]`,
+  `[ft_i]`, `[lb_av]`) on the `customary` lines, which have symbols only; `%`, `‰`, `ppm`, `ppb` read by the `Registry`
+  as a ratio's scale, as `serde::with_unit` reads them; American spellings of long names (`meter`, `liter`) as
+  aliases where they don't clash; a lookup index so a word isn't matched against every unit and prefix (the fuzz
+  target runs about 100 inputs a second).
 ## Dropped and superseded
 
 - **NUM-9 `Quantity` used at one fixed scale becomes `Fixed`** (was STD-57) — dropped (Roman, 27 Oct 2026): the per-use list of

@@ -149,18 +149,30 @@ impl<'a> ParsedUnit<'a> {
 
 impl fmt::Display for ParsedUnit<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let alone = self.factors().count() == 1;
         let write = |f: &mut fmt::Formatter<'_>, factor: &Factor<'_>, exp: i8| {
-            write!(
-                f,
-                "{}{}",
-                factor.reading.prefix.symbol(),
-                factor.reading.def.names.symbol
-            )?;
+            let symbol = factor.reading.def.names.symbol;
+            // a compound symbol in parentheses where it isn't the whole unit: `(cd/m²)²`, `m/(J/(kg·K))`
+            let parens = !crate::names::is_atom(symbol) && !(alone && exp == 1);
+            let (open, close) = if parens { ("(", ")") } else { ("", "") };
+            write!(f, "{open}{}{symbol}{close}", factor.reading.prefix.symbol())?;
             if exp != 1 {
                 crate::unit::write_superscript(f, i32::from(exp))?;
             }
             Ok(())
         };
+        if self.factors().all(|x| x.exp < 0) && self.factors().next().is_some() {
+            // `s⁻¹`, `m⁻¹·s⁻¹`: nothing above the line
+            let mut first = true;
+            for factor in self.factors() {
+                if !first {
+                    f.write_str("·")?;
+                }
+                first = false;
+                write(f, &factor, factor.exp)?;
+            }
+            return Ok(());
+        }
         let mut first = true;
         for factor in self.factors().filter(|x| x.exp > 0) {
             if !first {
@@ -322,7 +334,11 @@ struct Terms<'a> {
 }
 
 impl<'a> Terms<'a> {
+    /// Adds `t`; an exponent of 0 (`m^0`, `h0`) names no unit and is refused.
     fn push(&mut self, t: Term<'a>) -> Result<(), ParseError<'a>> {
+        if t.exp == 0 {
+            return Err(ParseError::Syntax { at: t.readings.at });
+        }
         let slot = self.list.get_mut(self.len).ok_or(ParseError::TooComplex)?;
         *slot = Some(t);
         self.len = self.len.checked_add(1).ok_or(ParseError::TooComplex)?;
@@ -358,6 +374,24 @@ impl<'a> Registry<'a> {
             text,
             &|u: &ParsedUnit<'_>| expected.is_none_or(|e| u.dim().is_some_and(|d| d.same(e))),
             expected.is_some(),
+        )
+    }
+
+    /// The unit `text` names, of the dimension `dim` and the kind `kind`: [parse_unit](Self::parse_unit) where two
+    /// units of one dimension are different quantities (`J/K` of a heat capacity and of an entropy). A named unit
+    /// is of its own kind, a product or a power of [Kind::Plain].
+    pub fn parse_unit_of(
+        &self,
+        text: &str,
+        dim: Dim<'_>,
+        kind: Kind<'_>,
+    ) -> Result<ParsedUnit<'a>, ParseError<'a>> {
+        self.read(
+            text,
+            &|u: &ParsedUnit<'_>| {
+                u.dim().is_some_and(|d| d.same(dim)) && kinds_agree(u.kind(), kind)
+            },
+            true,
         )
     }
 
@@ -649,7 +683,7 @@ struct Parser<'r, 'a, 't> {
     at: usize,
 }
 
-impl<'a> Parser<'_, 'a, '_> {
+impl<'a, 't> Parser<'_, 'a, 't> {
     fn rest(&self) -> &str {
         self.text.get(self.at..).unwrap_or_default()
     }
@@ -681,7 +715,15 @@ impl<'a> Parser<'_, 'a, '_> {
             return Err(ParseError::TooComplex);
         }
         self.skip_spaces();
-        // `/ms`: a unit that starts with a quotient
+        // `/ms` and `1/ms`: a unit that starts with a quotient
+        if self
+            .rest()
+            .strip_prefix('1')
+            .is_some_and(|r| r.trim_start().starts_with('/'))
+        {
+            self.bump('1');
+            self.skip_spaces();
+        }
         let mut op = if self.peek() == Some('/') {
             self.bump('/');
             -1
@@ -731,6 +773,19 @@ impl<'a> Parser<'_, 'a, '_> {
         depth: usize,
     ) -> Result<(), ParseError<'a>> {
         if self.peek() == Some('(') {
+            // the longest match first, as for the whole text: `(cd/m²)²` is a nit squared
+            if let Some(inner) = self.group() {
+                let start = self.at.saturating_add(1);
+                let readings = self.registry.word(inner, start);
+                if readings.count() > 0 {
+                    self.at = start.saturating_add(inner.len()).saturating_add(1);
+                    let exp = self.exponent()?.unwrap_or(1);
+                    return terms.push(Term {
+                        readings,
+                        exp: exp.checked_mul(sign).ok_or(ParseError::TooComplex)?,
+                    });
+                }
+            }
             self.bump('(');
             let from = terms.len;
             self.expr(terms, 1, depth.saturating_add(1))?;
@@ -741,6 +796,9 @@ impl<'a> Parser<'_, 'a, '_> {
             self.bump(')');
             let exp = self.exponent()?.unwrap_or(1);
             let k = exp.checked_mul(sign).ok_or(ParseError::TooComplex)?;
+            if k == 0 {
+                return Err(ParseError::Syntax { at: self.at });
+            }
             for t in terms.list.iter_mut().skip(from).flatten() {
                 t.exp = t.exp.checked_mul(k).ok_or(ParseError::TooComplex)?;
             }
@@ -787,6 +845,25 @@ impl<'a> Parser<'_, 'a, '_> {
         })
     }
 
+    /// The text inside the parentheses that open here, up to the one that closes them; `None` where none does.
+    fn group(&self) -> Option<&'t str> {
+        let rest = self.text.get(self.at..)?;
+        let mut depth = 0usize;
+        for (i, c) in rest.char_indices() {
+            match c {
+                '(' => depth = depth.checked_add(1)?,
+                ')' => {
+                    depth = depth.checked_sub(1)?;
+                    if depth == 0 {
+                        return rest.get(1..i);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
     /// `^2`, `^-1`, `^(-1)` or `²`, `⁻¹`: `None` for none.
     fn exponent(&mut self) -> Result<Option<i8>, ParseError<'a>> {
         if self.peek() == Some('^') {
@@ -815,12 +892,14 @@ impl<'a> Parser<'_, 'a, '_> {
             }
             return Ok(Some(n));
         }
+        // the digits are added with the sign, so -128 reads as i8's own
         let mut n: Option<i8> = None;
         let mut neg = false;
         while let Some(c) = self.peek() {
             match superscript(c) {
                 Some(Sup::Minus) if n.is_none() && !neg => neg = true,
                 Some(Sup::Digit(d)) => {
+                    let d = if neg { d.saturating_neg() } else { d };
                     let v = n.unwrap_or(0);
                     n = Some(
                         v.checked_mul(10)
@@ -833,8 +912,7 @@ impl<'a> Parser<'_, 'a, '_> {
             self.bump(c);
         }
         match (n, neg) {
-            (Some(n), true) => Ok(Some(n.checked_neg().ok_or(ParseError::TooComplex)?)),
-            (Some(n), false) => Ok(Some(n)),
+            (Some(n), _) => Ok(Some(n)),
             (None, true) => Err(ParseError::Syntax { at: self.at }),
             (None, false) => Ok(None),
         }

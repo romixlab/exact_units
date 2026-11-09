@@ -34,7 +34,9 @@ assert!((Rpm::EXPR.factor() * 60.0 - core::f64::consts::TAU).abs() < 1e-12);
 assert_eq!(Bucket::DIM, exact_units::counted!(Bucket));
 ```
 
-A line is `<attributes> <visibility> struct <Name> = "<symbol>", <dimension>[, <scale>];`:
+A line is `<attributes> <visibility> struct <Name> = "<symbol>" [(<names>)], <dimension>[, <scale>];`:
+
+- **Names**, in parentheses after the symbol, all optional: an `ascii` form, the English `long` name and its `plural`, `aliases`, a `ucum` code and the `prefixes` the unit takes. Text reads and writes the unit through them; [Unit names and text](names.md) has the details.
 
 - **Dimension**: exponents of `s`, `m`, `kg`, `a`, `k`, `mol`, `cd`, `rad`, `bit` (`[kg 1, m 2, s -3, a -1]` is a volt, `[]` a plain number), or `counted` for a base of its own, named by your crate and the marker.
 - **Scale**, an exact [`Magnitude`](../nomicon/magnitude.md), one when left out: `Pow10(-3)`, or `Exact(num / den, pow10 e, pow2 e, pi e)`. A unit has no offset: a scale with a zero of its own, like °C, is an [origin](../points/points.md) of points.

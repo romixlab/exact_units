@@ -55,6 +55,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "registry"
+path = "fuzz_targets/registry.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "wire_bytes"
 path = "fuzz_targets/wire_bytes.rs"
 test = false

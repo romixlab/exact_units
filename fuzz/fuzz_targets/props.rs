@@ -15,6 +15,8 @@ pub mod panics;
 pub mod q_text;
 #[path = "../../tests/props/reference.rs"]
 pub mod reference;
+#[path = "../../tests/props/registry.rs"]
+pub mod registry;
 #[path = "../../tests/props/serde_input.rs"]
 pub mod serde_input;
 #[path = "../../tests/props/text.rs"]

@@ -51,6 +51,8 @@ mod q_range_point;
 #[cfg(all(feature = "q", not(kani)))]
 mod q_text;
 mod reference;
+#[cfg(not(kani))]
+mod registry;
 mod rounding;
 #[cfg(all(not(kani), feature = "serde", feature = "std", feature = "shrink_wrap"))]
 mod serde_input;

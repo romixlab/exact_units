@@ -103,6 +103,7 @@ nav = [
             "customary.md",
             { "Advanced" = [
                     "units/declare.md",
+                    "units/names.md",
                 ]
             },
         ]

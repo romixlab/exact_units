@@ -318,5 +318,22 @@ mod parse {
         );
         // a dimension past what a Dim holds
         assert_eq!(R.parse_unit("m^100", None).map(|u| u.dim()), Ok(None));
+        // an exponent 0 names no unit (found by fuzzing: `h0` was a unit written `1`)
+        assert_eq!(R.parse_unit("h0", None), Err(ParseError::Syntax { at: 0 }));
+        assert_eq!(R.parse_unit("m^0", None), Err(ParseError::Syntax { at: 0 }));
+        assert!(matches!(
+            R.parse_unit("(m/s)^0", None),
+            Err(ParseError::Syntax { .. })
+        ));
+        // i8's own -128 reads in each form (found by fuzzing: `d⁻¹²⁸` overflowed)
+        for text in ["d-128", "d^-128", "d⁻¹²⁸"] {
+            let u = R.parse_unit(text, None).unwrap();
+            assert_eq!(u.factors().next().unwrap().exp, -128, "{text}");
+        }
+        // a reciprocal writes `m⁻¹` and reads `1/m` (found by proptest: `1/m` didn't read)
+        assert_eq!(R.parse_unit("/m", None).unwrap().to_string(), "m⁻¹");
+        assert!(R.parse_unit("1/m", None).is_ok());
+        // a compound symbol with an exponent in parentheses (found by proptest: `nit^2` wrote `cd/m²²`)
+        assert_eq!(R.parse_unit("nit^2", None).unwrap().to_string(), "(cd/m²)²");
     }
 }

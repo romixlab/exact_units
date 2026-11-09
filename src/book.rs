@@ -58,6 +58,8 @@ pages! {
     #[cfg(feature = "customary")]
     Customary = "customary.md";
     Declare = "units/declare.md";
+    #[cfg(all(feature = "electrical", feature = "time", feature = "mechanical", feature = "information", feature = "levels"))]
+    Names = "units/names.md";
     #[cfg(feature = "shrink_wrap")]
     Wire = "wire/shrink_wrap.md";
     Sensors = "recipes/sensors.md";
