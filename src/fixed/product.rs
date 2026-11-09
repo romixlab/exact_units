@@ -131,9 +131,9 @@
 //!
 //! ```compile_fail
 //! use exact_units::{Fixed, prefix::Rational, units::{Ampere, Volt}};
-//! // 3·7·11·13·17·19·23 and 29·31·37·41·43·47: 13 primes
-//! let a = Fixed::<Volt, Rational<22309287, 1>, i32>::new(1);
-//! let b = Fixed::<Ampere, Rational<2756205443, 1>, i32>::new(1);
+//! // 3·7·11·13·17·19·23·29·31 and 37·41·43·47·53·59·61·67: 17 primes
+//! let a = Fixed::<Volt, Rational<20056049013, 1>, i32>::new(1);
+//! let b = Fixed::<Ampere, Rational<39181802686993, 1>, i32>::new(1);
 //! let _ = a * b;
 //! ```
 //!

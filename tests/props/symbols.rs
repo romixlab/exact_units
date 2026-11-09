@@ -141,9 +141,15 @@ pub(crate) fn half(a: (i8, Symbols, &[(u32, i8)]), k: i8) {
     let want = Doubled::read(&m).pow_x2(i32::from(k));
     match (m.checked_pow_x2(k), want) {
         (Ok(p), Some(w)) => assert_eq!(Doubled::read(&p), w, "{m:?}^({k}/2)"),
-        (Err(MagnitudeError::NotSquare), None) => {}
-        (Err(MagnitudeError::ExponentRange), Some(_)) => {}
-        (got, want) => panic!("{m:?}^({k}/2): {got:?}, the model {want:?}"),
+        (got, want) => assert!(
+            // a quarter power refused, or a result past ±63½ the model doesn't bound
+            matches!(
+                (got, &want),
+                (Err(MagnitudeError::NotSquare), None)
+                    | (Err(MagnitudeError::ExponentRange), Some(_))
+            ),
+            "{m:?}^({k}/2): {got:?}, the model {want:?}"
+        ),
     }
     if let Ok(r) = m.checked_sqrt() {
         assert_eq!(r.checked_mul(r), Ok(m));
@@ -172,9 +178,11 @@ pub(crate) fn resolve<S: Constants>(a: (i8, Symbols, &[(u32, i8)])) {
             return;
         };
         want = want.mul(&v, 1);
-        rel_u[i] = c
-            .rel_u
-            .map(|u| u.mul(Magnitude::ratio(u64::from(k.unsigned_abs()), 2)));
+        if let Some(slot) = rel_u.get_mut(i) {
+            *slot = c
+                .rel_u
+                .map(|u| u.mul(Magnitude::ratio(u64::from(k.unsigned_abs()), 2)));
+        }
     }
     let Ok(r) = got else {
         // only a product past what a magnitude holds is refused
