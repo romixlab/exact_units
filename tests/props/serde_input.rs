@@ -37,10 +37,6 @@ pub(crate) fn any_json(s: &str) {
     }
     if let Some(d) = read::<DimOwned>(s) {
         // serde keeps only a canonical dimension, as the wire reader does: every one read goes on the wire
-        assert!(
-            d.as_dim().is_canonical(),
-            "{s:?}: {d:?} reads, not canonical"
-        );
         dim(&d);
     }
     if let Some(p) = read::<ProvenanceOwned>(s) {
@@ -74,7 +70,7 @@ pub(crate) fn dim(d: &DimOwned) {
 
 #[cfg(not(any(kani, fuzzing)))]
 mod tests {
-    use exact_units::Dim;
+    use exact_units::{Dim, DimOwned, MarkerId};
     use proptest::prelude::*;
 
     /// JSON shaped like the types: their field names, small and edge numbers, lists of pairs.
@@ -94,10 +90,19 @@ mod tests {
                 .prop_map(|v| format!("\"primes\":[{}]", v.iter().map(|(p, e)| format!("[{p},{e}]")).collect::<Vec<_>>().join(","))),
             any::<bool>().prop_map(|b| format!("\"negative\":{b}")),
             num.clone().prop_map(|n| format!("\"magnitude\":{{\"pow10\":{n}}}")),
-            num.clone().prop_map(|n| format!("\"s\":{n}")),
-            num.clone().prop_map(|n| format!("\"m\":{n}")),
-            any::<bool>().prop_map(|b| format!("\"root\":{b}")),
-            num.prop_map(|n| format!("\"counted\":[{{\"crate_name\":\"exact_units\",\"name\":\"Sample\",\"exp\":{n}}},null,null,null]")),
+            proptest::collection::vec(num.clone(), 0..9).prop_map(|v| format!(
+                "\"exps\":[{}]",
+                v.iter().map(|h| format!("{{\"halves\":{h}}}")).collect::<Vec<_>>().join(",")
+            )),
+            proptest::collection::vec((prop_oneof![Just("Sample"), Just("Frame")], num), 0..4).prop_map(|v| format!(
+                "\"bases\":[{}]",
+                v.iter()
+                    .map(|(name, h)| format!(
+                        "{{\"base\":{{\"crate_name\":\"exact_units\",\"name\":\"{name}\"}},\"exp\":{{\"halves\":{h}}}}}"
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )),
         ];
         prop_oneof![
             4 => proptest::collection::vec(field, 0..8).prop_map(|f| format!("{{{}}}", f.join(","))),
@@ -119,59 +124,48 @@ mod tests {
             r#"{"Unknown":0}"#,
             r#"{"Unknown":1}"#,
             r#"{"Unknown":2}"#,
-            r#"{"s":0,"m":0,"kg":0,"a":0,"k":0,"mol":0,"cd":0,"rad":0,"bit":0,"root":false,"counted":[null,null,null,null]}"#,
-            r#"{"s":9,"m":0,"kg":0,"a":0,"k":0,"mol":0,"cd":0,"rad":0,"bit":0,"root":false,"counted":[null,null,null,null]}"#,
-            r#"{"s":0,"m":0,"kg":0,"a":0,"k":0,"mol":0,"cd":0,"rad":0,"bit":0,"root":true,"counted":[null,null,null,null]}"#,
-            r#"{"s":0,"m":0,"kg":0,"a":0,"k":0,"mol":0,"cd":0,"rad":0,"bit":0,"root":false,"counted":[{"crate_name":"exact_units","name":"Sample","exp":1},{"crate_name":"exact_units","name":"Frame","exp":-1},null,null]}"#,
-            r#"{"s":0,"m":0,"kg":0,"a":0,"k":0,"mol":0,"cd":0,"rad":0,"bit":0,"root":false,"counted":[null,{"crate_name":"exact_units","name":"Sample","exp":1},null,null]}"#,
+            r#"{"exps":[{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0}],"bases":[]}"#,
+            r#"{"exps":[{"halves":-128},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0}],"bases":[]}"#,
+            r#"{"exps":[{"halves":1},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0}],"bases":[]}"#,
+            r#"{"exps":[],"bases":[]}"#,
+            r#"{"exps":[{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0}],"bases":[{"base":{"crate_name":"exact_units","name":"Frame"},"exp":{"halves":-2}},{"base":{"crate_name":"exact_units","name":"Sample"},"exp":{"halves":2}}]}"#,
+            r#"{"exps":[{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0}],"bases":[{"base":{"crate_name":"exact_units","name":"Sample"},"exp":{"halves":2}},{"base":{"crate_name":"exact_units","name":"Frame"},"exp":{"halves":-2}}]}"#,
+            r#"{"exps":[{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0}],"bases":[{"base":{"crate_name":"exact_units","name":"Sample"},"exp":{"halves":0}}]}"#,
             r#"{"Conventional":{"source":"NIST SP 811","year":2008}}"#,
         ] {
             super::any_json(s);
         }
     }
 
-    /// A canonical dimension built the way markers build one: SI exponents, counted bases multiplied in (several
-    /// crates and names, so the order matters), maybe a square root.
-    fn dim() -> impl Strategy<Value = Dim<'static>> {
-        const BASES: [(&str, &str); 5] = [
+    /// A dimension built the way markers build one: SI exponents in halves, distinguished bases multiplied in (several
+    /// crates and names, so the order matters), maybe a power.
+    fn dim() -> impl Strategy<Value = DimOwned> {
+        const BASES: [(&str, &str); 7] = [
+            ("exact_units", "Radian"),
+            ("exact_units", "Bit"),
             ("exact_units", "Sample"),
             ("exact_units", "Frame"),
             ("my_api", "Bucket"),
             ("a", "Sample"),
             ("my_api", "Frame"),
         ];
-        let e = -8i8..=7;
         (
-            [
-                e.clone(),
-                e.clone(),
-                e.clone(),
-                e.clone(),
-                e.clone(),
-                e.clone(),
-                e,
-            ],
-            (-8i8..=7, -8i8..=7),
+            proptest::array::uniform7(-16i8..=16),
             proptest::collection::vec((proptest::sample::select(&BASES[..]), any::<bool>()), 0..8),
-            any::<bool>(),
+            -3i8..=3,
         )
-            .prop_map(|([s, m, kg, a, k, mol, cd], (rad, bit), counted, root)| {
-                let mut d = Dim::new(s, m, kg, a, k, mol, cd)
-                    .with_rad(rad)
-                    .with_bit(bit);
-                for ((c, n), up) in counted {
-                    let b = Dim::counted(c, n);
+            .prop_map(|(halves, bases, pow)| {
+                let mut d = DimOwned::from(Dim::of_exps(halves.map(exact_units::Exp::from_halves)));
+                for ((crate_name, name), up) in bases {
+                    let b = DimOwned::from(Dim::base(MarkerId { crate_name, name }));
                     d = if up {
-                        d.checked_mul(b)
+                        d.checked_mul(&b)
                     } else {
-                        d.checked_div(b)
+                        d.checked_div(&b)
                     }
                     .unwrap_or(d);
                 }
-                if root {
-                    d = d.checked_sqrt().unwrap_or(d);
-                }
-                d
+                d.checked_pow(pow).unwrap_or(d)
             })
     }
 
@@ -183,8 +177,7 @@ mod tests {
 
         #[test]
         fn dim_round_trips(d in dim()) {
-            prop_assert!(d.is_canonical(), "{d:?}");
-            super::dim(&d.into());
+            super::dim(&d);
         }
     }
 }

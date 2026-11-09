@@ -71,7 +71,7 @@ fn refs_resolve_through_a_table_that_lists_both() {
     let tables = both();
     let (ra, rb) = (SIExpr::Ref(a.id), SIExpr::Ref(b.id));
     for (r, def) in [(&ra, a), (&rb, b)] {
-        assert_eq!(r.dim(&tables), Some(def.dim));
+        assert_eq!(r.dim(&tables), Some(def.dim.into()));
         assert_eq!(r.magnitude(&tables), Some(def.scale));
         assert_eq!(r.symbol(&tables).to_string(), "rpm");
         assert!(r.same(&SIExpr::Def(def), &tables));
@@ -110,7 +110,7 @@ fn an_unlisted_ref_is_known_by_name_only() {
 #[test]
 fn an_unlisted_def_reads_alone() {
     let db = SIExpr::Def(def_b());
-    assert_eq!(db.dim(&()), Some(def_b().dim));
+    assert_eq!(db.dim(&()), Some(def_b().dim.into()));
     assert_eq!(db.magnitude(&()), Some(def_b().scale));
     assert_eq!(db.to_string(), "rpm");
     assert_eq!(db.known(), None, "not a unit of exact_units");
@@ -200,7 +200,7 @@ fn refs_on_the_wire() {
 
     let back = SIExpr::from_ww_bytes(&bytes).unwrap();
     assert_eq!(back.symbol(&tables).to_string(), "rpm/rpm");
-    assert_eq!(back.dim(&tables), Some(exact_units::Dim::ONE));
+    assert_eq!(back.dim(&tables), Some(exact_units::Dim::ONE.into()));
     assert_eq!(back.magnitude(&tables), Some(Magnitude::ONE));
     assert!(back.same(&SIExpr::from_ww_bytes(&full).unwrap(), &tables));
     // not a ratio of one unit by itself: two units
@@ -210,5 +210,55 @@ fn refs_on_the_wire() {
     let resolved = back.resolve_in(&tables, &mut arena).unwrap();
     assert_eq!(SIExprOwned::from(&resolved), owned);
     let listed: &[&UnitExpr] = rpm_a::UNITS;
-    assert_eq!(listed, [rpm_a::Rpm::EXPR]);
+    assert_eq!(listed, [rpm_a::Rpm::EXPR, rpm_a::Pixel::EXPR]);
+}
+
+/// A crate's own base takes the path of this crate's `Radian`: a `base` line declares it ([Unit::BASE]), its
+/// dimension names it by crate and marker, a compound keeps it apart from the true bases, `strip` drops it, and it
+/// goes through the wire and a table. Two crates' `Pixel` are two bases.
+#[test]
+fn a_crate_declares_a_base_as_this_crate_declares_the_radian() {
+    use exact_units::{BaseDef, Dim, DimOwned, Exp, units::Radian};
+
+    let (pa, pb) = (rpm_a::Pixel::BASE.unwrap(), rpm_b::Pixel::BASE.unwrap());
+    let id_a = MarkerId {
+        crate_name: "rpm_a",
+        name: "Pixel",
+    };
+    assert_eq!(pa, BaseDef { id: id_a });
+    assert_eq!(Radian::BASE.unwrap().id, MarkerId::RADIAN);
+    assert_eq!(rpm_a::Pixel::DIM, pa.dim());
+    assert_eq!(Radian::DIM, Radian::BASE.unwrap().dim());
+    assert_eq!(rpm_a::Rpm::BASE, None, "a unit of a base declares none");
+    assert_ne!(pa, pb);
+    assert_ne!(rpm_a::Pixel::DIM, rpm_b::Pixel::DIM);
+    assert_ne!(rpm_a::Pixel::DIM, Dim::ONE);
+    assert_eq!(rpm_a::Pixel::DIM.to_string(), "Pixel");
+
+    // pixels per second, as radians per second: not a hertz, the base stripped it is
+    type PxRate = Per<rpm_a::Pixel, Second>;
+    type RadRate = Per<Radian, Second>;
+    let hz = <units::Hertz as Unit>::DIM;
+    for (d, base) in [(PxRate::DIM, id_a), (RadRate::DIM, MarkerId::RADIAN)] {
+        assert!(!d.same(hz), "{d}");
+        assert_eq!(d.exp_of(base), Exp::ONE);
+        assert_eq!(d.strip(base), hz);
+        assert_eq!(d.true_part(), hz);
+    }
+    assert_eq!(PxRate::DIM.to_string(), "s⁻¹·Pixel");
+    assert_eq!(RadRate::DIM.to_string(), "s⁻¹·rad");
+    assert_ne!(PxRate::DIM, RadRate::DIM);
+    assert_ne!(PxRate::DIM, <Per<rpm_b::Pixel, Second>>::DIM);
+    let two = <units::Times<PxRate, RadRate>>::DIM;
+    assert_eq!(two.to_string(), "s⁻²·rad·Pixel");
+
+    // the wire, and a run-time unit through the tables that list it
+    let mut buf = [0u8; 128];
+    let bytes = two.to_ww_bytes(&mut buf).unwrap().to_vec();
+    assert_eq!(Dim::from_ww_bytes(&bytes).unwrap(), two);
+    assert_eq!(DimOwned::from_ww_bytes_owned(&bytes).unwrap(), two);
+    let px = SIExpr::Ref(id_a);
+    assert_eq!(px.dim(&both()), Some(rpm_a::Pixel::DIM.into()));
+    let only_b: [&dyn UnitTable; 2] = [&units::TABLE, &rpm_b::UNITS];
+    assert_eq!(px.dim(&only_b), None);
 }

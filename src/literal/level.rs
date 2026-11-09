@@ -148,9 +148,11 @@ enum Gain {
     reason = "a compile error in const code (a panic at run time): a kind without a level form"
 )]
 const fn form<U: Unit>() -> LevelForm {
-    match U::KIND.level_form() {
+    let level = matches!(U::DIM.const_exp_of(crate::MarkerId::NEPER), Some(e) if !e.is_zero())
+        || matches!(U::DIM.const_exp_of(crate::MarkerId::NEPER_LOSS), Some(e) if !e.is_zero());
+    match U::KIND.level_form_typed() {
         Some(form) => form,
-        None if !U::DIM.same(U::DIM.strip_neper()) => panic!(
+        None if level => panic!(
             "q!(x dB) and q!(x Np) are levels of a gain; against a value stored as a level, a level of gain and one \
              of loss differ in sign: write its unit, q!(-3 Decibel) or q!(3 Loss<Decibel>)"
         ),

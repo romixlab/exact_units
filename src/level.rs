@@ -1,7 +1,7 @@
 //! Levels as quantities: the neper on a base of its own, the decibel a scaled unit of it, a loss on a second base,
 //! and the edge between a gain and a level. Feature `levels` (in `quantities`).
 //!
-//! - [Neper] and [Decibel] are levels signed as a gain (a decay is negative), on the counted base `Neper` of this
+//! - [Neper] and [Decibel] are levels signed as a gain (a decay is negative), on the distinguished base `Neper` of this
 //!   crate. 1 dB is (ln 10)/20 Np exactly, a [Magnitude](crate::Magnitude): floats convert by it, integers round by name
 //!   ([convert_rounded](Fixed::convert_rounded)), and a literal lands exactly with `fixed!(17.7 in Decibel)`.
 //! - [Loss]`<Neper>` and `Loss<Decibel>` ([NeperLoss], [DecibelLoss]) are the same signed as a loss, positive for a
@@ -10,7 +10,7 @@
 //!   overflow policy.
 //! - A rate of a level is an ordinary compound: `Per<Loss<Decibel>, Meter>` (dB/m), `Per<Neper, Second>` (a damping
 //!   coefficient). It isn't a wavenumber or a hertz: the level base stays in its dimension, and
-//!   [Dim::strip_neper] is the explicit bridge for exports.
+//!   [Dim::strip] (of [MarkerId::NEPER](crate::MarkerId::NEPER)) is the explicit bridge for exports.
 //! - A level carries no 10·lg or 20·lg: a field level and its power level are the same number (ISO 80000-3,
 //!   IEC 60027-3). The form comes in at the edge, from the gain's [Kind](crate::Kind): [to_level](Fixed::to_level) from a gain
 //!   (V/V is ln, W/W ½·ln) and [to_gain](Fixed::to_gain) back. A plain [Ratio](crate::units::Ratio) has no level, at
@@ -211,11 +211,11 @@ use crate::units::{CentimetreMegahertz, Meter, OpticalDepth};
 use crate::units::{Decibel, DecibelLoss, Neper, NeperLoss, Per};
 use crate::{Dim, Fixed, Unit, Unlimited};
 
-/// The dimension of a level signed as a gain, [Neper]'s: the counted base `Neper` of this crate.
-pub const GAIN_DIM: Dim<'static> = Dim::counted("exact_units", "Neper");
+/// The dimension of a level signed as a gain, [Neper]'s: the distinguished base `Neper` of this crate.
+pub const GAIN_DIM: Dim<'static> = Dim::base(crate::MarkerId::NEPER);
 
-/// The dimension of a level signed as a loss, [NeperLoss]'s: the counted base `NeperLoss` of this crate.
-pub const LOSS_DIM: Dim<'static> = Dim::counted("exact_units", "NeperLoss");
+/// The dimension of a level signed as a loss, [NeperLoss]'s: the distinguished base `NeperLoss` of this crate.
+pub const LOSS_DIM: Dim<'static> = Dim::base(crate::MarkerId::NEPER_LOSS);
 
 /// A unit of a level signed as a gain, or a rate of one: [Neper], [Decibel], `Per<Decibel, Meter>`. Its [Loss] is the
 /// same unit signed as a loss.
@@ -323,12 +323,12 @@ pub type MolarAbsorptivity = Per<Absorbance, MolarCentimeter>;
 #[cfg(any(feature = "std", feature = "libm"))]
 const fn sign<L: Unit>() -> f64 {
     assert!(
-        L::KIND.same(crate::Kind::Plain),
+        L::KIND.same_typed(crate::Kind::Plain),
         "a level unit has no kind of its own"
     );
-    if L::DIM.same(GAIN_DIM) {
+    if L::DIM.same_typed(GAIN_DIM) {
         1.0
-    } else if L::DIM.same(LOSS_DIM) {
+    } else if L::DIM.same_typed(LOSS_DIM) {
         -1.0
     } else {
         panic!(

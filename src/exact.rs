@@ -296,10 +296,10 @@ impl<U> Exact<U> {
     reason = "a compile error in const code (evaluated in const blocks), as documented"
 )]
 const fn factor<U: Unit, U2: Unit>() -> Fraction {
-    if !U::DIM.same(U2::DIM) {
+    if !U::DIM.same_typed(U2::DIM) {
         crate::conv_error::dim_mismatch::<U, U2>("an Exact");
     }
-    if !U::KIND.same(U2::KIND) {
+    if !U::KIND.same_typed(U2::KIND) {
         crate::conv_error::kind_mismatch::<U, U2>("an Exact");
     }
     let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
@@ -317,7 +317,7 @@ const fn factor<U: Unit, U2: Unit>() -> Fraction {
     reason = "a compile error in const code (evaluated in const blocks), as documented"
 )]
 const fn recip_factor<U: Unit, U2: Unit>() -> Fraction {
-    if !U::DIM.mul(U2::DIM).is_one() {
+    if !<Times<U, U2>>::DIM.is_one_typed() {
         crate::conv_error::recip_mismatch::<U, U2>();
     }
     let (Some(a), Some(b)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {

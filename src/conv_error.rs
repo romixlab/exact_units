@@ -8,8 +8,9 @@
 //! buffer never has to outlive the function that builds it (a `const` buffer can't be borrowed into a `'static`
 //! `&str` any other way on stable Rust).
 
+use crate::dim::{TRUE_ORDER, base_symbol};
 use crate::unit::superscript_digit;
-use crate::{Dim, Kind, Unit, UnitExpr};
+use crate::{Dim, Exp, Kind, MarkerId, Unit, UnitExpr};
 
 /// Text written into a buffer on the stack, for a `panic!("{}", msg.as_str())` right after. A push that wouldn't
 /// fit whole is dropped whole (never split a char in half: [as_str](Self::as_str) always decodes); a cut-off
@@ -131,63 +132,52 @@ const fn push_exp_digits(mut msg: Msg, e: u32, superscript: bool) -> Msg {
     }
 }
 
-/// The dimension as [Dim]'s `Display` writes it: `kg·m²·s⁻²·rad⁻¹`, `1` for a ratio.
-#[expect(clippy::indexing_slicing, reason = "i < parts.len(), the loop bound")]
+/// The dimension as [Dim]'s `Display` writes it: `kg·m²·s⁻²·rad⁻¹`, `1` for a ratio; `…` for distinguished bases
+/// read at run time, which a unit type's dimension never has.
 #[expect(
-    clippy::arithmetic_side_effects,
-    reason = "i < parts.len() and i < MAX_COUNTED, the loop bounds"
+    clippy::indexing_slicing,
+    reason = "i < TRUE_ORDER.len(), the loop bound, and its indices are below MAX_TRUE_BASES"
 )]
+#[expect(clippy::arithmetic_side_effects, reason = "i < TRUE_ORDER.len()")]
 const fn push_dim(mut msg: Msg, d: Dim<'_>) -> Msg {
-    let parts: [(&str, i8); 9] = [
-        ("kg", d.kg),
-        ("m", d.m),
-        ("s", d.s),
-        ("A", d.a),
-        ("K", d.k),
-        ("mol", d.mol),
-        ("cd", d.cd),
-        ("rad", d.rad),
-        ("bit", d.bit),
-    ];
+    let exps = d.exps();
     let mut first = true;
     let mut i = 0;
-    while i < parts.len() {
-        let (symbol, exp) = parts[i];
-        if exp != 0 {
-            (msg, first) = push_dim_part(msg, first, symbol, exp, d.root);
+    while i < TRUE_ORDER.len() {
+        let (symbol, at) = TRUE_ORDER[i];
+        if !exps[at].is_zero() {
+            (msg, first) = push_dim_part(msg, first, symbol, exps[at]);
         }
         i += 1;
     }
-    let mut i = 0;
-    while i < crate::MAX_COUNTED {
-        if let Some(c) = d.counted[i] {
-            (msg, first) = push_dim_part(msg, first, c.name, c.exp, d.root);
+    let mut after = None;
+    loop {
+        match d.const_next_base(after) {
+            Some(Some(b)) => {
+                (msg, first) = push_dim_part(msg, first, base_symbol(b.base), b.exp);
+                after = Some(b.base);
+            }
+            Some(None) => break,
+            None => {
+                (msg, first) = (msg.push(if first { "…" } else { "·…" }), false);
+                break;
+            }
         }
-        i += 1;
     }
     if first { msg.push("1") } else { msg }
 }
 
-/// One base of a [Dim]: `·` before it unless it is the first, its symbol, and its exponent unless that is 1 (even
-/// in `root`'s halved form).
-const fn push_dim_part(
-    mut msg: Msg,
-    first: bool,
-    symbol: &str,
-    exp: i8,
-    root: bool,
-) -> (Msg, bool) {
+/// One base of a [Dim]: `·` before it unless it is the first, its symbol, and its exponent unless that is 1, a half
+/// as `⁻⁵ᐟ²`.
+const fn push_dim_part(mut msg: Msg, first: bool, symbol: &str, exp: Exp) -> (Msg, bool) {
     if !first {
         msg = msg.push("·");
     }
     msg = msg.push(symbol);
-    if root && exp % 2 != 0 {
-        msg = msg.push_superscript(widen(exp)).push("ᐟ²");
-    } else {
-        let exp = if root { exp / 2 } else { exp };
-        if exp != 1 {
-            msg = msg.push_superscript(widen(exp));
-        }
+    match exp.whole() {
+        Some(1) => {}
+        Some(n) => msg = msg.push_superscript(widen(n)),
+        None => msg = msg.push_superscript(widen(exp.halves())).push("ᐟ²"),
     }
     (msg, false)
 }
@@ -253,19 +243,29 @@ const fn push_unit(mut msg: Msg, e: &'static UnitExpr) -> Msg {
     push_symbol(msg, e).push(")")
 }
 
-/// Whether `d` is only an angle: every exponent 0 but `rad`'s, no counted base, not a root.
-const fn is_only_rad(d: Dim<'_>) -> bool {
-    d.rad != 0
-        && d.s == 0
-        && d.m == 0
-        && d.kg == 0
-        && d.a == 0
-        && d.k == 0
-        && d.mol == 0
-        && d.cd == 0
-        && d.bit == 0
-        && !d.root
-        && d.counted[0].is_none()
+/// The radians of `d` when it is only an angle (no true base, no other distinguished base) a whole number of times.
+const fn only_rad(d: Dim<'_>) -> Option<i8> {
+    if !d.true_part().is_one_typed() {
+        return None;
+    }
+    let Some(rad) = d.const_exp_of(MarkerId::RADIAN) else {
+        return None;
+    };
+    if rad.is_zero() {
+        return None;
+    }
+    // nothing but the radian: the same as rad to that power
+    let slot = [crate::BaseExp {
+        base: MarkerId::RADIAN,
+        exp: rad,
+    }];
+    match Dim::checked_with_list([Exp::ZERO; crate::MAX_TRUE_BASES], &slot) {
+        Some(r) => match r.const_same(d) {
+            Some(true) => rad.whole(),
+            _ => None,
+        },
+        None => None,
+    }
 }
 
 /// `n` widened into an `i32`, for [push_angle_hint]'s `push_superscript(widen_u8(n))`: `const fn`, where `From` is
@@ -313,9 +313,9 @@ const fn known_angle_step(
     let mut i = 0;
     while i < table.len() {
         let entry = &table[i];
-        let o_matches = entry.o.0.same(high) && entry.o.1.same(high_kind);
-        let a_matches = entry.a.0.same(low) && entry.a.1.same(low_kind);
-        let b_matches = entry.b.0.same(low) && entry.b.1.same(low_kind);
+        let o_matches = entry.o.0.same_typed(high) && entry.o.1.same_typed(high_kind);
+        let a_matches = entry.a.0.same_typed(low) && entry.a.1.same_typed(low_kind);
+        let b_matches = entry.b.0.same_typed(low) && entry.b.1.same_typed(low_kind);
         if o_matches && (a_matches || b_matches) {
             return true;
         }
@@ -324,7 +324,7 @@ const fn known_angle_step(
     false
 }
 
-/// When `diff` (`A::DIM` divided by `B::DIM`) is only an angle ([is_only_rad]), the hint that crosses it: when
+/// When `diff` (`A::DIM` divided by `B::DIM`) is only an angle ([only_rad]), the hint that crosses it: when
 /// [known_angle_step] says the product table really has that step, `A`'s and `B`'s real names around the angle
 /// marker that carries it (`Torque × Radian is Joule` when `A`'s dimension has fewer radians than `B`'s, `Candela ×
 /// Steradian is Lumen` when the gap is two), the same wording whichever direction `A`/`B` come in, since the
@@ -333,11 +333,11 @@ const fn known_angle_step(
 /// compound a caller would actually have to build, then convert from. Does nothing when `diff` isn't only an
 /// angle.
 const fn push_angle_hint<A: Unit, B: Unit>(mut msg: Msg, diff: Dim<'_>) -> Msg {
-    if !is_only_rad(diff) {
+    let Some(rad) = only_rad(diff) else {
         return msg;
-    }
-    let n = diff.rad.unsigned_abs();
-    let (low_dim, low_kind, high_dim, high_kind) = if diff.rad < 0 {
+    };
+    let n = rad.unsigned_abs();
+    let (low_dim, low_kind, high_dim, high_kind) = if rad < 0 {
         (A::DIM, A::KIND, B::DIM, B::KIND)
     } else {
         (B::DIM, B::KIND, A::DIM, A::KIND)
@@ -347,13 +347,13 @@ const fn push_angle_hint<A: Unit, B: Unit>(mut msg: Msg, diff: Dim<'_>) -> Msg {
     {
         msg = msg.push(" — cross it with a named step: ");
         msg = push_name(msg, A::EXPR);
-        msg = msg.push(if diff.rad < 0 { " × " } else { " / " });
+        msg = msg.push(if rad < 0 { " × " } else { " / " });
         msg = msg.push(angle_unit);
         msg = msg.push(" is ");
         return push_name(msg, B::EXPR);
     }
     msg = msg.push(" — not a named step: converts through ");
-    msg = msg.push(if diff.rad < 0 { "Times<" } else { "Per<" });
+    msg = msg.push(if rad < 0 { "Times<" } else { "Per<" });
     msg = push_name(msg, A::EXPR);
     msg = msg.push(", Radian");
     if n != 1 {
@@ -380,7 +380,7 @@ pub(crate) const fn dim_mismatch<A: Unit, B: Unit>(what: &str) -> ! {
     msg = push_unit(msg, B::EXPR);
     msg = msg.push(" which is ");
     msg = push_dim(msg, B::DIM);
-    if let Some(diff) = A::DIM.checked_div(B::DIM) {
+    if let Some(diff) = A::DIM.const_div(&B::DIM) {
         msg = msg.push("; they differ by ");
         msg = push_dim(msg, diff);
         msg = push_angle_hint::<A, B>(msg, diff);
@@ -419,7 +419,7 @@ pub(crate) const fn recip_mismatch<A: Unit, B: Unit>() -> ! {
     let mut msg = Msg::new().push("recip from ");
     msg = push_unit(msg, A::EXPR);
     msg = msg.push(" needs a unit of the reciprocal dimension");
-    if let Some(want) = A::DIM.checked_pow(-1) {
+    if let Some(want) = Dim::ONE.const_div(&A::DIM) {
         msg = msg.push(", ");
         msg = push_dim(msg, want);
     }
@@ -489,21 +489,16 @@ mod tests {
 
     #[test]
     fn push_dim_writes_half_exponents_of_a_root() {
-        // V²/Hz, kg²·m⁴·s⁻⁵·A⁻² with `root` set (the module doc's own example): shown halved, the odd one
-        // (s⁻⁵, odd) in superscript with `ᐟ²`, the even ones (kg, m, A) plainly halved.
-        let d = Dim {
-            s: -5,
-            m: 4,
-            kg: 2,
-            a: -2,
-            k: 0,
-            mol: 0,
-            cd: 0,
-            rad: 0,
-            bit: 0,
-            root: true,
-            counted: [None; crate::MAX_COUNTED],
-        };
+        // V/√Hz: s⁻⁵ᐟ² is -5 halves, shown with `ᐟ²`, the whole ones plainly.
+        let d = Dim::of_exps([
+            Exp::from_halves(-5),
+            Exp::int(2),
+            Exp::int(1),
+            Exp::int(-1),
+            Exp::ZERO,
+            Exp::ZERO,
+            Exp::ZERO,
+        ]);
         let msg = push_dim(Msg::new(), d);
         assert_eq!(msg.as_str(), "kg·m²·s⁻⁵ᐟ²·A⁻¹");
     }
@@ -526,7 +521,7 @@ mod tests {
     fn angle_hint_multiplies_when_a_has_fewer_radians() {
         // Torque's rad is -1, Energy's is 0: crossing Torque to Energy multiplies by Radian. No product table
         // entry backs this invented pair (that's the point), so the fallback names the Times<..> instead.
-        let diff = Torque::DIM.checked_div(Energy::DIM).unwrap();
+        let diff = Torque::DIM.checked_div(&Energy::DIM).unwrap();
         let msg = push_angle_hint::<Torque, Energy>(Msg::new(), diff);
         assert_eq!(
             msg.as_str(),
@@ -537,7 +532,7 @@ mod tests {
     #[test]
     fn angle_hint_divides_when_a_has_more_radians() {
         // the other way round: Energy's rad is 0, Torque's is -1, so going from Energy to Torque divides.
-        let diff = Energy::DIM.checked_div(Torque::DIM).unwrap();
+        let diff = Energy::DIM.checked_div(&Torque::DIM).unwrap();
         let msg = push_angle_hint::<Energy, Torque>(Msg::new(), diff);
         assert_eq!(
             msg.as_str(),
@@ -548,7 +543,13 @@ mod tests {
     #[test]
     fn angle_hint_does_nothing_when_more_than_angle_differs() {
         // kg differs too (a mass, not only an angle): no hint, same as a dimension that doesn't differ at all.
-        let not_only_rad = Dim::new(0, 0, 1, 0, 0, 0, 0).with_rad(1);
+        let not_only_rad = Dim::with_list(
+            Dim::new(0, 0, 1, 0, 0, 0, 0).exps(),
+            &[crate::BaseExp {
+                base: MarkerId::RADIAN,
+                exp: Exp::ONE,
+            }],
+        );
         let msg = push_angle_hint::<Torque, Energy>(Msg::new(), not_only_rad);
         assert_eq!(msg.as_str(), "");
     }
@@ -576,7 +577,7 @@ mod tests {
     fn hertz_times_radian_is_angular_velocity_a_named_step() {
         use crate::units::{AngularVelocity, Hertz, Radian};
         assert_is_a_product::<Hertz, Radian, AngularVelocity>();
-        let diff = Hertz::DIM.checked_div(AngularVelocity::DIM).unwrap();
+        let diff = Hertz::DIM.checked_div(&AngularVelocity::DIM).unwrap();
         let msg = push_angle_hint::<Hertz, AngularVelocity>(Msg::new(), diff);
         assert_eq!(
             msg.as_str(),
@@ -590,7 +591,7 @@ mod tests {
         use crate::units::{AngularAcceleration, HertzPerSecond, Radian};
         assert_is_a_product::<HertzPerSecond, Radian, AngularAcceleration>();
         let diff = HertzPerSecond::DIM
-            .checked_div(AngularAcceleration::DIM)
+            .checked_div(&AngularAcceleration::DIM)
             .unwrap();
         let msg = push_angle_hint::<HertzPerSecond, AngularAcceleration>(Msg::new(), diff);
         assert_eq!(
@@ -604,7 +605,7 @@ mod tests {
     fn real_torque_times_radian_is_joule_a_named_step() {
         use crate::units::{Joule, Radian, Torque as RealTorque};
         assert_is_a_product::<RealTorque, Radian, Joule>();
-        let diff = RealTorque::DIM.checked_div(Joule::DIM).unwrap();
+        let diff = RealTorque::DIM.checked_div(&Joule::DIM).unwrap();
         let msg = push_angle_hint::<RealTorque, Joule>(Msg::new(), diff);
         assert_eq!(
             msg.as_str(),
@@ -617,7 +618,7 @@ mod tests {
     fn candela_times_steradian_is_lumen_a_named_step() {
         use crate::units::{Candela, Lumen, Steradian};
         assert_is_a_product::<Candela, Steradian, Lumen>();
-        let diff = Candela::DIM.checked_div(Lumen::DIM).unwrap();
+        let diff = Candela::DIM.checked_div(&Lumen::DIM).unwrap();
         let msg = push_angle_hint::<Candela, Lumen>(Msg::new(), diff);
         assert_eq!(
             msg.as_str(),
@@ -630,7 +631,7 @@ mod tests {
     fn radiant_intensity_times_steradian_is_watt_a_named_step() {
         use crate::units::{RadiantIntensity, Steradian, Watt};
         assert_is_a_product::<RadiantIntensity, Steradian, Watt>();
-        let diff = RadiantIntensity::DIM.checked_div(Watt::DIM).unwrap();
+        let diff = RadiantIntensity::DIM.checked_div(&Watt::DIM).unwrap();
         let msg = push_angle_hint::<RadiantIntensity, Watt>(Msg::new(), diff);
         assert_eq!(
             msg.as_str(),
@@ -644,7 +645,7 @@ mod tests {
         // the crate's own design (Radian's doc comment): angle is a base dimension of its own so it never mixes
         // with a plain Ratio, so there's no product crossing them even though they differ only by one radian.
         use crate::units::{Radian, Ratio};
-        let diff = Ratio::DIM.checked_div(Radian::DIM).unwrap();
+        let diff = Ratio::DIM.checked_div(&Radian::DIM).unwrap();
         let msg = push_angle_hint::<Ratio, Radian>(Msg::new(), diff);
         assert_eq!(
             msg.as_str(),
@@ -659,7 +660,7 @@ mod tests {
         // over the cosine-weighted solid angle (Lambert's law), not a bare product, so this is left out even
         // though the two differ only by a steradian.
         use crate::units::{Lux, Nit};
-        let diff = Nit::DIM.checked_div(Lux::DIM).unwrap();
+        let diff = Nit::DIM.checked_div(&Lux::DIM).unwrap();
         let msg = push_angle_hint::<Nit, Lux>(Msg::new(), diff);
         assert_eq!(
             msg.as_str(),
@@ -672,7 +673,7 @@ mod tests {
     fn radiance_and_irradiance_is_not_a_named_step() {
         // the radiometric analogue of nit/lux, same reason: no bare product, Lambert's law in the way.
         use crate::units::{Irradiance, Radiance};
-        let diff = Radiance::DIM.checked_div(Irradiance::DIM).unwrap();
+        let diff = Radiance::DIM.checked_div(&Irradiance::DIM).unwrap();
         let msg = push_angle_hint::<Radiance, Irradiance>(Msg::new(), diff);
         assert_eq!(
             msg.as_str(),
@@ -687,7 +688,7 @@ mod tests {
         // `convert`): known_angle_step must tell them apart by kind, not dimension alone, so RadiantIntensity ×
         // Steradian stays Watt's step only, never VoltAmpere's.
         use crate::units::{RadiantIntensity, VoltAmpere};
-        let diff = RadiantIntensity::DIM.checked_div(VoltAmpere::DIM).unwrap();
+        let diff = RadiantIntensity::DIM.checked_div(&VoltAmpere::DIM).unwrap();
         let msg = push_angle_hint::<RadiantIntensity, VoltAmpere>(Msg::new(), diff);
         assert_eq!(
             msg.as_str(),
@@ -704,13 +705,13 @@ mod tests {
         // possible (it scans the table now, so it can't drift from it, but the property is worth keeping true).
         for entry in crate::products::TABLE {
             for side in [entry.a, entry.b] {
-                let Some(diff) = side.0.checked_div(entry.o.0) else {
+                let Some(diff) = side.0.checked_div(&entry.o.0) else {
                     continue;
                 };
-                if !is_only_rad(diff) {
+                let Some(rad) = only_rad(diff) else {
                     continue;
-                }
-                let (low, low_kind, high, high_kind) = if diff.rad < 0 {
+                };
+                let (low, low_kind, high, high_kind) = if rad < 0 {
                     (side.0, side.1, entry.o.0, entry.o.1)
                 } else {
                     (entry.o.0, entry.o.1, side.0, side.1)

@@ -3,10 +3,12 @@
 //! unit model (`wire_weaver_client`'s `DynUnit`): a unit known at run time or only from introspection data is shown
 //! exactly like the same unit known from a type.
 //!
-//! A unit model implements [Tree], the functions here do the rest:
+//! A unit model implements [Tree], and [BaseSource] through [tree::exp_of](exp_of) and [tree::each_base](each_base)
+//! for its dimension's distinguished bases; the functions here do the rest:
 //!
 //! ```
 //! use exact_units::tree::{self, Node, Tree};
+//! use exact_units::{BaseSource, MarkerId};
 //!
 //! /// A unit as some client keeps it: names it only knows, and quotients of them.
 //! enum MyUnit {
@@ -23,13 +25,24 @@
 //!     }
 //! }
 //!
+//! impl BaseSource for &MyUnit {
+//!     fn exp_of(&self, base: MarkerId<'_>) -> Option<i32> {
+//!         tree::exp_of(self, base)
+//!     }
+//!
+//!     fn each_base<'s>(&'s self, f: &mut dyn FnMut(MarkerId<'s>)) -> bool {
+//!         tree::each_base(self, &mut |b| f(b))
+//!     }
+//! }
+//!
 //! let u = MyUnit::Per(Box::new(MyUnit::Name("rpm")), Box::new(MyUnit::Name("s")));
 //! assert_eq!(tree::symbol(&&u).to_string(), "rpm/s");
 //! assert_eq!(tree::name(&&u).to_string(), "Per<rpm, s>");
 //! assert_eq!(tree::dim(&&u), None);
 //! ```
 
-use crate::unit::{Dim, write_superscript};
+use crate::unit::write_superscript;
+use crate::{BaseSource, Dim, Exp, MAX_TRUE_BASES};
 use crate::{Magnitude, MarkerId, UnitNames, UnitTable};
 use crate::{Prefix, UnitExpr};
 use core::fmt;
@@ -94,7 +107,7 @@ pub enum Node<'a, E> {
     Div(E, E),
     /// `A` to an integer power
     Pow(E, i8),
-    /// `√A`, a dimension with the root flag (`V/√Hz`)
+    /// `√A`, a dimension with half exponents (`V/√Hz`)
     Sqrt(E),
 }
 
@@ -129,7 +142,7 @@ impl<'a, E> Node<'a, E> {
 /// way), or a client's own model. Children are `Self`, usually a reference into the tree.
 pub trait Tree<'a>: Sized {
     /// The node, `None` when it can't be read (children that don't decode). Its names live for `'a`, so a
-    /// [dim] of the tree can name counted bases after the walk.
+    /// [dim] of the tree can name distinguished bases after the walk.
     fn node(&self) -> Option<Node<'a, Self>>;
 }
 
@@ -154,10 +167,24 @@ pub(crate) fn symbol_of<'t, E: Tree<'t>>(e: E) -> impl fmt::Display {
     Show(e, |e, f, depth| write_symbol(e, f, depth))
 }
 
-/// SI exponents of the whole tree; `None` when an exponent leaves -8..=7, a part is known by name only or doesn't
-/// decode, or the tree is deeper than [MAX_UNIT_DEPTH].
-pub fn dim<'t, E: Tree<'t>>(e: &E) -> Option<Dim<'t>> {
-    dim_at(e, 0)
+/// The dimension of the whole tree, its distinguished bases read from the tree on demand (so it borrows the tree);
+/// `None` when an exponent leaves ±63½ or a root isn't whole halves, a part is known by name only or doesn't decode,
+/// or the tree is deeper than [MAX_UNIT_DEPTH]. [exp_of] and [each_base] implement [BaseSource] for a tree of one's
+/// own.
+pub fn dim<'e, 't, E: Tree<'t> + BaseSource + Sync>(e: &'e E) -> Option<Dim<'e>> {
+    Dim::of_source(exps_at(e, 0)?, e)
+}
+
+/// The exponent in halves of the distinguished base `base` in the tree, `None` like [dim]: what
+/// [BaseSource::exp_of] answers for a tree.
+pub fn exp_of<'t, E: Tree<'t>>(e: &E, base: MarkerId<'_>) -> Option<i32> {
+    exp_of_at(e, base, 0)
+}
+
+/// Calls `f` with every distinguished base of the tree's named units, `false` where a part is known by name only or
+/// doesn't decode: what [BaseSource::each_base] does for a tree.
+pub fn each_base<'t, E: Tree<'t>>(e: &E, f: &mut dyn FnMut(MarkerId<'t>)) -> bool {
+    each_base_at(e, f, 0)
 }
 
 /// Factor to coherent SI of the whole tree, as a float; `None` like [dim], and where a scale keeps a measured constant
@@ -350,22 +377,109 @@ fn write_name<'t, E: Tree<'t>>(e: &E, f: &mut fmt::Formatter<'_>, depth: usize) 
     }
 }
 
-/// SI exponents of the whole tree, `None` when an exponent leaves -8..=7, a part doesn't decode or it is too deep.
+/// The true exponents of the whole tree in halves, `None` when a part doesn't decode, is known by name only, a root
+/// isn't whole halves or it is too deep.
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "depth < MAX_UNIT_DEPTH, checked first"
 )]
-fn dim_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<Dim<'t>> {
+fn exps_at<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<[i32; MAX_TRUE_BASES]> {
+    if depth >= MAX_UNIT_DEPTH {
+        return None;
+    }
+    let d = depth + 1;
+    let zip = |a: [i32; MAX_TRUE_BASES], f: &dyn Fn(i32, usize) -> Option<i32>| {
+        let mut out = [0; MAX_TRUE_BASES];
+        for (i, (o, x)) in out.iter_mut().zip(a).enumerate() {
+            *o = f(x, i)?;
+        }
+        Some(out)
+    };
+    match e.node()? {
+        Node::Named { dim, .. } => Some(dim?.wide_exps()),
+        Node::Mul(a, b) => {
+            let y = exps_at(&b, d)?;
+            zip(exps_at(&a, d)?, &|x, i| x.checked_add(*y.get(i)?))
+        }
+        Node::Div(a, b) => {
+            let y = exps_at(&b, d)?;
+            zip(exps_at(&a, d)?, &|x, i| x.checked_sub(*y.get(i)?))
+        }
+        Node::Pow(a, n) => zip(exps_at(&a, d)?, &|x, _| x.checked_mul(i32::from(n))),
+        Node::Sqrt(a) => zip(exps_at(&a, d)?, &|x, _| (x % 2 == 0).then_some(x / 2)),
+    }
+}
+
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "depth < MAX_UNIT_DEPTH, checked first"
+)]
+fn exp_of_at<'t, E: Tree<'t>>(e: &E, base: MarkerId<'_>, depth: usize) -> Option<i32> {
     if depth >= MAX_UNIT_DEPTH {
         return None;
     }
     let d = depth + 1;
     match e.node()? {
-        Node::Named { dim, .. } => dim,
-        Node::Mul(a, b) => dim_at(&a, d)?.checked_mul(dim_at(&b, d)?),
-        Node::Div(a, b) => dim_at(&a, d)?.checked_div(dim_at(&b, d)?),
-        Node::Pow(a, n) => dim_at(&a, d)?.checked_pow(n),
-        Node::Sqrt(a) => dim_at(&a, d)?.checked_sqrt(),
+        Node::Named { dim, .. } => {
+            let dim = dim?;
+            let mut sum = Some(0i32);
+            // a named unit's dimension adds up (every Dim does), so its own walk answers
+            dim.for_each_base(|b| {
+                if b.base == base {
+                    sum = sum.and_then(|s| s.checked_add(b.exp.wide()));
+                }
+            });
+            sum
+        }
+        Node::Mul(a, b) => exp_of_at(&a, base, d)?.checked_add(exp_of_at(&b, base, d)?),
+        Node::Div(a, b) => exp_of_at(&a, base, d)?.checked_sub(exp_of_at(&b, base, d)?),
+        Node::Pow(a, n) => exp_of_at(&a, base, d)?.checked_mul(i32::from(n)),
+        Node::Sqrt(a) => {
+            let x = exp_of_at(&a, base, d)?;
+            (x % 2 == 0).then_some(x / 2)
+        }
+    }
+}
+
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "depth < MAX_UNIT_DEPTH, checked first"
+)]
+fn each_base_at<'t, E: Tree<'t>>(e: &E, f: &mut dyn FnMut(MarkerId<'t>), depth: usize) -> bool {
+    if depth >= MAX_UNIT_DEPTH {
+        return false;
+    }
+    let d = depth + 1;
+    match e.node() {
+        None | Some(Node::Named { dim: None, .. }) => false,
+        Some(Node::Named { dim: Some(dim), .. }) => {
+            dim.for_each_base(|b| f(b.base));
+            true
+        }
+        Some(Node::Mul(a, b) | Node::Div(a, b)) => each_base_at(&a, f, d) && each_base_at(&b, f, d),
+        Some(Node::Pow(a, _) | Node::Sqrt(a)) => each_base_at(&a, f, d),
+    }
+}
+
+/// A unit expression's bases, read from its named units.
+impl BaseSource for &UnitExpr {
+    fn exp_of(&self, base: MarkerId<'_>) -> Option<i32> {
+        exp_of(self, base)
+    }
+
+    fn each_base<'s>(&'s self, f: &mut dyn FnMut(MarkerId<'s>)) -> bool {
+        each_base(self, &mut |b| f(b))
+    }
+}
+
+/// The bases of the tree, its references looked up in the table.
+impl<'a, E: Tree<'a>, T: UnitTable + ?Sized> BaseSource for Resolved<'a, E, T> {
+    fn exp_of(&self, base: MarkerId<'_>) -> Option<i32> {
+        exp_of(self, base)
+    }
+
+    fn each_base<'s>(&'s self, f: &mut dyn FnMut(MarkerId<'s>)) -> bool {
+        each_base(self, &mut |b| f(b))
     }
 }
 
@@ -613,9 +727,9 @@ fn den_symbol<'t, E: Tree<'t>>(e: &E) -> Option<&'t str> {
         Node::Named { symbol, dim, .. } => {
             let dim = dim?;
             let known = match symbol {
-                "m" => dim.m == 1,
-                "s" => dim.s == 1,
-                "Hz" => dim.s == -1,
+                "m" => dim.m() == Exp::ONE,
+                "s" => dim.s() == Exp::ONE,
+                "Hz" => dim.s() == Exp::int(-1),
                 _ => true,
             };
             plain(symbol).filter(|_| known)
@@ -625,7 +739,7 @@ fn den_symbol<'t, E: Tree<'t>>(e: &E) -> Option<&'t str> {
                 symbol: "m",
                 dim: Some(dim),
                 ..
-            } if dim.m == 1 => Some(if n == 2 { "m²" } else { "m³" }),
+            } if dim.m() == Exp::ONE => Some(if n == 2 { "m²" } else { "m³" }),
             _ => None,
         },
         _ => None,
@@ -756,14 +870,14 @@ fn metre_power<'t, E: Tree<'t>>(e: &E, depth: usize) -> Option<i8> {
                 "m³" => 3,
                 _ => return None,
             };
-            (dim?.m == n).then_some(n)
+            (dim?.m() == Exp::int(n)).then_some(n)
         }
         Node::Pow(a, n @ (2 | 3)) => match a.node()? {
             Node::Named {
                 symbol: "m",
                 dim: Some(dim),
                 ..
-            } if dim.m == 1 => Some(n),
+            } if dim.m() == Exp::ONE => Some(n),
             _ => None,
         },
         // as write_symbol parenthesises them

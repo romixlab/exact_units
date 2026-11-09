@@ -10,8 +10,8 @@
 use core::fmt;
 use exact_units::units::{self, AngularVelocity, Per, Times, Torque};
 use exact_units::{
-    Dim, MAX_UNIT_DEPTH, Magnitude, MarkerId, Prefix, Provenance, SIExpr, SIExprOwned, Unit,
-    UnitDef, UnitDefOwned, UnitExpr, UnitNames, tree,
+    BaseExp, Dim, DimOwned, DimWire, Exp, MAX_UNIT_DEPTH, Magnitude, MarkerId, Prefix, Provenance,
+    SIExpr, SIExprOwned, Unit, UnitDef, UnitDefOwned, UnitExpr, UnitNames, tree,
 };
 use shrink_wrap::prelude::*;
 
@@ -19,109 +19,165 @@ type Viscous = Per<Torque, AngularVelocity>;
 
 #[test]
 fn dim_bytes() {
-    let mut buf = [0u8; 8];
+    let mut buf = [0u8; 64];
     let volt = <units::Volt as Unit>::DIM;
-    // s -3, m 2, kg 1, A -1, K 0, mol 0, cd 0, rad 0, bit 0: nine nibbles, the root bit, then four bits of empty
-    // counted slots
-    assert_eq!(
-        volt.to_ww_bytes(&mut buf).unwrap(),
-        [0xd2, 0x1f, 0x00, 0x00, 0x00, 0x00]
-    );
-    assert_eq!(
-        Dim::from_ww_bytes(&[0xd2, 0x1f, 0x00, 0x00, 0x00, 0x00]).unwrap(),
-        volt
-    );
+    // seven exponents as INib32 of halves (zigzag), then an empty list of bases
+    let bytes = volt.to_ww_bytes(&mut buf).unwrap().to_vec();
+    assert_eq!(Dim::from_ww_bytes(&bytes).unwrap(), volt);
+    assert_eq!(DimOwned::from_ww_bytes_owned(&bytes).unwrap(), volt);
+    assert_eq!(DimOwned::from(volt).to_ww_bytes_owned().unwrap(), bytes);
     assert_eq!(
         <Dim<'_> as SerializeShrinkWrap>::ELEMENT_SIZE,
-        ElementSize::UnsizedFinalStructure
+        <DimWire<'_> as SerializeShrinkWrap>::ELEMENT_SIZE
     );
-    let edge = Dim::new(-8, 7, 0, 0, 0, 0, -1).with_rad(7).with_bit(-8);
+    // the same bytes as the wire shape written from a slice
+    let exps = volt.exps();
+    let wire = DimWire {
+        exps: RefVec::Slice { slice: &exps },
+        bases: RefVec::Slice { slice: &[] },
+    };
+    assert_eq!(wire.to_ww_bytes(&mut [0u8; 64]).unwrap(), bytes);
+    // exponents past the old -8..=7 and halves
+    let edge = Dim::of_exps([
+        Exp::int(-64),
+        Exp::int(63),
+        Exp::from_halves(127),
+        Exp::from_halves(-1),
+        Exp::ZERO,
+        Exp::ZERO,
+        Exp::int(12),
+    ]);
     let bytes = edge.to_ww_bytes(&mut buf).unwrap().to_vec();
-    assert_eq!(bytes, [0x87, 0x00, 0x00, 0xf7, 0x80, 0x00]);
     assert_eq!(Dim::from_ww_bytes(&bytes).unwrap(), edge);
-    // samples per second: one counted slot, its name and exponent
+    // samples per second: one base, by crate and name, and its exponent
     let rate = <Per<units::Sample, units::Second> as Unit>::DIM;
-    let mut buf = [0u8; 32];
     let bytes = rate.to_ww_bytes(&mut buf).unwrap().to_vec();
-    // s -1 and eight 0 nibbles, no root, slot 1 used: crate "exact_units", "Sample" and exponent 1, three empty slots
-    assert_eq!(
-        bytes,
-        [
-            0xf0, 0x00, 0x00, 0x00, 0x04, 0x65, 0x78, 0x61, 0x63, 0x74, 0x5f, 0x75, 0x6e, 0x69,
-            0x74, 0x73, 0x53, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x10, 0x06, 0x39
-        ]
-    );
+    let sample = [BaseExp {
+        base: MarkerId {
+            crate_name: "exact_units",
+            name: "Sample",
+        },
+        exp: Exp::ONE,
+    }];
+    let exps = rate.exps();
+    let wire = DimWire {
+        exps: RefVec::Slice { slice: &exps },
+        bases: RefVec::Slice { slice: &sample },
+    };
+    assert_eq!(wire.to_ww_bytes(&mut [0u8; 64]).unwrap(), bytes);
     assert_eq!(Dim::from_ww_bytes(&bytes).unwrap(), rate);
     assert_eq!(rate.to_string(), "s⁻¹·Sample");
 }
 
-/// Counted bases: sorted by name, added up, gone at exponent 0, at most `MAX_COUNTED`; a dimension that isn't in
-/// that form doesn't decode.
+/// Distinguished bases: sorted by crate and name, added up, gone at exponent 0, as many as a dimension needs; a
+/// dimension that isn't in that form doesn't decode.
 #[test]
-fn counted_bases() {
-    let sample = Dim::counted("exact_units", "Sample");
-    let block = Dim::counted("exact_units", "Block");
-    let d = sample.mul(block).div(Dim::counted("exact_units", "Frame"));
+fn distinguished_bases() {
+    let id = |name| MarkerId {
+        crate_name: "exact_units",
+        name,
+    };
+    type D = Per<Times<units::Sample, units::Block>, units::Frame>;
+    let d = <D as Unit>::DIM;
+    let mut seen = Vec::new();
+    d.for_each_base(|b| seen.push((b.base.name, b.exp)));
     assert_eq!(
-        d.counted_bases().collect::<Vec<_>>(),
-        [("Block", 1), ("Frame", -1), ("Sample", 1)]
+        seen,
+        [
+            ("Block", Exp::ONE),
+            ("Frame", Exp::int(-1)),
+            ("Sample", Exp::ONE)
+        ]
     );
     assert_eq!(
         d,
-        block.div(Dim::counted("exact_units", "Frame")).mul(sample)
+        <Times<Per<units::Block, units::Frame>, units::Sample> as Unit>::DIM
     );
     assert!(
-        d.div(sample)
-            .div(block)
-            .mul(Dim::counted("exact_units", "Frame"))
-            .is_one()
+        <Per<Times<D, units::Frame>, Times<units::Sample, units::Block>> as Unit>::DIM.is_one()
     );
-    let four = d.mul(Dim::counted("exact_units", "Item"));
-    assert_eq!(
-        four.checked_mul(Dim::counted("exact_units", "Packet")),
-        None
-    );
-    assert_eq!(
-        four.checked_mul(Dim::counted("exact_units", "Item"))
-            .unwrap()
-            .to_string(),
-        "Block·Frame⁻¹·Item²·Sample"
-    );
-    assert_ne!(sample, block);
-    assert_ne!(sample, Dim::ONE);
+    // six bases at once, past the four slots of before
+    type Six = Times<Times<D, Times<units::Item, units::Packet>>, Times<units::Line, units::Row>>;
+    let six = <Six as Unit>::DIM;
+    assert_eq!(six.to_string(), "Block·Frame⁻¹·Item·Line·Packet·Row·Sample");
+    assert_eq!(six.exp_of(id("Frame")), Exp::int(-1));
+    assert_eq!(six.exp_of(id("Code")), Exp::ZERO);
+    assert_ne!(Dim::base(id("Sample")), Dim::base(id("Block")));
+    assert_ne!(Dim::base(id("Sample")), Dim::ONE);
 
     // a base is its crate and marker name: another crate's Sample is another base, sorted by crate first
-    let theirs = Dim::counted("my_api", "Sample");
-    assert_ne!(theirs, sample);
-    let both = sample.mul(theirs);
-    assert_eq!(both.counted[0].unwrap().crate_name, "exact_units");
-    assert_eq!(both.counted[1].unwrap().crate_name, "my_api");
-    assert!(both.div(theirs).same(sample));
+    let ours = Dim::base(id("Sample"));
+    let theirs = Dim::base(MarkerId {
+        crate_name: "my_api",
+        name: "Sample",
+    });
+    assert_ne!(theirs, ours);
+    let both = ours.checked_mul(&theirs).unwrap();
+    let mut crates = Vec::new();
+    both.for_each_base(|b| crates.push(b.base.crate_name));
+    assert_eq!(crates, ["exact_units", "my_api"]);
+    assert_eq!(both.checked_div(&theirs).unwrap(), ours);
     assert_eq!(
-        exact_units::counted!(Bucket),
-        Dim::counted("dynamic", "Bucket")
+        exact_units::base!(Bucket),
+        MarkerId {
+            crate_name: "dynamic",
+            name: "Bucket"
+        }
     );
 
-    let mut buf = [0u8; 256];
-    let bytes = d.to_ww_bytes(&mut buf).unwrap().to_vec();
-    assert_eq!(Dim::from_ww_bytes(&bytes).unwrap(), d);
-    // out of order: refused on decode
-    let mut unsorted = d;
-    unsorted.counted.swap(0, 2);
-    assert!(!unsorted.is_canonical());
-    let bytes = unsorted.to_ww_bytes(&mut buf).unwrap().to_vec();
-    assert!(Dim::from_ww_bytes(&bytes).is_err());
+    let mut buf = [0u8; 512];
+    let bytes = six.to_ww_bytes(&mut buf).unwrap().to_vec();
+    assert_eq!(Dim::from_ww_bytes(&bytes).unwrap(), six);
+    assert_eq!(DimOwned::from_ww_bytes_owned(&bytes).unwrap(), six);
+}
+
+/// Encodings of a dimension that aren't canonical: refused by both readers and by serde.
+#[test]
+fn non_canonical_dims() {
+    let exps = [Exp::ZERO; 7];
+    let b = |name, e| BaseExp {
+        base: MarkerId {
+            crate_name: "exact_units",
+            name,
+        },
+        exp: Exp::int(e),
+    };
+    let unsorted = [b("Sample", 1), b("Block", 1)];
+    let repeated = [b("Block", 1), b("Block", 1)];
+    let zero = [b("Block", 0)];
+    let six = [Exp::ZERO; 6];
+    for (exps, bases) in [
+        (&exps[..], &unsorted[..]),
+        (&exps[..], &repeated[..]),
+        (&exps[..], &zero[..]),
+        (&six[..], &[][..]),
+    ] {
+        let wire = DimWire {
+            exps: RefVec::Slice { slice: exps },
+            bases: RefVec::Slice { slice: bases },
+        };
+        let mut buf = [0u8; 256];
+        let bytes = wire.to_ww_bytes(&mut buf).unwrap().to_vec();
+        assert!(Dim::from_ww_bytes(&bytes).is_err(), "{bases:?}");
+        assert!(DimOwned::from_ww_bytes_owned(&bytes).is_err(), "{bases:?}");
+    }
 }
 
 #[test]
 fn dim_range() {
-    assert_eq!(Dim::checked_new([8, 0, 0, 0, 0, 0, 0, 0, 0]), None);
-    assert_eq!(Dim::checked_new([0, 0, 0, 0, 0, 0, 0, 0, -9]), None);
-    let m4 = Dim::new(0, 4, 0, 0, 0, 0, 0);
-    assert_eq!(m4.checked_mul(m4), None);
-    assert_eq!(m4.checked_pow(2), None);
-    assert_eq!(m4.checked_pow(-1), Some(Dim::new(0, -4, 0, 0, 0, 0, 0)));
-    assert_eq!(m4.checked_div(m4), Some(Dim::ONE));
+    let m40 = Dim::new(0, 40, 0, 0, 0, 0, 0);
+    assert_eq!(m40.checked_mul(&m40), None);
+    let owned = DimOwned::from(m40);
+    assert_eq!(owned.checked_pow(2), None);
+    assert_eq!(
+        owned.checked_pow(-1).unwrap(),
+        Dim::new(0, -40, 0, 0, 0, 0, 0)
+    );
+    assert_eq!(m40.checked_div(&m40).unwrap(), Dim::ONE);
+    // m¹² builds, as a type too
+    type M12 = Times<Times<Times<units::Volume, units::Volume>, units::Volume>, units::Volume>;
+    assert_eq!(<M12 as Unit>::DIM, Dim::new(0, 12, 0, 0, 0, 0, 0));
+    assert_eq!(<M12 as Unit>::DIM.to_string(), "m¹²");
 }
 
 /// A plain coherent unit of this test: `name` as its marker, `symbol` after a number.
@@ -169,7 +225,7 @@ fn scale_is_a_magnitude() {
 const VOLT_BYTES: [u8; 45] = [
     0x00, b'e', b'x', b'a', b'c', b't', b'_', b'u', b'n', b'i', b't', b's', b'V', b'o', b'l', b't',
     b'V', 0x00, b'v', b'o', b'l', b't', b'v', b'o', b'l', b't', b's', 0x80, b'V', 0x11, 0x05, b'A',
-    0xd2, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0xa4, 0x39, 0x3d,
+    0xb1, 0x81, 0x43, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x70, 0xa4, 0x39, 0x3d,
 ];
 
 #[test]
@@ -183,7 +239,7 @@ fn named_bytes() {
     assert_eq!(back.known(), Some(<units::Volt as Unit>::EXPR));
     assert_eq!(back.to_string(), "V");
     assert_eq!(back.name().to_string(), "Volt");
-    assert_eq!(back.dim(&()), Some(<units::Volt as Unit>::DIM));
+    assert_eq!(back.same_dim(&(), <units::Volt as Unit>::DIM), Some(true));
 }
 
 #[test]
@@ -191,7 +247,7 @@ fn compound_round_trip() {
     let mut buf = [0u8; 512];
     let si = <Viscous as Unit>::SI_EXPR;
     let bytes = si.to_ww_bytes(&mut buf).unwrap().to_vec();
-    assert_eq!(bytes.len(), 167);
+    assert_eq!(bytes.len(), 204);
     assert_eq!(&bytes[..2], [0x30, 0x00]);
     let back = SIExpr::from_ww_bytes(&bytes).unwrap();
     assert_eq!(&back, si);
@@ -201,7 +257,7 @@ fn compound_round_trip() {
     assert_eq!(back.to_string(), <Viscous as Unit>::EXPR.to_string());
     assert_eq!(back.to_string(), "N·m/(rad/s)");
     assert_eq!(back.name().to_string(), "Per<Torque, AngularVelocity>");
-    assert_eq!(back.dim(&()), Some(<Viscous as Unit>::DIM));
+    assert_eq!(back.same_dim(&(), <Viscous as Unit>::DIM), Some(true));
     assert_eq!(back.factor(&()), Some(1.0));
 
     type Fan = Per<Torque, Times<AngularVelocity, AngularVelocity>>;
@@ -252,9 +308,9 @@ fn pow() {
     let back = SIExpr::from_ww_bytes(&bytes).unwrap();
     assert_eq!(back, SPEED_SQ);
     assert_eq!(back.to_string(), "(m/s)²");
-    assert_eq!(back.dim(&()), Some(SPEED_SQ.dim()));
-    // out of -8..=7 at run time: no dimension, no panic
-    let too_big = SIExprOwned::Pow(Box::new(owned), 4);
+    assert_eq!(back.same_dim(&(), SPEED_SQ.dim()), Some(true));
+    // past ±63½ at run time: no dimension, no panic
+    let too_big = SIExprOwned::Pow(Box::new(owned), 40);
     let back = too_big.to_ww_bytes_owned().unwrap();
     assert_eq!(SIExpr::from_ww_bytes(&back).unwrap().dim(&()), None);
 }
@@ -294,7 +350,7 @@ fn typed_depth_up_to_the_limit() {
 
     let si = <L32 as Unit>::SI_EXPR;
     assert!(!si.to_string().contains('…'), "{si}");
-    assert_eq!(si.dim(&()), Some(<L32 as Unit>::DIM));
+    assert_eq!(si.same_dim(&(), <L32 as Unit>::DIM), Some(true));
     assert_eq!(*si, *<L32 as Unit>::EXPR);
     let owned = SIExprOwned::from(si);
     let bytes = owned.to_ww_bytes_owned().unwrap();
@@ -324,37 +380,41 @@ fn bad_bytes() {
     }
 }
 
-/// The root flag: a noise density in V/√Hz is the square root of V²/Hz, shown with half exponents; roots of even
-/// exponents are plain dimensions, and a root that isn't canonical doesn't decode.
+/// Halves: a noise density in V/√Hz has the exponent -5/2 of s, shown with half exponents; a root of an odd count of
+/// halves isn't a dimension.
 #[test]
-fn root() {
-    let volt = <units::Volt as Unit>::DIM;
-    let hertz = <units::Hertz as Unit>::DIM;
-    let density = volt.div(hertz.sqrt());
-    assert!(density.root);
-    assert_eq!(density.exps()[..4], [-5, 4, 2, -2]);
+fn halves() {
+    use exact_units::units::{Hertz, Sqrt, Volt};
+    let density = <Per<Volt, Sqrt<Hertz>> as Unit>::DIM;
+    assert_eq!(density.s(), Exp::from_halves(-5));
     assert_eq!(density.to_string(), "kg·m²·s⁻⁵ᐟ²·A⁻¹");
     // back to volts: times √Hz, or squared times Hz
-    assert_eq!(density.mul(hertz.sqrt()), volt);
     assert_eq!(
-        density.checked_pow(2).unwrap().mul(hertz),
-        volt.checked_pow(2).unwrap()
+        <Times<Per<Volt, Sqrt<Hertz>>, Sqrt<Hertz>> as Unit>::DIM,
+        <Volt as Unit>::DIM
     );
-    // √(m²) is m, not a root
-    let m2 = Dim::new(0, 2, 0, 0, 0, 0, 0);
-    assert_eq!(m2.sqrt(), Dim::new(0, 1, 0, 0, 0, 0, 0));
-    assert_eq!(density.checked_sqrt(), None);
+    let owned = DimOwned::from(density);
+    let volt2 = DimOwned::from(<Volt as Unit>::DIM).checked_pow(2).unwrap();
+    assert_eq!(
+        owned
+            .checked_pow(2)
+            .unwrap()
+            .checked_mul(&DimOwned::from(<Hertz as Unit>::DIM))
+            .unwrap(),
+        volt2
+    );
+    // √(m²) is m; the root of -5/2 isn't whole halves
+    assert_eq!(
+        DimOwned::from(Dim::new(0, 2, 0, 0, 0, 0, 0))
+            .checked_sqrt()
+            .unwrap(),
+        Dim::new(0, 1, 0, 0, 0, 0, 0)
+    );
+    assert_eq!(owned.checked_sqrt(), None);
 
-    let mut buf = [0u8; 16];
+    let mut buf = [0u8; 64];
     let bytes = density.to_ww_bytes(&mut buf).unwrap().to_vec();
-    assert_eq!(bytes, [0xb4, 0x2e, 0x00, 0x00, 0x08, 0x00]);
     assert_eq!(Dim::from_ww_bytes(&bytes).unwrap(), density);
-    // m² with the root bit is √(m²) written the long way: refused
-    let mut long = m2;
-    long.root = true;
-    assert!(!long.is_canonical());
-    let bytes = long.to_ww_bytes(&mut buf).unwrap().to_vec();
-    assert!(Dim::from_ww_bytes(&bytes).is_err());
 }
 
 /// The typed root, `Sqrt<U>`: V/√Hz as `Per<Volt, Sqrt<Hertz>>` has the root dimension, the symbol `V/√Hz`, and goes
@@ -364,8 +424,7 @@ fn sqrt_marker() {
     use exact_units::units::{Hertz, Sqrt, Volt};
     type Density = Per<Volt, Sqrt<Hertz>>;
     let dim = <Density as Unit>::DIM;
-    assert_eq!(dim, <Volt as Unit>::DIM.div(<Hertz as Unit>::DIM.sqrt()));
-    assert!(dim.root);
+    assert_eq!(dim.s(), Exp::from_halves(-5));
     let expr = <Density as Unit>::EXPR;
     assert_eq!(expr.to_string(), "V/√Hz");
     assert_eq!(expr.name().to_string(), "Per<Volt, Sqrt<Hertz>>");
@@ -410,7 +469,7 @@ fn sqrt_marker() {
     assert!(matches!(back, SIExpr::Div(..)));
     assert_eq!(back, *expr);
     assert_eq!(back.to_string(), "V/√Hz");
-    assert_eq!(back.dim(&()), Some(dim));
+    assert_eq!(back.same_dim(&(), dim), Some(true));
     let owned = SIExprOwned::from(expr);
     assert_eq!(owned.to_ww_bytes_owned().unwrap(), bytes);
     assert_eq!(SIExprOwned::from(&back), owned);
@@ -698,7 +757,7 @@ fn owned_from_wire_stops_at_the_limit() {
 /// doesn't need, and a unit tree with such a dimension.
 #[test]
 fn validate_refuses() {
-    use exact_units::{DimOwned, Index, Offset, Range};
+    use exact_units::{Index, Offset, Range};
     type Slot = Index<units::Sample, u8, Range<0, 7>>;
     let err = shrink_wrap::Error::SubtypeOutOfRange;
     assert_eq!(Slot::from_ww_bytes(&[7]).unwrap().get(), 7);
@@ -715,34 +774,6 @@ fn validate_refuses() {
     let minus = Offset::new(true, Magnitude::ratio(1, 2));
     let bytes = minus.to_ww_bytes(&mut buf).unwrap().to_vec();
     assert_eq!(Offset::from_ww_bytes(&bytes), Ok(minus));
-
-    let counted = Dim::counted("exact_units", "Sample")
-        .mul(Dim::counted("exact_units", "Block"))
-        .div(Dim::counted("exact_units", "Frame"));
-    let mut unsorted = counted;
-    unsorted.counted.swap(0, 2);
-    let mut long = Dim::new(0, 2, 0, 0, 0, 0, 0);
-    long.root = true;
-    for bad in [unsorted, long] {
-        assert!(!bad.is_canonical());
-        let mut buf = [0u8; 256];
-        let bytes = bad.to_ww_bytes(&mut buf).unwrap().to_vec();
-        assert_eq!(Dim::from_ww_bytes(&bytes).err(), Some(err), "{bad:?}");
-        assert_eq!(
-            DimOwned::from_ww_bytes_owned(&bytes).err(),
-            Some(err),
-            "{bad:?}"
-        );
-        let mut unit = UnitDefOwned::from(def("Forged", "f", Dim::ONE));
-        unit.dim = bad.into();
-        let unit = SIExprOwned::Def(unit);
-        let bytes = unit.to_ww_bytes_owned().unwrap();
-        assert!(SIExprOwned::from_ww_bytes_owned(&bytes).is_err(), "{bad:?}");
-        assert!(SIExpr::from_ww_bytes(&bytes).is_err(), "{bad:?}");
-    }
-    let mut buf = [0u8; 256];
-    let bytes = counted.to_ww_bytes(&mut buf).unwrap().to_vec();
-    assert_eq!(DimOwned::from_ww_bytes_owned(&bytes), Ok(counted.into()));
 }
 
 /// A `Ref` on the wire: the variant, then the identity alone, two strings.
@@ -756,7 +787,10 @@ fn ref_bytes() {
     let back = SIExpr::from_ww_bytes(&bytes).unwrap();
     assert_eq!(back, SIExpr::Ref(id));
     assert_eq!(back.known(), Some(<units::Volt as Unit>::EXPR));
-    assert_eq!(back.dim(&units::TABLE), Some(<units::Volt as Unit>::DIM));
+    assert_eq!(
+        back.same_dim(&units::TABLE, <units::Volt as Unit>::DIM),
+        Some(true)
+    );
     assert_eq!(back.dim(&()), None);
     assert_eq!(back.to_string(), "V");
     let owned = SIExprOwned::from(&back);

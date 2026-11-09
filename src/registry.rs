@@ -119,12 +119,17 @@ impl<'a> ParsedUnit<'a> {
         self.factors.iter().flatten().copied()
     }
 
-    /// The dimension, `None` where an exponent leaves what a [Dim] holds.
+    /// The dimension, its distinguished bases read from the factors on demand (so it borrows the parse); `None`
+    /// where an exponent leaves what a [Dim] holds.
     #[must_use]
-    pub fn dim(&self) -> Option<Dim<'a>> {
-        self.factors().try_fold(Dim::ONE, |d, f| {
-            d.checked_mul(f.reading.def.dim.checked_pow(f.exp)?)
-        })
+    pub fn dim(&self) -> Option<Dim<'_>> {
+        let mut exps = [0i32; crate::MAX_TRUE_BASES];
+        for f in self.factors() {
+            for (e, x) in exps.iter_mut().zip(f.reading.def.dim.exps()) {
+                *e = e.checked_add(x.wide().checked_mul(i32::from(f.exp))?)?;
+            }
+        }
+        Dim::of_source(exps, self)
     }
 
     /// The exact factor to coherent SI, prefixes and all; `None` past what a [Magnitude] holds.
@@ -504,6 +509,29 @@ impl<'a> Registry<'a> {
             read_word(def, w, &mut out);
         }
         out
+    }
+}
+
+/// The distinguished bases of the factors' units, each to the factor's power.
+impl crate::BaseSource for ParsedUnit<'_> {
+    fn exp_of(&self, base: crate::MarkerId<'_>) -> Option<i32> {
+        self.factors().try_fold(0i32, |sum, f| {
+            sum.checked_add(
+                f.reading
+                    .def
+                    .dim
+                    .exp_of(base)
+                    .wide()
+                    .checked_mul(i32::from(f.exp))?,
+            )
+        })
+    }
+
+    fn each_base<'s>(&'s self, f: &mut dyn FnMut(crate::MarkerId<'s>)) -> bool {
+        for factor in self.factors.iter().flatten() {
+            factor.reading.def.dim.for_each_base(|b| f(b.base));
+        }
+        true
     }
 }
 

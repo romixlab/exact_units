@@ -18,7 +18,7 @@
 //! [Plain]: Kind::Plain
 //! [RatioOf]: Kind::RatioOf
 
-use crate::Dim;
+use crate::{Dim, Exp};
 use core::fmt;
 
 /// The kind of quantity a unit measures, beyond its dimension. See the [module](crate::kind) for the rules.
@@ -81,23 +81,35 @@ const ROOT_POWER: [Dim<'static>; 6] = [
     Dim::new(-2, -1, 1, 0, 0, 0, 0),
     Dim::new(-3, 1, 1, -1, 0, 0, 0),
     Dim::new(0, -1, 0, 1, 0, 0, 0),
-    Dim::new(-3, 2, 1, 0, 0, 0, 0).sqrt(),
+    // √W: kg^½·m·s^-3/2
+    Dim::of_exps([
+        Exp::from_halves(-3),
+        Exp::int(1),
+        Exp::from_halves(1),
+        Exp::ZERO,
+        Exp::ZERO,
+        Exp::ZERO,
+        Exp::ZERO,
+    ]),
 ];
 
+/// Whether `d` is one of `dims`: `None` where `d`'s bases are read at run time and `const` code can't tell.
 #[expect(clippy::indexing_slicing, reason = "i < dims.len(), the loop bound")]
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "i < dims.len(), the loop bound"
 )]
-const fn any_same(dims: &[Dim<'static>], d: Dim<'_>) -> bool {
+const fn any_same(dims: &[Dim<'static>], d: Dim<'_>) -> Option<bool> {
     let mut i = 0;
     while i < dims.len() {
-        if dims[i].same(d) {
-            return true;
+        match dims[i].const_same(d) {
+            Some(true) => return Some(true),
+            Some(false) => {}
+            None => return None,
         }
         i += 1;
     }
-    false
+    Some(false)
 }
 
 /// `==` on two names in `const` code.
@@ -125,41 +137,140 @@ pub(crate) const fn same_str(a: &str, b: &str) -> bool {
 }
 
 impl<'i> Kind<'i> {
-    /// `==` in `const` code.
+    /// `==`: the same kind, a ratio of the same dimension.
     #[must_use]
-    pub const fn same(self, o: Kind<'_>) -> bool {
+    pub fn same(self, o: Kind<'_>) -> bool {
+        match (self, o) {
+            (Kind::RatioOf(a), Kind::RatioOf(b)) => a.same(b),
+            _ => Self::same_with(self, o, false),
+        }
+    }
+
+    /// [same](Self::same) in `const` code: `None` where a ratio's dimension has bases read at run time (from the
+    /// wire, a parse), which `const` code can't walk; always `Some` for the kinds of unit types.
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{Kind, Unit, units::{Ohm, Per, Volt, Ampere}};
+    ///
+    /// const RESISTANCE: Option<bool> = Ohm::KIND.const_same(<Per<Volt, Ampere>>::KIND);
+    /// assert_eq!(RESISTANCE, Some(false)); // V/A is a plain quotient, Ω a resistance
+    /// const GAIN: Option<bool> = <Per<Volt, Volt>>::KIND.const_same(Kind::RatioOf(Volt::DIM));
+    /// assert_eq!(GAIN, Some(true));
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn const_same(self, o: Kind<'_>) -> Option<bool> {
+        let ratios = match (self, o) {
+            (Kind::RatioOf(a), Kind::RatioOf(b)) => match a.const_same(b) {
+                Some(x) => x,
+                None => return None,
+            },
+            _ => false,
+        };
+        Some(Self::same_with(self, o, ratios))
+    }
+
+    /// [const_same](Self::const_same) of two unit types' kinds: their dimensions are `const` data.
+    #[expect(
+        clippy::panic,
+        reason = "a unit type's dimension is const data, which const_same always answers"
+    )]
+    pub(crate) const fn same_typed(self, o: Kind<'_>) -> bool {
+        match self.const_same(o) {
+            Some(x) => x,
+            None => panic!("a unit type's dimension read at run time"),
+        }
+    }
+
+    /// The comparison, given whether two ratios' dimensions are the same.
+    const fn same_with(self, o: Kind<'_>, ratios: bool) -> bool {
         match (self, o) {
             (Kind::Plain, Kind::Plain) => true,
             (Kind::Named(a), Kind::Named(b)) => same_str(a, b),
-            (Kind::RatioOf(a), Kind::RatioOf(b)) => a.same(b),
+            (Kind::RatioOf(_), Kind::RatioOf(_)) => ratios,
             _ => false,
         }
     }
 
     /// The kind of `a · b`, for quantities `a` of kind `self` and dimension `a_dim`, `b` of kind `o` and `b_dim`.
     #[must_use]
-    pub const fn mul(self, a_dim: Dim<'i>, o: Kind<'i>, b_dim: Dim<'i>) -> Kind<'i> {
-        Self::combine(self, a_dim, o, b_dim)
+    pub fn mul(self, a_dim: Dim<'i>, o: Kind<'i>, b_dim: Dim<'i>) -> Kind<'i> {
+        let facts = Facts::of(self, a_dim, o, b_dim);
+        Self::combine(self, o, facts)
     }
 
     /// The kind of `a / b`, for quantities `a` of kind `self` and dimension `a_dim`, `b` of kind `o` and `b_dim`.
     #[must_use]
-    pub const fn div(self, a_dim: Dim<'i>, o: Kind<'i>, b_dim: Dim<'i>) -> Kind<'i> {
+    pub fn div(self, a_dim: Dim<'i>, o: Kind<'i>, b_dim: Dim<'i>) -> Kind<'i> {
         // what cancels is kept: V/V is a ratio of voltage
         if !a_dim.is_one() && a_dim.same(b_dim) {
             return Kind::RatioOf(a_dim);
         }
-        Self::combine(self, a_dim, o, b_dim)
+        Self::mul(self, a_dim, o, b_dim)
+    }
+
+    /// [mul](Self::mul) in `const` code, `None` like [const_same](Self::const_same).
+    #[must_use]
+    pub const fn const_mul(self, a_dim: Dim<'i>, o: Kind<'i>, b_dim: Dim<'i>) -> Option<Kind<'i>> {
+        match Facts::constant(self, a_dim, o, b_dim) {
+            Some(facts) => Some(Self::combine(self, o, facts)),
+            None => None,
+        }
+    }
+
+    /// [div](Self::div) in `const` code, `None` like [const_same](Self::const_same).
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{Kind, Unit, units::Volt};
+    ///
+    /// // what cancels is kept: V/V is a ratio of voltage, worked out in a const item
+    /// const GAIN: Option<Kind<'static>> = Kind::Plain.const_div(Volt::DIM, Kind::Plain, Volt::DIM);
+    /// assert_eq!(GAIN, Some(Kind::RatioOf(Volt::DIM)));
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn const_div(self, a_dim: Dim<'i>, o: Kind<'i>, b_dim: Dim<'i>) -> Option<Kind<'i>> {
+        match (a_dim.const_is_one(), a_dim.const_same(b_dim)) {
+            (Some(false), Some(true)) => Some(Kind::RatioOf(a_dim)),
+            (Some(_), Some(_)) => self.const_mul(a_dim, o, b_dim),
+            _ => None,
+        }
+    }
+
+    /// [const_mul](Self::const_mul) of unit types: their dimensions are `const` data.
+    #[expect(
+        clippy::panic,
+        reason = "a unit type's dimension is const data, which const_mul always answers"
+    )]
+    pub(crate) const fn mul_typed(self, a_dim: Dim<'i>, o: Kind<'i>, b_dim: Dim<'i>) -> Kind<'i> {
+        match self.const_mul(a_dim, o, b_dim) {
+            Some(k) => k,
+            None => panic!("a unit type's dimension read at run time"),
+        }
+    }
+
+    /// [const_div](Self::const_div) of unit types: their dimensions are `const` data.
+    #[expect(
+        clippy::panic,
+        reason = "a unit type's dimension is const data, which const_div always answers"
+    )]
+    pub(crate) const fn div_typed(self, a_dim: Dim<'i>, o: Kind<'i>, b_dim: Dim<'i>) -> Kind<'i> {
+        match self.const_div(a_dim, o, b_dim) {
+            Some(k) => k,
+            None => panic!("a unit type's dimension read at run time"),
+        }
     }
 
     /// What a product and a quotient have in common: a plain dimension-one side keeps the other's kind, two ratios
     /// of one dimension stay one, a ratio with a quantity of a dimension gives the quantity's kind.
-    const fn combine(a: Kind<'i>, a_dim: Dim<'i>, b: Kind<'i>, b_dim: Dim<'i>) -> Kind<'i> {
+    const fn combine(a: Kind<'i>, b: Kind<'i>, f: Facts) -> Kind<'i> {
         match (a, b) {
-            (Kind::RatioOf(x), Kind::RatioOf(y)) if x.same(y) => a,
+            (Kind::RatioOf(_), Kind::RatioOf(_)) if f.ratios_same => a,
             (Kind::RatioOf(_), Kind::RatioOf(_)) => Kind::Plain,
-            (Kind::Plain | Kind::RatioOf(_), _) if a_dim.is_one() => b,
-            (_, Kind::Plain | Kind::RatioOf(_)) if b_dim.is_one() => a,
+            (Kind::Plain | Kind::RatioOf(_), _) if f.a_one => b,
+            (_, Kind::Plain | Kind::RatioOf(_)) if f.b_one => a,
             _ => Kind::Plain,
         }
     }
@@ -173,12 +284,90 @@ impl<'i> Kind<'i> {
     /// How a quantity of this kind is put in decibels: a ratio of a power or root-power dimension (W/W, V/V, A/A),
     /// `None` for any other kind (a plain [Ratio](crate::units::Ratio) has no level form: 0.5 duty is not −3 dB).
     #[must_use]
-    pub const fn level_form(self) -> Option<LevelForm> {
+    pub fn level_form(self) -> Option<LevelForm> {
         match self {
-            Kind::RatioOf(d) if any_same(&POWER, d) => Some(LevelForm::Power),
-            Kind::RatioOf(d) if any_same(&ROOT_POWER, d) => Some(LevelForm::RootPower),
+            Kind::RatioOf(d) if POWER.iter().any(|p| p.same(d)) => Some(LevelForm::Power),
+            Kind::RatioOf(d) if ROOT_POWER.iter().any(|p| p.same(d)) => Some(LevelForm::RootPower),
             _ => None,
         }
+    }
+
+    /// [level_form](Self::level_form) in `const` code: the outer `None` like [const_same](Self::const_same), the
+    /// inner one a kind without a level form.
+    ///
+    /// ```
+    /// # #[cfg(feature = "electrical")] {
+    /// use exact_units::{LevelForm, Unit, units::{Per, Volt, Watt}};
+    ///
+    /// const FIELD: Option<Option<LevelForm>> = <Per<Volt, Volt>>::KIND.const_level_form();
+    /// const POWER: Option<Option<LevelForm>> = <Per<Watt, Watt>>::KIND.const_level_form();
+    /// assert_eq!(FIELD, Some(Some(LevelForm::RootPower)));
+    /// assert_eq!(POWER, Some(Some(LevelForm::Power)));
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn const_level_form(self) -> Option<Option<LevelForm>> {
+        let Kind::RatioOf(d) = self else {
+            return Some(None);
+        };
+        match (any_same(&POWER, d), any_same(&ROOT_POWER, d)) {
+            (Some(true), _) => Some(Some(LevelForm::Power)),
+            (Some(false), Some(true)) => Some(Some(LevelForm::RootPower)),
+            (Some(false), Some(false)) => Some(None),
+            _ => None,
+        }
+    }
+
+    /// [const_level_form](Self::const_level_form) of a unit type's kind: its dimension is `const` data.
+    #[expect(
+        clippy::panic,
+        reason = "a unit type's dimension is const data, which const_level_form always answers"
+    )]
+    pub(crate) const fn level_form_typed(self) -> Option<LevelForm> {
+        match self.const_level_form() {
+            Some(f) => f,
+            None => panic!("a unit type's dimension read at run time"),
+        }
+    }
+}
+
+/// What [Kind::combine] needs to know of two dimensions.
+#[derive(Copy, Clone)]
+struct Facts {
+    a_one: bool,
+    b_one: bool,
+    ratios_same: bool,
+}
+
+impl Facts {
+    fn of(a: Kind<'_>, a_dim: Dim<'_>, b: Kind<'_>, b_dim: Dim<'_>) -> Facts {
+        Facts {
+            a_one: a_dim.is_one(),
+            b_one: b_dim.is_one(),
+            ratios_same: match (a, b) {
+                (Kind::RatioOf(x), Kind::RatioOf(y)) => x.same(y),
+                _ => false,
+            },
+        }
+    }
+
+    /// The facts in `const` code, `None` where a dimension's bases are read at run time.
+    const fn constant(a: Kind<'_>, a_dim: Dim<'_>, b: Kind<'_>, b_dim: Dim<'_>) -> Option<Facts> {
+        let (Some(a_one), Some(b_one)) = (a_dim.const_is_one(), b_dim.const_is_one()) else {
+            return None;
+        };
+        let ratios_same = match (a, b) {
+            (Kind::RatioOf(x), Kind::RatioOf(y)) => match x.const_same(y) {
+                Some(s) => s,
+                None => return None,
+            },
+            _ => false,
+        };
+        Some(Facts {
+            a_one,
+            b_one,
+            ratios_same,
+        })
     }
 }
 
@@ -519,6 +708,7 @@ mod tests {
     const W: Dim<'static> = Dim::new(-3, 2, 1, 0, 0, 0, 0);
     const OHM: Dim<'static> = Dim::new(-3, 2, 1, -2, 0, 0, 0);
     const ONE: Dim<'static> = Dim::ONE;
+    const SQRT_W: Dim<'static> = ROOT_POWER[5];
 
     #[test]
     fn a_quotient_of_one_dimension_keeps_it() {
@@ -560,9 +750,7 @@ mod tests {
         assert_eq!(Kind::RatioOf(OHM).level_form(), None);
         // b/a of power waves in √W
         assert_eq!(
-            Kind::Plain
-                .div(W.sqrt(), Kind::Plain, W.sqrt())
-                .level_form(),
+            Kind::Plain.div(SQRT_W, Kind::Plain, SQRT_W).level_form(),
             Some(LevelForm::RootPower)
         );
         assert_eq!(Kind::Plain.level_form(), None);

@@ -41,15 +41,15 @@ use crate::{Fixed, FixedScale, Repr, Storage, Unit, Unlimited};
 /// compile time, as the product table does for `Watt` (`Volt * Ampere = Watt` in `products.rs`).
 const _: () = {
     assert!(
-        Volt::DIM.mul(Ampere::DIM).same(VoltAmpere::DIM),
+        <crate::units::Times<Volt, Ampere>>::DIM.same_typed(VoltAmpere::DIM),
         "VoltAmpere: SI exponents differ from Volt * Ampere"
     );
     assert!(
-        VoltAmpere::DIM.same(Watt::DIM),
+        VoltAmpere::DIM.same_typed(Watt::DIM),
         "VoltAmpere: SI exponents differ from Watt"
     );
     assert!(
-        Var::DIM.same(Watt::DIM),
+        Var::DIM.same_typed(Watt::DIM),
         "Var: SI exponents differ from Watt"
     );
 };

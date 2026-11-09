@@ -34,17 +34,13 @@ fn magnitude(m: Mag) -> Magnitude {
     )
 }
 
-fn dim(d: CatDim) -> Dim<'static> {
-    let mut out = Dim::ONE;
-    out.s = crate::__dim_exp(d[0]);
-    out.m = crate::__dim_exp(d[1]);
-    out.kg = crate::__dim_exp(d[2]);
-    out.a = crate::__dim_exp(d[3]);
-    out.k = crate::__dim_exp(d[4]);
-    out.mol = crate::__dim_exp(d[5]);
-    out.cd = crate::__dim_exp(d[6]);
-    out.rad = crate::__dim_exp(d[7]);
-    out
+/// Whether `d` is the catalogue's dimension `c`: its exponents, the radian's, and no other base.
+fn is_dim(d: Dim<'_>, c: CatDim) -> bool {
+    let exps = c.map(|e| crate::__dim_exp(e, 1));
+    let [s, m, kg, a, k, mol, cd, rad] = exps;
+    let mut others = false;
+    d.for_each_base(|b| others |= b.base != crate::MarkerId::RADIAN);
+    d.exps() == [s, m, kg, a, k, mol, cd] && d.exp_of(crate::MarkerId::RADIAN) == rad && !others
 }
 
 fn row(id: &str) -> &'static CatUnit {
@@ -66,7 +62,7 @@ fn one_marker_per_unit_with_its_definition() {
         assert_eq!(def.id.crate_name, "exact_units", "{name}");
         assert_eq!(name, camel(u.id), "markers in catalogue order");
         assert_eq!(def.names.symbol, u.symbol, "{name}");
-        assert_eq!(def.dim, dim(u.dim), "{name}");
+        assert!(is_dim(def.dim, u.dim), "{name}: {}", def.dim);
         assert_eq!(def.scale, magnitude(u.mag), "{name}");
         assert_eq!(
             matches!(provenance, Provenance::Conventional { .. }),
@@ -104,7 +100,7 @@ fn the_rest_is_other_markers_and_origins() {
             .zero
             .map_or(Offset::ZERO, |z| Offset::new(false, magnitude(z)));
         assert_eq!(zero, want, "{}", o.id);
-        assert_eq!(dim(o.dim), Kelvin::DIM);
+        assert!(is_dim(Kelvin::DIM, o.dim));
     }
 }
 

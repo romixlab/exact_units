@@ -15,9 +15,9 @@ use exact_units::origins::Celsius;
 use exact_units::prefix::{Centi, Milli, One};
 use exact_units::units::{Kelvin, Ratio, Sample, Volt};
 use exact_units::{
-    CompactError, Complex, Counted, Dim, Fixed, FullScaleBits, Index, IndexFrom1, Magnitude,
-    Offset, Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, SIExpr, SIExprOwned, Seq, Symbols,
-    UnitDef, UnitDefOwned, UnitTable, tree,
+    BaseExp, CompactError, Complex, Dim, DimWire, Exp, Fixed, FullScaleBits, Index, IndexFrom1,
+    Magnitude, Offset, Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, SIExpr, SIExprOwned,
+    Seq, Symbols, UnitDef, UnitDefOwned, UnitTable, tree,
 };
 use shrink_wrap::max_size::MaxSize;
 use shrink_wrap::prelude::*;
@@ -188,59 +188,61 @@ pub(crate) fn prefix(which: u8, param: i8, tag: u16) {
     }
 }
 
-/// A dimension as written into its fields, canonical or not. It encodes where every exponent fits 4 bits, and then
-/// decodes, to itself, exactly when it is canonical (used counted slots first, sorted, no exponent 0, `root` only
-/// with an odd exponent).
+/// A dimension as written into the fields of its wire shape, canonical or not: exponents in halves (any count) and
+/// distinguished bases (any order, repeats, 0). It always encodes, and decodes as a [Dim] exactly when it is canonical
+/// (7 exponents, the bases sorted by crate and name without repeats, no exponent 0), to the same exponents and bases;
+/// what decodes writes the same bytes again.
 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
-pub(crate) fn dim(exps: [i8; 9], root: bool, counted: &[Option<(String, i8)>; 4]) {
-    let [s, m, kg, a, k, mol, cd, rad, bit] = exps;
-    let d = Dim {
-        s,
-        m,
-        kg,
-        a,
-        k,
-        mol,
-        cd,
-        rad,
-        bit,
-        root,
-        counted: counted.each_ref().map(|c| {
-            c.as_ref().map(|(name, exp)| Counted {
+pub(crate) fn dim(exps: &[i8], bases: &[(String, i8)]) {
+    let exps: Vec<Exp> = exps.iter().map(|h| Exp::from_halves(*h)).collect();
+    let list: Vec<BaseExp<'_>> = bases
+        .iter()
+        .map(|(name, h)| BaseExp {
+            base: exact_units::MarkerId {
                 crate_name: "exact_units",
                 name,
-                exp: *exp,
-            })
-        }),
+            },
+            exp: Exp::from_halves(*h),
+        })
+        .collect();
+    let w = DimWire {
+        exps: RefVec::Slice { slice: &exps },
+        bases: RefVec::Slice { slice: &list },
     };
-    let fits = |e: i8| (-8..=7).contains(&e);
     let mut buf = vec![0u8; BUF];
-    let Ok(bytes) = d.to_ww_bytes(&mut buf) else {
-        assert!(
-            !exps
-                .into_iter()
-                .chain(d.counted.iter().flatten().map(|c| c.exp))
-                .all(fits),
-            "{d:?} doesn't encode"
-        );
-        return;
-    };
-    let bytes = bytes.to_vec();
+    let bytes = w.to_ww_bytes(&mut buf).expect("encodes").to_vec();
+    let canonical = exps.len() == exact_units::MAX_TRUE_BASES
+        && list.iter().all(|b| !b.exp.is_zero())
+        && list
+            .windows(2)
+            .all(|p| matches!(p, [a, b] if a.base < b.base));
     match Dim::from_ww_bytes(&bytes) {
         Ok(back) => {
-            assert!(d.is_canonical(), "{d:?} isn't canonical, yet decodes");
-            assert_eq!(back, d);
+            assert!(canonical, "{exps:?} {list:?} isn't canonical, yet decodes");
+            assert_eq!(back.exps().as_slice(), exps.as_slice());
+            let mut seen = Vec::new();
+            back.for_each_base(|b| seen.push(b));
+            assert_eq!(seen, list);
+            let mut buf2 = vec![0u8; BUF];
+            assert_eq!(
+                back.to_ww_bytes(&mut buf2).expect("encodes"),
+                bytes.as_slice()
+            );
+            let owned = exact_units::DimOwned::from(back);
+            assert_eq!(owned, back);
+            let _ = (
+                back.to_string(),
+                owned.checked_mul(&owned),
+                owned.checked_sqrt(),
+            );
         }
         Err(_) => assert!(
-            !d.is_canonical() || !exps.into_iter().all(fits),
-            "{d:?} is canonical, yet doesn't decode"
+            !canonical,
+            "{exps:?} {list:?} is canonical, yet doesn't decode"
         ),
     }
-    let _ = d.to_string();
-    let _ = d.checked_mul(d).map(|x| x.checked_div(d));
-    let owned = exact_units::DimOwned::from(d);
     if let Ok(back) = exact_units::DimOwned::from_ww_bytes_owned(&bytes) {
-        assert_eq!(back, owned);
+        assert!(canonical);
         assert_eq!(back.to_ww_bytes_owned().expect("encodes"), bytes);
     }
 }
@@ -486,7 +488,6 @@ pub(crate) fn any_bytes(which: u8, bytes: &[u8]) {
         6 => decode::<IndexFrom1<Sample, u32>>(bytes),
         7 => {
             if let Ok(d) = Dim::from_ww_bytes(bytes) {
-                assert!(d.is_canonical(), "{d:?} decodes, not canonical");
                 let mut buf = vec![0u8; BUF];
                 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
                 let again = d.to_ww_bytes(&mut buf).expect("encodes");
@@ -494,10 +495,7 @@ pub(crate) fn any_bytes(which: u8, bytes: &[u8]) {
                 let _ = d.to_string();
             }
             if let Ok(d) = exact_units::DimOwned::from_ww_bytes_owned(bytes) {
-                assert!(
-                    d.as_dim().is_canonical(),
-                    "{d:?} decodes owned, not canonical"
-                );
+                assert_eq!(Dim::from_ww_bytes(bytes).ok(), Some(d.as_dim()), "{d:?}");
                 #[cfg(feature = "serde")]
                 super::serde_input::dim(&d);
                 let _ = d.as_dim().to_string();
@@ -511,7 +509,6 @@ pub(crate) fn any_bytes(which: u8, bytes: &[u8]) {
                 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
                 let back = UnitDef::from_ww_bytes(&again).expect("decodes");
                 assert_eq!(back, d);
-                assert!(d.dim.is_canonical(), "{d:?} decodes, not canonical");
                 let _ = (d.id.to_string(), d.scale.to_f64(), d.kind());
             }
         }
@@ -594,14 +591,14 @@ mod tests {
         ]
     }
 
-    /// Counted bases from a few names, so equal and sorted ones come up.
-    fn counted() -> impl Strategy<Value = [Option<(String, i8)>; 4]> {
-        let slot = proptest::option::of((
+    /// Bases from a few names, so equal and sorted ones come up.
+    fn bases() -> impl Strategy<Value = Vec<(String, i8)>> {
+        let one = (
             proptest::sample::select(&["Block", "Frame", "Item", "Sample", ""][..])
                 .prop_map(String::from),
-            -9i8..=9,
-        ));
-        [slot.clone(), slot.clone(), slot.clone(), slot]
+            prop_oneof![-3i8..=3, any::<i8>()],
+        );
+        vec(one, 0..6)
     }
 
     /// Chains at the reader's depth limit and past it.
@@ -656,8 +653,11 @@ mod tests {
         }
 
         #[test]
-        fn dims(exps in any::<[i8; 9]>().prop_map(|e| e.map(|x| x % 9)), root: bool, counted in counted()) {
-            super::dim(exps, root, &counted);
+        fn dims(exps in prop_oneof![
+            8 => vec(any::<i8>(), 7..=7),
+            1 => vec(any::<i8>(), 0..10),
+        ], bases in bases()) {
+            super::dim(&exps, &bases);
         }
 
         #[test]

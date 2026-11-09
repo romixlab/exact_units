@@ -317,7 +317,10 @@ mod parse {
             Err(ParseError::Syntax { at: 2 })
         );
         // a dimension past what a Dim holds
-        assert_eq!(R.parse_unit("m^100", None).map(|u| u.dim()), Ok(None));
+        assert_eq!(
+            R.parse_unit("m^100", None).map(|u| u.dim().is_none()),
+            Ok(true)
+        );
         // an exponent 0 names no unit (found by fuzzing: `h0` was a unit written `1`)
         assert_eq!(R.parse_unit("h0", None), Err(ParseError::Syntax { at: 0 }));
         assert_eq!(R.parse_unit("m^0", None), Err(ParseError::Syntax { at: 0 }));

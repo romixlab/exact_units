@@ -255,10 +255,10 @@ impl Decimal {
 /// The scale of a literal in unit `S` against stored values of `P · U`, `U · P / S`, or a compile error for units
 /// that don't convert ([Fixed::convert]'s rules).
 const fn scale_in<S: Unit, U: Unit, P: FixedScale>() -> Magnitude {
-    if !S::DIM.same(U::DIM) {
+    if !S::DIM.same_typed(U::DIM) {
         crate::conv_error::dim_mismatch::<S, U>("a literal's unit");
     }
-    if !S::KIND.same(U::KIND) {
+    if !S::KIND.same_typed(U::KIND) {
         crate::conv_error::kind_mismatch::<S, U>("a literal's unit");
     }
     let (Some(from), Some(to)) = (S::EXPR.magnitude(), U::EXPR.magnitude()) else {

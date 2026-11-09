@@ -11,7 +11,7 @@
 //! | Λ | ζ | [from_log_decrement](Fixed::from_log_decrement): ζ = Λ/√(4π² + Λ²), in `f64` |
 //! | ζ | Λ | [log_decrement](Fixed::log_decrement): Λ = 2πζ/√(1 − ζ²), in `f64` |
 //! | δ in Np/s | the time constant in s | [time_constant](Fixed::time_constant) = 1 Np / δ |
-//! | Np/s | Hz | [Dim::strip_neper](crate::Dim::strip_neper) for exports; never a conversion |
+//! | Np/s | Hz | [Dim::strip](crate::Dim::strip) for exports; never a conversion |
 //!
 //! δ, Λ and the time constant are signed as a loss, positive for a decay, as ISO 80000-3 writes F(t) = A·e^(−δt)·cos
 //! ωt: they are rates of [Loss](crate::units::Loss) levels. A rate signed as a gain (the real part σ of a pole, an AGC's
@@ -114,7 +114,10 @@
 use super::LOSS_DIM;
 use crate::num::sqrt_f64;
 use crate::units::{DampingRatio, Per, QualityFactor};
-use crate::{Bounds, Dim, Fixed, FixedScale, Magnitude, Overflow, Rounding, Storage, Unit};
+use crate::{
+    BaseExp, Bounds, Dim, Exp, Fixed, FixedScale, MAX_TRUE_BASES, Magnitude, MarkerId, Overflow,
+    Rounding, Storage, Unit,
+};
 use core::f64::consts::{PI, TAU};
 
 /// The damping coefficient δ in Np/s (ISO 80000-3), a loss per second: F(t) = A·e^(−δt)·cos ωt.
@@ -130,7 +133,39 @@ pub type LogarithmicDecrement = Per<crate::units::NeperLoss, crate::units::Cycle
 const TIME: Dim<'static> = Dim::new(1, 0, 0, 0, 0, 0, 0);
 
 /// The dimension of a loss per cycle, Λ's.
-const PER_CYCLE: Dim<'static> = LOSS_DIM.div(Dim::counted("exact_units", "Cycle"));
+const PER_CYCLE: Dim<'static> = Dim::with_list(
+    [Exp::ZERO; MAX_TRUE_BASES],
+    &[
+        BaseExp {
+            base: MarkerId::NEPER_LOSS,
+            exp: Exp::ONE,
+        },
+        BaseExp {
+            base: MarkerId {
+                crate_name: "exact_units",
+                name: "Cycle",
+            },
+            exp: Exp::int(-1),
+        },
+    ],
+);
+
+/// The dimension of an angular frequency, rad/s.
+const RAD_PER_S: Dim<'static> = Dim::with_list(
+    [
+        Exp::int(-1),
+        Exp::ZERO,
+        Exp::ZERO,
+        Exp::ZERO,
+        Exp::ZERO,
+        Exp::ZERO,
+        Exp::ZERO,
+    ],
+    &[BaseExp {
+        base: MarkerId::RADIAN,
+        exp: Exp::ONE,
+    }],
+);
 
 /// The factor of one stored step of `P · U` in the coherent unit of `U`'s dimension (Np/s, rad/s, s), or a compile
 /// error for a unit without an exact scale.
@@ -147,7 +182,11 @@ const fn step<U: Unit, P: FixedScale>() -> Magnitude {
 
 /// A compile error unless `U` has the dimension `dim` and no kind of its own.
 const fn check(u: Dim<'_>, kind: crate::Kind<'_>, dim: Dim<'_>, what: &str) {
-    assert!(u.same(dim) && kind.same(crate::Kind::Plain), "{}", what);
+    assert!(
+        u.same_typed(dim) && kind.same_typed(crate::Kind::Plain),
+        "{}",
+        what
+    );
 }
 
 /// `1` in `T`.
@@ -267,7 +306,7 @@ impl<L: Unit, X: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<Per<L, X>,
             check(
                 W::DIM,
                 W::KIND,
-                Dim::ONE.with_rad(1).div(TIME),
+                RAD_PER_S,
                 "ω₀ is an angular frequency in rad/s (not Hz: a factor 2π)",
             );
             // ζ = (d · δ step) / (w · ω step), in steps of P3

@@ -11,8 +11,8 @@
 //!   Conversions between scales are exact or refused, never rounded through a float.
 //! - [units]: zero-size unit markers (SI, angle, information, counted things) with their [UnitDef] (identity, [Dim], exact scale), and the
 //!   products and quotients the compiler checks (`Volt · Ampere` is `Watt`).
-//! - [Dim]: the dimension as data: SI base exponents, angle, information, up to [MAX_COUNTED] counted bases and a
-//!   square root (V/√Hz). [Magnitude]: a factor of integers and powers of 10, 2 and π (`°` is π/180 rad).
+//! - [Dim]: the dimension as data: SI's seven base exponents and a list of distinguished bases with no count limit
+//!   (angle, level, information, counted things), every exponent in halves (V/√Hz). [Magnitude]: a factor of integers and powers of 10, 2 and π (`°` is π/180 rad).
 //! - [Complex]`<U, P, T, B>`: a complex quantity, two `T` in unit `U` and scale `P`: an [Impedance], an
 //!   [Admittance], a phasor, a Q15 IQ sample. Products and conversions by the rules of `Fixed`, part by part, and
 //!   a complex multiply rounded once into a chosen scale. For IQ samples: [CQ15] and [CQ31], a multiply-accumulate
@@ -62,6 +62,7 @@ mod conv_error;
 pub mod cordic;
 pub mod decibel;
 mod declare;
+mod dim;
 mod exact;
 mod fixed;
 #[cfg(feature = "counting")]
@@ -107,6 +108,13 @@ pub use complex::{
 };
 pub use contains::Contains;
 #[doc(hidden)]
+pub use declare::{__dim_exp, __dim_set};
+#[cfg(feature = "shrink_wrap")]
+pub use dim::DimWire;
+pub use dim::{BaseDef, BaseExp, BaseSource, Bases, Dim, Exp, MAX_TRUE_BASES};
+#[cfg(all(feature = "std", feature = "shrink_wrap"))]
+pub use dim::{BaseDefOwned, BaseExpOwned, DimOwned, DimWireOwned, NotCanonical};
+#[doc(hidden)]
 pub use exact::Fraction8;
 #[doc(hidden)]
 pub use exact::order_parts as __order_parts;
@@ -144,29 +152,29 @@ pub use si_expr::SIExprOwned;
 pub use si_expr::{CompactError, SIExpr};
 pub use si_prefix::{FullScaleBits, Pow2Exp, Pow10Exp, Prefix, PrefixDecimal, PrefixRatio};
 pub use tree::MAX_UNIT_DEPTH;
-#[doc(hidden)]
-pub use unit::exp as __dim_exp;
 pub use unit::{
-    Counted, Dim, MAX_COUNTED, MarkerId, PrefixPolicy, PrefixSet, Provenance, Unit, UnitDef,
-    UnitDiv, UnitExpr, UnitMul, UnitNames, UnitTable,
+    MarkerId, PrefixPolicy, PrefixSet, Provenance, Unit, UnitDef, UnitDiv, UnitExpr, UnitMul,
+    UnitNames, UnitTable,
 };
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
-pub use unit::{
-    CountedOwned, DimOwned, MarkerIdOwned, ProvenanceOwned, UnitDefOwned, UnitNamesOwned,
-};
+pub use unit::{MarkerIdOwned, ProvenanceOwned, UnitDefOwned, UnitNamesOwned};
 pub use window::{Fit, Window};
 
-/// The [Dim] of a counted unit marker `Name` of the crate this is written in: `Dim::counted(<this crate>, "Name")`,
-/// with the crate as Rust names it (`CARGO_CRATE_NAME`). Two crates' markers of the same name are different bases.
+/// The [MarkerId] of the marker `Name` of the crate this is written in, with the crate as Rust names it
+/// (`CARGO_CRATE_NAME`): a distinguished base a crate declares with `base` on a [unit!](crate::unit) line is
+/// `Dim::base(base!(Name))`. Two crates' markers of the same name are different bases.
 ///
 /// ```
-/// let bucket = exact_units::counted!(Bucket);
-/// assert_eq!(bucket, exact_units::Dim::counted(env!("CARGO_CRATE_NAME"), "Bucket"));
-/// assert_eq!(bucket.to_string(), "Bucket");
+/// let pixel = exact_units::Dim::base(exact_units::base!(Pixel));
+/// assert_eq!(exact_units::base!(Pixel).crate_name, env!("CARGO_CRATE_NAME"));
+/// assert_eq!(pixel.to_string(), "Pixel");
 /// ```
 #[macro_export]
-macro_rules! counted {
+macro_rules! base {
     ($name:ident) => {
-        $crate::Dim::counted(env!("CARGO_CRATE_NAME"), stringify!($name))
+        $crate::MarkerId {
+            crate_name: env!("CARGO_CRATE_NAME"),
+            name: stringify!($name),
+        }
     };
 }

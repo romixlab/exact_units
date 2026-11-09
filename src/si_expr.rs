@@ -1,7 +1,8 @@
 //! Units known only at run time: [SIExpr], the same model as the markers of [units](crate::units) put on the wire.
 
+use crate::Dim;
 use crate::tree::{self, Node, Resolved, Tree};
-use crate::unit::{Dim, MarkerId, Unit, UnitDef, UnitExpr, UnitTable};
+use crate::unit::{MarkerId, Unit, UnitDef, UnitExpr, UnitTable};
 #[cfg(feature = "std")]
 use crate::unit::{MarkerIdOwned, UnitDefOwned};
 use core::fmt;
@@ -76,15 +77,21 @@ impl SIExpr<'static> {
 }
 
 impl<'i> SIExpr<'i> {
-    /// SI base-unit exponents of the whole tree, its references looked up in `table`; `None` when one leaves
-    /// -8..=7, a reference isn't listed, a part doesn't decode or the tree is deeper than
-    /// [MAX_UNIT_DEPTH](crate::MAX_UNIT_DEPTH).
+    /// The dimension of the whole tree, its references looked up in `table`; `None` when an exponent leaves ±63½, a
+    /// reference isn't listed, a part doesn't decode or the tree is deeper than
+    /// [MAX_UNIT_DEPTH](crate::MAX_UNIT_DEPTH). Owned, as the lookup is gone after the call; without `std`,
+    /// [same_dim](Self::same_dim) compares, and [tree::dim] of a [Resolved] borrows it.
+    #[cfg(feature = "std")]
     #[must_use]
-    pub fn dim<'a, T: UnitTable + ?Sized>(&self, table: &'a T) -> Option<Dim<'a>>
-    where
-        'i: 'a,
-    {
-        tree::dim(&self.resolved(table))
+    pub fn dim<T: UnitTable + ?Sized>(&self, table: &T) -> Option<crate::DimOwned> {
+        tree::dim(&self.resolved(table)).map(crate::DimOwned::from)
+    }
+
+    /// Whether the whole tree, its references looked up in `table`, has the dimension `d`; `None` like
+    /// [dim](Self::dim).
+    #[must_use]
+    pub fn same_dim<T: UnitTable + ?Sized>(&self, table: &T, d: Dim<'_>) -> Option<bool> {
+        tree::dim(&self.resolved(table)).map(|x| x.same(d))
     }
 
     /// The factor to coherent SI of the whole tree as a float, [magnitude](Self::magnitude) is the exact one; `None`
@@ -340,6 +347,17 @@ fn ref_node<E>(id: MarkerId<'_>) -> Node<'_, E> {
     }
 }
 
+/// The tree's bases, its references unresolved (a `Ref` has none to give: wrap it in a [Resolved]).
+impl crate::BaseSource for SIExpr<'_> {
+    fn exp_of(&self, base: MarkerId<'_>) -> Option<i32> {
+        tree::exp_of(self, base)
+    }
+
+    fn each_base<'s>(&'s self, f: &mut dyn FnMut(MarkerId<'s>)) -> bool {
+        tree::each_base(self, &mut |b| f(b))
+    }
+}
+
 impl<'i> Tree<'i> for SIExpr<'i> {
     fn node(&self) -> Option<Node<'i, Self>> {
         Some(match self {
@@ -387,6 +405,16 @@ mod owned {
     use std::boxed::Box;
     use std::string::ToString;
 
+    impl crate::BaseSource for &SIExprOwned {
+        fn exp_of(&self, base: crate::MarkerId<'_>) -> Option<i32> {
+            tree::exp_of(self, base)
+        }
+
+        fn each_base<'s>(&'s self, f: &mut dyn FnMut(crate::MarkerId<'s>)) -> bool {
+            tree::each_base(self, &mut |b| f(b))
+        }
+    }
+
     impl<'a> Tree<'a> for &'a SIExprOwned {
         fn node(&self) -> Option<Node<'a, Self>> {
             Some(match *self {
@@ -424,8 +452,14 @@ mod owned {
     impl SIExprOwned {
         /// Like [SIExpr::dim].
         #[must_use]
-        pub fn dim<'a, T: UnitTable + ?Sized>(&'a self, table: &'a T) -> Option<Dim<'a>> {
-            tree::dim(&Resolved::new(self, table))
+        pub fn dim<T: UnitTable + ?Sized>(&self, table: &T) -> Option<crate::DimOwned> {
+            tree::dim(&Resolved::new(self, table)).map(crate::DimOwned::from)
+        }
+
+        /// Like [SIExpr::same_dim].
+        #[must_use]
+        pub fn same_dim<T: UnitTable + ?Sized>(&self, table: &T, d: Dim<'_>) -> Option<bool> {
+            tree::dim(&Resolved::new(self, table)).map(|x| x.same(d))
         }
 
         /// Like [SIExpr::factor].

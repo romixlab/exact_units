@@ -28,8 +28,8 @@ use exact_units::units::{self, Byte, Cycle, Per, Sample, Second};
 use exact_units::{Bytes, Fixed, Rounding, Unit};
 
 exact_units::unit! {
-    /// One record of this recorder's own log format: an API's own counted thing.
-    struct Record = "record", counted;
+    /// One record of this recorder's own log format: an API's own counted thing, a base of its own.
+    struct Record = "record", base;
 }
 
 type Rate = Fixed<Per<Sample, Second>, One, u32>;

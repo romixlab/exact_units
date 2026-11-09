@@ -64,10 +64,10 @@ fn main() {
     );
     assert!((same.get() - noise.get()).abs() < 1e-3);
 
-    // the dimension has a root flag, and prints with a half exponent
+    // the dimension holds half exponents, and prints them
     let dim = <Density as Unit>::DIM;
     println!("V/√Hz is {dim}");
-    assert!(dim.root);
+    assert_eq!(dim.s().whole(), None, "s to a half power");
 
     // what it costs: a `Fixed` of f32 is an f32; the √1000 is a constant folded at compile time
     assert_eq!(size_of::<Fixed<Density, Nano, f32>>(), size_of::<f32>());

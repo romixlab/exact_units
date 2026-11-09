@@ -9,9 +9,10 @@
 //! compiler gets their [Unit] impls from it, and the snapshot of this crate (WireWeaver's walker reads the same
 //! lines) their docs and definitions, so clients know them without a table (INT-13).
 
+use crate::Dim;
 #[cfg(feature = "shrink_wrap")]
 use crate::SIExpr;
-use crate::unit::{Dim, Unit, UnitDef, UnitExpr, UnitTable};
+use crate::unit::{Unit, UnitDef, UnitExpr, UnitTable};
 use crate::{Kind, MAX_UNIT_DEPTH};
 use core::marker::PhantomData;
 #[cfg(feature = "shrink_wrap")]
@@ -330,7 +331,7 @@ crate::unit! {
 
     /// Angle in radians, rad: a base dimension of its own here, so an angle doesn't mix with a [Ratio].
     #[cfg(feature = "angle")]
-    pub struct Radian = "rad" (long "radian", ucum "rad"), [rad 1];
+    pub struct Radian = "rad" (long "radian", ucum "rad", prefixes decimal), base;
 
     /// Angle in degrees of arc, ° (π/180 rad, exactly: an exact [Magnitude](crate::Magnitude)).
     #[cfg(feature = "angle")]
@@ -353,7 +354,7 @@ crate::unit! {
     #[cfg(feature = "angle")]
     pub struct AngularAcceleration = "rad/s²" (long "radian per second squared" plural "radians per second squared", ucum "rad/s2"), [rad 1, s -2];
 
-    // Levels: the neper is a base of its own (a counted base of this crate), like the radian, so a level doesn't mix
+    // Levels: the neper is a base of its own (a distinguished base of this crate), like the radian, so a level doesn't mix
     // with a Ratio and a rate of one (Np/m, dB/s) not with a wavenumber or a hertz. A loss is a second base: a loss and
     // a gain of the same number are each other's negation, crossed by the named steps `as_loss` and `as_gain`.
 
@@ -362,40 +363,40 @@ crate::unit! {
     /// its own here: [Fixed::to_level](crate::Fixed::to_level) and [to_gain](crate::Fixed::to_gain) cross from and to
     /// a gain (V/V, W/W).
     #[cfg(feature = "levels")]
-    pub struct Neper = "Np" (long "neper", ucum "Np"), counted;
+    pub struct Neper = "Np" (long "neper", ucum "Np"), base;
 
     /// A level in decibels, dB ((ln 10)/20 [Neper], exactly): 20·lg of a root-power ratio, 10·lg of a power ratio,
     /// the same number for both. Signed as a gain.
     #[cfg(feature = "levels")]
-    pub struct Decibel = "dB" (long "decibel", ucum "dB"), counted(Neper), Exact(1 / 20, ln10 1);
+    pub struct Decibel = "dB" (long "decibel", ucum "dB"), base(Neper), Exact(1 / 20, ln10 1);
 
     /// A level in bels, B ((ln 10)/2 [Neper], 10 [Decibel]), the unit the decibel is a tenth of (IEC 80000-3). Its
     /// symbol is the byte's too: text reads `5 B` as one of them only where the quantity it goes into says which.
     #[cfg(feature = "levels")]
-    pub struct Bel = "B" (long "bel", ucum "B"), counted(Neper), Exact(1 / 2, ln10 1);
+    pub struct Bel = "B" (long "bel", ucum "B"), base(Neper), Exact(1 / 2, ln10 1);
 
     /// A loss in nepers, Np: a [Neper] level signed as a loss, positive for a decay, as attenuation coefficients and
     /// datasheets write it. A base of its own, so a loss doesn't convert to a gain: `as_gain` negates. Written
     /// `Loss<Neper>` ([Loss]).
     #[cfg(feature = "levels")]
-    pub struct NeperLoss = "Np" (long "neper", ucum "Np"), counted;
+    pub struct NeperLoss = "Np" (long "neper", ucum "Np"), base;
 
     /// A loss in decibels, dB ((ln 10)/20 [NeperLoss], exactly): a cable's 17.7 dB/100 m is
     /// `Per<Loss<Decibel>, _>` of +17.7. Written `Loss<Decibel>` ([Loss]).
     #[cfg(feature = "levels")]
-    pub struct DecibelLoss = "dB" (long "decibel", ucum "dB"), counted(NeperLoss), Exact(1 / 20, ln10 1);
+    pub struct DecibelLoss = "dB" (long "decibel", ucum "dB"), base(NeperLoss), Exact(1 / 20, ln10 1);
 
     /// Absorbance A = −lg T of a transmitted power ratio T, AU ((ln 10)/2 [NeperLoss], exactly): the loss in bels of
     /// power, so 1 AU is 10 dB. Decadic, and positive for a decay as a [DecibelLoss] is; a lab's "OD". `Fixed<Absorbance,
     /// Milli, _>` prints mAU. [to_gain](crate::Fixed::to_gain) into `Per<Watt, Watt>` is T.
     #[cfg(feature = "levels")]
-    pub struct Absorbance = "AU" (long "absorbance unit"), counted(NeperLoss), Exact(1 / 2, ln10 1);
+    pub struct Absorbance = "AU" (long "absorbance unit"), base(NeperLoss), Exact(1 / 2, ln10 1);
 
     /// Optical depth τ = −ln T of a transmitted power ratio T, τ (½ [NeperLoss], exactly): power falls as e^(−τ), its
     /// field as e^(−τ/2), so 1 Np of loss is 2 of depth. τ = ln 10 · A of an [Absorbance], a conversion by name for
     /// integers.
     #[cfg(feature = "levels")]
-    pub struct OpticalDepth = "τ" (ascii "tau"), counted(NeperLoss), Exact(1 / 2);
+    pub struct OpticalDepth = "τ" (ascii "tau"), base(NeperLoss), Exact(1 / 2);
 
     /// A damping ratio, ζ: δ/ω₀ of a second-order system (x″ + 2ζω₀·x′ + ω₀²·x = 0), 1 at critical damping. A number of
     /// the kind `damping ratio`, so it isn't a plain `Ratio` or a [QualityFactor] (Q = 1/(2ζ)): `damping_ratio` and
@@ -601,7 +602,7 @@ crate::unit! {
 
     /// Information in bits, bit: the base of information, so a size never mixes with a [Ratio] or a count of things.
     #[cfg(feature = "information")]
-    pub struct Bit = "bit" (long "bit", ucum "bit", prefixes decimal_and_binary), [bit 1];
+    pub struct Bit = "bit" (long "bit", ucum "bit", prefixes decimal_and_binary), base;
 
     /// Information in nibbles, nibble (4 [Bit]): a hex digit, a BCD digit, a 4-bit field. Not to be confused with
     /// shrink_wrap's `Nibble`, the 4-bit storage a `Fixed` may hold its number in.
@@ -625,65 +626,65 @@ crate::unit! {
     #[cfg(feature = "information")]
     pub struct Doubleword = "doubleword" (long "doubleword"), [bit 1], Exact(64 / 1);
 
-    // Counting: each marker is a base dimension of its own (a counted base, named by its crate and marker name), so
+    // Counting: each marker is a base dimension of its own (a distinguished base, named by its crate and marker name), so
     // samples don't add to bytes, and become bytes only through a `Per<Byte, Sample>`. An API that counts something else
-    // declares its own marker with `exact_units::counted!(Name)`, see [Unit].
+    // declares its own marker with a `base` line of `unit!` (`exact_units::base!(Name)` is its id), see [Unit].
 
     /// A count of things, item: a queue's length, a number of filters, channels, presses, repeats, steps.
     #[cfg(feature = "counting")]
-    pub struct Item = "item" (long "item"), counted;
+    pub struct Item = "item" (long "item"), base;
 
     /// A count of samples, sample: an ADC's, a logic analyzer's; a sample rate is `Per<Sample, Second>`.
     #[cfg(feature = "counting")]
-    pub struct Sample = "sample" (long "sample"), counted;
+    pub struct Sample = "sample" (long "sample"), base;
 
     /// A count of frames, frame (a bus's, a video's).
     #[cfg(feature = "counting")]
-    pub struct Frame = "frame" (long "frame"), counted;
+    pub struct Frame = "frame" (long "frame"), base;
 
     /// A count of packets, packet.
     #[cfg(feature = "counting")]
-    pub struct Packet = "packet" (long "packet"), counted;
+    pub struct Packet = "packet" (long "packet"), base;
 
     /// A count of lines, line: of a text, a file, a log.
     #[cfg(feature = "counting")]
-    pub struct Line = "line" (long "line"), counted;
+    pub struct Line = "line" (long "line"), base;
 
     /// A count of rows, row: of a table, a grid, a report.
     #[cfg(feature = "counting")]
-    pub struct Row = "row" (long "row"), counted;
+    pub struct Row = "row" (long "row"), base;
 
     /// A count of records, record: of a store, a file format, a ring buffer.
     #[cfg(feature = "counting")]
-    pub struct Record = "record" (long "record"), counted;
+    pub struct Record = "record" (long "record"), base;
 
     /// A count of entries, entry: of a log, a list, a directory, a table of contents.
     #[cfg(feature = "counting")]
-    pub struct Entry = "entry" (long "entry" plural "entries"), counted;
+    pub struct Entry = "entry" (long "entry" plural "entries"), base;
 
     /// A count of cycles, cycle: clock cycles, time quanta; time only with a clock (`Per<Cycle, Second>`).
     #[cfg(feature = "counting")]
-    pub struct Cycle = "cycle" (long "cycle"), counted;
+    pub struct Cycle = "cycle" (long "cycle"), base;
 
     /// A count of blocks, block: of a block device, whose size differs per device (bytes through `Per<Byte, Block>`).
     #[cfg(feature = "counting")]
-    pub struct Block = "block" (long "block"), counted;
+    pub struct Block = "block" (long "block"), base;
 
     /// A count of sectors, sector: of a flash or a disk (bytes through `Per<Byte, Sector>`).
     #[cfg(feature = "counting")]
-    pub struct Sector = "sector" (long "sector"), counted;
+    pub struct Sector = "sector" (long "sector"), base;
 
     /// A count of chunks, chunk: of a transfer or a file format (bytes through `Per<Byte, Chunk>`).
     #[cfg(feature = "counting")]
-    pub struct Chunk = "chunk" (long "chunk"), counted;
+    pub struct Chunk = "chunk" (long "chunk"), base;
 
     /// A count of characters, char: of a UART line (an idle time in characters).
     #[cfg(feature = "counting")]
-    pub struct Char = "char" (long "char"), counted;
+    pub struct Char = "char" (long "char"), base;
 
     /// A count of raw codes of a converter, code: an ADC's or DAC's output before scaling (LSB).
     #[cfg(feature = "counting")]
-    pub struct Code = "code" (long "code"), counted;
+    pub struct Code = "code" (long "code"), base;
 }
 
 // Compound
@@ -707,8 +708,8 @@ pub struct Times<A, B> {
 }
 
 /// `√U`, the square root of a unit: an amplitude spectral density in V/√Hz is `Per<Volt, Sqrt<Hertz>>`. Its
-/// dimension has the root flag ([Dim::sqrt](crate::Dim::sqrt)): the exponents of V²/Hz, so the algebra stays integer.
-/// `Sqrt<Sqrt<U>>` doesn't compile (a fourth root isn't a [Dim]).
+/// dimension has half exponents ([Exp](crate::Exp)): V/√Hz is kg·m²·s⁻⁵ᐟ²·A⁻¹. `Sqrt<Sqrt<U>>` of a unit with an odd
+/// exponent doesn't compile (a quarter isn't an [Exp](crate::Exp)).
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Sqrt<U> {
     _u: PhantomData<U>,
@@ -730,7 +731,7 @@ const fn deeper(a: usize, b: usize) -> usize {
 }
 
 impl<U: Unit> Unit for Sqrt<U> {
-    const DIM: Dim<'static> = U::DIM.sqrt();
+    const DIM: Dim<'static> = Self::EXPR.dim();
     const KIND: Kind<'static> = U::KIND.sqrt();
     const DEPTH: usize = deeper(U::DEPTH, 0);
     const EXPR: &'static UnitExpr = {
@@ -783,7 +784,8 @@ pub struct Phase<A> {
 impl<A: PlaneAngle> Unit for Phase<A> {
     const DIM: Dim<'static> = {
         assert!(
-            A::DIM.same(Dim::ONE.with_rad(1)) && A::KIND.same(Kind::Plain),
+            A::DIM.same_typed(Dim::base(crate::MarkerId::RADIAN))
+                && A::KIND.same_typed(Kind::Plain),
             "Phase wraps a plane angle (rad, °, rev) of no kind of its own"
         );
         A::DIM
@@ -796,8 +798,8 @@ impl<A: PlaneAngle> Unit for Phase<A> {
 }
 
 impl<A: Unit, B: Unit> Unit for Per<A, B> {
-    const DIM: Dim<'static> = A::DIM.div(B::DIM);
-    const KIND: Kind<'static> = A::KIND.div(A::DIM, B::KIND, B::DIM);
+    const DIM: Dim<'static> = Self::EXPR.dim();
+    const KIND: Kind<'static> = A::KIND.div_typed(A::DIM, B::KIND, B::DIM);
     const DEPTH: usize = deeper(A::DEPTH, B::DEPTH);
     const EXPR: &'static UnitExpr = {
         check_depth(Self::DEPTH);
@@ -814,8 +816,8 @@ impl<A: Unit, B: Unit> Unit for Per<A, B> {
 }
 
 impl<A: Unit, B: Unit> Unit for Times<A, B> {
-    const DIM: Dim<'static> = A::DIM.mul(B::DIM);
-    const KIND: Kind<'static> = A::KIND.mul(A::DIM, B::KIND, B::DIM);
+    const DIM: Dim<'static> = Self::EXPR.dim();
+    const KIND: Kind<'static> = A::KIND.mul_typed(A::DIM, B::KIND, B::DIM);
     const DEPTH: usize = deeper(A::DEPTH, B::DEPTH);
     const EXPR: &'static UnitExpr = {
         check_depth(Self::DEPTH);

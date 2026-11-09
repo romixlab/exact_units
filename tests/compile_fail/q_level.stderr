@@ -150,8 +150,8 @@ note: inside `exact_units::literal::level::form::<Decibel>`
   |
  ::: src/literal/level.rs
   |
-  |           None if !U::DIM.same(U::DIM.strip_neper()) => panic!(
-  |  _______________________________________________________-
+  |           None if level => panic!(
+  |  __________________________-
   | |             "q!(x dB) and q!(x Np) are levels of a gain; against a value stored as a level, a level of gain and one \
   | |              of loss differ in sign: write its unit, q!(-3 Decibel) or q!(3 Loss<Decibel>)"
   | |         ),
@@ -185,8 +185,8 @@ note: inside `exact_units::literal::level::form::<DecibelLoss>`
   |
  ::: src/literal/level.rs
   |
-  |           None if !U::DIM.same(U::DIM.strip_neper()) => panic!(
-  |  _______________________________________________________-
+  |           None if level => panic!(
+  |  __________________________-
   | |             "q!(x dB) and q!(x Np) are levels of a gain; against a value stored as a level, a level of gain and one \
   | |              of loss differ in sign: write its unit, q!(-3 Decibel) or q!(3 Loss<Decibel>)"
   | |         ),

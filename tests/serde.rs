@@ -461,35 +461,46 @@ fn with_unit_round_trips_the_ends_of_wide_storages() {
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 #[test]
 fn dim_reads_only_canonical() {
-    use exact_units::{Dim, DimOwned};
+    use exact_units::{Dim, DimOwned, MarkerId};
 
-    let json = |s: i8, root: bool, counted: &str| {
+    let exps = |halves: &[i8]| {
+        let all: Vec<String> = halves
+            .iter()
+            .map(|h| format!(r#"{{"halves":{h}}}"#))
+            .collect();
+        all.join(",")
+    };
+    let json = |exps: &str, bases: &str| format!(r#"{{"exps":[{exps}],"bases":[{bases}]}}"#);
+    let base = |name: &str, halves: i8| {
         format!(
-            r#"{{"s":{s},"m":0,"kg":0,"a":0,"k":0,"mol":0,"cd":0,"rad":0,"bit":0,"root":{root},"counted":[{counted}]}}"#
+            r#"{{"base":{{"crate_name":"exact_units","name":"{name}"}},"exp":{{"halves":{halves}}}}}"#
         )
     };
-    let base = |name: &str, exp: i8| {
-        format!(r#"{{"crate_name":"exact_units","name":"{name}","exp":{exp}}}"#)
-    };
-    let (frame, sample) = (base("Frame", 1), base("Sample", 1));
+    let (frame, sample) = (base("Frame", 2), base("Sample", 2));
+    let per_s = exps(&[-2, 0, 0, 0, 0, 0, 0]);
 
-    let good = json(-1, false, &format!("{frame},{sample},null,null"));
+    let good = json(&per_s, &format!("{frame},{sample}"));
     let d: DimOwned = serde_json::from_str(&good).unwrap();
-    let want = Dim::counted("exact_units", "Frame")
-        .mul(Dim::counted("exact_units", "Sample"))
-        .div(Dim::new(1, 0, 0, 0, 0, 0, 0));
+    let id = |name| MarkerId {
+        crate_name: "exact_units",
+        name,
+    };
+    let (frame_d, sample_d, s) = (
+        Dim::base(id("Frame")),
+        Dim::base(id("Sample")),
+        Dim::new(1, 0, 0, 0, 0, 0, 0),
+    );
+    let fs = frame_d.checked_mul(&sample_d).unwrap();
+    let want = fs.checked_div(&s).unwrap();
     assert_eq!(d.as_dim(), want);
     assert_eq!(serde_json::to_string(&d).unwrap(), good);
 
     for bad in [
-        json(-1, false, &format!("{sample},{frame},null,null")),
-        json(-1, false, &format!("{sample},{sample},null,null")),
-        json(-1, false, &format!("null,{sample},null,null")),
-        json(-1, false, &format!("{},null,null,null", base("Sample", 0))),
-        json(-1, false, &format!("{},null,null,null", base("Sample", 8))),
-        json(8, false, "null,null,null,null"),
-        json(-9, false, "null,null,null,null"),
-        json(2, true, "null,null,null,null"),
+        json(&per_s, &format!("{sample},{frame}")),
+        json(&per_s, &format!("{sample},{sample}")),
+        json(&per_s, &base("Sample", 0)),
+        json(&exps(&[-2, 0, 0, 0, 0, 0]), ""),
+        json(&exps(&[-2, 0, 0, 0, 0, 0, 0, 0]), ""),
     ] {
         let e = serde_json::from_str::<DimOwned>(&bad).unwrap_err();
         assert!(e.to_string().contains("isn't canonical"), "{bad}: {e}");

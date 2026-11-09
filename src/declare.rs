@@ -12,7 +12,7 @@
 ///     /// Revolutions per minute: 2π rad / 60 s, exactly.
 ///     pub struct Rpm = "rpm", [rad 1, s -1], Exact(1 / 30, pi 1);
 ///     /// A count of buckets of a histogram, a base of its own (named by this crate and `Bucket`).
-///     pub struct Bucket = "bucket", counted;
+///     pub struct Bucket = "bucket", base;
 /// }
 /// use exact_units::{Fixed, Unit, prefix::One};
 ///
@@ -20,17 +20,18 @@
 /// let speed = Fixed::<Rpm, One, u8>::new(60);
 /// assert_eq!(format!("{speed}"), "60 rpm");
 /// assert!((Rpm::EXPR.factor() * 60.0 - TAU).abs() < 1e-12); // rad/s
-/// assert_eq!(Bucket::DIM, exact_units::counted!(Bucket));
+/// assert_eq!(Bucket::DIM, exact_units::Dim::base(exact_units::base!(Bucket)));
 /// ```
 ///
 /// Each line is `<attributes> <visibility> struct <Name> = "<symbol>" [(<names>)], <dimension>[, <scale>];`:
 ///
 /// - The attributes are the marker's (docs, `#[cfg(..)]`); its derives are `Copy, Clone, Debug, Default, PartialEq,
 ///   Eq, Hash`. A `#[cfg(..)]` applies to its impl too.
-/// - The dimension is a list of exponents of `s`, `m`, `kg`, `a`, `k`, `mol`, `cd`, `rad`, `bit` (`[kg 1, m 2, s -3,
-///   a -1]` for a volt, `[]` for a ratio), or `counted`: a counted base of its own named by the crate and the marker
-///   ([counted!](crate::counted)), or `counted(Other)`: the counted base of the marker `Other` of the same crate, a
-///   scaled unit of it (the decibel of the neper).
+/// - The dimension is a list of exponents of the true bases `s`, `m`, `kg`, `a`, `k`, `mol`, `cd` and the bases `rad`,
+///   `bit` (`[kg 1, m 2, s -3, a -1]` for a volt, `[]` for a ratio), each whole or a half (`[s -1/2]`, -64..=63½), or
+///   `base`: a distinguished base of its own named by the crate and the marker ([base!](crate::base),
+///   [BaseDef](crate::BaseDef)), or `base(Other)`: the base of the marker `Other` of the same crate, a scaled unit of it
+///   (the decibel of the neper). A true base named twice is a compile error.
 /// - The scale, an exact [Magnitude](crate::Magnitude), one when left out: `Pow10(-3)`, `Exact(1 / 180, pi 1)`
 ///   (`num / den`, then optionally `pow10 e`, `pow2 e`, `pi e`, `ln2 e`, `ln10 e`, `mu0 e`, `g e` in that order, see
 ///   [Magnitude::new](crate::Magnitude::new); the decibel is `Exact(1 / 20, ln10 1)` of the neper), so every reader
@@ -49,7 +50,7 @@
 ///   `u`, `Ω` as `Ohm`, `²` as `^2`) isn't its ASCII form, `long "ohm"` (the plural adds an s) or `long "foot" plural
 ///   "feet"`, `aliases ["nit", "nt"]`, `ucum "Ohm"`, and `prefixes none`, `decimal`, `decimal_and_binary` or `only
 ///   [Milli, Kilo]` ([PrefixPolicy](crate::PrefixPolicy)). Without `prefixes`, a coherent unit whose symbol is one
-///   word takes the SI prefixes and every other unit none (a scaled one, `min`; a counted one; a compound symbol,
+///   word takes the SI prefixes and every other unit none (a scaled one, `min`; a base of its own; a compound symbol,
 ///   whose parts take theirs).
 ///
 ///   ```
@@ -126,6 +127,7 @@ macro_rules! unit {
                 [] $(#[$($attr)*])* =>
                 impl $crate::Unit for $name {
                     const DIM: $crate::Dim<'static> = $crate::__unit_dim!($name $dim $(($base))?);
+                    const BASE: Option<$crate::BaseDef<'static>> = $crate::__unit_base!($name $dim $(($base))?);
                     const KIND: $crate::Kind<'static> = match Self::EXPR {
                         $crate::UnitExpr::Named(def) => def.kind(),
                         _ => $crate::Kind::Plain,
@@ -221,23 +223,146 @@ macro_rules! __with_cfgs {
     };
 }
 
-/// The dimension of a [unit!] line.
+/// The base a [unit!] line declares: its own with `base`, none otherwise (`base(Other)` is a scaled unit of `Other`'s).
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __unit_base {
+    ($name:ident base) => {
+        Some($crate::BaseDef {
+            id: $crate::base!($name),
+        })
+    };
+    ($name:ident $($rest:tt)*) => {
+        None
+    };
+}
+
+/// The dimension of a [unit!] line: `base`, `base(Other)` or `[<base> <exponent>, ..]`, where `rad` and `bit` are
+/// the reserved spellings of this crate's [Radian](crate::units::Radian) and [Bit](crate::units::Bit) and an
+/// exponent is whole or a half (`1/2`, `-5/2`).
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __unit_dim {
-    ($name:ident counted) => {
-        $crate::counted!($name)
+    ($name:ident base) => {
+        $crate::Dim::base($crate::base!($name))
     };
-    ($name:ident counted($base:ident)) => {
-        $crate::counted!($base)
+    ($name:ident base($base:ident)) => {
+        $crate::Dim::base($crate::base!($base))
     };
-    ($name:ident [$($d:ident $e:literal),* $(,)?]) => {{
-        #[expect(clippy::allow_attributes, reason = "mutated only when the dimension has exponents")]
-        #[allow(unused_mut, reason = "a dimension with no exponents is never changed")]
-        let mut dim = $crate::Dim::ONE;
-        $(dim.$d = $crate::__dim_exp($e);)*
-        dim
-    }};
+    ($name:ident [$($parts:tt)*]) => {
+        $crate::__unit_dim!(@split [] [] $($parts)*)
+    };
+    (@split [$($t:tt)*] [$($b:tt)*] $(,)?) => {
+        $crate::Dim::with_list(
+            {
+                #[expect(clippy::allow_attributes, reason = "mutated only when the dimension has exponents")]
+                #[allow(unused_mut, reason = "a dimension with no true base is never changed")]
+                let mut exps = [$crate::Exp::ZERO; $crate::MAX_TRUE_BASES];
+                $(exps = $crate::__dim_set(exps, $t);)*
+                exps
+            },
+            &[$($b)*],
+        )
+    };
+    (@split [$($t:tt)*] [$($b:tt)*] rad $n:literal $(/ $den:literal)? $(, $($rest:tt)*)?) => {
+        $crate::__unit_dim!(@split [$($t)*] [$($b)* $crate::BaseExp {
+            base: $crate::MarkerId { crate_name: "exact_units", name: "Radian" },
+            exp: $crate::__dim_exp($n, $crate::__dim_den!($($den)?)),
+        },] $($($rest)*)?)
+    };
+    (@split [$($t:tt)*] [$($b:tt)*] bit $n:literal $(/ $den:literal)? $(, $($rest:tt)*)?) => {
+        $crate::__unit_dim!(@split [$($t)*] [$($b)* $crate::BaseExp {
+            base: $crate::MarkerId { crate_name: "exact_units", name: "Bit" },
+            exp: $crate::__dim_exp($n, $crate::__dim_den!($($den)?)),
+        },] $($($rest)*)?)
+    };
+    (@split [$($t:tt)*] [$($b:tt)*] $d:ident $n:literal $(/ $den:literal)? $(, $($rest:tt)*)?) => {
+        $crate::__unit_dim!(@split [$($t)* (
+            $crate::__dim_index!($d),
+            $crate::__dim_exp($n, $crate::__dim_den!($($den)?))
+        )] [$($b)*] $($($rest)*)?)
+    };
+}
+
+/// The denominator of an exponent on a [unit!] line: 1 when none is written.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __dim_den {
+    () => {
+        1
+    };
+    ($den:literal) => {
+        $den
+    };
+}
+
+/// The index of a true base in [Dim::exps](crate::Dim::exps), by its name on a [unit!] line.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __dim_index {
+    (s) => {
+        $crate::Dim::S
+    };
+    (m) => {
+        $crate::Dim::M
+    };
+    (kg) => {
+        $crate::Dim::KG
+    };
+    (a) => {
+        $crate::Dim::A
+    };
+    (k) => {
+        $crate::Dim::K
+    };
+    (mol) => {
+        $crate::Dim::MOL
+    };
+    (cd) => {
+        $crate::Dim::CD
+    };
+    ($other:ident) => {
+        compile_error!(concat!(
+            "a base of a dimension is s, m, kg, a, k, mol, cd, rad or bit, not ",
+            stringify!($other)
+        ))
+    };
+}
+
+/// An exponent `num / den` of a [unit!] line, `den` 1 or 2. Panics (a compile error in the line's `const`) for
+/// another denominator or past ±63½.
+#[doc(hidden)]
+#[must_use]
+#[expect(
+    clippy::panic,
+    reason = "a compile error in unit!'s const items, the exponent is written on the line"
+)]
+pub const fn __dim_exp(num: i8, den: i8) -> crate::Exp {
+    match den {
+        1 => crate::Exp::int(num),
+        2 => crate::Exp::from_halves(num),
+        _ => panic!("an exponent of a dimension is whole or a half: n or n/2"),
+    }
+}
+
+/// `exps` with the true base `at.0` set to `at.1`. Panics (a compile error in the line's `const`) when the line
+/// names that base twice.
+#[doc(hidden)]
+#[must_use]
+#[expect(
+    clippy::indexing_slicing,
+    reason = "at.0 is one of Dim's index constants, below MAX_TRUE_BASES"
+)]
+pub const fn __dim_set(
+    mut exps: [crate::Exp; crate::MAX_TRUE_BASES],
+    at: (usize, crate::Exp),
+) -> [crate::Exp; crate::MAX_TRUE_BASES] {
+    assert!(
+        exps[at.0].is_zero(),
+        "a base twice in the dimension of a unit! line"
+    );
+    exps[at.0] = at.1;
+    exps
 }
 
 /// The kind of quantity of a [unit!] line: `kind "<name>"` after the dimension, else none.
@@ -252,12 +377,12 @@ macro_rules! __unit_quantity {
     };
 }
 
-/// The names of a [unit!] line: the symbol, the dimension (a counted unit takes no prefix by default), the scale's
+/// The names of a [unit!] line: the symbol, the dimension (a `base` unit takes no prefix by default), the scale's
 /// kind (none for a coherent unit, which takes the SI prefixes by default) and the items of its `( .. )`.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __unit_names {
-    ([$symbol:literal] [counted] [$($kind:ident)?] $($items:tt)*) => {
+    ([$symbol:literal] [base] [$($kind:ident)?] $($items:tt)*) => {
         $crate::__unit_names!(@munch [] $crate::UnitNames::new($symbol, $crate::PrefixPolicy::None); $($items)*)
     };
     ([$symbol:literal] [$dim:tt] [] $($items:tt)*) => {

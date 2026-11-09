@@ -539,7 +539,7 @@ use crate::num::math;
 
 impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// The form a level of `U` takes, or a compile error for a kind without one.
-    pub(crate) const LEVEL_FORM: LevelForm = match U::KIND.level_form() {
+    pub(crate) const LEVEL_FORM: LevelForm = match U::KIND.level_form_typed() {
         Some(form) => form,
         None => panic!(
             "decibels are for a ratio of powers (W/W) or of root-power quantities (V/V, A/A, Pa/Pa): a plain \

@@ -1314,10 +1314,10 @@ impl Conversion {
     const fn between<U: Unit, P: FixedScale, U2: Unit, P2: FixedScale, T: Storage, T2: Storage>(
         rounding: bool,
     ) -> Self {
-        if !U::DIM.same(U2::DIM) {
+        if !U::DIM.same_typed(U2::DIM) {
             crate::conv_error::dim_mismatch::<U, U2>("a Fixed");
         }
-        if !U::KIND.same(U2::KIND) {
+        if !U::KIND.same_typed(U2::KIND) {
             crate::conv_error::kind_mismatch::<U, U2>("a Fixed");
         }
         let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
@@ -1338,10 +1338,10 @@ impl Conversion {
     >(
         rounding: bool,
     ) -> Self {
-        if !U::DIM.same(U2::DIM) {
+        if !U::DIM.same_typed(U2::DIM) {
             crate::conv_error::dim_mismatch::<U, U2>("a Fixed");
         }
-        if !U::KIND.same(U2::KIND) {
+        if !U::KIND.same_typed(U2::KIND) {
             crate::conv_error::kind_mismatch::<U, U2>("a Fixed");
         }
         let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {

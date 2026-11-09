@@ -385,10 +385,15 @@ counted units, and the kinds that keep look-alike quantities apart.
 - 📋 **UNIT-9 Dimension systems** · `foundations` — `SystemDef` with a rule by dimension and a bridge table by quantity,
   because Gaussian's D and P share a dimension and differ by a factor; `Natural` (ħ = c = 1) and `Gaussian` together,
   exact, with μ₀ as a symbol (NUM-10); distinguished bases pass through untouched.
-- 📋 **UNIT-10 The dimension's shape** · `foundations` — a system's true bases in an array (SI: 7); rad, Np, NpLoss, bit
-  and user counts as one list of distinguished dimensionless bases with no count limit (a const tree of `&'static`
-  nodes, a `Vec` at run time); exponents in halves with no root flag, `UNib32` with zigzag in the schema; `strip(base)`
-  and `true_part()`.
+- ✅ **UNIT-10 The dimension's shape** · `foundations` — a system's true bases in an array (SI: 7); rad, Np, NpLoss, bit
+  and user counts as one list of distinguished bases named by `MarkerId`, with no count limit (`Bases`: a const tree of
+  `&'static` nodes, a `Vec` in `DimOwned` at run time), read in one canonical order (crate, name) by `==`, `Hash`,
+  `Display` and the wire; exponents in halves (`Exp`), no root flag, an `INib32` on the wire; `strip(base)` and
+  `true_part()`; `unit!` lines with `base`, `base(Other)` and halves; `Unit::BASE: Option<BaseDef>`. Tests:
+  `tests/dynamic.rs` (`distinguished_bases`, six at once in any order; `halves`, V/√Hz; `dim_range`, m¹²;
+  `non_canonical_dims`), `tests/two_crates.rs` (a crate's `Pixel` takes `Radian`'s path), `tests/units.rs` (torque is
+  not energy until stripped), `tests/props/dim.rs` (the const walk against plain sums and `DimOwned`, the wire),
+  `tests/props/wire.rs` (`dims`: only a canonical `DimWire` decodes).
 
 ## Points and origins (`PT`)
 

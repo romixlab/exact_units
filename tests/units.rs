@@ -2,11 +2,11 @@
 #![cfg(all(feature = "std", feature = "quantities"))]
 
 use exact_units::units::{self, Per};
-use exact_units::{Prefix, Unit};
+use exact_units::{MarkerId, Prefix, Unit};
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
 
-/// rad, bit and counted bases are dimensions of their own (STD-60): bytes never turn into a ratio, an angular
+/// rad, bit and distinguished bases are dimensions of their own (STD-60): bytes never turn into a ratio, an angular
 /// velocity is not a frequency, and a count per thing times the thing is the count.
 #[test]
 fn angle_information_counting() {
@@ -24,12 +24,12 @@ fn angle_information_counting() {
     assert!(!<units::AngularVelocity as Unit>::DIM.same(<units::Hertz as Unit>::DIM));
     assert!(
         <units::AngularVelocity as Unit>::DIM
-            .strip_radian()
+            .strip(MarkerId::RADIAN)
             .same(<units::Hertz as Unit>::DIM)
     );
     assert!(
         <units::Torque as Unit>::DIM
-            .strip_radian()
+            .strip(MarkerId::RADIAN)
             .same(<units::Joule as Unit>::DIM)
     );
     assert!(!<units::Torque as Unit>::DIM.same(<units::Joule as Unit>::DIM));
@@ -45,11 +45,17 @@ fn angle_information_counting() {
     assert!(!<units::Sample as Unit>::DIM.is_one());
     let per_sample = <Per<units::Byte, units::Sample> as Unit>::DIM;
     assert_eq!(per_sample.to_string(), "bit·Sample⁻¹");
-    assert!(per_sample.mul(<units::Sample as Unit>::DIM).same(byte));
+    assert!(
+        per_sample
+            .checked_mul(&<units::Sample as Unit>::DIM)
+            .unwrap()
+            .same(byte)
+    );
     let rate = <Per<units::Sample, units::Second> as Unit>::DIM;
     assert!(!rate.same(<units::Hertz as Unit>::DIM));
     assert!(
-        rate.mul(<units::Second as Unit>::DIM)
+        rate.checked_mul(&<units::Second as Unit>::DIM)
+            .unwrap()
             .same(<units::Sample as Unit>::DIM)
     );
 }

@@ -58,9 +58,8 @@ macro_rules! products {
             $(#[doc = $doc])*
             const _: () = {
                 assert!(
-                    <crate::units::$a as crate::Unit>::DIM
-                        .mul(<crate::units::$b as crate::Unit>::DIM)
-                        .same(<crate::units::$o as crate::Unit>::DIM),
+                    <crate::units::Times<crate::units::$a, crate::units::$b> as crate::Unit>::DIM
+                        .same_typed(<crate::units::$o as crate::Unit>::DIM),
                     concat!(stringify!($a * $b = $o), ": SI exponents differ")
                 );
             };
