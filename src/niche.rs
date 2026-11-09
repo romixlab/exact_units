@@ -265,17 +265,19 @@ pub trait RawValue: Copy + sealed::Sealed {
     fn from_raw_unchecked(raw: Self::Raw, token: sealed::Token) -> Self;
 }
 
-mod sealed {
+pub(crate) mod sealed {
     /// Only this crate implements [RawValue](super::RawValue).
     pub trait Sealed {}
 
-    /// Proof that the caller is this crate: no constructor outside it.
+    /// Proof that the caller is this crate: no constructor outside it. `pub(crate)`, not `pub(super)`, so a
+    /// sibling module ([codec](crate::codec)'s `Coded`) can also implement [RawValue](super::RawValue); still no
+    /// constructor outside this crate.
     #[derive(Copy, Clone, Debug)]
-    pub struct Token(pub(super) ());
+    pub struct Token(pub(crate) ());
 }
 
 /// The integer range of a storage `T` with bounds `B`, `None` for a float.
-const fn int_range<T: Storage, B: Bounds<T>>() -> Option<(i128, i128)> {
+pub(crate) const fn int_range<T: Storage, B: Bounds<T>>() -> Option<(i128, i128)> {
     if T::IS_FLOAT {
         None
     } else {

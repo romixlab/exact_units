@@ -1,5 +1,6 @@
-use super::{Coded, MuLaw};
+use super::{Codec, Coded, MuLaw};
 use crate::Rounding;
+use crate::niche::RawValue;
 
 #[test]
 fn zero_byte_decodes_to_the_most_negative_sample() {
@@ -33,5 +34,47 @@ fn decode_encode_decode_is_idempotent() {
         let linear = Coded::<MuLaw>::from_raw(raw).get();
         let re_encoded = Coded::<MuLaw>::try_new(linear, Rounding::NearestEven).unwrap();
         assert_eq!(re_encoded.get(), linear, "{raw:#x}");
+    }
+}
+
+/// `Coded<MuLaw>`'s [RawValue] range is the whole byte: every code of `u8` decodes, so none is out of bounds.
+#[test]
+fn raw_value_range_is_the_whole_byte() {
+    assert_eq!(<Coded<MuLaw> as RawValue>::RANGE, Some((0, 255)));
+}
+
+/// [RawValue::try_from_raw] never refuses, for the same reason, and gives the same `Coded` [from_raw](Coded::from_raw) does.
+#[test]
+fn raw_value_try_from_raw_never_refuses() {
+    for raw in 0..=u8::MAX {
+        let v = <Coded<MuLaw> as RawValue>::try_from_raw(raw).unwrap();
+        assert_eq!(RawValue::raw(v), raw);
+        assert_eq!(v, Coded::<MuLaw>::from_raw(raw));
+    }
+}
+
+/// [CodecDef::decode] (the data alone, no type) agrees with [MuLaw]'s own typed [Codec::decode], for every byte.
+#[test]
+fn dynamic_decode_matches_the_typed_path() {
+    for raw in 0..=u8::MAX {
+        let typed = i128::from(Coded::<MuLaw>::from_raw(raw).get().get());
+        assert_eq!(
+            MuLaw::DEF.decode(i128::from(raw)),
+            Some(typed),
+            "{raw:#04x}"
+        );
+    }
+}
+
+/// [CodecDef::encode] agrees with [MuLaw]'s own typed [Codec::encode], for a few representative values (every
+/// `i16` is `tests/props/codec.rs`'s job).
+#[test]
+fn dynamic_encode_matches_the_typed_path() {
+    for value in [i16::MIN, -8031, -1, 0, 1, 8031, i16::MAX] {
+        let linear = crate::Fixed::<crate::units::Ratio, crate::prefix::Pow2<-13>, i16>::new(value);
+        let typed =
+            Coded::<MuLaw>::try_new(linear, Rounding::NearestEven).map(|c| i128::from(c.raw()));
+        let dynamic = MuLaw::DEF.encode(i128::from(value), Rounding::NearestEven);
+        assert_eq!(dynamic, typed.ok(), "{value}");
     }
 }

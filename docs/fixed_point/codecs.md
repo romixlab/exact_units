@@ -73,3 +73,48 @@ use exact_units::codec::{Codec, CodecShape, MuLaw};
 
 assert_eq!(MuLaw::DEF.shape, CodecShape::MuLaw);
 ```
+
+`CodecDef` (and `CodecShape`) also run the algorithm themselves, from the data alone: `decode` and `encode` take
+and give plain `i128`, no `Codec`, no generated type. `tests/props/codec.rs` checks this agrees with `MuLaw`'s own
+typed path for every byte and every `i16`, so a client that only has the schema (WireWeaver's eventual
+`MarkerDef::Codec`) computes the same bits as one compiled against this crate.
+
+```rust
+use exact_units::codec::MuLaw;
+use exact_units::Rounding;
+use exact_units::codec::Codec;
+
+assert_eq!(MuLaw::DEF.decode(0x80), Some(8031));
+assert_eq!(MuLaw::DEF.encode(8031, Rounding::NearestEven), Some(0x80));
+```
+
+With `shrink_wrap` on, `CodecDef` and `CodecShape` are on the wire too, every shape included (`Power`'s `gamma`,
+`Exp`'s `base` and `offset`, `Table`'s slice, each exact data, never a float standing in for a parameter).
+
+## Composing with `Niched`, not yet for real
+
+`Coded` implements `RawValue`, the trait `Fixed` and `Point` implement too, so `Niched<Coded<C, V, T>, N>` is a
+type that builds, read and written the same way a `Niched<Fixed<..>, N>` is. But every `Codec` in this crate is
+total — `decode` never refuses a code — so `Coded`'s whole raw range is already in bounds, and no code is left
+for a niche to claim. Trying anyway is a compile error, caught the same way a niche inside a `Fixed`'s bounds is:
+
+```rust,compile_fail
+use exact_units::codec::{Coded, MuLaw};
+use exact_units::niche::{Niched, Null};
+
+// every byte of MuLaw's Raw (u8) already decodes: 0xFF has nowhere left to mean "not available"
+let _ = Niched::<Coded<MuLaw>, Null<0xFF>>::try_from_raw(3);
+```
+
+This is exactly the shape IEEE 11073 SFLOAT needs (a NaN, ±∞ or "not at this resolution" code outside the linear
+formula), and exactly why it has no `Codec` here yet: it needs `decode` to leave such codes to a niche instead of
+deciding every one of them, a real design question for whoever implements it next (LVL-4 or IO-3), not settled
+by this foundation.
+
+## `Curve`, declared for LVL-4
+
+Non-linear conversions that aren't a code on the wire but a *named relationship between two quantities* (AWG,
+mpg ↔ L/100 km, Beaufort, Richter, shoe sizes) get their own trait, `Curve`, marked by `CurveKind`: `Exact` (mpg
+↔ L/100 km, a reciprocal), `Tabled` (AWG, Beaufort: named points, not a formula) or `Float` (Richter: the one kind
+that isn't exact, named so a client never has to guess). `Curve` is declared here, beside `Codec`, with no
+conversion method yet and no curve implementing it: LVL-4 gives it one and writes the first curves.

@@ -28,11 +28,14 @@
 //! # }
 //! ```
 
+#[cfg(all(feature = "std", feature = "shrink_wrap"))]
+use crate::MarkerIdOwned;
 #[cfg(feature = "dimensionless")]
 use crate::fixed::Fixed;
 #[cfg(feature = "dimensionless")]
 use crate::fixed::prefix::Pow2;
 use crate::fixed::{OutOfBounds, Storage};
+use crate::niche::{self, RawValue};
 use crate::{Magnitude, MarkerId, Rounding};
 use core::fmt;
 use core::hash::{Hash, Hasher};
@@ -68,8 +71,17 @@ pub trait Codec: Copy + 'static {
 /// Where a [Codec]'s algorithm is found, as data a client without the trait can run: an id ([MarkerId], as
 /// [UnitDef](crate::UnitDef)'s is) and a [CodecShape]. [Codec::DEF] carries one for every codec in this crate.
 ///
-/// Not yet on the wire (no `derive_shrink_wrap`): WireWeaver's `MarkerDef::Codec` is where this is read from a
-/// schema, and that walker and conformance corpus are its own, separate landing (a gap, not an oversight).
+/// On the wire (feature `shrink_wrap`): WireWeaver's `MarkerDef::Codec` is where a schema holds one; its walker,
+/// `ww_self`, `ww_si` and the conformance corpus are their own, separate landing (filed, not done here).
+#[cfg_attr(
+    feature = "shrink_wrap",
+    derive_shrink_wrap(
+        borrowed,
+        owned(feature = "std"),
+        derive_owned(Clone, Debug, PartialEq),
+        cfg_attr_owned(feature = "serde", derive(serde::Serialize, serde::Deserialize))
+    )
+)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CodecDef<'i> {
@@ -79,8 +91,41 @@ pub struct CodecDef<'i> {
     pub shape: CodecShape<'i>,
 }
 
+impl CodecDef<'_> {
+    /// `raw` decoded by this shape alone, as [CodecShape::decode] does: no type, no `Codec` impl, the same
+    /// algorithm `Codec::decode` runs. `None` for a shape with no algorithm here yet.
+    #[must_use]
+    pub fn decode(&self, raw: i128) -> Option<i128> {
+        self.shape.decode(raw)
+    }
+
+    /// `value` encoded by this shape alone, as [CodecShape::encode] does.
+    ///
+    /// # Errors
+    ///
+    /// `None` for a shape with no algorithm here yet, or where `value` is beyond every code's range.
+    #[must_use]
+    pub fn encode(&self, value: i128, rounding: Rounding) -> Option<i128> {
+        self.shape.encode(value, rounding)
+    }
+}
+
 /// What a [Codec] computes, as data: the family of algorithm, with its parameters where it has any. Every shape
 /// here is exact (a table or an integer formula) or names where it isn't yet, never a float standing in for it.
+#[cfg_attr(
+    feature = "shrink_wrap",
+    derive_shrink_wrap(
+        borrowed,
+        owned(feature = "std"),
+        derive_owned(Clone, Debug, PartialEq),
+        cfg_attr_owned(feature = "serde", derive(serde::Serialize, serde::Deserialize)),
+        cfg_attr_owned(
+            feature = "serde",
+            expect(clippy::unsafe_derive_deserialize, reason = "the unsafe is shrink_wrap's, in the generated owned type")
+        ),
+        ww_repr = unib32
+    )
+)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CodecShape<'i> {
@@ -107,6 +152,42 @@ pub enum CodecShape<'i> {
     /// The linear value of every code, ascending by raw code: IEEE 11073 SFLOAT's shape, where the codes outside a
     /// formula (NaN, ±∞, "not at this resolution") are the common case. No [Codec] in this crate yet (IO-3).
     Table(&'i [i128]),
+}
+
+impl CodecShape<'_> {
+    /// `raw` decoded by this shape, as its [Codec] would, but from the shape alone: a dynamic client's path, the
+    /// same algorithm as the typed one, never a separate implementation of it. `None` for a shape with no
+    /// algorithm here yet ([ALaw](Self::ALaw), [Power](Self::Power), [PiecewisePower](Self::PiecewisePower),
+    /// [Exp](Self::Exp), [Table](Self::Table)); never `None` for [MuLaw](Self::MuLaw), whose decode is total.
+    #[must_use]
+    pub fn decode(&self, raw: i128) -> Option<i128> {
+        match self {
+            CodecShape::MuLaw => {
+                let byte = u8::try_from(raw).ok()?;
+                Some(i128::from(mu_law_decode(byte)))
+            }
+            // every other shape today (ALaw, Power, PiecewisePower, Exp, Table), and (feature shrink_wrap) a
+            // shape wire bytes named that this version doesn't know
+            _ => None,
+        }
+    }
+
+    /// `value` encoded by this shape, as its [Codec] would, but from the shape alone.
+    ///
+    /// # Errors
+    ///
+    /// `None` for a shape with no algorithm here yet, or (for [MuLaw](Self::MuLaw)) where `value` doesn't fit the
+    /// `Linear`'s storage (`i16`); otherwise never refuses for [MuLaw](Self::MuLaw).
+    #[must_use]
+    pub fn encode(&self, value: i128, rounding: Rounding) -> Option<i128> {
+        match self {
+            CodecShape::MuLaw => {
+                let value = i16::try_from(value).ok()?;
+                Some(i128::from(mu_law_encode(value, rounding)))
+            }
+            _ => None,
+        }
+    }
 }
 
 /// A value given by a [Codec]'s code instead of a linear step: the bytes of `C::Raw`, nothing more (`size_of` is
@@ -201,6 +282,49 @@ impl<C: Codec<Linear = V, Raw = T>, V: fmt::Debug, T: Storage> fmt::Debug for Co
     }
 }
 
+impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> niche::sealed::Sealed for Coded<C, V, T> {}
+
+/// `Coded` composes with [Niched](niche::Niched), as [Fixed] and [Point](crate::Point) do: `Niched<Coded<C, V, T>,
+/// N>` is a type for any `N`, built and read the same way. But every code of `C::Raw` decodes ([Codec::decode] is
+/// total), so `Coded`'s whole raw range is in bounds and no code is free for a niche to claim: with every `Codec`
+/// in this crate total, `N::CODES` has nowhere to go, and a real niche set is a compile error, caught where a
+/// `Niched` method first checks the codes against the bounds (`niche`'s "a niche code is inside the bounds").
+///
+/// ```compile_fail
+/// # #[cfg(feature = "dimensionless")] {
+/// use exact_units::codec::{Coded, MuLaw};
+/// use exact_units::niche::{Niched, Null};
+///
+/// // every byte of MuLaw::Raw (u8) already decodes: 0xFF has nowhere left to mean "not available"
+/// let _ = Niched::<Coded<MuLaw>, Null<0xFF>>::try_from_raw(3);
+/// # }
+/// ```
+///
+/// The SFLOAT shape this crate names (`CodecShape::Table`) is exactly the future case `Niched<Coded<..>, N>` is
+/// for, a NaN or ±∞ code outside the codec's formula; it needs `Codec::decode` to leave such codes to a niche
+/// instead of deciding every one of them, which is a real, open design question for whoever implements it (LVL-4
+/// or IO-3), not decided here.
+impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> RawValue for Coded<C, V, T> {
+    type Raw = T;
+
+    const RANGE: Option<(i128, i128)> = niche::int_range::<T, crate::fixed::Unbounded>();
+
+    #[inline(always)]
+    fn raw(self) -> T {
+        self.raw
+    }
+
+    #[inline(always)]
+    fn try_from_raw(raw: T) -> Result<Self, OutOfBounds> {
+        Ok(Self::from_raw(raw))
+    }
+
+    #[inline(always)]
+    fn from_raw_unchecked(raw: T, _: niche::sealed::Token) -> Self {
+        Self::from_raw(raw)
+    }
+}
+
 /// ITU-T G.711 μ-law: 8 segments of 16 steps each, the step doubling every segment (2, 4, 8, .., 256), encoded in
 /// one byte. [decode](Codec::decode) is onto but not one-to-one (`0xFF` and `0x7F` both mean 0, the standard's
 /// "double zero"), and two adjacent segments leave a gap a few steps wide at the boundary (segment 0's 16 steps of
@@ -214,17 +338,16 @@ impl<C: Codec<Linear = V, Raw = T>, V: fmt::Debug, T: Storage> fmt::Debug for Co
 pub struct MuLaw;
 
 /// The bias a μ-law byte's magnitude is computed against, in the 14-bit domain: `(2·15 + 33) << 7 - 33 = 8031` is
-/// the largest magnitude a byte decodes to ([CLIP]).
-#[cfg(feature = "dimensionless")]
+/// the largest magnitude a byte decodes to ([CLIP]). Plain integer arithmetic, so unlike [MuLaw] itself this and
+/// the functions below need no unit feature: [CodecShape::decode] and [CodecShape::encode] call them too, for a
+/// dynamic client that runs the algorithm from [CodecDef] alone.
 const BIAS: i32 = 33;
 
 /// The largest magnitude a μ-law byte decodes to, and the clip [Codec::encode] applies before it computes a code.
-#[cfg(feature = "dimensionless")]
 const CLIP: i32 = 8031;
 
 /// `byte` decoded by [MuLaw], exactly: the sign, 3-bit segment and 4-bit mantissa it carries (one's complemented on
 /// the wire) give the 14-bit magnitude `((2·mantissa + 33) << segment) - 33`.
-#[cfg(feature = "dimensionless")]
 #[expect(
     clippy::as_conversions,
     reason = "const fn: From isn't const on stable; the final cast narrows a magnitude proven to be -8031..=8031"
@@ -260,7 +383,6 @@ const fn mu_law_decode(byte: u8) -> i16 {
 
 /// `value` (a signed 14-bit magnitude) encoded as a μ-law byte, rounded to the nearest code by `r`: the inverse of
 /// [mu_law_decode], clipped first to [CLIP]. Always some byte: encoding never refuses in this codec.
-#[cfg(feature = "dimensionless")]
 #[expect(
     clippy::as_conversions,
     reason = "const fn: From isn't const on stable; each narrowing cast is proven in its own `expect` below"
@@ -363,6 +485,29 @@ impl Codec for MuLaw {
     fn encode(value: Self::Linear, rounding: Rounding) -> Option<u8> {
         Some(mu_law_encode(value.get(), rounding))
     }
+}
+
+/// How a [Curve] computes: never a float standing in where an exact or tabled relationship holds (AGENTS.md
+/// "Every lossy step is named").
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum CurveKind {
+    /// A closed-form relationship, exact in both directions (mpg to L/100 km, an exact reciprocal).
+    Exact,
+    /// A table of named points, not a formula (AWG wire gauge, the Beaufort scale).
+    Tabled,
+    /// A floating-point approximation (Richter magnitude from amplitude): named so a client can always tell this
+    /// curve apart from an [Exact](CurveKind::Exact) or [Tabled](CurveKind::Tabled) one.
+    Float,
+}
+
+/// A named, non-linear conversion between two quantities: AWG, mpg ↔ L/100 km, Beaufort, Richter, shoe sizes
+/// (LVL-4), marked by [CurveKind] so a client never has to guess which it is. Declared here, beside [Codec], as
+/// the foundation; LVL-4 gives it a conversion (`convert` or similar, not fixed yet) and implements the first
+/// curves. No `Curve` in this crate yet.
+pub trait Curve: Copy + 'static {
+    /// Whether this curve is exact, tabled or a float approximation.
+    const KIND: CurveKind;
 }
 
 #[cfg(test)]
