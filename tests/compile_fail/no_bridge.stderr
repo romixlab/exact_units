@@ -12,9 +12,9 @@ note: inside `exact_units::fixed::Conversion::across::<Gaussian, Times<Per<Volt,
 note: inside `exact_units::fixed::Conversion::across_factor::<Gaussian, Times<Per<Volt, Meter>, MagneticFieldStrength>, exact_units::prefix::Product<One, One>, Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>>, One>`
  --> src/fixed.rs
   |
-  |         let bridge = crate::system::typed_bridge::<U, U2>();
-  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-note: inside `system::typed_bridge::<Times<Per<Volt, Meter>, MagneticFieldStrength>, Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>>>`
+  |         let bridge = crate::system::typed_bridge::<S, U, U2>();
+  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `system::typed_bridge::<Gaussian, Times<Per<Volt, Meter>, MagneticFieldStrength>, Per<Erg, Times<GaussianSecond, Times<GaussianCentimeter, GaussianCentimeter>>>>`
  --> src/system.rs
   |
   |         Err(e) => crate::conv_error::no_bridge::<U, U2>(e),
