@@ -1,4 +1,4 @@
-//! [Registry]: units read from text through their [UnitNames](crate::UnitNames), over tables of named units, without
+//! [Registry]: units read from text through their [UnitNames], over tables of named units, without
 //! a global and without alloc.
 
 use crate::exact::{number, scale};
@@ -153,7 +153,7 @@ impl fmt::Display for ParsedUnit<'_> {
         let write = |f: &mut fmt::Formatter<'_>, factor: &Factor<'_>, exp: i8| {
             let symbol = factor.reading.def.names.symbol;
             // a compound symbol in parentheses where it isn't the whole unit: `(cd/m²)²`, `m/(J/(kg·K))`
-            let parens = !crate::names::is_atom(symbol) && !(alone && exp == 1);
+            let parens = !(crate::names::is_atom(symbol) || alone && exp == 1);
             let (open, close) = if parens { ("(", ")") } else { ("", "") };
             write!(f, "{open}{}{symbol}{close}", factor.reading.prefix.symbol())?;
             if exp != 1 {
