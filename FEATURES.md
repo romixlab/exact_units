@@ -410,9 +410,23 @@ counted units, and the kinds that keep look-alike quantities apart.
   against the rules written out by hand; also a cycle of parents, one open root per dimension, and the wire
   round-trip of a `QuantityDef` with its parent as an id. Book: [Quantities](docs/maths/quantities.md),
   [`quantity!`](docs/units/declare.md#quantity).
-- 📋 **UNIT-9 Dimension systems** · `foundations` — `SystemDef` with a rule by dimension and a bridge table by quantity,
-  because Gaussian's D and P share a dimension and differ by a factor; `Natural` (ħ = c = 1) and `Gaussian` together,
-  exact, with μ₀ as a symbol (NUM-10); distinguished bases pass through untouched.
+- ✅ **UNIT-9 Dimension systems** · `foundations` — `SystemDef { id, bases, set_to_one, by_dim, by_quantity, no_rule }`
+  (`System` its marker trait) with a rule by dimension (`BaseRule`, each SI base's image and exact factor) and a table
+  by quantity (`BridgeDef`), because Gaussian's D and P share a dimension and differ by 4π; `systems::{Si, Natural,
+  Gaussian}` (feature `systems`), every factor exact, μ₀ a symbol until a set of constants names it (NUM-10). A `Dim`
+  belongs to a system (`Dim::system`, `true_count`; a dimension without true exponents to every one, written as SI's);
+  SI and another system in one unit don't compile. A value crosses only by `Fixed::to_system::<S>()`, a `Crossing`
+  finished by `convert`, `convert_rounded`, `convert_with::<Set, ..>` into a unit of `S` whose quantity says what it is
+  there; no bridge is a compile error with its reason (`BridgeError`): an SI base without an image, a quantity the rule
+  refuses (a frequency in Natural), a kind the rule can't name, an unnamed product of rows (E×H), a crossing within one
+  system that `convert` would refuse. Distinguished bases pass through untouched (a torque keeps its radian). C/m² and
+  A/m have no open root: D, P, surface charge density, H, M and linear current density are kinds. `unit!`/`quantity!`
+  lines name their system (`[Gaussian: g 1/2, cm -1/2, s -1]`); `const_bridge` and the run-time `bridge` give the
+  factor as data, and the wire carries `SystemDef` and a `Dim`'s system. Tests: `tests/systems.rs` (each crossing with
+  its exact factor, every row `const` and at run time, the wire), `tests/systems_laws.rs` (Coulomb, Lorentz, D = ε₀E,
+  B = μ₀H, P = 4π·D, Ohm and Faraday across the bridge, symbolic and under three sets), `tests/props/systems.rs` (both
+  rules against an exact reference, a bridge and its way back multiply to 1, neutral dimensions, wire round trips),
+  `tests/compile_fail/no_bridge.rs` and compile_fail doctests. Book: `docs/maths/systems.md`.
 - ✅ **UNIT-10 The dimension's shape** · `foundations` — a system's true bases in an array (SI: 7); rad, Np, NpLoss, bit
   and user counts as one list of distinguished bases named by `MarkerId`, with no count limit (`Bases`: a const tree of
   `&'static` nodes, a `Vec` in `DimOwned` at run time), read in one canonical order (crate, name) by `==`, `Hash`,
