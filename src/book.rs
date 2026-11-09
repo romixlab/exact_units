@@ -35,6 +35,8 @@ pages! {
     QFormats = "fixed_point/q_formats.md";
     Bam = "fixed_point/bam.md";
     Products = "fixed_point/products.md";
+    #[cfg(feature = "dimensionless")]
+    Codecs = "fixed_point/codecs.md";
     Points = "points/points.md";
     Wrapping = "points/wrapping.md";
     Registers = "points/registers.md";

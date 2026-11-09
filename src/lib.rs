@@ -57,6 +57,7 @@ struct ReadmeDoctests;
 #[cfg(all(doctest, feature = "std"))]
 mod book;
 
+pub mod codec;
 pub mod complex;
 pub mod constants;
 mod contains;

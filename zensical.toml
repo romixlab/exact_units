@@ -55,6 +55,7 @@ nav = [
             { "Advanced" = [
                     "fixed_point/products.md",
                     "fixed_point/cost.md",
+                    "fixed_point/codecs.md",
                 ]
             },
         ]

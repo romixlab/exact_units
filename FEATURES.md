@@ -511,9 +511,25 @@ non-linear named scales.
 - 📋 **LVL-5 Complex level rates** (was STD-98) — `Level` / `LossLevel` and the rate forms of LVL-3 on `Complex` and
   `Polar` quantities (a complex gain or loss, S-parameters and transfer functions as levels with a rate), once
   LVL-3's remaining pieces land.
-- 📋 **LVL-6 Codecs: non-linear encodings beside `Fixed`** · `foundations` — `Coded<C, V>` with the bytes of the raw
-  number, `Codec`, `CodecDef` as data (μ-law, A-law, gamma, exp, table), composing with `Niched`; a `Curve` trait for
-  named conversions. The foundation of LVL-4 and of IO-3's SFLOAT.
+- ✅ **LVL-6 Codecs: non-linear encodings beside `Fixed`** · `foundations` (P2401#3nov-0047d) — `codec::Coded<C, V,
+  T>` with the bytes of `C::Raw`, like `Niched`: `V` is `C::Linear`, `T` is `C::Raw`, both spelled out so a `Coded`
+  reads without following the trait. `Codec` (`type Raw: Storage`, `type Linear`, `const DEF: CodecDef`, total
+  `decode`, `encode(Linear, Rounding) -> Option<Raw>`); `CodecDef` names a `CodecShape` as data (`MuLaw`, `ALaw`,
+  `Power { gamma }`, `PiecewisePower`, `Exp { base, offset }`, `Table`), as `UnitDef`/`OriginDef`/`QuantityDef` are
+  data with a `MarkerId`. `MuLaw` is the worked codec: ITU-T G.711 μ-law's 8 segments of 16 steps, exact integer
+  formulas (no float), `Linear` is `Fixed<Ratio, Pow2<-13>, i16>` (the standard's native 14-bit domain, not the
+  widely used ×4-scaled 16-bit one). Decode is total and onto but not one-to-one (the standard's own redundant
+  negative zero, `0x7F`, decoding the same as `0xFF`); every other byte round-trips to itself, `encode` finds the
+  segment by a direct search and resolves the one ties-in-the-gap case (rounding past a segment's top 15th step)
+  by comparing both neighbouring codes' true distance, not a blind carry (a real bug the property test caught).
+  Tests: `tests/props/codec.rs`, every byte against an independent i128 reference, every `i16` target's `encode`
+  checked against a brute-force nearest-of-256 search, a Kani proof. Book:
+  [Codecs](docs/fixed_point/codecs.md). Not yet: `CodecDef`/`CodecShape` aren't on the wire (no
+  `derive_shrink_wrap`; WireWeaver's `MarkerDef::Codec`, its walker and its conformance corpus are a separate,
+  wire_weaver-side landing), `Coded` doesn't yet implement `RawValue` so it can't compose with `Niched` (needs
+  widening `niche`'s sealed token, left for LVL-4 or IO-3 when one of them actually needs it), and `ALaw`,
+  `Power`, `PiecewisePower`, `Exp` and `Table` have no `Codec` behind them yet (LVL-4, IO-3). A `Curve` trait for
+  named conversions between quantities is LVL-4's own, not part of this item.
 - ✅ **LVL-7 Level ranges** — `gain.is_in(q!(-3 dB ..= 3 dB, Inside))`, `q!(20 dB +- 1 dB, Inside)`, `q!(0 dB ..= 20 dB)` against a linear gain whose kind has a level form (NUM-22 parses them into `LiteralRange` of two `LevelLiteral` types, refusing a part of a level), each end folded as NUM-18 folds one level, then by NUM-22's rules: a gain that is no stored value (every level but whole decades) needs `, Inside` or `, Outside`, no empty or always-true range, NaN in no range. Integer and float storages. Tests: `tests/props/q_range_level.rs` (against `reference::range_order` over `q_level::order_db` / `order_np` in big integers, every `u16` walked; floats through the single compares), `tests/compile_fail/q_range_at.rs`, `tests/q_asm.rs`. Docs: [A range of levels](docs/levels/decibels.md#a-range-of-levels). P2401#8nov-0605c.
 
 ## Complex quantities (`CPX`)

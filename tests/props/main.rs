@@ -11,6 +11,8 @@
 )]
 
 mod arith;
+#[cfg(feature = "dimensionless")]
+mod codec;
 #[cfg(feature = "levels")]
 mod damping;
 mod dim;
