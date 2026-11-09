@@ -42,6 +42,42 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// use exact_units::systems::gaussian::Gauss;
     /// const D: Dim<'static> = <Times<Meter, Gauss> as Unit>::DIM;
     /// ```
+    ///
+    /// Within one system a crossing checks what [convert](Fixed::convert) checks: a metre is no second,
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Fixed, prefix::One, systems::Si, units::{Meter, Second}};
+    /// let _ = Fixed::<Meter, One, i32>::new(1).to_system::<Si>().convert::<Second, One, i32>();
+    /// ```
+    ///
+    /// a gauss no oersted,
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Fixed, prefix::One};
+    /// use exact_units::systems::{Gaussian, gaussian::{Gauss, Oersted}};
+    /// let _ = Fixed::<Gauss, One, i32>::new(1).to_system::<Gaussian>().convert::<Oersted, One, i32>();
+    /// ```
+    ///
+    /// and a ratio is no length: a dimension without true exponents counts in the system it is on, the target's.
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Fixed, prefix::One, systems::Si, units::{Meter, Ratio}};
+    /// let _ = Fixed::<Ratio, One, i32>::new(1).to_system::<Si>().convert::<Meter, One, i32>();
+    /// ```
+    ///
+    /// Where the system merges dimensions, a target without true exponents is one of it: an action is a number in
+    /// Natural, 1 J·s being 1/ħ there.
+    ///
+    /// ```
+    /// # #[cfg(feature = "systems")] {
+    /// use exact_units::{Fixed, Rounding, prefix::One, units::{Joule, Ratio, Second, Times}};
+    /// use exact_units::systems::{Natural, natural::HBAR};
+    ///
+    /// let hbar = Fixed::<Times<Joule, Second>, One, f64>::try_new(HBAR.to_f64()).unwrap();
+    /// let one = hbar.to_system::<Natural>().convert_rounded::<Ratio, One, f64>(Rounding::NearestEven).unwrap();
+    /// assert!((one.get() - 1.0).abs() < 1e-15);
+    /// # }
+    /// ```
     #[inline(always)]
     pub fn to_system<S: System>(self) -> Crossing<S, U, P, T, B> {
         Crossing {

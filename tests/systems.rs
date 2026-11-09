@@ -441,3 +441,33 @@ mod wire {
         assert_eq!(SystemDefOwned::try_from(read).expect("decodes"), owned);
     }
 }
+
+#[test]
+fn within_one_system_a_crossing_checks_as_convert() {
+    // the same system on both sides: no factor, but the dimension and the quantity are checked
+    assert_eq!(factor::<Meter, Second>(), Err(BridgeError::Dimension));
+    assert_eq!(factor::<Gauss, Oersted>(), Err(BridgeError::Quantity));
+    assert_eq!(factor::<Erg, Joule>().map(|_| ()), Ok(()));
+    // a ratio counts in the other side's system: no length, no energy
+    type R = exact_units::units::Ratio;
+    assert_eq!(factor::<R, Meter>(), Err(BridgeError::Dimension));
+    assert_eq!(
+        factor::<NaturalElectronVolt, R>(),
+        Err(BridgeError::Dimension)
+    );
+    // a ratio named in Natural is one there: 1 J·s is 1/ħ, ħ set to one
+    let in_natural = |s: Side<'static>| Side {
+        dim: Dim::in_system(Natural::ID, Natural::BASES, &[], &[]),
+        ..s
+    };
+    let to = in_natural(side::<R>());
+    type Action = Times<Joule, Second>;
+    assert_eq!(
+        const_bridge(side::<Action>(), to),
+        Ok(Magnitude::ONE.div(HBAR))
+    );
+    assert_eq!(
+        bridge(side::<Action>(), to, &()),
+        Ok(Magnitude::ONE.div(HBAR))
+    );
+}

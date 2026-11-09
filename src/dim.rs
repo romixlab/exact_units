@@ -541,6 +541,16 @@ impl<'i> Dim<'i> {
         (self.system, self.count)
     }
 
+    /// This dimension counted in `system` of `count` true bases, for one without true exponents, which belongs to
+    /// every system: the target of a crossing into `system`.
+    pub(crate) const fn with_system(self, system: SystemRef<'i>, count: u8) -> Dim<'i> {
+        Dim {
+            system,
+            count,
+            ..self
+        }
+    }
+
     /// Whether a true exponent isn't 0: a dimension without one belongs to every system.
     #[must_use]
     pub const fn has_true_exps(&self) -> bool {

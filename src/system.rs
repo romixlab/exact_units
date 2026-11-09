@@ -525,6 +525,9 @@ pub enum BridgeError {
     Dimension,
     /// A row matched one side's quantity but not the other's: the row gives another quantity.
     RowMismatch,
+    /// Both sides in one system, and the source's quantity doesn't convert to the target's (a gauss into an
+    /// oersted): as [Fixed::convert](crate::Fixed::convert) refuses.
+    Quantity,
     /// A factor past what a [Magnitude] holds.
     Factor,
     /// Data `const` code can't read (a definition known by its id only, a list read from bytes); at run time, a
@@ -556,6 +559,9 @@ impl BridgeError {
             BridgeError::Dimension => "the dimensions don't correspond across the systems",
             BridgeError::RowMismatch => {
                 "the system's row for one side gives another quantity on the other side"
+            }
+            BridgeError::Quantity => {
+                "both sides are in one system, and the source's quantity doesn't convert to the target's"
             }
             BridgeError::Factor => "the bridge's factor is past what a Magnitude holds",
             BridgeError::Unknown => "a definition read at run time, or not in the table",
@@ -606,8 +612,16 @@ macro_rules! c_some {
 pub const fn const_bridge(from: Side<'_>, to: Side<'_>) -> Result<Magnitude, BridgeError> {
     let (fs, ts) = (effective(&from, &to), effective(&to, &from));
     if fs.same(&ts) {
-        // within one system (a ratio, an angle): nothing to bridge
-        return Ok(Magnitude::ONE);
+        // within one system: no factor, and a plain conversion's checks
+        return match (
+            from.dim.const_same(to.dim),
+            from.quantity.const_converts(to.quantity),
+        ) {
+            (Some(false), _) => Err(BridgeError::Dimension),
+            (Some(true), Some(true)) => Ok(Magnitude::ONE),
+            (Some(true), Some(false)) => Err(BridgeError::Quantity),
+            _ => Err(BridgeError::Unknown),
+        };
     }
     let (si_to_x, x) = if fs.is_si() {
         (true, c_some!(ts.def()))
@@ -699,9 +713,10 @@ pub const fn const_bridge(from: Side<'_>, to: Side<'_>) -> Result<Magnitude, Bri
 }
 
 /// The system a side's dimension counts in: its own, or the other side's where it has no true exponent (a ratio,
-/// an angle belongs to every system).
+/// an angle belongs to every system) and names SI. A dimension without true exponents that names another system
+/// (eV·eV⁻¹ in Natural, or the target of a crossing into it) counts in that one.
 const fn effective<'a>(side: &Side<'a>, other: &Side<'a>) -> SystemRef<'a> {
-    if side.dim.has_true_exps() {
+    if side.dim.has_true_exps() || !side.dim.system().is_si() {
         side.dim.system()
     } else {
         other.dim.system()
@@ -911,7 +926,14 @@ pub fn bridge(
 ) -> Result<Magnitude, BridgeError> {
     let (fs, ts) = (effective(&from, &to), effective(&to, &from));
     if fs.same(&ts) {
-        return Ok(Magnitude::ONE);
+        if !from.dim.same(to.dim) {
+            return Err(BridgeError::Dimension);
+        }
+        return match from.quantity.converts(to.quantity, table) {
+            Some(true) => Ok(Magnitude::ONE),
+            Some(false) => Err(BridgeError::Quantity),
+            None => Err(BridgeError::Unknown),
+        };
     }
     let (si_to_x, x) = if fs.is_si() {
         (true, ts.resolve(table).ok_or(BridgeError::Unknown)?)
@@ -1059,8 +1081,18 @@ fn run_project(
 
 /// The bridge between two unit types' sides, for [Fixed::to_system](crate::Fixed::to_system): a compile error that
 /// names the reason where there is none.
-pub(crate) const fn typed_bridge<U: crate::Unit, U2: crate::Unit>() -> Magnitude {
-    let (from, to) = (typed_side::<U, U2>(), typed_side::<U2, U>());
+pub(crate) const fn typed_bridge<S: System, U: crate::Unit, U2: crate::Unit>() -> Magnitude {
+    let (from, mut to) = (typed_side::<U, U2>(), typed_side::<U2, U>());
+    if !to.dim.has_true_exps() {
+        // the target is a unit of S: a ratio or an angle there counts in S
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            reason = "a system has at most MAX_TRUE_BASES bases; From is not const"
+        )]
+        let count = S::BASES.len() as u8;
+        to.dim = to.dim.with_system(SystemRef::Def(S::DEF), count);
+    }
     match const_bridge(from, to) {
         Ok(m) => m,
         Err(e) => crate::conv_error::no_bridge::<U, U2>(e),

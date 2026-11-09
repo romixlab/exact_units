@@ -1393,7 +1393,7 @@ impl Conversion {
             !U2::DIM.has_true_exps() || U2::DIM.system().same(&crate::SystemRef::Id(S::ID)),
             "to_system::<S>() converts into a unit of S: the target unit is of another system"
         );
-        let bridge = crate::system::typed_bridge::<U, U2>();
+        let bridge = crate::system::typed_bridge::<S, U, U2>();
         let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
             crate::conv_error::no_exact_factor::<U, U2>("a Fixed")
         };
