@@ -36,14 +36,79 @@ pub mod origins;
 mod tests;
 
 /// What an [Origin]'s offset is measured from: [UnitZero] (0 K, vacuum) unless the zero is something only known at
-/// run time ([AmbientPressure] for gauge pressure, an encoder's index pulse). Points of origins with different
-/// references don't convert into each other at compile time.
+/// run time ([AmbientPressure] for gauge pressure, an encoder's index pulse) or a time scale's (TAI's, POSIX time's, a
+/// device's monotonic clock's). Points of origins with different references don't convert into each other at compile
+/// time.
 pub trait Reference: Copy + Default + 'static {
     /// Who the reference is: `exact_units::UnitZero`.
     const ID: crate::MarkerId<'static>;
 
     /// What the zero is, `""` for the unit's own zero: `"ambient pressure"`.
     const NAME: &'static str;
+
+    /// How its zero is known: [Exact](ReferenceHow::Exact), [RunTime](ReferenceHow::RunTime) or a
+    /// [TimeScale](ReferenceHow::TimeScale). No default: a reference says which it is.
+    const HOW: ReferenceHow;
+
+    /// All of it as data, for introspection and the API model.
+    const DEF: ReferenceDef = ReferenceDef {
+        id: Self::ID,
+        name: Self::NAME,
+        how: Self::HOW,
+    };
+}
+
+/// A [Reference] as data: what a client needs to tell whether points of two origins convert, and how.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ReferenceDef {
+    /// The crate and marker that declare it: [Reference::ID].
+    pub id: crate::MarkerId<'static>,
+    /// [Reference::NAME].
+    pub name: &'static str,
+    /// [Reference::HOW].
+    pub how: ReferenceHow,
+}
+
+/// How a [Reference]'s zero is known.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ReferenceHow {
+    /// A fixed zero of the unit ([UnitZero]): points against it convert at compile time.
+    Exact,
+    /// A zero only known at run time ([AmbientPressure], an encoder's index pulse): points reach another reference
+    /// only through [Point::against] with its value.
+    RunTime,
+    /// A time scale's zero: points convert at compile time within the scale, and between scales only as its
+    /// [TimeScaleDef] allows.
+    TimeScale(TimeScaleDef),
+}
+
+/// A time scale as data: how it counts seconds and how its zero is known.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TimeScaleDef {
+    /// Whether every SI second is counted (TAI, GPS) or every day is 86400 s (POSIX time).
+    pub counting: TimeCounting,
+    /// Whether the zero is an agreed moment (1958-01-01 TAI, 1970-01-01 UTC) or a device's own (its boot).
+    pub zero: TimeZero,
+}
+
+/// How a time scale counts its seconds.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TimeCounting {
+    /// Every SI second, uniformly: TAI and GPS time; a device's monotonic clock nominally (its crystal's rate).
+    EverySecond,
+    /// UTC as POSIX time counts it: every day is 86400 s, a leap second isn't counted (`time_t`, NTP). The
+    /// difference to TAI steps at each leap second and needs a table at run time.
+    PosixDays,
+}
+
+/// How a time scale's zero is known.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TimeZero {
+    /// An agreed moment, the same for everyone: TAI's 1958-01-01, POSIX time's 1970-01-01 UTC.
+    Agreed,
+    /// A moment of one clock, known only at run time and different per device and per boot: a device's monotonic
+    /// clock. Points reach another scale only through [Point::against] with where it lies there (a clock sync).
+    RunTime,
 }
 
 /// The unit's own zero: 0 K, 0 Pa (vacuum), the zero of an angle.
@@ -57,6 +122,8 @@ impl Reference for UnitZero {
     };
 
     const NAME: &'static str = "";
+
+    const HOW: ReferenceHow = ReferenceHow::Exact;
 }
 
 /// The pressure around the sensor, known only at run time: what gauge pressure is measured against.
@@ -70,6 +137,8 @@ impl Reference for AmbientPressure {
     };
 
     const NAME: &'static str = "ambient pressure";
+
+    const HOW: ReferenceHow = ReferenceHow::RunTime;
 }
 
 /// Whether the points of an origin wrap around: [Linear] (temperatures, pressures) or [Modulo] (angles).
@@ -144,7 +213,7 @@ pub trait Origin: Copy + Default + 'static {
         name: Self::NAME,
         symbol: Self::SYMBOL,
         unit: <Self::Unit as Unit>::EXPR,
-        reference: <Self::Reference as Reference>::ID,
+        reference: <Self::Reference as Reference>::DEF,
         offset: Self::OFFSET,
         modulus: <Self::Modulus as Modulus>::MODULUS,
         step: Self::STEP,
@@ -164,7 +233,7 @@ pub struct OriginDef {
     /// The unit of the points' numbers.
     pub unit: &'static UnitExpr,
     /// The [Reference] the offset is measured from: [UnitZero] for the unit's zero.
-    pub reference: crate::MarkerId<'static>,
+    pub reference: ReferenceDef,
     /// The origin above the reference, in the unit: [Origin::OFFSET].
     pub offset: Offset,
     /// The period in the unit, `None` when points don't wrap.

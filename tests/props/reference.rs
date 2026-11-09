@@ -579,3 +579,92 @@ pub(crate) mod range_order {
         Some(lo)
     }
 }
+
+/// The leap seconds of IERS Bulletin C 72 as IANA's `leap-seconds.list` writes them: NTP seconds (from 1900-01-01)
+/// and TAI − UTC from then on, and the list's expiry in NTP seconds.
+#[cfg(feature = "leap_seconds")]
+pub(crate) const LEAPS_NTP: ([(i128, i128); 28], i128) = (
+    [
+        (2_272_060_800, 10),
+        (2_287_785_600, 11),
+        (2_303_683_200, 12),
+        (2_335_219_200, 13),
+        (2_366_755_200, 14),
+        (2_398_291_200, 15),
+        (2_429_913_600, 16),
+        (2_461_449_600, 17),
+        (2_492_985_600, 18),
+        (2_524_521_600, 19),
+        (2_571_782_400, 20),
+        (2_603_318_400, 21),
+        (2_634_854_400, 22),
+        (2_698_012_800, 23),
+        (2_776_982_400, 24),
+        (2_840_140_800, 25),
+        (2_871_676_800, 26),
+        (2_918_937_600, 27),
+        (2_950_473_600, 28),
+        (2_982_009_600, 29),
+        (3_029_443_200, 30),
+        (3_076_704_000, 31),
+        (3_124_137_600, 32),
+        (3_345_062_400, 33),
+        (3_439_756_800, 34),
+        (3_550_089_600, 35),
+        (3_644_697_600, 36),
+        (3_692_217_600, 37),
+    ],
+    4_023_129_600,
+);
+
+/// What a leap table answers for a moment, in `1/den` s: the shifted moment, or why not.
+#[cfg(feature = "leap_seconds")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Leap {
+    At(i128),
+    Stale,
+    Inside,
+    Before,
+}
+
+/// POSIX time `p` (in `1/den` s from 1970-01-01 UTC) as TAI in `1/den` s from 1958-01-01 TAI, by [LEAPS_NTP].
+#[cfg(feature = "leap_seconds")]
+pub(crate) fn posix_to_tai(p: i128, den: i128) -> Leap {
+    let (table, expires) = LEAPS_NTP;
+    // NTP seconds of the moment, times den
+    let ntp = p + 2_208_988_800 * den;
+    if ntp >= expires * den {
+        return Leap::Stale;
+    }
+    match table.iter().rev().find(|(from, _)| ntp >= from * den) {
+        None => Leap::Before,
+        // 1958 to 1970 is 12 years with 3 leap days
+        Some((_, delta)) => Leap::At(p + (delta + (12 * 365 + 3) * 86_400) * den),
+    }
+}
+
+/// TAI `t` (in `1/den` s from 1958-01-01 TAI) as POSIX time in `1/den` s, by [LEAPS_NTP]: each leap second is the
+/// TAI second before its entry's `from + delta`.
+#[cfg(feature = "leap_seconds")]
+pub(crate) fn tai_to_posix(t: i128, den: i128) -> Leap {
+    let (table, expires) = LEAPS_NTP;
+    // TAI as an NTP-like count: seconds from 1900-01-01 on TAI's calendar, times den
+    let x = t + ((1958 - 1900) * 365 + 14) * 86_400 * den;
+    for (&(_, d0), &(from, d1)) in table.iter().zip(table.iter().skip(1)) {
+        if x >= (from + d0) * den && x < (from + d1) * den {
+            return Leap::Inside;
+        }
+    }
+    let Some(&(_, delta)) = table
+        .iter()
+        .rev()
+        .find(|(from, delta)| x >= (from + delta) * den)
+    else {
+        return Leap::Before;
+    };
+    let ntp = x - delta * den;
+    if ntp >= expires * den {
+        return Leap::Stale;
+    }
+    Leap::At(ntp - 2_208_988_800 * den)
+}

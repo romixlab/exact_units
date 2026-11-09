@@ -19,6 +19,8 @@ mod exact_text;
 #[cfg(not(any(kani, fuzzing)))]
 mod float_conv;
 mod format;
+#[cfg(feature = "leap_seconds")]
+mod leap;
 #[cfg(feature = "levels")]
 mod level;
 mod literal;

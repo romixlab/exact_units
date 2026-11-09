@@ -66,6 +66,8 @@ mod fixed;
 #[cfg(feature = "counting")]
 mod index;
 pub mod kind;
+#[cfg(feature = "leap_seconds")]
+pub mod leap;
 #[cfg(feature = "levels")]
 pub mod level;
 pub mod literal;
@@ -129,7 +131,8 @@ pub use magnitude::{
 };
 pub use point::{
     AmbientPressure, Linear, Modulo, Modulus, Offset, Origin, OriginDef, Point, PointArith,
-    PointDiff, Reference, UnitZero, origins,
+    PointDiff, Reference, ReferenceDef, ReferenceHow, TimeCounting, TimeScaleDef, TimeZero,
+    UnitZero, origins,
 };
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use si_expr::SIExprOwned;

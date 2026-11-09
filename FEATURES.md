@@ -405,9 +405,7 @@ and clocks with a named epoch.
   through its existing `origins` re-export (feature `time`). Docs: [points](docs/points/points.md#origins-the-crate-ships).
 - 📋 **PT-3 Instants and clocks with named epochs** (was STD-65) · `v0.5` — `Instant<Clock, ..>`: device-monotonic, Unix, TAI, GPS
   (TAI − 19 s), UTC through a versioned leap-second table on hosts; GPS week rollover as a `Seq` modulo 1024.
-- 📋 **PT-4 Time scales as references** · `foundations` — `ReferenceDef` (exact, run time, time scale); `TaiScale`,
-  `PosixScale`, `DeviceMonotonic`; `UnixEpoch` moves off `UnitZero`; within a scale exact at compile time, across
-  through a `LeapTable` at run time behind a cargo feature, `InLeap` inside a leap second. The foundation of PT-3.
+- ✅ **PT-4 Time scales as references** · `foundations` — `ReferenceDef` (`Exact`, `RunTime`, `TimeScale(TimeScaleDef)`), carried by `OriginDef`; `TaiScale` (`TaiEpoch1958`, `GpsEpoch`, `PtpEpoch`), `PosixScale` (`UnixEpoch`, `NtpEpoch`), `DeviceMonotonic` (`DeviceBoot`); `UnixEpoch` moved off `UnitZero`; within a scale exact at compile time, POSIX time to TAI only through `Point::across(&LeapTable)` at run time behind the feature `leap_seconds` (`BULLETIN_C_72`, `Stale`, `InLeap`). Aliases `TaiNanos`, `GpsSecs`, `GpsMillis`, `DeviceMicros` and kin. The foundation of PT-3. Docs: [Time scales](docs/points/time.md); tests: `tests/props/leap.rs`.
 - ✅ **PT-5 Point literals** — `q!(25 degC)`, `q!(77 degF)`, `q!(491.67 degR)`, `q!(25 "°C")`: a number in an
   origin's own step; `q!(298.15 K @ AbsoluteZero)`, `q!(220 kPa @ Gauge)`: a unit at any origin's type;
   `q!(77 @ Fahrenheit)`: the origin's step again. A `literal::LiteralAt<N, E, S, O>` compared with a `Point<O2,

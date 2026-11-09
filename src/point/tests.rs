@@ -79,6 +79,70 @@ mod time {
         );
         let _: Point<UnixEpoch, Micros<i64>> = Point::from_raw(-1);
     }
+
+    #[test]
+    fn time_scales() {
+        use crate::origins::{
+            DeviceBoot, DeviceMicros, GpsEpoch, GpsMillis, GpsSecs, NtpEpoch, NtpSecs, PosixScale,
+            PtpEpoch, PtpNanos, TaiEpoch1958, TaiNanos, TaiScale,
+        };
+        use crate::{Reference, ReferenceHow, TimeCounting, TimeScaleDef, TimeZero};
+        assert_eq!(UnixEpoch::DEF.reference, PosixScale::DEF);
+        assert_eq!(
+            PosixScale::HOW,
+            ReferenceHow::TimeScale(TimeScaleDef {
+                counting: TimeCounting::PosixDays,
+                zero: TimeZero::Agreed
+            })
+        );
+        assert_eq!(GpsEpoch::DEF.reference.id.name, "TaiScale");
+        assert_eq!(
+            TaiScale::HOW,
+            ReferenceHow::TimeScale(TimeScaleDef {
+                counting: TimeCounting::EverySecond,
+                zero: TimeZero::Agreed
+            })
+        );
+        assert_eq!(
+            DeviceBoot::DEF.reference.how,
+            ReferenceHow::TimeScale(TimeScaleDef {
+                counting: TimeCounting::EverySecond,
+                zero: TimeZero::RunTime
+            })
+        );
+        // GPS time is TAI - 19 s from 1980-01-06: 8040 days after 1958-01-01
+        assert_eq!(
+            GpsSecs::from_raw(0).to::<TaiEpoch1958, Nano, u64>(),
+            Some(TaiNanos::from_raw((8040 * 86_400 + 19) * 1_000_000_000))
+        );
+        assert_eq!(
+            GpsMillis::from_raw(1_500).to::<GpsEpoch, One, u64>(),
+            None,
+            "not a whole second"
+        );
+        // PTP is TAI from 1970: 315 964 819 s before the GPS epoch
+        assert_eq!(
+            GpsSecs::from_raw(0).to::<PtpEpoch, Nano, u64>(),
+            Some(PtpNanos::from_raw(315_964_819_000_000_000))
+        );
+        // NTP is 2 208 988 800 s before Unix, on the same scale
+        assert_eq!(
+            UnixSecs::from_raw(0).to::<NtpEpoch, One, u64>(),
+            Some(NtpSecs::from_raw(2_208_988_800))
+        );
+        assert_eq!(
+            NtpSecs::from_raw(0).to::<UnixEpoch, One, u64>(),
+            None,
+            "before 1970 in a u64"
+        );
+        // a device's clock reaches TAI only with where its boot lies there
+        let sample = DeviceMicros::from_raw(2_500_000);
+        let boot = Point::<TaiEpoch1958, Micros<u64>>::from_raw(2_000_000_000_000_000);
+        assert_eq!(
+            sample.against(boot),
+            Some(Point::from_raw(2_000_000_002_500_000))
+        );
+    }
 }
 
 #[cfg(feature = "thermal")]
@@ -292,7 +356,8 @@ mod thermal {
         assert_eq!(d.name, "Fahrenheit");
         assert_eq!(d.id.to_string(), "exact_units::Fahrenheit");
         assert_eq!(d.symbol, "°F");
-        assert_eq!(d.reference, <crate::UnitZero as crate::Reference>::ID);
+        assert_eq!(d.reference, <crate::UnitZero as crate::Reference>::DEF);
+        assert_eq!(d.reference.how, crate::ReferenceHow::Exact);
         assert_eq!(d.offset, Offset::ratio(45967, 180));
         assert_eq!(d.step, Magnitude::ratio(5, 9));
         assert_eq!(d.modulus, None);
@@ -347,10 +412,11 @@ mod pressure {
             Some(321_325)
         );
         assert_eq!(
-            Gauge::DEF.reference,
+            Gauge::DEF.reference.id,
             <crate::AmbientPressure as crate::Reference>::ID
         );
-        assert_eq!(Gauge::DEF.reference.name, "AmbientPressure");
+        assert_eq!(Gauge::DEF.reference.id.name, "AmbientPressure");
+        assert_eq!(Gauge::DEF.reference.how, crate::ReferenceHow::RunTime);
     }
 }
 
@@ -512,6 +578,8 @@ mod angle {
         };
 
         const NAME: &'static str = "encoder index";
+
+        const HOW: crate::ReferenceHow = crate::ReferenceHow::RunTime;
     }
 
     #[test]

@@ -64,6 +64,7 @@ nav = [
                     "points/wrapping.md",
                     "points/registers.md",
                     "points/indices.md",
+                    "points/time.md",
                 ]
             },
         ]

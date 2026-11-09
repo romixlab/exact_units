@@ -181,7 +181,14 @@ let _ = t.is_in(q!(68.01 degF ..= 77 degF)); // 20.00555.. °C: Inside or Outsid
 | `Angle<Turn>` | rev | 0 | wraps every turn, see [Angles as points](wrapping.md) |
 | `Angle<Degree>` | ° | 0 | wraps every 360° |
 | `Angle<Radian>` | rad | 0 | wraps every 2π (float storages only) |
-| `UnixEpoch` | s | 0 | 1970-01-01 00:00:00 UTC, POSIX time (feature `time`), aliased as `UnixSecs`/`UnixMillis`/`UnixMicros`/`UnixNanos` |
+| `UnixEpoch` | s | 0 on `PosixScale` | 1970-01-01 00:00:00 UTC, POSIX time (feature `time`), aliased as `UnixSecs`/`UnixMillis`/`UnixMicros`/`UnixNanos` |
+| `NtpEpoch` | s | −2 208 988 800 on `PosixScale` | 1900-01-01 00:00:00 UTC, aliased as `NtpSecs` |
+| `TaiEpoch1958` | s | 0 on `TaiScale` | 1958-01-01 00:00:00 TAI, aliased as `TaiSecs` .. `TaiNanos` |
+| `GpsEpoch` | s | 694 656 019 on `TaiScale` | 1980-01-06 00:00:19 TAI, aliased as `GpsSecs` .. `GpsNanos` |
+| `PtpEpoch` | s | 378 691 200 on `TaiScale` | 1970-01-01 00:00:00 TAI, aliased as `PtpNanos` |
+| `DeviceBoot` | s | 0 on `DeviceMonotonic` | a device's boot, known only at run time, aliased as `DeviceMillis` .. `DeviceNanos` |
+
+The time origins and how their scales convert: [Time scales](time.md).
 
 A crate declares its own with `origin!`, from the unit's zero or above another origin: [Your own units](../units/declare.md#origin).
 
@@ -191,3 +198,4 @@ A crate declares its own with `origin!`, from the unit's zero or above another o
 - Angles that wrap: [Angles as points](wrapping.md).
 - A sensor's own register formula, `raw / 256 + 25 °C`: [Register formulas](registers.md).
 - A position in a table or a sequence number: [Indices](indices.md).
+- Timestamps on TAI, GPS, POSIX time and a device's clock, and leap seconds: [Time scales](time.md).

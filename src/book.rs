@@ -39,6 +39,8 @@ pages! {
     Wrapping = "points/wrapping.md";
     Registers = "points/registers.md";
     Indices = "points/indices.md";
+    #[cfg(feature = "leap_seconds")]
+    TimeScales = "points/time.md";
     Decibels = "levels/decibels.md";
     Thresholds = "levels/thresholds.md";
     #[cfg(all(feature = "levels", feature = "time", feature = "angle", feature = "counting"))]

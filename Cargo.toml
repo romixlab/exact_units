@@ -125,8 +125,12 @@ quantities = [
     "counting",
     "levels",
 ]
-# Second, Minute, Hour, Day, Week, Hertz, HertzPerSecond, Baud; the UnixEpoch origin
+# Second, Minute, Hour, Day, Week, Hertz, HertzPerSecond, Baud; the time scales (TAI, POSIX time, a device's
+# monotonic clock) and their origins (TaiEpoch1958, GpsEpoch, PtpEpoch, UnixEpoch, NtpEpoch, DeviceBoot)
 time = []
+# the leap-second table (IERS Bulletin C) and Point::across between POSIX time and TAI: opt-in, not in `quantities`
+# or `std`, so a build that doesn't ask for it carries no table
+leap_seconds = ["time"]
 # Ampere, Volt, Ohm, Farad, Siemens, Henry, Coulomb, Watt, VoltAmpere, Var, Weber, Tesla
 electrical = []
 # ElectricFieldStrength (V/m), MagneticFieldStrength (A/m), CurrentDensity (A/m²), ChargeDensity (C/m³),

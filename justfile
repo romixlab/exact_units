@@ -8,14 +8,14 @@ default:
 # PROPTEST_RNG_SEED fixes tests/props' draws: the same code gives the same result here and under `just mutants`;
 # `just props-hunt` draws from proptest's own random seed instead.
 test *flags:
-    CARGO_BUILD_WARNINGS=deny PROPTEST_RNG_SEED=0 cargo nextest run --features shrink_wrap,customary,serde --no-fail-fast
+    CARGO_BUILD_WARNINGS=deny PROPTEST_RNG_SEED=0 cargo nextest run --features shrink_wrap,customary,serde,leap_seconds --no-fail-fast
     CARGO_BUILD_WARNINGS=deny PROPTEST_RNG_SEED=0 cargo nextest run --no-default-features --features std --no-fail-fast
     CARGO_BUILD_WARNINGS=deny PROPTEST_RNG_SEED=0 cargo nextest run --no-default-features --features shrink_wrap,quantities,serde --no-fail-fast
     # every example built for real, with the features all of them require: a literal a const check refuses fails only
     # when its constant is instantiated, which `clippy --all-targets` never does
-    CARGO_BUILD_WARNINGS=deny cargo build --examples --features shrink_wrap,customary,serde,libm
+    CARGO_BUILD_WARNINGS=deny cargo build --examples --features shrink_wrap,customary,serde,libm,leap_seconds
     # nextest does not run doctests; they include the book's pages (src/book.rs)
-    CARGO_BUILD_WARNINGS=deny cargo test --doc --features shrink_wrap,customary,serde
+    CARGO_BUILD_WARNINGS=deny cargo test --doc --features shrink_wrap,customary,serde,leap_seconds
     # the book site's Markdown extensions (docs_ext: the `bits` fence, `rust,compile_fail` blocks)
     uv run --group dev pytest -q docs_ext
     # the book, strict as CI's docs job builds it: its plots run the crate (tools/book_plots), so a const assert or
@@ -27,18 +27,18 @@ test *flags:
 # tests/proptest-regressions/<module>.txt, the file `just test` and `just mutants` replay too; commit it with the
 # fix. SECONDS time-boxes the run with `timeout` (none: runs to completion)
 props-hunt cases="10000" seconds="":
-    PROPTEST_CASES={{cases}} {{ if seconds == "" { "" } else { "timeout " + seconds + "s" } }} cargo nextest run --features shrink_wrap,customary,serde --no-fail-fast
+    PROPTEST_CASES={{cases}} {{ if seconds == "" { "" } else { "timeout " + seconds + "s" } }} cargo nextest run --features shrink_wrap,customary,serde,leap_seconds --no-fail-fast
 
 # The Kani proofs in tests/props: the properties the proptests draw inputs for, proved for every input. Needs Kani
 # (`cargo install --locked kani-verifier && cargo kani setup`); takes minutes, so it isn't part of `just test`. The features: test targets require `shrink_wrap` and `serde`, and Kani refuses a target whose features are off
 verify:
-    cargo kani --tests --features shrink_wrap,customary,serde
+    cargo kani --tests --features shrink_wrap,customary,serde,leap_seconds
 
 # Mutation testing: change the library one mutation at a time (.cargo/mutants.toml) and list the mutants no test
 # catches, in mutants.out/. Needs cargo-mutants (`cargo install --locked cargo-mutants`); hours, so not in CI. Extra
 # flags pass through: `-f src/index.rs` for one file, `-j 8` for parallel jobs. PROPTEST_RNG_SEED: see `just test`
 mutants *flags:
-    PROPTEST_RNG_SEED=0 cargo mutants --features shrink_wrap,customary,serde {{flags}}
+    PROPTEST_RNG_SEED=0 cargo mutants --features shrink_wrap,customary,serde,leap_seconds {{flags}}
 
 # Fuzz one target of fuzz/ for SECONDS: the property functions of tests/props, coverage-guided. Needs a nightly
 # toolchain and cargo-fuzz (`rustup toolchain install nightly`, `cargo install cargo-fuzz`). Starts from the
@@ -75,6 +75,7 @@ check:
     cargo check --no-default-features --features=electrical,libm --target thumbv7em-none-eabihf
     cargo check --no-default-features --features=angle,dimensionless,counting,serde --target thumbv6m-none-eabi
     cargo check --no-default-features --features=q,mechanical,time --target thumbv6m-none-eabi
+    cargo check --no-default-features --features=leap_seconds --target thumbv6m-none-eabi
 
 # A library has nothing to put on PATH: builds it with the deploy profile, as a dependent's release build would
 install:
@@ -125,7 +126,7 @@ q-symbols:
 # Collect coverage for the feature sets `just test` uses (shared by cov and cov-html)
 _cov-collect:
     cargo llvm-cov clean --workspace
-    cargo llvm-cov nextest --no-report --features shrink_wrap,customary,serde
+    cargo llvm-cov nextest --no-report --features shrink_wrap,customary,serde,leap_seconds
     cargo llvm-cov nextest --no-report --no-default-features --features std
     cargo llvm-cov nextest --no-report --no-default-features --features shrink_wrap,quantities,serde
 

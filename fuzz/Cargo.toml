@@ -12,8 +12,9 @@ cargo-fuzz = true
 
 # the features of exact_units the property functions ask for with cfg(feature = ..), all on
 [features]
-default = ["customary", "serde", "shrink_wrap", "std"]
+default = ["customary", "leap_seconds", "serde", "shrink_wrap", "std"]
 customary = ["exact_units/customary"]
+leap_seconds = ["exact_units/leap_seconds"]
 serde = ["exact_units/serde"]
 shrink_wrap = ["exact_units/shrink_wrap"]
 std = ["exact_units/std"]

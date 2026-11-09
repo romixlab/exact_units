@@ -51,7 +51,7 @@ let took: Millis<u64> = end - start;
 assert_eq!(took, Fixed::new(3_500));
 ```
 
-POSIX time has its aliases: `UnixSecs<T>`, `UnixMillis<T>`, `UnixMicros<T>`, `UnixNanos<T>` in `exact_units::origins`.
+POSIX time has its aliases: `UnixSecs<T>`, `UnixMillis<T>`, `UnixMicros<T>`, `UnixNanos<T>` in `exact_units::origins`. A device's clock has `DeviceMillis<T>` .. `DeviceNanos<T>`, TAI and GPS time have theirs. How they convert, and the leap seconds between POSIX time and TAI: [Time scales](../points/time.md).
 
 ## `core::time::Duration`
 
