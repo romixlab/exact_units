@@ -20,9 +20,10 @@
 //!
 //! - **The written form is kept.** The unit of `a * b` is [Times]`<U1, U2>` and of `a / b` [Per]`<U1, U2>`, never
 //!   normalized: V/V · V stays `Times<Per<Volt, Volt>, Volt>`. The named unit is a [convert](Fixed::convert) away
-//!   (`V·A` to [Watt](crate::units::Watt), V/V · V to a volt), which checks the dimension and the [kind](crate::kind)
-//!   at compile time. The kind of a product or quotient follows the rules of the kind module (mp-units'): V/V · V is
-//!   a plain voltage and converts to `Volt`, V/V · V/V stays a voltage gain, V/A · A is a plain voltage, Ω · A too.
+//!   (`V·A` to [Watt](crate::units::Watt), V/V · V to a volt), which checks the dimension and the
+//!   [quantity](mod@crate::quantity) at compile time. The quantity of a product or quotient follows that module's
+//!   rules (mp-units'): V/V · V is a plain voltage and converts to `Volt`, V/V · V/V stays a voltage gain, V/A · A
+//!   is a plain voltage, Ω · A too.
 //! - **The scale is exact, as a type.** Stable Rust can't compute `Pow10<{A + B}>` in a type, so the scale of a
 //!   product is the marker [Product]`<P1, P2>` and of a quotient [Quotient]`<P1, P2>`, whose
 //!   [SCALE](FixedScale::SCALE) is the exact [Magnitude] product (or quotient) of the two, worked out at compile
