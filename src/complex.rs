@@ -27,12 +27,12 @@
 //!   and an impedance in mΩ needs no float.
 //! - **Signed storage only** ([ComplexStorage]: `i8`..`i64`, `f32`, `f64`), and **`B` is an overflow policy only**
 //!   ([Unbounded], [Wrapping], [Saturating]): a range has no single meaning for a complex value.
-//! - **Memory and wire: `re`, then `im`.** `#[repr(C)]`, the common interleaved layout of complex sample buffers; on the
-//!   wire the two numbers and nothing else.
+//! - **Memory and wire: `re`, then `im`.** `#[repr(C)]`, the common interleaved layout of complex sample buffers; on
+//!   the wire the two numbers and nothing else.
 //! - **Products keep the written unit and an exact scale, as `Fixed`'s do.** `z * y` of an [Impedance] and an
 //!   [Admittance] is `Complex<Times<Ohm, Siemens>, Product<P1, P2>, T>`, of dimension one and plain
-//!   [kind](crate::kind), so it [converts](Complex::convert) to a [Ratio](crate::units::Ratio). A real `Fixed`
-//!   factor multiplies both parts.
+//!   [quantity](mod@crate::quantity), so it [converts](Complex::convert) to a [Ratio](crate::units::Ratio). A real
+//!   `Fixed` factor multiplies both parts.
 //! - **`*` of two complex values is four multiplies of `T` by the policy**, (a+jb)(c+jd) = (ac−bd) + j(ad+bc): for
 //!   [Unbounded] `T`'s own operators (a panic on overflow in debug builds), for [Wrapping] modulo 2^bits (the exact
 //!   result modulo 2^bits), for [Saturating] each step at the ends of `T`. Where the inner products don't fit `T`,
@@ -509,8 +509,8 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
         .ok()
     }
 
-    /// The same value in another unit `U2` of the same dimension and [kind](crate::kind), scale `P2` and storage
-    /// `T2`, if both parts are exact there ([Fixed::convert]): Ω · S to a [Ratio](crate::units::Ratio).
+    /// The same value in another unit `U2` of the same dimension and [quantity](mod@crate::quantity), scale `P2` and
+    /// storage `T2`, if both parts are exact there ([Fixed::convert]): Ω · S to a [Ratio](crate::units::Ratio).
     #[inline(always)]
     pub fn convert<U2: Unit, P2: FixedScale, T2: ComplexStorage>(
         self,
@@ -552,8 +552,9 @@ impl<U: Unit, P: FixedScale, T: ComplexStorage, B: Unlimited<T>> Complex<U, P, T
         self.times_requantize(rhs, r, Overflow::Checked)
     }
 
-    /// As [times_into](Self::times_into), each part settled by `o` where it doesn't fit `T3`: [Overflow::Saturate]
-    /// puts a part past `T3` at its nearest end: (−1 − j)² = 2j is `0 + j·(1 − 2⁻¹⁵)` in Q15. `None` only for [Overflow::Checked].
+    /// As [times_into](Self::times_into), each part settled by `o` where it doesn't fit `T3`: [Overflow::Saturate] puts
+    /// a part past `T3` at its nearest end: (−1 − j)² = 2j is `0 + j·(1 − 2⁻¹⁵)` in Q15. `None` only for
+    /// [Overflow::Checked].
     #[inline(always)]
     pub fn times_requantize<
         U2: Unit,

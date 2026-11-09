@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: a Fixed converts only between units of the same kind: Ohm (Ω) is resistance, Per<Volt, Ampere> (V/A) is a plain unit (cross kinds with a named step: as_ratio, as_resistance, as_phase, ..)
+error[E0080]: evaluation panicked: a Fixed converts only to the same quantity or one above it: Ohm (Ω) is resistance, Per<Volt, Ampere> (V/A) is its dimension's quantity (down the tree or across a kind with a named step: as_quantity, as_ratio, as_phase, ..)
  --> src/fixed.rs
   |
   |         let c = const { Conversion::between::<U, P, U2, P2, T, T2>(false) };

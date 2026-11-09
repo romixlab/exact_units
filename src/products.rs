@@ -14,11 +14,11 @@ impl<U: crate::Unit> crate::UnitDiv<crate::units::Ratio> for U {
     type Output = U;
 }
 
-/// One side of a [ProductEntry]: a unit's real [Dim](crate::Dim) and [Kind](crate::Kind), the two things
-/// [Fixed::convert](crate::Fixed::convert) itself checks.
-pub(crate) type Side = (crate::Dim<'static>, crate::Kind<'static>);
+/// One side of a [ProductEntry]: a unit's real [Dim](crate::Dim) and [QuantityExpr](crate::QuantityExpr), the two
+/// things [Fixed::convert](crate::Fixed::convert) itself checks.
+pub(crate) type Side = (crate::Dim<'static>, crate::QuantityExpr<'static>);
 
-/// One line of the product table (`A * B = O`), its three sides' real `Dim` and `Kind` read straight off the unit
+/// One line of the product table (`A * B = O`), its three sides' real `Dim` and quantity read straight off the unit
 /// types: what [TABLE] holds, so [known_angle_step](crate::conv_error::known_angle_step) can scan the table
 /// itself for an angle-crossing step instead of keeping a separate list that could drift from it.
 pub(crate) struct ProductEntry {
@@ -73,15 +73,15 @@ macro_rules! products {
                 ProductEntry {
                     a: (
                         <crate::units::$a as crate::Unit>::DIM,
-                        <crate::units::$a as crate::Unit>::KIND,
+                        <crate::units::$a as crate::Unit>::QUANTITY,
                     ),
                     b: (
                         <crate::units::$b as crate::Unit>::DIM,
-                        <crate::units::$b as crate::Unit>::KIND,
+                        <crate::units::$b as crate::Unit>::QUANTITY,
                     ),
                     o: (
                         <crate::units::$o as crate::Unit>::DIM,
-                        <crate::units::$o as crate::Unit>::KIND,
+                        <crate::units::$o as crate::Unit>::QUANTITY,
                     ),
                 },
             )*

@@ -258,7 +258,7 @@ const fn scale_in<S: Unit, U: Unit, P: FixedScale>() -> Magnitude {
     if !S::DIM.same_typed(U::DIM) {
         crate::conv_error::dim_mismatch::<S, U>("a literal's unit");
     }
-    if !S::KIND.same_typed(U::KIND) {
+    if !S::QUANTITY.converts_typed(U::QUANTITY) {
         crate::conv_error::kind_mismatch::<S, U>("a literal's unit");
     }
     let (Some(from), Some(to)) = (S::EXPR.magnitude(), U::EXPR.magnitude()) else {

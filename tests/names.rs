@@ -249,10 +249,17 @@ mod parse {
         let u = R.parse_unit("kg·m²/(s³·A)", None).unwrap();
         assert_eq!(u.dim(), Some(units::Volt::DIM));
         assert_eq!(u.to_string(), "kg·m²/(s³·A)");
-        // kinds: a named unit only into its own kind
+        // quantities: a named unit of a quantity of its own only into that one, a unit that names only its
+        // dimension (J/K, V/A) into any quantity of it, the type's
         assert_eq!(R.parse::<Entropy>("2 J/K"), Ok(Exact::int(2)));
         assert_eq!(R.parse::<HeatCapacity>("2 J/K"), Ok(Exact::int(2)));
-        assert_eq!(R.parse::<Ohm>("2 V/A"), Err(ParseError::Mismatch));
+        assert_eq!(R.parse::<Ohm>("2 V/A"), Ok(Exact::int(2)));
+        assert_eq!(
+            R.parse::<units::Becquerel>("2 Hz"),
+            Err(ParseError::Mismatch)
+        );
+        assert_eq!(R.parse::<units::Hertz>("2 Bq"), Err(ParseError::Mismatch));
+        assert_eq!(R.parse::<units::Sievert>("2 Gy"), Err(ParseError::Mismatch));
         assert_eq!(R.parse::<Speed>("2 s"), Err(ParseError::Mismatch));
     }
 

@@ -165,8 +165,9 @@ customary = []
 # Item, Sample, Frame, Packet, Line, Row, Record, Entry, Cycle, Block, Sector, Chunk, Char, Code: counted bases, each a dimension of its own
 counting = []
 # Neper, Decibel and their losses (Loss<Neper>, Loss<Decibel>): levels on a base of their own, rates of them (dB/m,
-# Np/s), and the edge to a gain (to_level, to_gain); Absorbance and OpticalDepth (Beer-Lambert)
-levels = []
+# Np/s), and the edge to a gain (to_level, to_gain); Absorbance and OpticalDepth (Beer-Lambert); DampingRatio and
+# QualityFactor, numbers over `dimensionless`'s Ratio
+levels = ["dimensionless"]
 
 [dependencies]
 defmt = { version = "1.1", optional = true }

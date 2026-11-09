@@ -7,7 +7,7 @@ error[E0080]: evaluation panicked: a literal's unit converts only between units 
   | literal_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
   | ------------------------------------------- in this macro invocation
   |
-note: inside `quantity::cut::<Meter, Speed, exact_units::prefix::Centi>`
+note: inside `exact_units::literal::quantity::cut::<Meter, Speed, exact_units::prefix::Centi>`
  --> src/literal/quantity.rs
   |
   |     cut_scale(x, scale_in::<S, U, P>())
@@ -39,7 +39,7 @@ note: erroneous constant encountered
   |
   = note: this note originates in the macro `literal_cmp` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-note: the above error was encountered while instantiating `fn quantity::<impl PartialOrd<LiteralIn<1, 2, Meter>> for Fixed<Speed, exact_units::prefix::Centi, i16>>::lt`
+note: the above error was encountered while instantiating `fn exact_units::literal::quantity::<impl PartialOrd<LiteralIn<1, 2, Meter>> for Fixed<Speed, exact_units::prefix::Centi, i16>>::lt`
  --> tests/compile_fail/q_dim_mismatch.rs:6:13
   |
 6 |     let _ = speed < q!(100 m);

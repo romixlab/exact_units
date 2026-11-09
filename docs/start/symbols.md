@@ -308,13 +308,11 @@ These `unit!` symbols are no `q!` symbol: a compound one is written with operato
 | N/m | `SurfaceTension` |
 | Pa·s | `DynamicViscosity` |
 | m²/s | `KinematicViscosity` |
-| J/m³ | `EnergyDensity` |
 | W/m³ | `PowerDensity` |
 | rad/s | `AngularVelocity` |
 | rad/s² | `AngularAcceleration` |
 | W/m² | `HeatFluxDensity` |
 | J/K | `HeatCapacity` |
-| J/K | `Entropy` |
 | J/(kg·K) | `SpecificHeatCapacity` |
 | W/(m·K) | `ThermalConductivity` |
 | W/K | `ThermalConductance` |

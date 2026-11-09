@@ -2,8 +2,8 @@
 //! and the edge between a gain and a level. Feature `levels` (in `quantities`).
 //!
 //! - [Neper] and [Decibel] are levels signed as a gain (a decay is negative), on the distinguished base `Neper` of this
-//!   crate. 1 dB is (ln 10)/20 Np exactly, a [Magnitude](crate::Magnitude): floats convert by it, integers round by name
-//!   ([convert_rounded](Fixed::convert_rounded)), and a literal lands exactly with `fixed!(17.7 in Decibel)`.
+//!   crate. 1 dB is (ln 10)/20 Np exactly, a [Magnitude](crate::Magnitude): floats convert by it, integers round by
+//!   name ([convert_rounded](Fixed::convert_rounded)), and a literal lands exactly with `fixed!(17.7 in Decibel)`.
 //! - [Loss]`<Neper>` and `Loss<Decibel>` ([NeperLoss], [DecibelLoss]) are the same signed as a loss, positive for a
 //!   decay, as attenuation coefficients and datasheets write them. They are on a second base, `NeperLoss`, so a loss
 //!   doesn't convert to a gain: [as_gain](Fixed::as_gain) and [as_loss](Fixed::as_loss) negate, by the bound's
@@ -11,10 +11,10 @@
 //! - A rate of a level is an ordinary compound: `Per<Loss<Decibel>, Meter>` (dB/m), `Per<Neper, Second>` (a damping
 //!   coefficient). It isn't a wavenumber or a hertz: the level base stays in its dimension, and
 //!   [Dim::strip] (of [MarkerId::NEPER](crate::MarkerId::NEPER)) is the explicit bridge for exports.
-//! - A level carries no 10·lg or 20·lg: a field level and its power level are the same number (ISO 80000-3,
-//!   IEC 60027-3). The form comes in at the edge, from the gain's [Kind](crate::Kind): [to_level](Fixed::to_level) from a gain
-//!   (V/V is ln, W/W ½·ln) and [to_gain](Fixed::to_gain) back. A plain [Ratio](crate::units::Ratio) has no level, at
-//!   both edges.
+//! - A level carries no 10·lg or 20·lg: a field level and its power level are the same number (ISO 80000-3, IEC
+//!   60027-3). The form comes in at the edge, from the gain's [quantity](crate::QuantityExpr):
+//!   [to_level](Fixed::to_level) from a gain (V/V is ln, W/W ½·ln) and [to_gain](Fixed::to_gain) back. A plain
+//!   [Ratio](crate::units::Ratio) has no level, at both edges.
 //! - Beer-Lambert is defined on power, without the ½ of a level: [Absorbance] A = −lg T and [OpticalDepth] τ = −ln T
 //!   are exact scales of the loss base, (ln 10)/2 and ½ of a neper of loss. So τ = ln 10 · A by conversion, 1 AU is
 //!   10 dB, and the coefficient μ ([LinearAttenuation], natural) is twice the α of `Per<Loss<Neper>, Meter>` by
@@ -23,8 +23,8 @@
 //!   numbers only.
 //!
 //! ```
-//! # #[cfg(all(feature = "levels", feature = "electrical", feature = "mechanical"))] {
-//! use exact_units::{Fixed, Rounding, fixed, prefix::{Centi, Micro, One}, q, units::{Decibel, Loss, Meter, Neper, Per, Volt}};
+//! # #[cfg(all(feature = "levels", feature = "electrical", feature = "mechanical"))] { use exact_units::{Fixed,
+//! Rounding, fixed, prefix::{Centi, Micro, One}, q, units::{Decibel, Loss, Meter, Neper, Per, Volt}};
 //!
 //! // a cable's 17.7 dB/100 m, positive as the datasheet writes it, in nepers per meter exactly rounded
 //! type Alpha = Fixed<Per<Loss<Neper>, Meter>, Micro, u32>;
@@ -156,21 +156,21 @@
 //! ```
 //!
 //! ```compile_fail
-//! # #[cfg(not(all(feature = "levels", feature = "angle", feature = "time")))] compile_error!("needs levels, angle, time");
-//! use exact_units::{Fixed, prefix::One, units::{AngularVelocity, Neper, Per, Second}};
-//! let _ = Fixed::<Per<Neper, Second>, One, f32>::bounded(3.0).convert::<AngularVelocity, One, f32>();
+//! # #[cfg(not(all(feature = "levels", feature = "angle", feature = "time")))] compile_error!("needs levels, angle,
+//! time"); use exact_units::{Fixed, prefix::One, units::{AngularVelocity, Neper, Per, Second}}; let _ =
+//! Fixed::<Per<Neper, Second>, One, f32>::bounded(3.0).convert::<AngularVelocity, One, f32>();
 //! ```
 //!
 //! α(f) = α₀·f takes a frequency in hertz, not an angular velocity (a factor 2π lost, and cm·MHz / (rad/s) isn't a
 //! length):
 //!
 //! ```compile_fail
-//! # #[cfg(not(all(feature = "levels", feature = "mechanical", feature = "angle")))] compile_error!("needs levels, mechanical, angle");
-//! use exact_units::{Fixed, Rounding, prefix::One, units::{AngularVelocity, CentimetreMegahertz, Decibel, Loss, Meter, Per}};
-//! let alpha0 = Fixed::<Per<Loss<Decibel>, CentimetreMegahertz>, One, i32>::new(5);
-//! let omega = Fixed::<AngularVelocity, One, i32>::new(5);
-//! let product = alpha0.times_into::<AngularVelocity, One, _, One, i32>(omega, Rounding::NearestEven).unwrap();
-//! let _: Option<Fixed<Per<Loss<Decibel>, Meter>, One, i32>> = product.convert();
+//! # #[cfg(not(all(feature = "levels", feature = "mechanical", feature = "angle")))] compile_error!("needs levels,
+//! mechanical, angle"); use exact_units::{Fixed, Rounding, prefix::One, units::{AngularVelocity, CentimetreMegahertz,
+//! Decibel, Loss, Meter, Per}}; let alpha0 = Fixed::<Per<Loss<Decibel>, CentimetreMegahertz>, One, i32>::new(5); let
+//! omega = Fixed::<AngularVelocity, One, i32>::new(5); let product = alpha0.times_into::<AngularVelocity, One, _, One,
+//! i32>(omega, Rounding::NearestEven).unwrap(); let _: Option<Fixed<Per<Loss<Decibel>, Meter>, One, i32>> =
+//! product.convert();
 //! ```
 //!
 //! An absorbance is a loss, and ln 10 isn't a fraction of integers, so an integer conversion to a depth names its
@@ -323,8 +323,8 @@ pub type MolarAbsorptivity = Per<Absorbance, MolarCentimeter>;
 #[cfg(any(feature = "std", feature = "libm"))]
 const fn sign<L: Unit>() -> f64 {
     assert!(
-        L::KIND.same_typed(crate::Kind::Plain),
-        "a level unit has no kind of its own"
+        L::QUANTITY.same_typed(crate::QuantityExpr::Derived(L::DIM)),
+        "a level unit measures its dimension's quantity"
     );
     if L::DIM.same_typed(GAIN_DIM) {
         1.0
@@ -409,9 +409,9 @@ impl<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>> Fixe
     /// ```
     ///
     /// ```compile_fail
-    /// # #[cfg(not(feature = "levels"))] compile_error!("needs levels");
-    /// use exact_units::{Fixed, prefix::One, units::{Decibel, Ratio}};
-    /// let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_level::<Decibel, One, f64>(exact_units::Rounding::NearestEven);
+    /// # #[cfg(not(feature = "levels"))] compile_error!("needs levels"); use exact_units::{Fixed, prefix::One,
+    /// units::{Decibel, Ratio}}; let _ = Fixed::<Ratio, One, f64>::bounded(0.5).to_level::<Decibel, One,
+    /// f64>(exact_units::Rounding::NearestEven);
     /// ```
     #[must_use]
     pub fn to_level<L: Unit, P2: crate::FixedScale, T2: crate::Storage>(
@@ -507,8 +507,8 @@ impl<L: Unit, X: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds
     /// `None` where it doesn't fit `T2`. Feature `std` or `libm`.
     ///
     /// ```
-    /// # #[cfg(all(feature = "levels", feature = "mechanical"))] {
-    /// use exact_units::{Fixed, Rounding::NearestEven, prefix::{Deci, One}, q, units::{Decibel, Feet100, Loss, Metres100, Per}};
+    /// # #[cfg(all(feature = "levels", feature = "mechanical"))] { use exact_units::{Fixed, Rounding::NearestEven,
+    /// prefix::{Deci, One}, q, units::{Decibel, Feet100, Loss, Metres100, Per}};
     ///
     /// // Belden 8259: 5.4 dB/100 ft, over 820 ft (8.2 "100 ft" units) of cable
     /// let alpha = Fixed::<Per<Loss<Decibel>, Feet100>, Deci, i32>::new(54);

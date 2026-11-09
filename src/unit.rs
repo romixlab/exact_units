@@ -1,11 +1,11 @@
 //! What a unit is: its dimension, how its values become coherent SI, and how it is written.
 
-#[cfg(all(feature = "std", feature = "shrink_wrap"))]
-use crate::DimOwned;
 #[cfg(feature = "shrink_wrap")]
 use crate::SIExpr;
 use crate::tree;
-use crate::{Dim, Kind, Prefix};
+use crate::{Dim, Prefix, QuantityExpr, QuantityRef};
+#[cfg(all(feature = "std", feature = "shrink_wrap"))]
+use crate::{DimOwned, QuantityRefOwned};
 use core::fmt;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
@@ -315,8 +315,8 @@ impl PrefixPolicy {
 }
 
 /// A named unit as data: who it is, how it is written, its dimension, its kind of quantity, its exact factor to
-/// coherent SI and where that factor comes from. [unit!](crate::unit) builds one per marker ([UnitExpr::Named]), and the
-/// same record is a unit's definition in an API model and in a run-time [SIExpr].
+/// coherent SI and where that factor comes from. [unit!](crate::unit) builds one per marker ([UnitExpr::Named]), and
+/// the same record is a unit's definition in an API model and in a run-time [SIExpr].
 ///
 /// The scale is a [Magnitude](crate::Magnitude), always: a unit has no offset (°C is the origin
 /// [Celsius](crate::origins::Celsius) of kelvins) and no float factor.
@@ -338,22 +338,22 @@ pub struct UnitDef<'i> {
     pub names: UnitNames<'i>,
     /// Its dimension.
     pub dim: Dim<'i>,
-    /// The kind of quantity of its own, by its ISO 80000 name (`"resistance"` for [Ohm](crate::units::Ohm)), `None`
-    /// for a plain unit ([Kind::Named](crate::Kind)). A quantity reference once quantity specs exist (UNIT-8).
-    pub quantity: Option<&'i str>,
+    /// The quantity it measures by default ([Ohm](crate::units::Ohm) a resistance, [Becquerel](crate::units::Becquerel)
+    /// an activity), `None` for its dimension's quantity ([QuantityExpr::Derived]). On the wire by id.
+    pub quantity: Option<QuantityRef<'i>>,
     /// The exact factor to coherent SI: ° is π/180 rad, eV 1.602176634·10⁻¹⁹ J.
     pub scale: crate::Magnitude,
     /// Whether the scale is the unit's definition or a value a source prints.
     pub provenance: Provenance<'i>,
 }
 
-impl UnitDef<'_> {
-    /// The [Kind] of a unit with this definition.
+impl<'i> UnitDef<'i> {
+    /// The quantity a unit with this definition measures: its own, or its dimension's.
     #[must_use]
-    pub const fn kind(&self) -> Kind<'_> {
+    pub const fn quantity_expr(&self) -> QuantityExpr<'i> {
         match self.quantity {
-            Some(name) => Kind::Named(name),
-            None => Kind::Plain,
+            Some(q) => QuantityExpr::Spec(q),
+            None => QuantityExpr::Derived(self.dim),
         }
     }
 }
@@ -389,6 +389,13 @@ impl UnitDef<'_> {
 pub trait UnitTable: Sync {
     /// The definition of the unit `id`, `None` when the table doesn't list it.
     fn unit(&self, id: MarkerId<'_>) -> Option<UnitDef<'_>>;
+
+    /// The definition of the quantity `id`, `None` when the table doesn't list it (the default: a table of units
+    /// only). A walk up a quantity tree read at run time resolves each parent here.
+    fn quantity(&self, id: MarkerId<'_>) -> Option<crate::QuantityDef<'_>> {
+        let _ = id;
+        None
+    }
 }
 
 /// The table that lists nothing: a walk over [SIExpr](crate::SIExpr) whose `Ref` leaves stay unresolved.
@@ -402,6 +409,10 @@ impl<T: UnitTable + ?Sized> UnitTable for &T {
     fn unit(&self, id: MarkerId<'_>) -> Option<UnitDef<'_>> {
         (**self).unit(id)
     }
+
+    fn quantity(&self, id: MarkerId<'_>) -> Option<crate::QuantityDef<'_>> {
+        (**self).quantity(id)
+    }
 }
 
 /// Tables chained: the first that lists `id` answers.
@@ -409,12 +420,20 @@ impl<T: UnitTable> UnitTable for [T] {
     fn unit(&self, id: MarkerId<'_>) -> Option<UnitDef<'_>> {
         self.iter().find_map(|t| t.unit(id))
     }
+
+    fn quantity(&self, id: MarkerId<'_>) -> Option<crate::QuantityDef<'_>> {
+        self.iter().find_map(|t| t.quantity(id))
+    }
 }
 
 /// Tables chained, like the slice.
 impl<T: UnitTable, const N: usize> UnitTable for [T; N] {
     fn unit(&self, id: MarkerId<'_>) -> Option<UnitDef<'_>> {
         self.as_slice().unit(id)
+    }
+
+    fn quantity(&self, id: MarkerId<'_>) -> Option<crate::QuantityDef<'_>> {
+        self.as_slice().quantity(id)
     }
 }
 
@@ -448,8 +467,8 @@ impl UnitTable for UnitExpr {
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 mod owned_defs {
     use super::{
-        MarkerId, MarkerIdOwned, Provenance, ProvenanceOwned, UnitDef, UnitDefOwned, UnitNames,
-        UnitNamesOwned,
+        MarkerId, MarkerIdOwned, Provenance, ProvenanceOwned, QuantityRef, UnitDef, UnitDefOwned,
+        UnitNames, UnitNamesOwned,
     };
 
     impl MarkerIdOwned {
@@ -523,7 +542,7 @@ mod owned_defs {
                 id: self.id.as_id(),
                 names: self.names.as_names(),
                 dim: self.dim.as_dim(),
-                quantity: self.quantity.as_deref(),
+                quantity: self.quantity.as_ref().map(|q| QuantityRef::Id(q.as_id())),
                 scale: self.scale,
                 provenance: match &self.provenance {
                     ProvenanceOwned::Defined => Provenance::Defined,
@@ -543,7 +562,7 @@ mod owned_defs {
                 id: d.id.into(),
                 names: d.names.into(),
                 dim: d.dim.into(),
-                quantity: d.quantity.map(Into::into),
+                quantity: d.quantity.map(|q| q.id().into()),
                 scale: d.scale,
                 provenance: d.provenance.into(),
             }
@@ -741,8 +760,9 @@ impl fmt::Display for UnitExpr {
     }
 }
 
-/// A unit marker: a zero-size type that is never sent, only named in types (`Fixed<units::Volt, Milli, u16>`). The markers of
-/// this crate are in [units](crate::units); an API crate declares its own the same way, with [unit!](crate::unit):
+/// A unit marker: a zero-size type that is never sent, only named in types (`Fixed<units::Volt, Milli, u16>`). The
+/// markers of this crate are in [units](crate::units); an API crate declares its own the same way, with
+/// [unit!](crate::unit):
 ///
 /// ```
 /// use exact_units::{Fixed, Unit, prefix::One};
@@ -770,10 +790,16 @@ pub trait Unit: Copy + Default + 'static {
     /// ([Degree](crate::units::Degree), `base(Neper)`'s decibel) too.
     const BASE: Option<crate::BaseDef<'static>> = None;
 
-    /// The kind of quantity beyond the dimension ([Kind]): plain, unless the `unit!` line names one (`Ohm` is a
-    /// resistance), or what a quotient kept (`Per<Volt, Volt>` is a ratio of voltage). [Fixed::convert](crate::Fixed::convert)
-    /// needs the same dimension and kind.
-    const KIND: Kind<'static> = Kind::Plain;
+    /// The quantity it measures beyond the dimension ([QuantityExpr]): its dimension's
+    /// ([Derived](QuantityExpr::Derived)) unless the `unit!` line names one (`Ohm` is a resistance), what a quotient
+    /// kept (`Per<Volt, Volt>` is a ratio of voltage), or `Of`'s (`Of<Height, Meter>` is a height).
+    /// [Fixed::convert](crate::Fixed::convert) needs the same dimension and a quantity that
+    /// [converts](QuantityExpr::converts): itself or an ancestor.
+    const QUANTITY: QuantityExpr<'static> = QuantityExpr::Derived(Self::DIM);
+
+    /// The unit without the quantity [Of](crate::units::Of) gave it: `Of<Height, Meter>`'s is `Meter`, every other
+    /// unit's itself. A named step (`as_quantity`) builds `Of<Q, Self::Bare>`, so `Of`s never nest.
+    type Bare: Unit;
 
     /// Name, symbol and scale, or the tree of a compound unit.
     const EXPR: &'static UnitExpr;

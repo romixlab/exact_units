@@ -633,7 +633,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// ```
     ///
     /// Units of different dimensions don't convert, a pound of force is not a pound of mass; nor do units of
-    /// different [kinds](crate::Kind) of one dimension (V/V and a ratio, V/A and Ω):
+    /// different [quantities](mod@crate::quantity) of one dimension (V/V and a ratio, V/A and Ω):
     ///
     /// ```compile_fail
     /// use exact_units::{Fixed, prefix::One, units::{PoundAvdp, PoundForce}};
@@ -1317,7 +1317,7 @@ impl Conversion {
         if !U::DIM.same_typed(U2::DIM) {
             crate::conv_error::dim_mismatch::<U, U2>("a Fixed");
         }
-        if !U::KIND.same_typed(U2::KIND) {
+        if !U::QUANTITY.converts_typed(U2::QUANTITY) {
             crate::conv_error::kind_mismatch::<U, U2>("a Fixed");
         }
         let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
@@ -1341,7 +1341,7 @@ impl Conversion {
         if !U::DIM.same_typed(U2::DIM) {
             crate::conv_error::dim_mismatch::<U, U2>("a Fixed");
         }
-        if !U::KIND.same_typed(U2::KIND) {
+        if !U::QUANTITY.converts_typed(U2::QUANTITY) {
             crate::conv_error::kind_mismatch::<U, U2>("a Fixed");
         }
         let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {

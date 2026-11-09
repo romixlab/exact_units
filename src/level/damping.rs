@@ -180,10 +180,10 @@ const fn step<U: Unit, P: FixedScale>() -> Magnitude {
     }
 }
 
-/// A compile error unless `U` has the dimension `dim` and no kind of its own.
-const fn check(u: Dim<'_>, kind: crate::Kind<'_>, dim: Dim<'_>, what: &str) {
+/// A compile error unless `U` has the dimension `dim` and measures its quantity (no kind of its own).
+const fn check(u: Dim<'_>, quantity: crate::QuantityExpr<'_>, dim: Dim<'_>, what: &str) {
     assert!(
-        u.same_typed(dim) && kind.same_typed(crate::Kind::Plain),
+        u.same_typed(dim) && quantity.same_typed(crate::QuantityExpr::Derived(dim)),
         "{}",
         what
     );
@@ -251,17 +251,17 @@ impl<L: Unit, X: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<Per<L, X>,
         let q = const {
             check(
                 L::DIM,
-                L::KIND,
+                L::QUANTITY,
                 LOSS_DIM,
                 "time_constant is of a loss level (Loss<Neper>, Loss<Decibel>): a gain rate takes as_loss first",
             );
             check(
                 X::DIM,
-                X::KIND,
+                X::QUANTITY,
                 TIME,
                 "time_constant is of a loss per time: Np/s, dB/min",
             );
-            check(S::DIM, S::KIND, TIME, "a time constant is a time");
+            check(S::DIM, S::QUANTITY, TIME, "a time constant is a time");
             // τ = 1 / (d · δ step) in s, in steps of S · P2
             let f = step::<Per<L, X>, P>().mul(step::<S, P2>()).recip();
             crate::fixed::Requant::of_terms::<T, T2>(f, true, 1)
@@ -293,19 +293,19 @@ impl<L: Unit, X: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<Per<L, X>,
         let q = const {
             check(
                 L::DIM,
-                L::KIND,
+                L::QUANTITY,
                 LOSS_DIM,
                 "a damping ratio is of a loss level (Loss<Neper>): a gain rate takes as_loss first",
             );
             check(
                 X::DIM,
-                X::KIND,
+                X::QUANTITY,
                 TIME,
                 "a damping ratio is of a loss per time: Np/s",
             );
             check(
                 W::DIM,
-                W::KIND,
+                W::QUANTITY,
                 RAD_PER_S,
                 "ω₀ is an angular frequency in rad/s (not Hz: a factor 2π)",
             );
@@ -378,7 +378,7 @@ impl<P: FixedScale, T: Storage, B: Bounds<T>> Fixed<DampingRatio, P, T, B> {
         let (s, z) = const {
             check(
                 U::DIM,
-                U::KIND,
+                U::QUANTITY,
                 PER_CYCLE,
                 "a logarithmic decrement is a loss per cycle (Np/cycle)",
             );
@@ -413,7 +413,7 @@ impl<P: FixedScale, T: Storage, B: Bounds<T>> Fixed<DampingRatio, P, T, B> {
         let (s, z) = const {
             check(
                 U::DIM,
-                U::KIND,
+                U::QUANTITY,
                 PER_CYCLE,
                 "a logarithmic decrement is a loss per cycle (Np/cycle)",
             );

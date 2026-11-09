@@ -2,7 +2,9 @@
 //! a global and without alloc.
 
 use crate::exact::{number, scale};
-use crate::{Dim, Exact, Fraction, Kind, Magnitude, Prefix, Unit, UnitDef, UnitExpr, UnitNames};
+use crate::{
+    Dim, Exact, Fraction, Magnitude, Prefix, QuantityExpr, Unit, UnitDef, UnitExpr, UnitNames,
+};
 use core::fmt::{self, Write as _};
 
 /// Most factors a unit read from text has: `kg·m²/(s³·A)` is four.
@@ -24,17 +26,17 @@ const MAX_NESTING: usize = 4;
 /// A unit is read by any of its names: its symbol (`Ω`), its ASCII form (`Ohm`), its aliases, its UCUM code, and its
 /// English name, singular or plural (`ohm`, `ohms`), each with a prefix where the unit takes it
 /// ([PrefixPolicy](crate::PrefixPolicy)): `kΩ`, `kOhm`, `kilohm`. The longest match comes first: `Pa·s` is a unit of
-/// its own before it is a pascal times a second. Then the text splits into factors, joined by `·`, `*`, `.` or a
-/// space and divided by `/` or `per`, left to right (`a/b·c` is `a·c/b`), with exponents as `²`, `^2` or UCUM's `m2`, and
+/// its own before it is a pascal times a second. Then the text splits into factors, joined by `·`, `*`, `.` or a space
+/// and divided by `/` or `per`, left to right (`a/b·c` is `a·c/b`), with exponents as `²`, `^2` or UCUM's `m2`, and
 /// parentheses.
 ///
 /// A word that reads two ways (`B`, a bel and a byte) is refused naming both, unless the expected dimension
 /// settles it: text that goes into a [Fixed](crate::Fixed) of bytes reads a byte.
 ///
 /// ```
-/// # #[cfg(all(feature = "electrical", feature = "time", feature = "mechanical", feature = "information", feature = "levels"))] {
-/// use exact_units::units::{self, Byte, Minute, Ohm, Second};
-/// use exact_units::{Exact, Fixed, Registry, prefix::{Kilo, One}};
+/// # #[cfg(all(feature = "electrical", feature = "time", feature = "mechanical", feature = "information", feature =
+/// "levels"))] { use exact_units::units::{self, Byte, Minute, Ohm, Second}; use exact_units::{Exact, Fixed, Registry,
+/// prefix::{Kilo, One}};
 ///
 /// let tables = [units::ALL];
 /// let r = Registry::new(&tables);
@@ -70,12 +72,12 @@ impl Reading<'_> {
         self.def.scale.checked_mul(self.prefix.magnitude()?).ok()
     }
 
-    /// The same value as `other`: dimension, scale and kind (`km` as a kilometre and as kilo metre).
+    /// The same value as `other`: dimension, scale and quantity (`km` as a kilometre and as kilo metre).
     fn same_value(&self, other: &Reading<'_>) -> bool {
         self.def.dim.same(other.def.dim)
             && self.scale().is_some()
             && self.scale() == other.scale()
-            && self.def.kind() == other.def.kind()
+            && self.def.quantity == other.def.quantity
     }
 }
 
@@ -141,13 +143,14 @@ impl<'a> ParsedUnit<'a> {
         })
     }
 
-    /// The kind: a named unit's own (`Ω` is a resistance), [Kind::Plain] for a product or a power.
+    /// The quantity: a named unit's own (`Ω` is a resistance), its dimension's for a product or a power
+    /// ([QuantityExpr::Derived]); `None` where the dimension isn't whole ([dim](Self::dim)).
     #[must_use]
-    pub fn kind(&self) -> Kind<'a> {
+    pub fn quantity(&self) -> Option<QuantityExpr<'_>> {
         let mut it = self.factors();
         match (it.next(), it.next()) {
-            (Some(f), None) if f.exp == 1 => f.reading.def.kind(),
-            _ => Kind::Plain,
+            (Some(f), None) if f.exp == 1 => Some(f.reading.def.quantity_expr()),
+            _ => self.dim().map(QuantityExpr::Derived),
         }
     }
 }
@@ -245,7 +248,7 @@ pub enum ParseError<'a> {
     },
     /// More than [MAX_FACTORS] factors, deeper parentheses than four, or an exponent past `i8`.
     TooComplex,
-    /// A unit, but of another dimension or kind than the one expected: [Registry::parse_unit] without one says
+    /// A unit, but of another dimension or quantity than the one expected: [Registry::parse_unit] without one says
     /// which.
     Mismatch,
     /// The value isn't exact in the expected unit: a scale with π or a root, or past a fraction of `u128`s.
@@ -382,26 +385,26 @@ impl<'a> Registry<'a> {
         )
     }
 
-    /// The unit `text` names, of the dimension `dim` and the kind `kind`: [parse_unit](Self::parse_unit) where two
-    /// units of one dimension are different quantities (`J/K` of a heat capacity and of an entropy). A named unit
-    /// is of its own kind, a product or a power of [Kind::Plain].
+    /// The unit `text` names, of the dimension `dim` going into the quantity `quantity`:
+    /// [parse_unit](Self::parse_unit) where two units of one dimension are different quantities (`Hz` and `Bq`).
+    /// A named unit is of its own quantity, which must [convert](QuantityExpr::converts) to `quantity`; a product or
+    /// a power names only its dimension, and goes into any quantity of it (`1/s` into an activity).
     pub fn parse_unit_of(
         &self,
         text: &str,
         dim: Dim<'_>,
-        kind: Kind<'_>,
+        quantity: QuantityExpr<'_>,
     ) -> Result<ParsedUnit<'a>, ParseError<'a>> {
         self.read(
             text,
-            &|u: &ParsedUnit<'_>| {
-                u.dim().is_some_and(|d| d.same(dim)) && kinds_agree(u.kind(), kind)
-            },
+            &|u: &ParsedUnit<'_>| u.dim().is_some_and(|d| d.same(dim)) && goes_into(u, quantity),
             true,
         )
     }
 
     /// The quantity `text` writes, a number then its unit (`4.7 kΩ`, `5 min`, `1.5e-3 Pa·s`), as an exact value of
-    /// `U`: read with `U`'s dimension and kind expected, then converted exactly. A unit of another dimension or kind
+    /// `U`: read with `U`'s dimension and quantity expected, then converted exactly. A unit of another dimension or
+    /// quantity
     /// is a [ParseError::Mismatch], a value not exact in `U` (a scale with π, a fraction past `u128`)
     /// [ParseError::Inexact]. Then [Exact::to] gives a [Fixed](crate::Fixed), exact or `None`.
     pub fn parse<U: Unit>(&self, text: &str) -> Result<Exact<U>, ParseError<'a>> {
@@ -411,7 +414,7 @@ impl<'a> Registry<'a> {
         let unit_text = rest.trim_start();
         let offset = offset.saturating_add(rest.len().saturating_sub(unit_text.len()));
         let accept = |u: &ParsedUnit<'_>| {
-            u.dim().is_some_and(|d| d.same(U::DIM)) && kinds_agree(u.kind(), U::KIND)
+            u.dim().is_some_and(|d| d.same(U::DIM)) && goes_into(u, U::QUANTITY)
         };
         let unit = if unit_text.is_empty() {
             ParsedUnit {
@@ -535,9 +538,14 @@ impl crate::BaseSource for ParsedUnit<'_> {
     }
 }
 
-/// Whether a unit read of kind `found` goes into a unit of kind `want`: equal kinds, or both plain.
-fn kinds_agree(found: Kind<'_>, want: Kind<'_>) -> bool {
-    found == want
+/// Whether a unit read goes into the quantity `want`: its own quantity converts to it, or it names only a dimension
+/// (a product, a power), which the caller's quantity names.
+fn goes_into(found: &ParsedUnit<'_>, want: QuantityExpr<'_>) -> bool {
+    match found.quantity() {
+        Some(QuantityExpr::Derived(_)) => true,
+        Some(q) => q.converts(want, &()).unwrap_or(false),
+        None => false,
+    }
 }
 
 /// `err` with its byte positions moved by `by`: they count from the unit, the caller's from the whole text.
@@ -692,7 +700,9 @@ fn choose<'a>(
         match found {
             None => found = Some(unit),
             Some(f)
-                if f.scale().is_some() && f.scale() == unit.scale() && f.kind() == unit.kind() => {}
+                if f.scale().is_some()
+                    && f.scale() == unit.scale()
+                    && f.quantity() == unit.quantity() => {}
             Some(_) => return Err(first_ambiguous.map_or(ParseError::TooComplex, ambiguous)),
         }
     }

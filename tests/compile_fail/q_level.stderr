@@ -7,7 +7,7 @@ error[E0080]: evaluation panicked: this literal is between two steps of the scal
   | level_cmp!(u8 u16 u32 u64 i8 i16 i32 i64);
   | ----------------------------------------- in this macro invocation
   |
-note: inside `quantity::AtMost::<u16>::equal`
+note: inside `exact_units::literal::quantity::AtMost::<u16>::equal`
  --> $RUST/core/src/panic.rs
   |
   |         $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));
@@ -46,7 +46,7 @@ error[E0080]: evaluation panicked: this literal is not a float of the storage: n
   |   level_cmp_float!(f32 f64);
   |   ------------------------- in this macro invocation
   |
-note: inside `quantity::Below::<f32>::equal`
+note: inside `exact_units::literal::quantity::Below::<f32>::equal`
  --> $RUST/core/src/panic.rs
   |
   |           $crate::panicking::panic_fmt($crate::const_format_args!($($t)+));

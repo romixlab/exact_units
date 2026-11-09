@@ -76,33 +76,57 @@ fn prefix_names() {
     assert_eq!(Prefix::from_name("milli"), None);
 }
 
-/// Kinds that share a dimension (UNIT-2): a quotient keeps what cancelled, a product cancels it, and Ω and S are kinds
-/// of their own.
+/// Quantities that share a dimension (UNIT-2, UNIT-8): a quotient keeps what cancelled, a product is derived, and Ω
+/// and S are kinds of their own.
 #[test]
-fn kinds_of_markers() {
-    use exact_units::{Exact, Fixed, Kind, LevelForm, prefix::One};
+fn quantities_of_markers() {
+    use exact_units::quantities::{Conductance, Resistance};
+    use exact_units::{Exact, Fixed, LevelForm, QuantityExpr, prefix::One};
     use units::{Ampere, Decibel, Ohm, Ratio, Siemens, Times, Volt, Watt};
 
     let volt = <Volt as Unit>::DIM;
-    assert_eq!(<Per<Volt, Volt> as Unit>::KIND, Kind::RatioOf(volt));
-    assert_eq!(<Per<Volt, Volt> as Unit>::DIM, <Ratio as Unit>::DIM);
-    assert!(!<Per<Volt, Volt> as Unit>::KIND.same(<Per<Ampere, Ampere> as Unit>::KIND));
-    assert!(!<Per<Volt, Volt> as Unit>::KIND.same(<Ratio as Unit>::KIND));
-    assert_eq!(<Ohm as Unit>::KIND, Kind::Named("resistance"));
-    assert_eq!(<Siemens as Unit>::KIND, Kind::Named("conductance"));
-    assert_eq!(<Per<Volt, Ampere> as Unit>::KIND, Kind::Plain);
-    assert_eq!(<Times<Per<Volt, Volt>, Volt> as Unit>::KIND, Kind::Plain);
     assert_eq!(
-        <Times<Per<Volt, Volt>, Per<Volt, Volt>> as Unit>::KIND,
-        Kind::RatioOf(volt)
+        <Per<Volt, Volt> as Unit>::QUANTITY,
+        QuantityExpr::RatioOf(volt)
     );
-    assert_eq!(<Per<Ohm, Ratio> as Unit>::KIND, Kind::Named("resistance"));
+    assert_eq!(<Per<Volt, Volt> as Unit>::DIM, <Ratio as Unit>::DIM);
+    let no = |a: QuantityExpr<'_>, b: QuantityExpr<'_>| a.same(b, &()) == Some(false);
+    assert!(no(
+        <Per<Volt, Volt> as Unit>::QUANTITY,
+        <Per<Ampere, Ampere> as Unit>::QUANTITY
+    ));
+    assert!(no(
+        <Per<Volt, Volt> as Unit>::QUANTITY,
+        <Ratio as Unit>::QUANTITY
+    ));
+    assert_eq!(<Ohm as Unit>::QUANTITY, QuantityExpr::of::<Resistance>());
     assert_eq!(
-        <Per<Watt, Watt> as Unit>::KIND.level_form(),
+        <Siemens as Unit>::QUANTITY,
+        QuantityExpr::of::<Conductance>()
+    );
+    let ohm = <Ohm as Unit>::DIM;
+    assert_eq!(
+        <Per<Volt, Ampere> as Unit>::QUANTITY,
+        QuantityExpr::Derived(ohm)
+    );
+    assert_eq!(
+        <Times<Per<Volt, Volt>, Volt> as Unit>::QUANTITY,
+        QuantityExpr::Derived(volt)
+    );
+    assert_eq!(
+        <Times<Per<Volt, Volt>, Per<Volt, Volt>> as Unit>::QUANTITY,
+        QuantityExpr::RatioOf(volt)
+    );
+    assert_eq!(
+        <Per<Ohm, Ratio> as Unit>::QUANTITY,
+        QuantityExpr::of::<Resistance>()
+    );
+    assert_eq!(
+        <Per<Watt, Watt> as Unit>::QUANTITY.level_form(),
         Some(LevelForm::Power)
     );
     assert_eq!(
-        <Per<Ampere, Ampere> as Unit>::KIND.level_form(),
+        <Per<Ampere, Ampere> as Unit>::QUANTITY.level_form(),
         Some(LevelForm::RootPower)
     );
 
@@ -277,12 +301,12 @@ fn derived_units() {
     assert_eq!(dim::<Times<ThermalResistance, Watt>>(), dim::<Kelvin>());
 }
 
-/// The derived units are plain but for two that share a named marker's dimension, and the related ones convert
-/// exactly.
+/// The derived units measure their dimension's quantity but for two, `Of` aliases over a compound, and the related
+/// ones convert exactly.
 #[test]
-fn derived_kinds_and_conversions() {
+fn derived_quantities_and_conversions() {
     use exact_units::prefix::{Kilo, Micro, Milli, One};
-    use exact_units::{Fixed, Kind};
+    use exact_units::{Fixed, QuantityExpr, quantities};
     use units::{
         AbsorbedDoseRate, Acceleration, Area, Candela, Density, EnergyDensity, Entropy,
         GramPerCubicCentimeter, GramPerMole, HeatCapacity, HeatFluxDensity, Irradiance, Joule,
@@ -290,18 +314,33 @@ fn derived_kinds_and_conversions() {
         SievertPerHour, Speed, ThermalResistance, Volume, Watt,
     };
 
-    // kinds: plain but for the two that share a named marker's dimension
-    assert_eq!(<EnergyDensity as Unit>::KIND, Kind::Named("energy density"));
-    assert_eq!(<Entropy as Unit>::KIND, Kind::Named("entropy"));
-    for kind in [
-        <Irradiance as Unit>::KIND,
-        <HeatFluxDensity as Unit>::KIND,
-        <HeatCapacity as Unit>::KIND,
-        <ThermalResistance as Unit>::KIND,
-        <Resistivity as Unit>::KIND,
-        <Nit as Unit>::KIND,
+    // quantities: derived but for the two that share a named marker's dimension
+    assert_eq!(
+        <EnergyDensity as Unit>::QUANTITY,
+        QuantityExpr::of::<quantities::EnergyDensity>()
+    );
+    assert_eq!(
+        <Entropy as Unit>::QUANTITY,
+        QuantityExpr::of::<quantities::Entropy>()
+    );
+    for (q, d) in [
+        (<Irradiance as Unit>::QUANTITY, <Irradiance as Unit>::DIM),
+        (
+            <HeatFluxDensity as Unit>::QUANTITY,
+            <HeatFluxDensity as Unit>::DIM,
+        ),
+        (
+            <HeatCapacity as Unit>::QUANTITY,
+            <HeatCapacity as Unit>::DIM,
+        ),
+        (
+            <ThermalResistance as Unit>::QUANTITY,
+            <ThermalResistance as Unit>::DIM,
+        ),
+        (<Resistivity as Unit>::QUANTITY, <Resistivity as Unit>::DIM),
+        (<Nit as Unit>::QUANTITY, <Nit as Unit>::DIM),
     ] {
-        assert_eq!(kind, Kind::Plain);
+        assert_eq!(q, QuantityExpr::Derived(d));
     }
 
     // conversions between the related ones, exact
@@ -382,7 +421,6 @@ fn derived_names() {
         "SurfaceTension",
         "DynamicViscosity",
         "KinematicViscosity",
-        "EnergyDensity",
         "PowerDensity",
         "ElectricFieldStrength",
         "MagneticFieldStrength",
@@ -395,7 +433,6 @@ fn derived_names() {
         "Conductivity",
         "HeatFluxDensity",
         "HeatCapacity",
-        "Entropy",
         "SpecificHeatCapacity",
         "ThermalConductivity",
         "ThermalConductance",
@@ -428,9 +465,10 @@ fn derived_names() {
 }
 
 /// No two named units share a symbol but the pairs that are one unit of two quantities (SI Brochure table 6 lists each
-/// pair on one line): W/m² of heat flux and irradiance, J/K of heat capacity and entropy, m²·s⁻² of absorbed and
-/// equivalent dose differ in their symbols. A loss shares its gain's symbol (dB, Np): their dimensions tell them
-/// apart, and so do the bel's and the byte's B. A damping ratio and a quality factor are numbers like a ratio, told apart by their kinds.
+/// pair on one line): W/m² of heat flux and irradiance; m²·s⁻² of absorbed and equivalent dose differ in their
+/// symbols. A loss shares its gain's symbol (dB, Np): their dimensions tell them apart, and so do the bel's and the
+/// byte's B. Entropy, energy density, a damping ratio and a quality factor are no named units but quantities of
+/// one (`Of<Entropy, HeatCapacity>`), so they share no line here.
 #[test]
 fn symbols_are_unique_but_for_shared_units() {
     use exact_units::UnitExpr;
@@ -458,14 +496,7 @@ fn symbols_are_unique_but_for_shared_units() {
             ("Decibel", "DecibelLoss"),
             #[cfg(all(feature = "levels", feature = "information"))]
             ("Bel", "Byte"),
-            #[cfg(feature = "levels")]
-            ("DampingRatio", "QualityFactor"),
-            #[cfg(all(feature = "levels", feature = "dimensionless"))]
-            ("DampingRatio", "Ratio"),
-            #[cfg(all(feature = "levels", feature = "dimensionless"))]
-            ("QualityFactor", "Ratio"),
             ("HeatFluxDensity", "Irradiance"),
-            ("HeatCapacity", "Entropy"),
         ]
     );
 }

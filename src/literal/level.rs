@@ -1,9 +1,9 @@
 //! `q!(-3 dB)`, a level of a gain, compared exactly with a linear gain [Fixed].
 //!
-//! `dB` or `Np` alone after the number is a [LevelLiteral]: zero-sized, its number and level in the type. A level
-//! reads one way against a gain whose [Kind](crate::Kind) has a level form: a ratio of root-power quantities (V/V,
-//! A/A, Pa/Pa) is 20·lg (dB) or ln (Np), one of powers (W/W) 10·lg or ½·ln. A compare folds the gain, `10^(x/20)` or
-//! `10^(x/10)` (`e^x` or `e^(2x)`), to steps of `P` of `U` in a `const` block, through the same interval the crate's
+//! `dB` or `Np` alone after the number is a [LevelLiteral]: zero-sized, its number and level in the type. A level reads
+//! one way against a gain whose [quantity](crate::QuantityExpr) has a level form: a ratio of root-power quantities
+//! (V/V, A/A, Pa/Pa) is 20·lg (dB) or ln (Np), one of powers (W/W) 10·lg or ½·ln. A compare folds the gain, `10^(x/20)`
+//! or `10^(x/10)` (`e^x` or `e^(2x)`), to steps of `P` of `U` in a `const` block, through the same interval the crate's
 //! π scales go through, so `gain < q!(-3 dB)` is one integer or float compare against a constant.
 //!
 //! - The gain is never rounded: 10^(−3/20) = 0.70794.. V/V against steps of 1 mV/V is between 707 and 708, so
@@ -150,7 +150,7 @@ enum Gain {
 const fn form<U: Unit>() -> LevelForm {
     let level = matches!(U::DIM.const_exp_of(crate::MarkerId::NEPER), Some(e) if !e.is_zero())
         || matches!(U::DIM.const_exp_of(crate::MarkerId::NEPER_LOSS), Some(e) if !e.is_zero());
-    match U::KIND.level_form_typed() {
+    match U::QUANTITY.level_form_typed() {
         Some(form) => form,
         None if level => panic!(
             "q!(x dB) and q!(x Np) are levels of a gain; against a value stored as a level, a level of gain and one \

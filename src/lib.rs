@@ -9,10 +9,11 @@
 //! - [Fixed]`<U, P, T, B>`: a `T` in unit `U` and scale `P` (a prefix, a binary prefix, a power of ten, a fraction),
 //!   within bounds `B`. `Fixed<Second, Micro, u32>` is a time in µs, the same bytes as the `u32` it replaces.
 //!   Conversions between scales are exact or refused, never rounded through a float.
-//! - [units]: zero-size unit markers (SI, angle, information, counted things) with their [UnitDef] (identity, [Dim], exact scale), and the
-//!   products and quotients the compiler checks (`Volt · Ampere` is `Watt`).
+//! - [units]: zero-size unit markers (SI, angle, information, counted things) with their [UnitDef] (identity, [Dim],
+//!   exact scale), and the products and quotients the compiler checks (`Volt · Ampere` is `Watt`).
 //! - [Dim]: the dimension as data: SI's seven base exponents and a list of distinguished bases with no count limit
-//!   (angle, level, information, counted things), every exponent in halves (V/√Hz). [Magnitude]: a factor of integers and powers of 10, 2 and π (`°` is π/180 rad).
+//!   (angle, level, information, counted things), every exponent in halves (V/√Hz). [Magnitude]: a factor of integers
+//!   and powers of 10, 2 and π (`°` is π/180 rad).
 //! - [Complex]`<U, P, T, B>`: a complex quantity, two `T` in unit `U` and scale `P`: an [Impedance], an
 //!   [Admittance], a phasor, a Q15 IQ sample. Products and conversions by the rules of `Fixed`, part by part, and
 //!   a complex multiply rounded once into a chosen scale. For IQ samples: [CQ15] and [CQ31], a multiply-accumulate
@@ -23,9 +24,9 @@
 //!   1-based, and a wrapping sequence number in serial number order; index − index is an amount, index + index
 //!   doesn't compile.
 //! - `SIExpr` (feature `shrink_wrap`): a unit as a tree on the wire, for a unit only known at run time.
-//! - [decibel]: levels in dB of a gain, 20·lg or 10·lg by its [Kind]: [db!] works the stored value out at compile
-//!   time, exactly; `to_db` / `from_db` at run time in `f64` and `f32` (feature `std` or `libm`). Nepers are the same
-//!   with [np!] and `to_np` / `from_np`.
+//! - [decibel]: levels in dB of a gain, 20·lg or 10·lg by its [quantity](QuantityExpr): [db!] works the stored value
+//!   out at compile time, exactly; `to_db` / `from_db` at run time in `f64` and `f32` (feature `std` or `libm`). Nepers
+//!   are the same with [np!] and `to_np` / `from_np`.
 //! - [level] (feature `levels`): a level as a quantity, the neper on a base of its own and the decibel a scaled
 //!   unit of it, a loss on a second base (`Loss<Decibel>`, positive for a decay), absorbance and optical depth,
 //!   rates like dB/m and Np/s, and the edge to a gain (`to_level`, `to_gain`), where 10·lg or 20·lg comes in.
@@ -36,8 +37,9 @@
 //!
 //! `no_std`, no alloc, and no dependencies without features. `shrink_wrap` adds the wire format (`shrink_wrap`'s),
 //! `std` every unit group and with `shrink_wrap` the owned forms of the wire types, `defmt` their `defmt::Format`,
-//! `serde` their serde, `libm` the run-time dB without `std`. Unit groups are cargo features (`time`, `electrical`, `mechanical`, `angle`, `thermal`, `chemical`, `photometric`,
-//! `radiometric`, `radiation`, `fields`, `dimensionless`, `information`, `counting`, `levels`, `quantities` for all).
+//! `serde` their serde, `libm` the run-time dB without `std`. Unit groups are cargo features (`time`, `electrical`,
+//! `mechanical`, `angle`, `thermal`, `chemical`, `photometric`, `radiometric`, `radiation`, `fields`, `dimensionless`,
+//! `information`, `counting`, `levels`, `quantities` for all).
 //!
 //! Run-time quantities (a prefix and a number type chosen per value) are `ww_si`'s `Quantity` and `AnyQuantity`,
 //! built on this crate.
@@ -67,7 +69,6 @@ mod exact;
 mod fixed;
 #[cfg(feature = "counting")]
 mod index;
-pub mod kind;
 #[cfg(feature = "leap_seconds")]
 pub mod leap;
 #[cfg(feature = "levels")]
@@ -83,6 +84,8 @@ pub mod notation;
 pub mod num;
 mod point;
 mod products;
+pub mod quantities;
+pub mod quantity;
 pub mod registry;
 #[cfg(feature = "serde")]
 pub mod serde;
@@ -137,7 +140,6 @@ pub use fixed::{Days, Hours, Hz, Micros, Millis, Minutes, Nanos, Secs};
 pub use fixed::{Duty16, Percent, Permille, Ppb, Ppm, Q15, Q31, UQ16_16};
 #[cfg(feature = "counting")]
 pub use index::{Index, IndexFrom1, Seq};
-pub use kind::{Kind, LevelForm};
 pub use magnitude::{MAX_FACTORS, Magnitude, MagnitudeError, MagnitudeRest, PrimePower, Symbols};
 pub use notation::Notation;
 pub use point::{
@@ -145,6 +147,9 @@ pub use point::{
     PointDiff, Reference, ReferenceDef, ReferenceHow, TimeCounting, TimeScaleDef, TimeZero,
     UnitZero, origins,
 };
+pub use quantity::{Character, LevelForm, QuantityDef, QuantityExpr, QuantityRef, QuantitySpec};
+#[cfg(all(feature = "std", feature = "shrink_wrap"))]
+pub use quantity::{QuantityDefOwned, QuantityRefOwned};
 pub use registry::Registry;
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use si_expr::SIExprOwned;

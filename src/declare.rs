@@ -76,8 +76,10 @@
 ///   ```
 /// - The marker's identity is the crate that declares it (`CARGO_CRATE_NAME`) and its name
 ///   ([MarkerId](crate::MarkerId)): two crates' `Rpm` are two units.
-/// - After the dimension, `kind "resistance"` names a kind of quantity of its own ([Kind::Named](crate::Kind)):
-///   such a unit doesn't convert to or from another of its dimension, `Ohm` is no `Per<Volt, Ampere>`.
+/// - After the dimension, `quantity Resistance` names the quantity the unit measures by default, a
+///   [QuantitySpec](crate::QuantitySpec) of the same dimension: `Ohm` is a resistance, and no `Per<Volt, Ampere>`,
+///   whose quantity is its dimension's ([QuantityExpr::Derived](crate::QuantityExpr::Derived)). A line without one
+///   measures its dimension's quantity.
 /// - After the scale, `conventional("NIST SP 811", 2008)` marks a unit fixed by a physical property (mercury at
 ///   32 °F, a calorie at 15 °C): its scale is the value that source prints, not a definition
 ///   ([Provenance::Conventional](crate::Provenance::Conventional)). Without it the scale is the unit's definition.
@@ -90,14 +92,14 @@ macro_rules! unit {
         @table $(#[$all_attr:meta])* $all_vis:vis static $all:ident;
         $(
             $(#[$($attr:tt)*])*
-            $vis:vis struct $name:ident = $symbol:literal $(($($names:tt)*))?, $dim:tt $(($base:ident))? $(kind $qkind:literal)?
+            $vis:vis struct $name:ident = $symbol:literal $(($($names:tt)*))?, $dim:tt $(($base:ident))? $(quantity $q:path)?
                 $(, $kind:ident $args:tt $(, conventional($source:literal, $year:literal))?)?;
         )*
     ) => {
         $crate::unit! {
             $(
                 $(#[$($attr)*])*
-                $vis struct $name = $symbol $(($($names)*))?, $dim $(($base))? $(kind $qkind)? $(, $kind $args $(, conventional($source, $year))?)?;
+                $vis struct $name = $symbol $(($($names)*))?, $dim $(($base))? $(quantity $q)? $(, $kind $args $(, conventional($source, $year))?)?;
             )*
         }
 
@@ -114,7 +116,7 @@ macro_rules! unit {
     (
         $(
             $(#[$($attr:tt)*])*
-            $vis:vis struct $name:ident = $symbol:literal $(($($names:tt)*))?, $dim:tt $(($base:ident))? $(kind $qkind:literal)?
+            $vis:vis struct $name:ident = $symbol:literal $(($($names:tt)*))?, $dim:tt $(($base:ident))? $(quantity $q:path)?
                 $(, $kind:ident $args:tt $(, conventional($source:literal, $year:literal))?)?;
         )*
     ) => {
@@ -128,10 +130,11 @@ macro_rules! unit {
                 impl $crate::Unit for $name {
                     const DIM: $crate::Dim<'static> = $crate::__unit_dim!($name $dim $(($base))?);
                     const BASE: Option<$crate::BaseDef<'static>> = $crate::__unit_base!($name $dim $(($base))?);
-                    const KIND: $crate::Kind<'static> = match Self::EXPR {
-                        $crate::UnitExpr::Named(def) => def.kind(),
-                        _ => $crate::Kind::Plain,
+                    const QUANTITY: $crate::QuantityExpr<'static> = match Self::EXPR {
+                        $crate::UnitExpr::Named(def) => def.quantity_expr(),
+                        _ => $crate::QuantityExpr::Derived(Self::DIM),
                     };
+                    type Bare = Self;
                     const EXPR: &'static $crate::UnitExpr = &$crate::UnitExpr::Named(&$crate::UnitDef {
                         id: $crate::MarkerId {
                             crate_name: env!("CARGO_CRATE_NAME"),
@@ -139,7 +142,7 @@ macro_rules! unit {
                         },
                         names: $crate::__unit_names!([$symbol] [$dim] [$($kind)?] $($($names)*)?),
                         dim: Self::DIM,
-                        quantity: $crate::__unit_quantity!($($qkind)?),
+                        quantity: $crate::__unit_quantity!($($q)?),
                         scale: $crate::__unit_scale!($($kind $args)?),
                         provenance: $crate::__unit_provenance!($($($source $year)?)?),
                     });
@@ -149,7 +152,7 @@ macro_rules! unit {
             // the names are checked where the line is, not only where the unit is used
             $crate::__with_cfgs! {
                 [] $(#[$($attr)*])* =>
-                const _: &$crate::UnitExpr = <$name as $crate::Unit>::EXPR;
+                const _: () = $crate::quantity::__check_unit(<$name as $crate::Unit>::EXPR);
             }
         )*
     };
@@ -365,15 +368,15 @@ pub const fn __dim_set(
     exps
 }
 
-/// The kind of quantity of a [unit!] line: `kind "<name>"` after the dimension, else none.
+/// The quantity of a [unit!] line: `quantity <Spec>` after the dimension, else none.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __unit_quantity {
     () => {
         None
     };
-    ($name:literal) => {
-        Some($name)
+    ($q:path) => {
+        Some($crate::QuantityRef::Def(<$q as $crate::QuantitySpec>::DEF))
     };
 }
 
@@ -562,5 +565,131 @@ macro_rules! __or_zero {
     };
     ($e:literal) => {
         $e
+    };
+}
+
+/// Declares quantity markers, the `Q` of [Of<Q, U>](crate::units::Of): a zero-size struct per line and its
+/// [QuantitySpec](crate::QuantitySpec) impl. WireWeaver reads the same lines from source, like [unit!](crate::unit)'s.
+///
+/// ```
+/// use exact_units::{QuantitySpec, Unit, quantities::Length, units::{Meter, Of}};
+///
+/// exact_units::quantity! {
+///     /// The length of a cable run, a length of its own subtree.
+///     pub struct CableLength: Length;
+///     /// A count of retries per second, a kind of its own: not a frequency.
+///     pub struct RetryRate = kind [s -1];
+/// }
+///
+/// assert_eq!(CableLength::DEF.dim, Meter::DIM);
+/// assert_eq!(CableLength::DEF.id.name, "CableLength");
+/// assert!(RetryRate::DEF.is_kind);
+/// let _ = <Of<CableLength, Meter>>::DIM;
+/// ```
+///
+/// Each line is `<attributes> <visibility> struct <Name>` and then:
+///
+/// - `= [<base> <exponent>, ..]`: a root of its dimension, written as on a [unit!](crate::unit) line. It is its
+///   dimension's *open* root, the quantity a unit without one measures ([Derived](crate::QuantityExpr::Derived)):
+///   a dimension has at most one.
+/// - `= kind [..]`: a root that is a kind of its own, which converts with no other quantity of its dimension.
+/// - `: Parent`: a child of the quantity `Parent`, of its dimension; it converts up to `Parent` and is reached from
+///   it by a named step.
+/// - `: kind Parent`: a child that is a kind of its own: reached from `Parent` and back only by a named step.
+///
+/// and `, complex` or `, vector` for a quantity whose values are complex or vectors
+/// ([Character](crate::Character), scalar without). The identity is the crate (`CARGO_CRATE_NAME`) and the name.
+///
+/// `@table static ALL;` before the lines also gives a `static ALL: &[&QuantityDef]` of them, as for `unit!`.
+#[macro_export]
+macro_rules! quantity {
+    (@table $(#[$all_attr:meta])* $all_vis:vis static $all:ident; $($lines:tt)*) => {
+        $crate::__quantity_lines! { [$(#[$all_attr])* $all_vis static $all] [] $($lines)* }
+    };
+    ($($lines:tt)*) => {
+        $crate::__quantity_lines! { [] [] $($lines)* }
+    };
+}
+
+/// One line of [quantity!] at a time: the item, then the rest, collecting the names for a table.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __quantity_lines {
+    ([] [$($done:tt)*]) => {};
+    ([$($table:tt)+] [$($(#[$($attr:tt)*])* $name:ident)*]) => {
+        #[expect(clippy::allow_attributes, reason = "a table may have no documented line")]
+        #[allow(unused_doc_comments, reason = "doc comments of the lines land on the expressions of the table")]
+        $($table)+: &[&$crate::QuantityDef<'static>] = &[
+            $(
+                $(#[$($attr)*])*
+                <$name as $crate::QuantitySpec>::DEF,
+            )*
+        ];
+    };
+    ([$($table:tt)*] [$($done:tt)*] $(#[$($attr:tt)*])* $vis:vis struct $name:ident = kind $dim:tt $(, $ch:ident)?; $($rest:tt)*) => {
+        $crate::__quantity_item! { [$(#[$($attr)*])*] $vis $name [None] [$crate::__unit_dim!($name $dim)] [true] [$($ch)?] }
+        $crate::__quantity_lines! { [$($table)*] [$($done)* $(#[$($attr)*])* $name] $($rest)* }
+    };
+    ([$($table:tt)*] [$($done:tt)*] $(#[$($attr:tt)*])* $vis:vis struct $name:ident = $dim:tt $(, $ch:ident)?; $($rest:tt)*) => {
+        $crate::__quantity_item! { [$(#[$($attr)*])*] $vis $name [None] [$crate::__unit_dim!($name $dim)] [false] [$($ch)?] }
+        $crate::__quantity_lines! { [$($table)*] [$($done)* $(#[$($attr)*])* $name] $($rest)* }
+    };
+    ([$($table:tt)*] [$($done:tt)*] $(#[$($attr:tt)*])* $vis:vis struct $name:ident : kind $parent:path $(, $ch:ident)?; $($rest:tt)*) => {
+        $crate::__quantity_item! {
+            [$(#[$($attr)*])*] $vis $name
+            [Some($crate::QuantityRef::Def(<$parent as $crate::QuantitySpec>::DEF))]
+            [<$parent as $crate::QuantitySpec>::DEF.dim] [true] [$($ch)?]
+        }
+        $crate::__quantity_lines! { [$($table)*] [$($done)* $(#[$($attr)*])* $name] $($rest)* }
+    };
+    ([$($table:tt)*] [$($done:tt)*] $(#[$($attr:tt)*])* $vis:vis struct $name:ident : $parent:path $(, $ch:ident)?; $($rest:tt)*) => {
+        $crate::__quantity_item! {
+            [$(#[$($attr)*])*] $vis $name
+            [Some($crate::QuantityRef::Def(<$parent as $crate::QuantitySpec>::DEF))]
+            [<$parent as $crate::QuantitySpec>::DEF.dim] [false] [$($ch)?]
+        }
+        $crate::__quantity_lines! { [$($table)*] [$($done)* $(#[$($attr)*])* $name] $($rest)* }
+    };
+}
+
+/// The marker and its [QuantitySpec](crate::QuantitySpec) impl, for [quantity!].
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __quantity_item {
+    ([$(#[$($attr:tt)*])*] $vis:vis $name:ident [$($parent:tt)*] [$($dim:tt)*] [$kind:literal] [$($ch:ident)?]) => {
+        $(#[$($attr)*])*
+        #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+        $vis struct $name;
+
+        $crate::__with_cfgs! {
+            [] $(#[$($attr)*])* =>
+            impl $crate::QuantitySpec for $name {
+                const DEF: &'static $crate::QuantityDef<'static> = &$crate::QuantityDef {
+                    id: $crate::MarkerId {
+                        crate_name: env!("CARGO_CRATE_NAME"),
+                        name: stringify!($name),
+                    },
+                    parent: $($parent)*,
+                    dim: $($dim)*,
+                    is_kind: $kind,
+                    character: $crate::__quantity_character!($($ch)?),
+                };
+            }
+        }
+    };
+}
+
+/// The character of a [quantity!] line: `complex`, `vector`, scalar without.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __quantity_character {
+    () => {
+        $crate::Character::Scalar
+    };
+    (complex) => {
+        $crate::Character::Complex
+    };
+    (vector) => {
+        $crate::Character::Vector
     };
 }

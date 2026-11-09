@@ -10,7 +10,7 @@
 
 use crate::dim::{TRUE_ORDER, base_symbol};
 use crate::unit::superscript_digit;
-use crate::{Dim, Exp, Kind, MarkerId, Unit, UnitExpr};
+use crate::{Dim, Exp, MarkerId, QuantityExpr, QuantityRef, Unit, UnitExpr};
 
 /// Text written into a buffer on the stack, for a `panic!("{}", msg.as_str())` right after. A push that wouldn't
 /// fit whole is dropped whole (never split a char in half: [as_str](Self::as_str) always decodes); a cut-off
@@ -182,14 +182,38 @@ const fn push_dim_part(mut msg: Msg, first: bool, symbol: &str, exp: Exp) -> (Ms
     (msg, false)
 }
 
-/// The kind beyond the dimension, as [Kind]'s `Display` writes it, but never empty: "a plain unit" for
-/// [Kind::Plain].
-const fn push_kind(msg: Msg, k: Kind<'_>) -> Msg {
-    match k {
-        Kind::Plain => msg.push("a plain unit"),
-        Kind::Named(name) => msg.push(name),
-        Kind::RatioOf(d) => push_dim(msg.push("a ratio of "), d),
+/// The quantity beyond the dimension, never empty: a spec's name split at its capitals (`path length`), "a ratio
+/// of" a dimension, "its dimension's quantity" for [QuantityExpr::Derived].
+const fn push_quantity(msg: Msg, q: QuantityExpr<'_>) -> Msg {
+    match q {
+        QuantityExpr::Spec(r) => push_quantity_name(msg, r),
+        QuantityExpr::RatioOf(d) => push_dim(msg.push("a ratio of "), d),
+        QuantityExpr::Derived(_) => msg.push("its dimension's quantity"),
     }
+}
+
+/// A quantity's name: its marker's name split at the capitals, lower case.
+#[expect(clippy::indexing_slicing, reason = "i < b.len(), the loop bound")]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "i < b.len(), the loop bound; b'a' - b'A' added to an upper-case ASCII letter stays ASCII"
+)]
+const fn push_quantity_name(mut msg: Msg, r: QuantityRef<'_>) -> Msg {
+    let b = r.id().name.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        let c = b[i];
+        if c.is_ascii_uppercase() {
+            if i > 0 {
+                msg = msg.push_byte(b' ');
+            }
+            msg = msg.push_byte(c + (b'a' - b'A'));
+        } else {
+            msg = msg.push_byte(c);
+        }
+        i += 1;
+    }
+    msg
 }
 
 /// The symbol of a unit expression, as written after a number: `N·m`, empty for [units::Ratio](crate::units::Ratio).
@@ -291,11 +315,11 @@ const fn angle_unit_name(n: u8) -> Option<&'static str> {
 }
 
 /// Whether `low` (fewer radians) reaches `high` (more) in one step of this crate's own product table
-/// ([products::TABLE](crate::products::TABLE)): scans every entry for a side whose [Dim] and [Kind] match `low`
+/// ([products::TABLE](crate::products::TABLE)): scans every entry for a side whose [Dim] and quantity match `low`
 /// exactly, the entry's output matching `high` — the table doesn't care which of its two factors that side was,
 /// so both are tried. Never a separate list of pairs to keep in step with `products.rs` by hand: an entry added,
-/// changed or removed there changes what this sees in the same build, nothing here to update. [Kind] as well as
-/// [Dim]: [Watt](crate::units::Watt), [VoltAmpere](crate::units::VoltAmpere) and [Var](crate::units::Var) share a
+/// changed or removed there changes what this sees in the same build, nothing here to update. The quantity as well as
+/// the [Dim]: [Watt](crate::units::Watt), [VoltAmpere](crate::units::VoltAmpere) and [Var](crate::units::Var) share a
 /// dimension but only [Watt] is really [RadiantIntensity](crate::units::RadiantIntensity) times a
 /// [Steradian](crate::units::Steradian), so a bare [Dim] match would wrongly say yes for the other two.
 #[expect(clippy::indexing_slicing, reason = "i < table.len(), the loop bound")]
@@ -305,9 +329,9 @@ const fn angle_unit_name(n: u8) -> Option<&'static str> {
 )]
 const fn known_angle_step(
     low: Dim<'_>,
-    low_kind: Kind<'_>,
+    low_kind: QuantityExpr<'_>,
     high: Dim<'_>,
-    high_kind: Kind<'_>,
+    high_kind: QuantityExpr<'_>,
 ) -> bool {
     let table = crate::products::TABLE;
     let mut i = 0;
@@ -338,9 +362,9 @@ const fn push_angle_hint<A: Unit, B: Unit>(mut msg: Msg, diff: Dim<'_>) -> Msg {
     };
     let n = rad.unsigned_abs();
     let (low_dim, low_kind, high_dim, high_kind) = if rad < 0 {
-        (A::DIM, A::KIND, B::DIM, B::KIND)
+        (A::DIM, A::QUANTITY, B::DIM, B::QUANTITY)
     } else {
-        (B::DIM, B::KIND, A::DIM, A::KIND)
+        (B::DIM, B::QUANTITY, A::DIM, A::QUANTITY)
     };
     if let Some(angle_unit) = angle_unit_name(n)
         && known_angle_step(low_dim, low_kind, high_dim, high_kind)
@@ -397,15 +421,17 @@ pub(crate) const fn dim_mismatch<A: Unit, B: Unit>(what: &str) -> ! {
 )]
 pub(crate) const fn kind_mismatch<A: Unit, B: Unit>(what: &str) -> ! {
     let mut msg = Msg::new().push(what);
-    msg = msg.push(" converts only between units of the same kind: ");
+    msg = msg.push(" converts only to the same quantity or one above it: ");
     msg = push_unit(msg, A::EXPR);
     msg = msg.push(" is ");
-    msg = push_kind(msg, A::KIND);
+    msg = push_quantity(msg, A::QUANTITY);
     msg = msg.push(", ");
     msg = push_unit(msg, B::EXPR);
     msg = msg.push(" is ");
-    msg = push_kind(msg, B::KIND);
-    msg = msg.push(" (cross kinds with a named step: as_ratio, as_resistance, as_phase, ..)");
+    msg = push_quantity(msg, B::QUANTITY);
+    msg = msg.push(
+        " (down the tree or across a kind with a named step: as_quantity, as_ratio, as_phase, ..)",
+    );
     panic!("{}", msg.as_str())
 }
 
@@ -473,12 +499,16 @@ mod tests {
 
     // two markers of the shape the angle hint cares about, without depending on the `mechanical` / `angle`
     // features that `units::Torque` and `units::Joule` need: a torque's dimension (kg·m²·s⁻²·rad⁻¹) and its
-    // energy (kg·m²·s⁻²), one radian apart. `Energy`'s own kind (not `units::Joule`'s plain one) keeps this pair
+    // energy (kg·m²·s⁻²), one radian apart. `Energy`'s own quantity (not `units::Joule`'s derived one) keeps this pair
     // from ever matching the real `Torque * Radian = Joule` entry of `known_angle_step`, whether or not those
     // features are on: these two test the fallback wording, the feature-gated tests below the named one.
+    crate::quantity! {
+        struct TestOnly = kind [kg 1, m 2, s -2];
+    }
+
     crate::unit! {
         struct Torque = "N·m", [kg 1, m 2, s -2, rad -1];
-        struct Energy = "J", [kg 1, m 2, s -2] kind "test-only";
+        struct Energy = "J", [kg 1, m 2, s -2] quantity TestOnly;
     }
 
     #[test]

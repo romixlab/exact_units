@@ -1,12 +1,12 @@
-//! Levels in decibels of a gain, the form (10·lg or 20·lg) from the unit's [Kind](crate::Kind): a ratio of root-power
-//! quantities (V/V, A/A, Pa/Pa) takes 20·lg, one of powers (W/W) 10·lg, and any other kind, a plain
+//! Levels in decibels of a gain, the form (10·lg or 20·lg) from the unit's [quantity](crate::QuantityExpr): a ratio of
+//! root-power quantities (V/V, A/A, Pa/Pa) takes 20·lg, one of powers (W/W) 10·lg, and any other kind, a plain
 //! [Ratio](crate::units::Ratio) too, has no level and doesn't compile.
 //!
 //! - [Fixed::to_db] / [Fixed::from_db] in `f64`, [Fixed::to_db_f32] / [Fixed::from_db_f32] in `f32`, the float a
 //!   Cortex-M4F or M33 has in hardware (`f64` is software there). With feature `std` or `libm`: `log10` and `powf`
-//!   aren't in `core`. With `libm` (pure Rust, no C) they come from it even when `std` is on, so a host and a
-//!   firmware compute the same bits. `to_db` gives a level as a typed value, `Option<Fixed<Decibel, One, f64>>`
-//!   (`libm` turns on `levels` for its markers), so it checks against `q!(6.0205... Decibel)` and keeps its unit; `from_db` takes the
+//!   aren't in `core`. With `libm` (pure Rust, no C) they come from it even when `std` is on, so a host and a firmware
+//!   compute the same bits. `to_db` gives a level as a typed value, `Option<Fixed<Decibel, One, f64>>` (`libm` turns on
+//!   `levels` for its markers), so it checks against `q!(6.0205... Decibel)` and keeps its unit; `from_db` takes the
 //!   bare number a setting or a reading arrives as.
 //! - [Fixed::from_db_const] and [db!](crate::db): a level written in decimal (`db!(-3.01)`) becomes the stored value
 //!   at compile time, exactly: the stored value nearest to `10^(dB/20)` (or `/10`), worked out in integers with an
@@ -538,8 +538,8 @@ from_db_const!(u8 u16 u32 u64 i8 i16 i32 i64 f32 f64);
 use crate::num::math;
 
 impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> {
-    /// The form a level of `U` takes, or a compile error for a kind without one.
-    pub(crate) const LEVEL_FORM: LevelForm = match U::KIND.level_form_typed() {
+    /// The form a level of `U` takes, or a compile error for a quantity without one.
+    pub(crate) const LEVEL_FORM: LevelForm = match U::QUANTITY.level_form_typed() {
         Some(form) => form,
         None => panic!(
             "decibels are for a ratio of powers (W/W) or of root-power quantities (V/V, A/A, Pa/Pa): a plain \

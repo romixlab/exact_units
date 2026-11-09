@@ -27,7 +27,7 @@ pub(crate) fn any_unit_text(s: &str) {
         .unwrap_or_else(|e| panic!("{s:?} read as {text:?}, which doesn't read: {e}"));
     assert_eq!(back.dim(), u.dim(), "{s:?} as {text:?}");
     assert_eq!(back.scale(), u.scale(), "{s:?} as {text:?}");
-    assert_eq!(back.kind(), u.kind(), "{s:?} as {text:?}");
+    assert_eq!(back.quantity(), u.quantity(), "{s:?} as {text:?}");
     if let Some(d) = u.dim() {
         let again = R
             .parse_unit(s, Some(d))
@@ -108,7 +108,7 @@ fn every_unit_reads_back_in_every_notation() {
             }
             for t in texts {
                 let u = R
-                    .parse_unit_of(&t, def.dim, def.kind())
+                    .parse_unit_of(&t, def.dim, def.quantity_expr())
                     .unwrap_or_else(|err| panic!("{}: {t:?} doesn't read: {err}", def.id));
                 assert_eq!(u.scale(), Some(scale), "{}: {t:?}", def.id);
                 checked += 1;

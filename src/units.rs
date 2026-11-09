@@ -1,19 +1,20 @@
 //! Unit markers: zero-size types that name a unit in a type (`Fixed<units::Volt, Milli, u16>`), never sent themselves.
 //! `ww_si` has an alias of the run-time quantity of each under the same name (`ww_si::Volt`).
 //!
-//! Compound units outside the list are [Per] and [Times] of markers: `Fixed<Per<Torque, AngularVelocity>, One, f32>` is in
-//! N·m/(rad/s). [by_name] and [ALL] give the [UnitExpr] of every named marker of this crate, for dynamic clients that
-//! see a unit only by its name in introspection data.
+//! Compound units outside the list are [Per] and [Times] of markers: `Fixed<Per<Torque, AngularVelocity>, One, f32>` is
+//! in N·m/(rad/s). [by_name] and [ALL] give the [UnitExpr] of every named marker of this crate, for dynamic clients
+//! that see a unit only by its name in introspection data.
 //!
 //! The markers are declared with [unit!](crate::unit), one line each with its symbol, dimension and scale: the
 //! compiler gets their [Unit] impls from it, and the snapshot of this crate (WireWeaver's walker reads the same
 //! lines) their docs and definitions, so clients know them without a table (INT-13).
 
 use crate::Dim;
+use crate::MAX_UNIT_DEPTH;
 #[cfg(feature = "shrink_wrap")]
 use crate::SIExpr;
 use crate::unit::{Unit, UnitDef, UnitExpr, UnitTable};
-use crate::{Kind, MAX_UNIT_DEPTH};
+use crate::{QuantityExpr, QuantitySpec};
 use core::marker::PhantomData;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::RefBox;
@@ -49,23 +50,23 @@ crate::unit! {
     #[cfg(feature = "time")]
     pub struct Day = "d" (long "day", ucum "d"), [s 1], Exact(86400 / 1);
 
-    /// Time in weeks, wk (7 [Day], 604800 [Second]): a retention or a report period. Not in the SI Brochure and without a
-    /// standard symbol: `wk` is the common one.
+    /// Time in weeks, wk (7 [Day], 604800 [Second]): a retention or a report period. Not in the SI Brochure and without
+    /// a standard symbol: `wk` is the common one.
     #[cfg(feature = "time")]
     pub struct Week = "wk" (long "week", ucum "wk"), [s 1], Exact(604800 / 1);
 
-    /// Frequency in hertz, Hz (s⁻¹).
+    /// Frequency in hertz, Hz (s⁻¹), a [Frequency](crate::quantities::Frequency): not an activity in [Becquerel].
     #[cfg(feature = "time")]
-    pub struct Hertz = "Hz" (long "hertz" plural "hertz", ucum "Hz"), [s -1];
+    pub struct Hertz = "Hz" (long "hertz" plural "hertz", ucum "Hz"), [s -1] quantity crate::quantities::Frequency;
 
     /// Frequency drift in hertz per second, Hz/s (s⁻²).
     #[cfg(feature = "time")]
     pub struct HertzPerSecond = "Hz/s" (long "hertz per second" plural "hertz per second", ucum "Hz/s"), [s -2];
 
-    /// Symbol rate in baud, Bd (s⁻¹): one symbol per second, for a UART one bit per second on the line. A frequency of
-    /// its own kind, so it is not mixed up with a clock in [Hertz].
+    /// Symbol rate in baud, Bd (s⁻¹): one symbol per second, for a UART one bit per second on the line. A
+    /// [SymbolRate](crate::quantities::SymbolRate), so it is not mixed up with a clock in [Hertz].
     #[cfg(feature = "time")]
-    pub struct Baud = "Bd" (long "baud" plural "baud", ucum "Bd"), [s -1];
+    pub struct Baud = "Bd" (long "baud" plural "baud", ucum "Bd"), [s -1] quantity crate::quantities::SymbolRate;
 
     // Electrical
 
@@ -77,19 +78,21 @@ crate::unit! {
     #[cfg(feature = "electrical")]
     pub struct Volt = "V" (long "volt", ucum "V"), [kg 1, m 2, s -3, a -1];
 
-    /// Resistance, reactance or impedance in ohms, Ω (kg·m²·s⁻³·A⁻², V/A).
-    /// Of the kind `resistance`: a transimpedance `Per<Volt, Ampere>` becomes one only by `as_resistance`.
+    /// Resistance, reactance or impedance in ohms, Ω (kg·m²·s⁻³·A⁻², V/A). A
+    /// [Resistance](crate::quantities::Resistance): a transimpedance `Per<Volt, Ampere>` becomes one only by
+    /// `as_resistance`.
     #[cfg(feature = "electrical")]
-    pub struct Ohm = "Ω" (long "ohm", ucum "Ohm"), [kg 1, m 2, s -3, a -2] kind "resistance";
+    pub struct Ohm = "Ω" (long "ohm", ucum "Ohm"), [kg 1, m 2, s -3, a -2] quantity crate::quantities::Resistance;
 
     /// Capacitance in farads, F (kg⁻¹·m⁻²·s⁴·A², C/V).
     #[cfg(feature = "electrical")]
     pub struct Farad = "F" (long "farad", ucum "F"), [kg -1, m -2, s 4, a 2];
 
-    /// Admittance, conductance or susceptance in siemens, S (kg⁻¹·m⁻²·s³·A², A/V).
-    /// Of the kind `conductance`: a transconductance `Per<Ampere, Volt>` becomes one only by `as_conductance`.
+    /// Admittance, conductance or susceptance in siemens, S (kg⁻¹·m⁻²·s³·A², A/V). A
+    /// [Conductance](crate::quantities::Conductance): a transconductance `Per<Ampere, Volt>` becomes one only by
+    /// `as_conductance`.
     #[cfg(feature = "electrical")]
-    pub struct Siemens = "S" (long "siemens" plural "siemens", ucum "S"), [kg -1, m -2, s 3, a 2] kind "conductance";
+    pub struct Siemens = "S" (long "siemens" plural "siemens", ucum "S"), [kg -1, m -2, s 3, a 2] quantity crate::quantities::Conductance;
 
     /// Inductance in henries, H (kg·m²·s⁻²·A⁻², Wb/A).
     #[cfg(feature = "electrical")]
@@ -99,21 +102,21 @@ crate::unit! {
     #[cfg(feature = "electrical")]
     pub struct Coulomb = "C" (long "coulomb", ucum "C"), [s 1, a 1];
 
-    /// Power in watts, W (kg·m²·s⁻³, J/s, V·A): active power, P, of ISO 80000-6 (stays plain, next to the kinds
-    /// below).
+    /// Power in watts, W (kg·m²·s⁻³, J/s, V·A): active power, P, of ISO 80000-6 ([Power](crate::quantities::Power),
+    /// next to the two below).
     #[cfg(feature = "electrical")]
     pub struct Watt = "W" (long "watt", ucum "W"), [kg 1, m 2, s -3];
 
-    /// Apparent power in volt-amperes, VA (kg·m²·s⁻³, like [Watt]): |S|, ISO 80000-6's S, of the complex power
-    /// S = V·I*. Of the kind `apparent power`: a product `Times<Volt, Ampere>` becomes one only through
-    /// [Complex::apparent_power](crate::Complex::apparent_power), never a plain `convert`.
+    /// Apparent power in volt-amperes, VA (kg·m²·s⁻³, like [Watt]): |S|, ISO 80000-6's S, of the complex power S =
+    /// V·I*. An [ApparentPower](crate::quantities::ApparentPower): a product `Times<Volt, Ampere>` becomes one only
+    /// through [Complex::apparent_power](crate::Complex::apparent_power), never a plain `convert`.
     #[cfg(feature = "electrical")]
-    pub struct VoltAmpere = "VA" (long "volt-ampere", ucum "V.A"), [kg 1, m 2, s -3] kind "apparent power";
+    pub struct VoltAmpere = "VA" (long "volt-ampere", ucum "V.A"), [kg 1, m 2, s -3] quantity crate::quantities::ApparentPower;
 
     /// Reactive power in volt-amperes reactive, var (kg·m²·s⁻³, like [Watt]): Im(S), ISO 80000-6's Q, of the
-    /// complex power S = V·I*. Of the kind `reactive power`: never a plain [Watt] by `convert`.
+    /// complex power S = V·I*. A [ReactivePower](crate::quantities::ReactivePower): never a plain [Watt] by `convert`.
     #[cfg(feature = "electrical")]
-    pub struct Var = "var" (long "var"), [kg 1, m 2, s -3] kind "reactive power";
+    pub struct Var = "var" (long "var"), [kg 1, m 2, s -3] quantity crate::quantities::ReactivePower;
 
     /// Magnetic flux in webers, Wb (kg·m²·s⁻²·A⁻¹, V·s).
     #[cfg(feature = "electrical")]
@@ -317,11 +320,6 @@ crate::unit! {
     #[cfg(feature = "mechanical")]
     pub struct KinematicViscosity = "m²/s" (long "square metre per second" plural "square metres per second", ucum "m2/s"), [m 2, s -1];
 
-    /// Energy density in joules per cubic meter, J/m³ (kg·m⁻¹·s⁻², SI Brochure, 9th ed., table 6). The dimension of a
-    /// [Pascal], so of the kind `energy density`: a pressure is not one, and `Per<Joule, Volume>` becomes one only by
-    /// `as_energy_density`.
-    #[cfg(feature = "mechanical")]
-    pub struct EnergyDensity = "J/m³" (long "joule per cubic metre" plural "joules per cubic metre", ucum "J/m3"), [kg 1, m -1, s -2] kind "energy density";
 
     /// Power density, or a volumetric heat source, in watts per cubic meter, W/m³ (kg·m⁻¹·s⁻³).
     #[cfg(feature = "mechanical")]
@@ -387,8 +385,8 @@ crate::unit! {
     pub struct DecibelLoss = "dB" (long "decibel", ucum "dB"), base(NeperLoss), Exact(1 / 20, ln10 1);
 
     /// Absorbance A = −lg T of a transmitted power ratio T, AU ((ln 10)/2 [NeperLoss], exactly): the loss in bels of
-    /// power, so 1 AU is 10 dB. Decadic, and positive for a decay as a [DecibelLoss] is; a lab's "OD". `Fixed<Absorbance,
-    /// Milli, _>` prints mAU. [to_gain](crate::Fixed::to_gain) into `Per<Watt, Watt>` is T.
+    /// power, so 1 AU is 10 dB. Decadic, and positive for a decay as a [DecibelLoss] is; a lab's "OD".
+    /// `Fixed<Absorbance, Milli, _>` prints mAU. [to_gain](crate::Fixed::to_gain) into `Per<Watt, Watt>` is T.
     #[cfg(feature = "levels")]
     pub struct Absorbance = "AU" (long "absorbance unit"), base(NeperLoss), Exact(1 / 2, ln10 1);
 
@@ -398,16 +396,7 @@ crate::unit! {
     #[cfg(feature = "levels")]
     pub struct OpticalDepth = "τ" (ascii "tau"), base(NeperLoss), Exact(1 / 2);
 
-    /// A damping ratio, ζ: δ/ω₀ of a second-order system (x″ + 2ζω₀·x′ + ω₀²·x = 0), 1 at critical damping. A number of
-    /// the kind `damping ratio`, so it isn't a plain `Ratio` or a [QualityFactor] (Q = 1/(2ζ)): `damping_ratio` and
-    /// `quality_factor` are the steps.
-    #[cfg(feature = "levels")]
-    pub struct DampingRatio = "", [] kind "damping ratio";
 
-    /// A quality factor, Q: 1/(2ζ) of a second-order system, ω₀ over the half-power bandwidth. A number of the kind
-    /// `quality factor`, so it isn't a plain `Ratio` or a [DampingRatio].
-    #[cfg(feature = "levels")]
-    pub struct QualityFactor = "", [] kind "quality factor";
 
     // Thermal
 
@@ -425,10 +414,6 @@ crate::unit! {
     #[cfg(feature = "thermal")]
     pub struct HeatCapacity = "J/K" (long "joule per kelvin" plural "joules per kelvin", ucum "J/K"), [kg 1, m 2, s -2, k -1];
 
-    /// Entropy in joules per kelvin, J/K (SI Brochure, 9th ed., table 6). The dimension of a [HeatCapacity], so of the
-    /// kind `entropy`: one becomes the other only by `as_entropy` and `as_heat_capacity`.
-    #[cfg(feature = "thermal")]
-    pub struct Entropy = "J/K" (long "joule per kelvin" plural "joules per kelvin", ucum "J/K"), [kg 1, m 2, s -2, k -1] kind "entropy";
 
     /// Specific heat capacity in joules per kilogram kelvin, J/(kg·K) (m²·s⁻²·K⁻¹, SI Brochure, 9th ed., table 6):
     /// water is about 4186 J/(kg·K).
@@ -538,17 +523,19 @@ crate::unit! {
 
     // Radiation
 
-    /// Radioactivity in becquerels, Bq (s⁻¹).
+    /// Radioactivity in becquerels, Bq (s⁻¹), an [Activity](crate::quantities::Activity): not a frequency in [Hertz].
     #[cfg(feature = "radiation")]
-    pub struct Becquerel = "Bq" (long "becquerel", ucum "Bq"), [s -1];
+    pub struct Becquerel = "Bq" (long "becquerel", ucum "Bq"), [s -1] quantity crate::quantities::Activity;
 
-    /// Absorbed dose in grays, Gy (m²·s⁻², J/kg).
+    /// Absorbed dose in grays, Gy (m²·s⁻², J/kg), an [AbsorbedDose](crate::quantities::AbsorbedDose): not a dose
+    /// equivalent in [Sievert], which weights it by the radiation.
     #[cfg(feature = "radiation")]
-    pub struct Gray = "Gy" (long "gray", ucum "Gy"), [m 2, s -2];
+    pub struct Gray = "Gy" (long "gray", ucum "Gy"), [m 2, s -2] quantity crate::quantities::AbsorbedDose;
 
-    /// Equivalent dose in sieverts, Sv (m²·s⁻², J/kg).
+    /// Equivalent dose in sieverts, Sv (m²·s⁻², J/kg), a [DoseEquivalent](crate::quantities::DoseEquivalent): not an
+    /// absorbed dose in [Gray].
     #[cfg(feature = "radiation")]
-    pub struct Sievert = "Sv" (long "sievert", ucum "Sv"), [m 2, s -2];
+    pub struct Sievert = "Sv" (long "sievert", ucum "Sv"), [m 2, s -2] quantity crate::quantities::DoseEquivalent;
 
     /// Energy in electron-volts, eV: 1.602176634·10⁻¹⁹ J exactly, the elementary charge times a volt (SI Brochure, 9th
     /// ed., table 8; exact since the 2019 SI fixed e).
@@ -692,8 +679,9 @@ crate::unit! {
 /// `A / B`, a unit outside the named list: `Per<Torque, AngularVelocity>` is N·m/(rad/s). Not normalized,
 /// `Per<Meter, Second>` is not [Speed] (convert with `to_si_f64` / `from_f32`).
 ///
-/// A quotient of one dimension keeps it as its [Kind]: `Per<Volt, Volt>` is a voltage gain, which
-/// doesn't convert to `Per<Ampere, Ampere>` or a [Ratio] (`as_ratio` is the step), and has a level in dB (`to_db`).
+/// A quotient of one dimension keeps it as its quantity ([QuantityExpr::RatioOf]): `Per<Volt, Volt>` is a voltage gain,
+/// which doesn't convert to `Per<Ampere, Ampere>` or a [Ratio] (`as_ratio` is the step), and has a level in dB
+/// (`to_db`).
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Per<A, B> {
     _a: PhantomData<A>,
@@ -732,7 +720,8 @@ const fn deeper(a: usize, b: usize) -> usize {
 
 impl<U: Unit> Unit for Sqrt<U> {
     const DIM: Dim<'static> = Self::EXPR.dim();
-    const KIND: Kind<'static> = U::KIND.sqrt();
+    const QUANTITY: QuantityExpr<'static> = U::QUANTITY.sqrt(Self::DIM);
+    type Bare = Self;
     const DEPTH: usize = deeper(U::DEPTH, 0);
     const EXPR: &'static UnitExpr = {
         check_depth(Self::DEPTH);
@@ -745,8 +734,8 @@ impl<U: Unit> Unit for Sqrt<U> {
     };
 }
 
-/// A unit of plane angle (rad¹ and no kind of its own): [Radian], [Degree], [Turn], or an API's own angle unit. What
-/// [Phase] wraps, and what the named steps `as_phase` and `electrical` start from.
+/// A unit of plane angle (rad¹ and its dimension's quantity): [Radian], [Degree], [Turn], or an API's own angle
+/// unit. What [Phase] wraps, and what the named steps `as_phase` and `electrical` start from.
 pub trait PlaneAngle: Unit {}
 
 #[cfg(feature = "angle")]
@@ -756,11 +745,67 @@ impl PlaneAngle for Degree {}
 #[cfg(feature = "angle")]
 impl PlaneAngle for Turn {}
 
-/// A phase angle in the angle unit `A`: the argument of a phasor, an NCO's phase, a motor's electrical angle. Same
-/// dimension, scale and symbol as `A`, but of the kind `phase angle` ([Kind::Named]), so it isn't a mechanical
-/// angle: `Phase<Turn>` converts to `Phase<Degree>`, not to [Turn]. The steps between them are named: `as_phase` and
-/// `as_plane_angle` (the same number), and `electrical(pole_pairs)` from a motor's mechanical angle to its electrical
-/// angle, the phase a field-oriented control's Park transform takes.
+/// The unit `U` measuring the quantity `Q`: `Fixed<Of<Height, Meter>, Milli, u16>` is a height in mm. Same
+/// dimension, scale and symbol as `U` (its [UnitExpr] and its `SIExpr` are `U`'s), its quantity `Q`
+/// ([quantity](mod@crate::quantity) has the rules): a height converts to a length, not to a width; a length becomes a
+/// height by the named step [as_quantity](crate::Fixed::as_quantity).
+///
+/// `Q` has `U`'s dimension and is reached from `U`'s own quantity
+/// ([reaches](crate::QuantityExpr::reaches)), else the type is a compile error where it is used: an
+/// `Of<Activity, Hertz>` would be a back door between two kinds.
+///
+/// ```
+/// # #[cfg(feature = "mechanical")] {
+/// use exact_units::{Fixed, prefix::{Micro, Milli}, quantities::Height, units::{Meter, Of}};
+///
+/// let h = Fixed::<Of<Height, Meter>, Milli, u16>::new(1750);
+/// // up the tree is implicit: a height is a length
+/// assert_eq!(h.convert::<Meter, Micro, u32>(), Some(Fixed::new(1_750_000)));
+/// # }
+/// ```
+///
+/// A width is not a height:
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, prefix::Milli, quantities::{Height, Width}, units::{Meter, Of}};
+/// let w = Fixed::<Of<Width, Meter>, Milli, u16>::new(400);
+/// let _ = w.convert::<Of<Height, Meter>, Milli, u16>();
+/// ```
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Of<Q, U> {
+    _q: PhantomData<Q>,
+    _u: PhantomData<U>,
+}
+
+impl<Q: QuantitySpec, U: Unit> Unit for Of<Q, U> {
+    const DIM: Dim<'static> = {
+        assert!(
+            Q::DEF.dim.same_typed(U::DIM),
+            "Of<Q, U>: the quantity Q has another dimension than the unit U"
+        );
+        assert!(
+            U::QUANTITY.reaches_typed(Q::DEF),
+            "Of<Q, U>: U's own quantity doesn't reach Q (a sibling, or another kind)"
+        );
+        U::DIM
+    };
+    const QUANTITY: QuantityExpr<'static> = {
+        let _ = Self::DIM;
+        QuantityExpr::of::<Q>()
+    };
+    type Bare = U::Bare;
+    const DEPTH: usize = U::DEPTH;
+    const EXPR: &'static UnitExpr = U::EXPR;
+    #[cfg(feature = "shrink_wrap")]
+    const SI_EXPR: &'static SIExpr<'static> = U::SI_EXPR;
+}
+
+/// A phase angle in the angle unit `A`, `Of<PhaseAngle, A>`: the argument of a phasor, an NCO's phase, a motor's
+/// electrical angle. Same dimension, scale and symbol as `A`, but a [PhaseAngle](crate::quantities::PhaseAngle), a
+/// kind of its own, so it isn't a mechanical angle: `Phase<Turn>` converts to `Phase<Degree>`, not to [Turn]. The
+/// steps between them are named: `as_phase` and `as_plane_angle` (the same number), and `electrical(pole_pairs)`
+/// from a motor's mechanical angle to its electrical angle, the phase a field-oriented control's Park transform
+/// takes.
 ///
 /// ```
 /// # #[cfg(feature = "angle")] {
@@ -774,32 +819,35 @@ impl PlaneAngle for Turn {}
 /// assert_eq!(phase.get(), 19661u16.wrapping_mul(7));
 /// # }
 /// ```
-///
-/// On the wire and in a unit's [UnitExpr] it is `A`: the kind is in the type, as for [Ohm].
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct Phase<A> {
-    _a: PhantomData<A>,
-}
+pub type Phase<A> = Of<crate::quantities::PhaseAngle, A>;
 
-impl<A: PlaneAngle> Unit for Phase<A> {
-    const DIM: Dim<'static> = {
-        assert!(
-            A::DIM.same_typed(Dim::base(crate::MarkerId::RADIAN))
-                && A::KIND.same_typed(Kind::Plain),
-            "Phase wraps a plane angle (rad, °, rev) of no kind of its own"
-        );
-        A::DIM
-    };
-    const KIND: Kind<'static> = Kind::Named("phase angle");
-    const DEPTH: usize = A::DEPTH;
-    const EXPR: &'static UnitExpr = A::EXPR;
-    #[cfg(feature = "shrink_wrap")]
-    const SI_EXPR: &'static SIExpr<'static> = A::SI_EXPR;
-}
+/// Energy density in joules per cubic meter, J/m³: an [EnergyDensity](crate::quantities::EnergyDensity), so not a
+/// pressure, though [Pascal] has its dimension. `Per<Joule, Volume>` becomes one only by
+/// `as_quantity::<EnergyDensity>()`.
+#[cfg(feature = "mechanical")]
+pub type EnergyDensity = Of<crate::quantities::EnergyDensity, Per<Joule, Volume>>;
+
+/// Entropy in joules per kelvin, J/K: an [Entropy](crate::quantities::Entropy), so not a [HeatCapacity], though both
+/// are J/K. One becomes the other only by a named step (`as_entropy`, `as_heat_capacity`).
+#[cfg(feature = "thermal")]
+pub type Entropy = Of<crate::quantities::Entropy, HeatCapacity>;
+
+/// A damping ratio, ζ: δ/ω₀ of a second-order system (x″ + 2ζω₀·x′ + ω₀²·x = 0), 1 at critical damping. A number
+/// that is a [DampingRatio](crate::quantities::DampingRatio), so it isn't a plain [Ratio] or a [QualityFactor]
+/// (Q = 1/(2ζ)): `damping_ratio` and `quality_factor` are the steps.
+#[cfg(feature = "levels")]
+pub type DampingRatio = Of<crate::quantities::DampingRatio, Ratio>;
+
+/// A quality factor, Q: 1/(2ζ) of a second-order system, ω₀ over the half-power bandwidth. A number that is a
+/// [QualityFactor](crate::quantities::QualityFactor), so it isn't a plain [Ratio] or a [DampingRatio].
+#[cfg(feature = "levels")]
+pub type QualityFactor = Of<crate::quantities::QualityFactor, Ratio>;
 
 impl<A: Unit, B: Unit> Unit for Per<A, B> {
     const DIM: Dim<'static> = Self::EXPR.dim();
-    const KIND: Kind<'static> = A::KIND.div_typed(A::DIM, B::KIND, B::DIM);
+    const QUANTITY: QuantityExpr<'static> =
+        A::QUANTITY.div_typed(A::DIM, B::QUANTITY, B::DIM, Self::DIM);
+    type Bare = Self;
     const DEPTH: usize = deeper(A::DEPTH, B::DEPTH);
     const EXPR: &'static UnitExpr = {
         check_depth(Self::DEPTH);
@@ -817,7 +865,9 @@ impl<A: Unit, B: Unit> Unit for Per<A, B> {
 
 impl<A: Unit, B: Unit> Unit for Times<A, B> {
     const DIM: Dim<'static> = Self::EXPR.dim();
-    const KIND: Kind<'static> = A::KIND.mul_typed(A::DIM, B::KIND, B::DIM);
+    const QUANTITY: QuantityExpr<'static> =
+        A::QUANTITY.mul_typed(A::DIM, B::QUANTITY, B::DIM, Self::DIM);
+    type Bare = Self;
     const DEPTH: usize = deeper(A::DEPTH, B::DEPTH);
     const EXPR: &'static UnitExpr = {
         check_depth(Self::DEPTH);

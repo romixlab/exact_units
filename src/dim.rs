@@ -9,7 +9,7 @@ use core::fmt;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
 
-mod walk;
+pub(crate) mod walk;
 #[cfg(feature = "shrink_wrap")]
 mod wire;
 

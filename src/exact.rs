@@ -299,7 +299,7 @@ const fn factor<U: Unit, U2: Unit>() -> Fraction {
     if !U::DIM.same_typed(U2::DIM) {
         crate::conv_error::dim_mismatch::<U, U2>("an Exact");
     }
-    if !U::KIND.same_typed(U2::KIND) {
+    if !U::QUANTITY.converts_typed(U2::QUANTITY) {
         crate::conv_error::kind_mismatch::<U, U2>("an Exact");
     }
     let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {

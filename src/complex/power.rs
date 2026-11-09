@@ -179,17 +179,28 @@ const TWO_POW_600: f64 = f64::from_bits((1023 + 600) << 52);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Kind;
+    use crate::QuantityExpr;
+    use crate::quantities::{ApparentPower, ReactivePower};
 
     #[test]
-    fn kinds_of_the_power_markers() {
-        assert_eq!(VoltAmpere::KIND, Kind::Named("apparent power"));
-        assert_eq!(Var::KIND, Kind::Named("reactive power"));
-        assert_eq!(Watt::KIND, Kind::Plain);
+    fn quantities_of_the_power_markers() {
+        assert_eq!(VoltAmpere::QUANTITY, QuantityExpr::of::<ApparentPower>());
+        assert_eq!(Var::QUANTITY, QuantityExpr::of::<ReactivePower>());
+        assert_eq!(Watt::QUANTITY, QuantityExpr::Derived(Watt::DIM));
         assert_eq!(VoltAmpere::DIM, Watt::DIM);
         assert_eq!(Var::DIM, Watt::DIM);
-        assert!(!VoltAmpere::KIND.same(Var::KIND));
-        assert!(!VoltAmpere::KIND.same(Watt::KIND));
+        assert_eq!(
+            VoltAmpere::QUANTITY.const_converts(Var::QUANTITY),
+            Some(false)
+        );
+        assert_eq!(
+            VoltAmpere::QUANTITY.const_converts(Watt::QUANTITY),
+            Some(false)
+        );
+        assert_eq!(
+            Watt::QUANTITY.const_converts(VoltAmpere::QUANTITY),
+            Some(false)
+        );
     }
 
     #[test]

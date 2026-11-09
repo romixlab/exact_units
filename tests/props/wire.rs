@@ -509,7 +509,7 @@ pub(crate) fn any_bytes(which: u8, bytes: &[u8]) {
                 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
                 let back = UnitDef::from_ww_bytes(&again).expect("decodes");
                 assert_eq!(back, d);
-                let _ = (d.id.to_string(), d.scale.to_f64(), d.kind());
+                let _ = (d.id.to_string(), d.scale.to_f64(), d.quantity_expr());
             }
         }
         9 => {
