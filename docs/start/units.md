@@ -102,6 +102,8 @@ let _ = samples.convert::<Byte, One, u32>();
 An API declares a distinguished base of its own too, with a `base` line:
 [Your own units](../units/declare.md#distinguished-bases-from-other-crates).
 
-## Kinds
+## Quantities
 
-Some units share a dimension and still mean different things: a resistance (Ω) and a transimpedance (V/A), a voltage gain (V/V) and a duty cycle. Those are [kinds](../maths/kinds.md), and they don't convert into each other either.
+A unit measures a [quantity](../maths/quantities.md), not just a dimension: a height and a width are both lengths,
+but don't convert into each other; a resistance (Ω) and a transimpedance (V/A), a voltage gain (V/V) and a duty
+cycle share a dimension and still mean different things, so they don't convert into each other either.

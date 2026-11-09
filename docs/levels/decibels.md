@@ -18,7 +18,7 @@ $$
 
 ## The kind picks the formula
 
-In `exact_units` the unit's [kind](../maths/kinds.md) picks the form, so nobody has to remember it. `to_db` gives the level as a value of its own, a `Fixed<Decibel, One, f64>`, so it keeps its unit and checks against `q!`; `None` for a gain below 0, which has no level:
+In `exact_units` the unit's [quantity](../maths/quantities.md) picks the form, so nobody has to remember it. `to_db` gives the level as a value of its own, a `Fixed<Decibel, One, f64>`, so it keeps its unit and checks against `q!`; `None` for a gain below 0, which has no level:
 
 ```rust
 use exact_units::{Fixed, q, prefix::{Milli, One}, units::{Ampere, Decibel, Per, Volt, Watt}};

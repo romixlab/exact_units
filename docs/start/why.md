@@ -106,6 +106,7 @@ Most unit crates get volts times amperes right. Firmware breaks on the rest, and
 
 - **Points**: 25 °C is a point, 5 K is an amount. [Points](../points/points.md)
 - **Angles that wrap**: a phase of 0.9 turn plus 0.2 turn is 0.1 turn. [Binary angles](../fixed_point/bam.md)
-- **Kinds**: a voltage gain V/V is not a duty cycle, though both are plain numbers. [Kinds](../maths/kinds.md)
+- **Quantities**: a voltage gain V/V is not a duty cycle, though both are plain numbers; a height is not a width,
+  though both are lengths. [Quantities](../maths/quantities.md)
 - **Levels**: a threshold of −3 dB is an integer compare. [Decibels](../levels/decibels.md)
 - **Counted things**: samples, packets and bytes don't mix. [Units and dimensions](units.md)

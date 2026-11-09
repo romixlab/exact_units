@@ -4,11 +4,11 @@ level: advanced
 
 # Your own units
 
-Three macros declare markers of your own: `unit!`, `scale!` and `origin!`. Each line is data, literal values only, for two readers:
+Four macros declare markers of your own: `unit!`, `quantity!`, `scale!` and `origin!`. Each line is data, literal values only, for two readers:
 
 ```mermaid
 graph LR
-  L["a unit! / scale! / origin! line<br/>in your crate"] --> C["the compiler<br/>impl Unit, impl FixedScale, impl Origin"]
+  L["a unit! / quantity! / scale! / origin! line<br/>in your crate"] --> C["the compiler<br/>impl Unit, impl QuantitySpec, impl FixedScale, impl Origin"]
   L --> W["WireWeaver's walker<br/>reads the same line from source"]
   W --> M["the API model<br/>clients know the unit"]
 ```
@@ -40,10 +40,41 @@ A line is `<attributes> <visibility> struct <Name> = "<symbol>" [(<names>)], <di
 
 - **Dimension**: exponents of `s`, `m`, `kg`, `a`, `k`, `mol`, `cd`, `rad`, `bit`, whole or a half (`[kg 1, m 2, s -3, a -1]` is a volt, `[s -1/2]` a half, `[]` a plain number, each exponent ±63½), or `base` for a distinguished base of its own, named by your crate and the marker ([Distinguished bases from other crates](#distinguished-bases-from-other-crates)), or `base(Other)` for a scaled unit on another base of your crate (the decibel on the neper). A true base named twice is a compile error.
 - **Scale**, an exact [`Magnitude`](../nomicon/magnitude.md), one when left out: `Pow10(-3)`, or `Exact(num / den, pow10 e, pow2 e, pi e)`. A unit has no offset: a scale with a zero of its own, like °C, is an [origin](../points/points.md) of points.
-- **Kind**, after the dimension: `kind "resistance"` makes a unit that doesn't convert to others of its dimension.
+- **Quantity**, after the dimension: `quantity Resistance` names the [quantity](../maths/quantities.md) the unit measures by default, in place of its dimension's open root (`Ohm` is a resistance, not a plain V/A). A line without one measures its dimension's own quantity.
 - **Provenance**, after the scale: `conventional("NIST SP 811", 2008)` marks a unit fixed by a measured property (inHg at 32 °F) rather than a definition.
 
 A float factor is not a scale: an exact one is a [`Magnitude`](../nomicon/magnitude.md), and a factor known only at run time (a calibration) is a value.
+
+## `quantity!`
+
+A marker for a place in the tree of [quantities](../maths/quantities.md), beyond the dimension: your own cable length, a kind of its own retry rate, or a child of a quantity another crate declared.
+
+```rust
+use exact_units::{QuantitySpec, Unit, quantities::Length, units::{Meter, Of}};
+
+exact_units::quantity! {
+    /// The length of a cable run, a length of its own subtree.
+    pub struct CableLength: Length;
+    /// A count of retries per second, a kind of its own: not a frequency.
+    pub struct RetryRate = kind [s -1];
+}
+
+assert_eq!(CableLength::DEF.dim, Meter::DIM);
+assert_eq!(CableLength::DEF.id.name, "CableLength");
+assert!(RetryRate::DEF.is_kind);
+let _ = <Of<CableLength, Meter>>::DIM;
+```
+
+A line is `<attributes> <visibility> struct <Name>` and then:
+
+- `= [<base> <exponent>, ..]`: a root of its dimension, written as on a `unit!` line. It is that dimension's *open* root, the quantity a unit without one measures; a dimension has at most one.
+- `= kind [..]`: a root that is a kind of its own, which converts with no other quantity of its dimension.
+- `: Parent`: a child of the quantity `Parent`, of its dimension; it converts up to `Parent` and is reached from it only by a named step.
+- `: kind Parent`: a child that is a kind of its own: reached from `Parent` and back only by a named step.
+
+and, after that, `, complex` or `, vector` for a quantity whose values are complex numbers or vectors (`Character`, scalar without). The identity is the crate (`CARGO_CRATE_NAME`) and the name, as for `unit!`.
+
+`@table static ALL;` before the lines gives a `static ALL: &[&QuantityDef]` of them too, as for `unit!`. A `unit!` line names the quantity it measures with `quantity CableLength` after its dimension; the line's own dimension must match the quantity's, checked at compile time.
 
 ## `scale!`
 

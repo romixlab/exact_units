@@ -30,7 +30,7 @@ pages! {
     Floats = "maths/floats.md";
     Rounding = "maths/rounding.md";
     Overflow = "maths/overflow.md";
-    Kinds = "maths/kinds.md";
+    Quantities = "maths/quantities.md";
     Niches = "maths/niches.md";
     QFormats = "fixed_point/q_formats.md";
     Bam = "fixed_point/bam.md";

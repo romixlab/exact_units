@@ -73,7 +73,7 @@ Without the range, a `Fixed<Volt, Milli, i16>` reaches 32 767 mV, and the `From`
 
 ## `convert`: to another unit
 
-`to` keeps the unit. `convert::<U2, P2, T2>()` moves to another unit of the same dimension and [kind](kinds.md):
+`to` keeps the unit. `convert::<U2, P2, T2>()` moves to another unit of the same dimension and [quantity](quantities.md):
 
 ```rust
 use exact_units::{Fixed, prefix::{Kibi, One}, units::{Bit, Byte}};

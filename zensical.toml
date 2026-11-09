@@ -13,6 +13,7 @@ edit_uri = "edit/main/docs/"
 # resolves: left out of the nav on purpose, not an oversight.
 not_in_nav = """
 complex/iq.md
+maths/kinds.md
 """
 
 nav = [
@@ -42,7 +43,7 @@ nav = [
             { "Advanced" = [
                     "maths/rounding.md",
                     "maths/overflow.md",
-                    "maths/kinds.md",
+                    "maths/quantities.md",
                     "maths/niches.md",
                 ]
             },
