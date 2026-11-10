@@ -23,6 +23,7 @@
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 use crate::MarkerIdOwned;
 use crate::{Fraction, MarkerId};
+use core::cmp::Ordering;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
 
@@ -48,27 +49,23 @@ pub struct MatrixDef<'i> {
 }
 
 impl MatrixDef<'_> {
-    /// `K_G = 1 − K_R − K_B`, the weight of G′ in Y′.
-    #[expect(
-        clippy::panic,
-        reason = "const fn evaluated only in a const item: the panic is a compile error naming an invalid K_R/K_B"
-    )]
+    /// `K_G = 1 − K_R − K_B`, the weight of G′ in Y′: `None` where the subtraction overflows a `Fraction` (an
+    /// extreme `K_R` or `K_B`), called at run time by [encode](Self::encode) and [decode](Self::decode), which
+    /// refuse the same way, never a panic. The three standards' matrices are checked against it at compile time
+    /// below.
     #[must_use]
-    pub const fn k_g(&self) -> Fraction {
-        let Some(one_minus_r) = Fraction::ONE.checked_sub(self.k_r) else {
-            panic!("a MatrixDef's K_R must subtract from 1 without overflow");
-        };
-        let Some(k_g) = one_minus_r.checked_sub(self.k_b) else {
-            panic!("a MatrixDef's K_R + K_B must subtract from 1 without overflow");
-        };
-        k_g
+    pub const fn k_g(&self) -> Option<Fraction> {
+        match Fraction::ONE.checked_sub(self.k_r) {
+            Some(one_minus_r) => one_minus_r.checked_sub(self.k_b),
+            None => None,
+        }
     }
 
     /// R′G′B′ (each a fraction of reference white) to Y′C′BC′R, exactly: `None` only on an overflow of the
     /// (tiny, fixed) exact arithmetic, never a rounding loss.
     #[must_use]
     pub fn encode(&self, r: Fraction, g: Fraction, b: Fraction) -> Option<[Fraction; 3]> {
-        let k_g = self.k_g();
+        let k_g = self.k_g()?;
         let y = self
             .k_r
             .checked_mul(r)?
@@ -108,10 +105,36 @@ impl MatrixDef<'_> {
         let g = y
             .checked_sub(self.k_r.checked_mul(r)?)?
             .checked_sub(self.k_b.checked_mul(b)?)?
-            .checked_div(self.k_g())?;
+            .checked_div(self.k_g()?)?;
         Some((r, g, b))
     }
 }
+
+// K_G of the three standards here, against their printed value, checked at compile time: `encode` and `decode`
+// call `k_g` at run time too, where it never panics, only refuses (`None`) on an extreme K_R or K_B.
+const _: () = {
+    let Some(bt601) = Bt601::DEF.k_g() else {
+        panic!("BT.601's K_R + K_B must subtract from 1 without overflow")
+    };
+    assert!(
+        matches!(bt601.compare(Fraction::new(587, 1000)), Ordering::Equal),
+        "BT.601's K_G is 0.587"
+    );
+    let Some(bt709) = Bt709Matrix::DEF.k_g() else {
+        panic!("BT.709's K_R + K_B must subtract from 1 without overflow")
+    };
+    assert!(
+        matches!(bt709.compare(Fraction::new(7152, 10_000)), Ordering::Equal),
+        "BT.709's K_G is 0.7152"
+    );
+    let Some(bt2020) = Bt2020::DEF.k_g() else {
+        panic!("BT.2020's K_R + K_B must subtract from 1 without overflow")
+    };
+    assert!(
+        matches!(bt2020.compare(Fraction::new(678, 1000)), Ordering::Equal),
+        "BT.2020's K_G is 0.6780"
+    );
+};
 
 /// ITU-R BT.601's Y′C′BC′R matrix (625- and 525-line): `K_R = 0.299`, `K_B = 0.114` (so `K_G = 0.587`).
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -164,15 +187,38 @@ impl Bt2020 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Bt601, Bt709Matrix, Bt2020};
-    use crate::Fraction;
+    use super::{Bt601, Bt709Matrix, Bt2020, MatrixDef};
+    use crate::{Fraction, MarkerId};
 
     /// `K_G` of every matrix here, against the standards' own printed value.
     #[test]
     fn k_g_of_every_matrix() {
-        assert_eq!(Bt601::DEF.k_g(), Fraction::new(587, 1000));
-        assert_eq!(Bt709Matrix::DEF.k_g(), Fraction::new(7152, 10_000));
-        assert_eq!(Bt2020::DEF.k_g(), Fraction::new(678, 1000));
+        assert_eq!(Bt601::DEF.k_g(), Some(Fraction::new(587, 1000)));
+        assert_eq!(Bt709Matrix::DEF.k_g(), Some(Fraction::new(7152, 10_000)));
+        assert_eq!(Bt2020::DEF.k_g(), Some(Fraction::new(678, 1000)));
+    }
+
+    /// A `K_R` too extreme for `1 − K_R` to fit a `Fraction`: `k_g`, `encode` and `decode` refuse it, never a
+    /// panic.
+    #[test]
+    fn extreme_k_r_refuses_instead_of_panicking() {
+        let def = MatrixDef {
+            id: MarkerId {
+                crate_name: "test",
+                name: "Extreme",
+            },
+            k_r: Fraction::pow10(1_000_000_000),
+            k_b: Fraction::ZERO,
+        };
+        assert_eq!(def.k_g(), None);
+        assert_eq!(
+            def.encode(Fraction::ONE, Fraction::ONE, Fraction::ONE),
+            None
+        );
+        assert_eq!(
+            def.decode(Fraction::ONE, Fraction::ZERO, Fraction::ZERO),
+            None
+        );
     }
 
     /// Every matrix round-trips a grid of R′G′B′ triples through `encode` and `decode`.
