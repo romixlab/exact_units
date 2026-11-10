@@ -87,6 +87,8 @@ mod point;
 mod products;
 pub mod quantities;
 pub mod quantity;
+#[cfg(feature = "radiation")]
+pub mod radiation;
 pub mod registry;
 #[cfg(feature = "serde")]
 pub mod serde;

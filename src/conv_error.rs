@@ -474,10 +474,29 @@ pub(crate) const fn kind_mismatch<A: Unit, B: Unit>(what: &str) -> ! {
     msg = push_unit(msg, B::EXPR);
     msg = msg.push(" is ");
     msg = push_quantity(msg, B::QUANTITY);
-    msg = msg.push(
-        " (down the tree or across a kind with a named step: as_quantity, as_ratio, as_phase, ..)",
-    );
+    msg = msg.push(if gray_to_sievert::<A, B>() {
+        " (a gray becomes a sievert only by a weighting from a named set: equivalent_dose(w_R) or \
+         dose_equivalent(Q), in exact_units::radiation)"
+    } else {
+        " (down the tree or across a kind with a named step: as_quantity, as_ratio, as_phase, ..)"
+    });
     panic!("{}", msg.as_str())
+}
+
+/// Whether `A` is an absorbed dose (or its rate) and `B` a dose in sieverts (or its rate): the pair whose step is a
+/// weighting, not `as_quantity`.
+const fn gray_to_sievert<A: Unit, B: Unit>() -> bool {
+    use crate::QuantitySpec;
+    use crate::quantities::{AbsorbedDose, AbsorbedDoseRate, DoseEquivalent, DoseEquivalentRate};
+    let gray = matches!(A::QUANTITY.const_reaches(AbsorbedDose::DEF), Some(true))
+        || matches!(A::QUANTITY.const_reaches(AbsorbedDoseRate::DEF), Some(true));
+    let sievert = matches!(B::QUANTITY.const_reaches(DoseEquivalent::DEF), Some(true))
+        || matches!(
+            B::QUANTITY.const_reaches(DoseEquivalentRate::DEF),
+            Some(true)
+        );
+    let open = matches!(A::QUANTITY, QuantityExpr::Derived(_));
+    gray && sievert && !open
 }
 
 /// The panic for [Exact::recip](crate::Exact::recip) into a unit that isn't `A`'s reciprocal dimension: `A` by name
@@ -646,6 +665,21 @@ mod tests {
     // test also asserts the real product with `assert_is_a_product`; a "not a named step" one is a pair that
     // differs only by a radian or a steradian but was left out of `products.rs` on purpose (the ready note says
     // why for each).
+
+    /// A gray to a sievert is a weighting, in every pair of their quantities and rates; nothing else is.
+    #[cfg(feature = "radiation")]
+    #[test]
+    fn gray_to_sievert_hints_a_weighting() {
+        use crate::units::{
+            EffectiveDose, Gray, GrayPerSecond, Kerma, Per, Second, Sievert, SievertPerHour,
+        };
+        assert!(gray_to_sievert::<Gray, Sievert>());
+        assert!(gray_to_sievert::<Gray, EffectiveDose>());
+        assert!(gray_to_sievert::<GrayPerSecond, SievertPerHour>());
+        assert!(gray_to_sievert::<Kerma, Sievert>());
+        assert!(!gray_to_sievert::<Sievert, Gray>());
+        assert!(!gray_to_sievert::<Per<Gray, Second>, SievertPerHour>());
+    }
 
     #[cfg(all(feature = "time", feature = "angle"))]
     #[test]

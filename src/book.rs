@@ -31,6 +31,8 @@ pages! {
     Rounding = "maths/rounding.md";
     Overflow = "maths/overflow.md";
     Quantities = "maths/quantities.md";
+    #[cfg(feature = "radiation")]
+    Doses = "maths/doses.md";
     #[cfg(feature = "systems")]
     Systems = "maths/systems.md";
     Niches = "maths/niches.md";

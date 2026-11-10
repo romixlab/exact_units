@@ -1681,6 +1681,18 @@ impl Conversion {
     }
 }
 
+/// `x · num/den` in `T`: exactly, else `None`, for `r` `None`; else rounded once by `r`, `None` past `T`. The run-time
+/// factor of a named step ([radiation](crate::radiation)'s weightings).
+#[cfg(feature = "radiation")]
+pub(crate) fn scale_by<T: Storage>(x: T, num: u64, den: u64, r: Option<Rounding>) -> Option<T> {
+    let f = exact_float::Factor {
+        num: u128::from(num),
+        den: u128::from(den),
+        shift: 0,
+    };
+    exact_float::convert(x.to_repr(), f, r, Overflow::Checked)
+}
+
 /// `x · scale` in `T`, if it is exact: `None` when not whole for an integer `T` or not a float of a float `T`, out of
 /// range, or with a power of π (no value but 0 has an exact one, and that is refused too).
 fn rescale<T: Storage>(x: Repr, scale: Magnitude) -> Option<T> {

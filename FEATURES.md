@@ -450,17 +450,23 @@ counted units, and the kinds that keep look-alike quantities apart.
   `non_canonical_dims`), `tests/two_crates.rs` (a crate's `Pixel` takes `Radian`'s path), `tests/units.rs` (torque is
   not energy until stripped), `tests/props/dim.rs` (the const walk against plain sums and `DimOwned`, the wire),
   `tests/props/wire.rs` (`dims`: only a canonical `DimWire` decodes).
-- 🚧 **UNIT-12 Dose quantities and a named weighting** — the quantities are built, the weighting step is next.
-  m²·s⁻², each a kind: `AbsorbedDose` and `Kerma` share the gray (SI Brochure table 4); `DoseEquivalent`, the
-  SI's H = Q·D (CIPM 2002 Rec. 2) and bare `Sievert`'s, with the operational `AmbientDoseEquivalent10` H*(10),
-  `PersonalDoseEquivalent10` Hp(10), `PersonalDoseEquivalent0_07` Hp(0.07) as kinds under it (ICRU 51 through ICRP
-  103 Table B.5; H′(0.07, Ω), H′(3, Ω) and Hp(3) when needed); ICRP's `EquivalentDose` H_T and `EffectiveDose` E
-  (`units::EquivalentDose`, `units::EffectiveDose`). Each has a rate kind, so Gy/s (`GrayPerSecond`) and Sv/h
-  (`SievertPerHour`, a `DoseEquivalentRate`) no longer convert into each other (they did). `LinearEnergyTransfer`
-  is a kind, not a force. Next: Gy to Sv by a weighting from a named, versioned set (ICRP 103 Table 2, ICRP 60
-  Table B.3, the ICRU's Q(L)), effective dose from ICRP 103's w_T, rate ⇄ dose steps. Plan:
-  `design/radiation-quantities-plan.md` (P2401). Tests: `tests/quantities.rs`, `tests/units.rs`
-  (`dose_rates_are_kinds`), `compile_fail` doctests in `quantity`. P2401#10nov-1911b.
+- 🚧 **UNIT-12 Dose quantities and a named weighting** — the quantities and the weighting step are built;
+  effective dose from w_T and the rate ⇄ dose steps are next. Quantities, m²·s⁻², all kinds: `AbsorbedDose` with
+  `Kerma` under it (the SI gives both the gray); `DoseEquivalent`, the SI's H = Q·D (CIPM 2002 Rec. 2) and bare
+  `Sievert`'s, with the operational `AmbientDoseEquivalent10` H*(10), `PersonalDoseEquivalent10` Hp(10),
+  `PersonalDoseEquivalent0_07` Hp(0.07) (ICRU 51 through ICRP 103 Table B.5) and ICRP's `EquivalentDose` H_T and
+  `EffectiveDose` E as kinds under it (`units::EquivalentDose`, `units::EffectiveDose`). Each has a rate kind, so
+  Gy/s (`GrayPerSecond`) and Sv/h (`SievertPerHour`, a `DoseEquivalentRate`) no longer convert into each other (they
+  did). `LinearEnergyTransfer` (keV/µm) is a kind, not a force. The step: `exact_units::radiation`, `Weight` from a
+  named set, `Icrp103` (Table 2; neutrons Eq. 4.3 as a float edge) and `Icrp60` (Table B.3, neutron bands exact;
+  Q(L) exact where it is a fraction), `Fixed::equivalent_dose(w_R)` and `dose_equivalent(Q)` of a dose or its rate,
+  exact or `None`, `_rounded`, `equivalent_dose_f64`; `convert`'s error for Gy to Sv says to weight. Not built: the
+  edition in the type (decided: named at the call), ICRU 95's operational quantities, H′(0.07, Ω), H′(3, Ω), Hp(3),
+  ICRP 26 and US NRC quantities (the user's to declare). Plan: P2401 `design/radiation-quantities-plan.md`. Tests:
+  `tests/quantities.rs`, `tests/units.rs` (`dose_rates_are_kinds`), `tests/props/radiation.rs` (every i16 by six
+  weights and every rounding, Q(L) walked to 1100 keV/µm, neutron band edges, a Kani proof), `conv_error`'s
+  `gray_to_sievert_hints_a_weighting`, `compile_fail` doctests. Book: [Doses and weighting](docs/maths/doses.md).
+  P2401#10nov-1911b.
 - 📋 **UNIT-13 Quantities of s⁻¹ beyond Hz and Bq** — decay constant, reaction rate, count rate, and the fluence
   rate (m⁻²·s⁻¹), with the named steps physics gives (λ·N is an activity). P2401#10nov-1911c.
 - 📋 **UNIT-14 Nuclear units** — barn, curie, rad, rem, röntgen, the dalton (after NUM-32) and years named apart

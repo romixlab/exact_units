@@ -544,6 +544,12 @@ crate::unit! {
     #[cfg(feature = "radiation")]
     pub struct ElectronVolt = "eV" (long "electronvolt", ucum "eV", prefixes decimal), [kg 1, m 2, s -2], Exact(1602176634 / 1, pow10 -28);
 
+    /// Linear energy transfer in kiloelectronvolts per micrometre, keV/µm (1.602176634·10⁻¹⁰ J/m exactly), a
+    /// [LinearEnergyTransfer](crate::quantities::LinearEnergyTransfer), not a force: the L of the quality factor
+    /// Q(L) ([radiation](crate::radiation)).
+    #[cfg(feature = "radiation")]
+    pub struct KiloElectronVoltPerMicrometer = "keV/µm" (long "kiloelectronvolt per micrometre" plural "kiloelectronvolts per micrometre", ascii "keV/um", ucum "keV/um"), [kg 1, m 1, s -2] quantity crate::quantities::LinearEnergyTransfer, Exact(1602176634 / 1, pow10 -19);
+
     /// Exposure to X and γ rays in coulombs per kilogram, C/kg (kg⁻¹·s·A, SI Brochure, 9th ed., table 6).
     #[cfg(feature = "radiation")]
     pub struct Exposure = "C/kg" (long "coulomb per kilogram" plural "coulombs per kilogram", ucum "C/kg"), [kg -1, s 1, a 1];

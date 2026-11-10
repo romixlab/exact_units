@@ -11,15 +11,15 @@
 //! 2018 and 2022 put it on either side of 1 g/mol), a half-life in NUBASE2020's year (365.2422 d, its §2.3) and
 //! ln 2, which is exact as a symbol but has no exact product with a run-time number: that last step is a float edge.
 //! A cross section in barns times a fluence rate is a reaction rate, which is neither a frequency (Hz) nor an
-//! activity (Bq). An absorbed dose in Gy becomes an equivalent dose in Sv only through a radiation weighting factor,
-//! a versioned convention (ICRP 103, 2007: protons 2; ICRP 60, 1991: protons 5), and the crate refuses the step
-//! without one. The semi-empirical mass formula ends the tour: its volume and asymmetry terms are exact, the
+//! activity (Bq). An absorbed dose in Gy becomes an equivalent dose in Sv only through a radiation weighting factor
+//! from a named set (ICRP 103, 2007: protons 2; ICRP 60, 1991: protons 5), `equivalent_dose`, and the crate refuses
+//! the step without one. The semi-empirical mass formula ends the tour: its volume and asymmetry terms are exact, the
 //! surface, Coulomb and pairing terms need A^(1/3), a float edge by necessity.
 //!
-//! Each number names its table. Where the crate has no place for something (m_u·c² in a set of constants, a
-//! weighting step, an activity from an `Exact`), the comment says so where the example works around it.
+//! Each number names its table. Where the crate has no place for something (m_u·c² in a set of constants, an
+//! activity from an `Exact`), the comment says so where the example works around it.
 //!
-//! `cargo run --example 15_nuclear --features radiation,systems,time,chemical,dimensionless,mechanical`
+//! `cargo run --example 15_nuclear --features radiation,systems,time,chemical,dimensionless,mechanical,libm`
 
 #![expect(
     clippy::print_stdout,
@@ -36,10 +36,11 @@ use core::f64::consts::LN_2;
 use exact_units::constants::{Codata2018, Codata2022};
 use exact_units::prefix::{Kilo, Micro, Milli, One};
 use exact_units::quantities::Activity;
+use exact_units::radiation::{Icrp60, Icrp103};
 use exact_units::systems::{Natural, Si, natural::NaturalElectronVolt};
 use exact_units::units::{
-    Becquerel, ElectronVolt, Gram, GramPerMole, Gray, Joule, Mole, Per, Ratio, Second, Sievert,
-    Speed,
+    Becquerel, ElectronVolt, EquivalentDose, Gram, GramPerMole, Gray, Joule, Mole, Per, Ratio,
+    Second, Speed,
 };
 use exact_units::{Exact, Fixed, Prefix, Rounding};
 
@@ -340,43 +341,41 @@ fn reaction_rate() {
     println!("  saturation activity: {saturation}");
 }
 
-/// ICRP 103 (2007), Eq. 4.3: the radiation weighting factor of neutrons, a continuous function of their energy in
-/// MeV; exponentials of logarithms, a float edge.
-fn neutron_weight(mev: f64) -> f64 {
-    let g = |x: f64| (-(x.ln() * x.ln()) / 6.0).exp();
-    if mev < 1.0 {
-        2.5 + 18.2 * g(mev)
-    } else if mev <= 50.0 {
-        5.0 + 17.0 * g(2.0 * mev)
-    } else {
-        2.5 + 3.25 * g(0.04 * mev)
-    }
-}
-
 fn doses() {
     println!("Absorbed dose against equivalent dose:");
     let dose = Fixed::<Gray, Micro, u32>::new(2000);
-    // Gy to Sv doesn't convert, and the named step is refused too: they are kinds apart, by a weighting factor.
+    // Gy to Sv doesn't convert, and as_quantity is refused too: they are kinds apart, by a weighting factor.
     //
     // let h: Fixed<Sievert, Micro, u32> = dose.convert().unwrap();
     // error[E0080]: evaluation panicked: a Fixed converts only to the same quantity or one above it: Gray (Gy) is
-    // absorbed dose, Sievert (Sv) is dose equivalent (down the tree or across a kind with a named step: as_quantity,
-    // as_ratio, as_phase, ..)
+    // absorbed dose, Sievert (Sv) is dose equivalent (a gray becomes a sievert only by a weighting from a named set:
+    // equivalent_dose(w_R) or dose_equivalent(Q), in exact_units::radiation)
     //
-    // let _ = dose.as_quantity::<DoseEquivalent>();
-    // error[E0080]: evaluation panicked: as_quantity: Q is not on one path with the unit's quantity (a sibling, or
-    // another tree)
-    //
-    // H_T = w_R·D_T,R (ICRP 103, Eq. 4.2), w_R from Table 2: alpha particles 20, protons 2. The crate has no
-    // weighting step, so the factor goes in by hand and nothing in the type says which table it came from: ICRP 60
-    // (1991) gave protons 5 (ICRP 103, Table B.3).
-    const W_R_ALPHA: u32 = 20;
-    let h = Fixed::<Sievert, Micro, u32>::new(dose.get().checked_mul(W_R_ALPHA).unwrap());
-    println!("  {dose} of alpha particles is {h}");
-    // neutrons: w_R is continuous in energy, 20.7 at 1 MeV
-    let w = neutron_weight(1.0);
-    assert!((w - 20.7).abs() < 0.01);
-    println!("  w_R of 1 MeV neutrons: {w:.2}");
+    // H_T = w_R·D_T,R (ICRP 103, Eq. 4.2), w_R from a named set: alpha particles 20 in both, protons 2 in ICRP 103
+    // and 5 in ICRP 60 (1991). The step names the set; the result is ICRP's equivalent dose, not the SI's dose
+    // equivalent H = Q·D that a bare Sievert measures.
+    let h: Fixed<EquivalentDose, Micro, u32> = dose
+        .equivalent_dose(Icrp103::ALPHA_FISSION_FRAGMENTS_HEAVY_IONS)
+        .unwrap();
+    println!("  {dose} of alpha particles is {h} (ICRP 103)");
+    let p103: Fixed<EquivalentDose, Micro, u32> = dose
+        .equivalent_dose(Icrp103::PROTONS_AND_CHARGED_PIONS)
+        .unwrap();
+    let p60: Fixed<EquivalentDose, Micro, u32> =
+        dose.equivalent_dose(Icrp60::PROTONS_ABOVE_2_MEV).unwrap();
+    println!("  of protons: {p103} by ICRP 103, {p60} by ICRP 60");
+    // neutrons: ICRP 60's bands are exact, ICRP 103's continuous w_R(E) (Eq. 4.3) a float edge, 20.7 at 1 MeV
+    let one_mev = Fixed::<ElectronVolt, Kilo, u32>::new(1000);
+    let w60 = Icrp60::neutrons(one_mev).unwrap();
+    let w103 = Icrp103::neutrons_f64(1.0).unwrap();
+    assert!((w103.w - 20.7).abs() < 0.01);
+    println!(
+        "  w_R of 1 MeV neutrons: {} by ICRP 60, {:.2} by ICRP 103",
+        w60.ratio().0,
+        w103.w
+    );
+    let hn: Fixed<EquivalentDose, Micro, f64> = dose.equivalent_dose_f64(w103).unwrap();
+    println!("  {dose} of 1 MeV neutrons is {hn:.0}");
 }
 
 /// The semi-empirical mass formula's coefficients in keV, fitted by least squares to AME2020's experimental binding

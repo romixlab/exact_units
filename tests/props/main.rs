@@ -57,6 +57,8 @@ mod q_range_level;
 mod q_range_point;
 #[cfg(all(feature = "q", not(kani)))]
 mod q_text;
+#[cfg(feature = "radiation")]
+mod radiation;
 mod reference;
 #[cfg(not(kani))]
 mod registry;

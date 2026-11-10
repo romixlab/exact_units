@@ -5,7 +5,7 @@ use crate::units::Of;
 use crate::{Bounds, Fixed, QuantitySpec, Storage, Unit};
 
 /// Whether `U` and `U2` have exactly one factor to SI, in `const` code.
-const fn same_factor<U: Unit, U2: Unit>() -> bool {
+pub(crate) const fn same_factor<U: Unit, U2: Unit>() -> bool {
     match (U::EXPR.magnitude(), U2::EXPR.magnitude()) {
         (Some(a), Some(b)) => match a.checked_div(b) {
             Ok(r) => matches!(r.to_ratio(), Some((1, 1))),

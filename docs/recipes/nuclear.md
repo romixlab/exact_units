@@ -16,7 +16,7 @@ The data are from the atomic mass evaluation AME2020 (Wang et al., Chinese Phys.
 | Atoms in a gram | with M_u = 1 g/mol | M_u | |
 | Activity A = ln 2 · N/T½ | N/T½ | | ln 2 |
 | Reaction rate σ·φ·N | yes | | |
-| Gy to Sv | | w_R (ICRP) | neutrons' w_R(E) |
+| Gy to Sv | ICRP 60's w_R | w_R named by its set (ICRP 103, ICRP 60) | ICRP 103 neutrons' w_R(E) |
 | Semi-empirical mass formula | volume, asymmetry | | A^(1/3) |
 
 ## Binding energies and Q-values: exact
@@ -154,7 +154,7 @@ The result is a plain s⁻¹. A reaction rate isn't periodic, so it isn't a freq
 
 ## Gy is not Sv
 
-Absorbed dose (Gy) and equivalent dose (Sv) are both J/kg, and the crate keeps them apart. Neither `convert` nor `as_quantity` crosses:
+Absorbed dose (Gy) and a dose in sieverts are both J/kg, and the crate keeps them apart. Neither `convert` nor `as_quantity` crosses:
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::Micro, units::{Gray, Sievert}};
@@ -163,23 +163,14 @@ let d = Fixed::<Gray, Micro, u32>::new(2000);
 let h: Fixed<Sievert, Micro, u32> = d.convert().unwrap();
 ```
 
-```rust,compile_fail
-use exact_units::{Fixed, prefix::Micro, quantities::DoseEquivalent, units::Gray};
-
-let d = Fixed::<Gray, Micro, u32>::new(2000);
-let _ = d.as_quantity::<DoseEquivalent>();
-```
-
-What crosses is a radiation weighting factor: H_T = Σ w_R·D_T,R (ICRP Publication 103, 2007, Eq. 4.2). Its Table 2 gives photons and electrons 1, protons 2, alpha particles 20, and neutrons a continuous function of their energy (Eq. 4.3, exponentials of logarithms, a float edge). These numbers are an edition, as CODATA's are: ICRP 60 (1991) gave protons 5 (ICRP 103, Table B.3). The CIPM's own definition of the dose equivalent is a third convention, H = Q·D, with the quality factor Q as a function of linear energy transfer (SI Brochure, 9th ed., §2.3.5).
-
-The crate has no weighting step yet, so the factor goes in by hand, and nothing in the type records which table it came from:
+What crosses is a weighting from a named set ([Doses and weighting](../maths/doses.md)). For an equivalent dose, H_T = Σ w_R·D_T,R (ICRP Publication 103, 2007, Eq. 4.2), its Table 2 gives photons and electrons 1, protons 2, alpha particles 20, and neutrons a continuous function of their energy (Eq. 4.3, a float edge). These numbers are an edition, as CODATA's are: ICRP 60 (1991) gave protons 5. The CIPM's own dose equivalent is a third convention, H = Q·D, with the quality factor Q a function of linear energy transfer (SI Brochure, 9th ed., §2.3.5); it is a bare `Sievert`'s quantity, and ICRP's equivalent dose is `units::EquivalentDose`.
 
 ```rust
-use exact_units::{Fixed, prefix::Micro, units::{Gray, Sievert}};
+use exact_units::{Fixed, prefix::Micro, radiation::Icrp103, units::{EquivalentDose, Gray}};
 
-const W_R_ALPHA: u32 = 20; // ICRP 103, Table 2
 let d = Fixed::<Gray, Micro, u32>::new(2000);
-let h = Fixed::<Sievert, Micro, u32>::new(d.get().checked_mul(W_R_ALPHA).unwrap());
+let h: Fixed<EquivalentDose, Micro, u32> =
+    d.equivalent_dose(Icrp103::ALPHA_FISSION_FRAGMENTS_HEAVY_IONS).unwrap();
 assert_eq!(h.to_string(), "40000 µSv");
 ```
 
@@ -195,5 +186,4 @@ The coefficients are a fit, and every fit is a convention: which nuclides, which
 - **No dalton, barn, curie or year among the units.** Each is declared above with `unit!`. The year needs a convention named (NUBASE's 365.2422 d, the Julian 365.25 d).
 - **`Exact` holds a `u128` fraction, without an exponent.** Atomic-scale values in SI units (10⁻³⁰ kg with c² below it), or N for a gram with CODATA's M_u, don't fit, and the arithmetic gives `None`.
 - **No quantity for a reaction rate or a decay constant.** Both are s⁻¹, but neither is a frequency nor an activity.
-- **No weighting step from Gy to Sv,** and one quantity, `DoseEquivalent`, stands for ICRP's equivalent dose (w_R) and the CIPM's dose equivalent (Q).
 - **No exact cube root.** A^(1/3) is a float, and so is ln 2 times a run-time value.

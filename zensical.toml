@@ -44,6 +44,7 @@ nav = [
                     "maths/rounding.md",
                     "maths/overflow.md",
                     "maths/quantities.md",
+                    "maths/doses.md",
                     "maths/systems.md",
                     "maths/niches.md",
                 ]
