@@ -20,6 +20,13 @@ pub(crate) const MODES: [Rounding; 6] = [
 /// Every overflow policy.
 pub(crate) const POLICIES: [Overflow; 3] = [Overflow::Checked, Overflow::Saturate, Overflow::Wrap];
 
+/// `x` on a circle of `m` steps: into `[0, m)`, or for a difference into `[-m/2, m - m/2)`, the shortest way round
+/// with the half turn negative.
+pub(crate) fn modulo(x: i128, m: i128, signed: bool) -> i128 {
+    let r = x.rem_euclid(m);
+    if signed && r >= m - m / 2 { r - m } else { r }
+}
+
 /// `p / d` rounded by `r`, for `d > 0`: from the Euclidean floor and its remainder.
 pub(crate) fn round_div(p: i128, d: i128, r: Rounding) -> i128 {
     let f = p.div_euclid(d);

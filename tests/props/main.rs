@@ -77,6 +77,8 @@ mod text;
 mod unit_text;
 #[cfg(feature = "dimensionless")]
 mod video;
+#[cfg(feature = "time")]
+mod video_time;
 mod window;
 #[cfg(all(not(kani), feature = "std", feature = "shrink_wrap"))]
 mod wire;
