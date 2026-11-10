@@ -313,13 +313,13 @@ const fn factor<U: Unit, U2: Unit>() -> Fraction {
     }
 }
 
-/// As [factor], with the measured constants in it (μ₀, G, m_u) replaced by the values of the set `S`.
+/// As [factor], with the measured constants in it (μ₀, G, m_u) replaced by the values of the set `C`.
 #[expect(
     clippy::panic,
     reason = "a compile error in const code (evaluated in const blocks), as documented"
 )]
-const fn factor_with<S: Constants, U: Unit, U2: Unit>() -> Fraction {
-    match Fraction::from_magnitude(&magnitude::<U, U2>().resolve::<S>().value) {
+const fn factor_with<C: Constants, U: Unit, U2: Unit>() -> Fraction {
+    match Fraction::from_magnitude(&magnitude::<U, U2>().resolve::<C>().value) {
         Some(f) => f,
         None => panic!(
             "the factor between these units under this set is not a fraction of u128s (π, a root, past u128)"
@@ -384,7 +384,7 @@ impl<U: Unit> Exact<U> {
         Some(Exact::of(self.value.checked_mul(k)?))
     }
 
-    /// The same value in `U2` with the measured constants of the factor (μ₀, G, m_u) taken from the set `S`, if it
+    /// The same value in `U2` with the measured constants of the factor (μ₀, G, m_u) taken from the set `C`, if it
     /// fits: a mass in daltons in grams, an oersted in A/m. As [convert](Self::convert) otherwise; a set that lacks a
     /// constant the factor needs doesn't compile, nor does [convert](Self::convert) where the factor has one.
     ///
@@ -407,8 +407,8 @@ impl<U: Unit> Exact<U> {
     /// assert_eq!((g22 - g18).unwrap(), Exact::new(232, 10u128.pow(35)));
     /// ```
     #[must_use]
-    pub fn convert_with<S: Constants, U2: Unit>(self) -> Option<Exact<U2>> {
-        let k = const { factor_with::<S, U, U2>() };
+    pub fn convert_with<C: Constants, U2: Unit>(self) -> Option<Exact<U2>> {
+        let k = const { factor_with::<C, U, U2>() };
         Some(Exact::of(self.value.checked_mul(k)?))
     }
 

@@ -135,14 +135,14 @@ const fn fraction_of(m: &Magnitude) -> Fraction {
 
 impl<S: System, U: Unit> Crossing<S, U> {
     /// The value in the unit `U2` of `S`, `None` where it doesn't fit: as [Exact::convert], with the bridge's
-    /// factor between. A factor that keeps μ₀ or G has no number without a set: [convert_with](Self::convert_with).
+    /// factor between. A factor that keeps μ₀, G or m_u has no number without a set: [convert_with](Self::convert_with).
     #[must_use]
     pub fn convert<U2: Unit>(self) -> Option<Exact<U2>> {
         let k = const { fraction_of(&Conversion::across_factor::<S, U, One, U2, One>()) };
         Some(Exact::of(self.value.value.checked_mul(k)?))
     }
 
-    /// [convert](Self::convert) with μ₀ and G taken from the named set `C` ([constants](crate::constants)), as
+    /// [convert](Self::convert) with μ₀, G and m_u taken from the named set `C` ([constants](crate::constants)), as
     /// [Crossing::convert_with](crate::Crossing::convert_with) of a [Fixed](crate::Fixed).
     #[must_use]
     pub fn convert_with<C: crate::constants::Constants, U2: Unit>(self) -> Option<Exact<U2>> {
