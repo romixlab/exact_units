@@ -249,8 +249,10 @@ A `Segment`'s `CurveForm` is written in the decode direction, signal to light, e
 (an exponent too, never a `Magnitude`: π or ln 2 mean nothing as an exponent):
 
 - `Affine { gain, offset }`: `y = gain·x + offset`, exact on every rational (a toe like sRGB's or BT.709's).
-- `Power { gain, shift, exponent, offset }`: `y = gain·max(x + shift, 0)^exponent + offset`, exact where `x + shift`
-  is a rational's `q`-th power, the exponent being `p/q`.
+- `Power { gain, scale, shift, exponent, offset }`: `y = gain·max(scale·x + shift, 0)^exponent + offset`, exact
+  where `scale·x + shift` is a rational's `q`-th power, the exponent being `p/q`. The base carries its own `scale`
+  so a divisor inside the power stays rational: BT.709's `((V + 0.099)/1.099)^(20/9)` is `scale` 1/1.099, `shift`
+  0.099/1.099 (a `gain` outside the power would be 1.099^(−20/9), irrational).
 - `Exp { gain, base, scale, shift, offset }`: `y = gain·base^(scale·(x − shift)) + offset`, exact for Euler's `e`
   only where the exponent is 0, for a rational base where the power is rational.
 - `RationalPower { m1, m2, c1, c2, c3 }`: PQ's own shape, `y = (max(x^(1/m2) − c1, 0)/(c2 − c3·x^(1/m2)))^(1/m1)`,
