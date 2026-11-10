@@ -16,7 +16,11 @@
 #![expect(clippy::panic, reason = "a property fails by panicking")]
 
 use super::reference::imaging as reference;
-use exact_units::codec::{CodeSpan, Codec, CodecDef, CodecShape, Coded};
+use exact_units::codec::{
+    CodeSpan, Codec, CodecDef, CodecShape, Coded, HevcLevelScale, J2kStepSize,
+};
+#[cfg(all(feature = "information", feature = "time"))]
+use exact_units::codec::{HrdBitRate, HrdCpbSize};
 use exact_units::prefix::{One, Pow2, Pow10, Rational};
 #[cfg(feature = "q")]
 use exact_units::q;
@@ -245,7 +249,7 @@ pub(crate) fn h273_round_is_nearest_away(p: i16, k: i8) {
 }
 
 /// JFIF's Round(x) = ⌊x + 0.5⌋ (T.871 clause 7) of `x = p / 2^k`, AV1's Round2(p, k) (4.7) and the add-half-then-shift
-/// of H.264 (eq. 8-337) and H.265 (eq. 8-309): `Floor` of `p` plus half a step, until `NearestCeil` names it.
+/// of H.264 (eq. 8-337) and H.265 (eq. 8-309): `NearestCeil`, and `Floor` of `p` plus half a step, as they write it.
 pub(crate) fn round_half_up_is_floor_of_half_more(p: i16, k: i8) {
     let p = i32::from(p);
     let want = reference::round_half_up(i128::from(p), 1 << k);
@@ -327,15 +331,22 @@ fn h273_round_and_round_half_up_every_i16() {
     }
 }
 
-/// None of today's five roundings is JFIF's ⌊x + 0.5⌋: each parts from it in quarters from −1.5 to 1.5 (`Ceil`,
-/// which agrees on every half, at 0.25). H.273's Round and JFIF's agree from 0 up and part on a negative half.
+/// JFIF's ⌊x + 0.5⌋ is `NearestCeil` and none of the other five roundings: each parts from it in quarters from −1.5
+/// to 1.5 (`Ceil`, which agrees on every half, at 0.25). H.273's Round and JFIF's agree from 0 up and part on a
+/// negative half.
 #[test]
-fn no_mode_is_round_half_up() {
+fn only_nearest_ceil_is_round_half_up() {
     for r in super::reference::MODES {
+        if r == Rounding::NearestCeil {
+            continue;
+        }
         let differs = (-6..=6)
             .any(|p| i128::from(shift(p, 2, r)) != reference::round_half_up(i128::from(p), 4));
         assert!(differs, "{r:?} is ⌊x + 0.5⌋ on halves");
     }
+    assert!((-6..=6).all(|p| {
+        i128::from(shift(p, 2, Rounding::NearestCeil)) == reference::round_half_up(i128::from(p), 4)
+    }));
     assert_eq!(reference::round_half_up(-1, 2), 0);
     assert_eq!(reference::round_h273(-1, 2), -1);
 }
@@ -815,6 +826,164 @@ fn qp_doubles_every_six_and_no_step_is_the_sixth_root_of_two() {
     }
 }
 
+/// Every code of a [CodecShape::MantissaExponent] codec in `codes`, by the typed path and the data path, against
+/// `want` (the standard's formula in `i128`, `None` for a spare code); each value encodes back to `lowest` of it,
+/// the lowest code with that value, by every rounding.
+fn walk_mantissa_exponent<C: Codec>(
+    codes: impl IntoIterator<Item = i128>,
+    want: impl Fn(i128) -> Option<i128>,
+    lowest: impl Fn(i128, i128) -> i128,
+) where
+    C::Raw: TryFrom<i128> + Into<i128> + core::fmt::Debug,
+    C::Linear: Copy + LinearInt,
+{
+    for raw in codes {
+        let Ok(code) = C::Raw::try_from(raw) else {
+            panic!("{raw} fits the raw storage")
+        };
+        let w = want(raw);
+        assert_eq!(
+            C::decode(code).map(LinearInt::int),
+            w,
+            "{} code {raw}",
+            C::DEF.id.name
+        );
+        assert_eq!(
+            C::DEF.decode(raw),
+            w,
+            "{}'s DEF, code {raw}",
+            C::DEF.id.name
+        );
+        if let (Some(v), Some(value)) = (w, C::decode(code)) {
+            let first = lowest(v, raw);
+            for r in super::reference::MODES {
+                assert_eq!(
+                    C::encode(value, r).map(Into::into),
+                    Some(first),
+                    "{} code {raw} by {r:?}",
+                    C::DEF.id.name
+                );
+                assert_eq!(C::DEF.encode(v, r), Some(first));
+            }
+        }
+    }
+}
+
+/// The raw value of a codec's `Linear`, an integer `Fixed`.
+trait LinearInt {
+    /// The stored integer.
+    fn int(self) -> i128;
+}
+
+impl<U, P, T: Into<i128> + exact_units::Storage> LinearInt for Fixed<U, P, T> {
+    fn int(self) -> i128 {
+        self.get().into()
+    }
+}
+
+#[test]
+fn j2k_step_size_every_code() {
+    walk_mantissa_exponent::<J2kStepSize>(
+        0..=0xFFFF,
+        |raw| Some(reference::j2k_step(raw)),
+        |_, raw| raw,
+    );
+}
+
+#[test]
+fn hevc_level_scale_every_code() {
+    walk_mantissa_exponent::<HevcLevelScale>(
+        0..=255,
+        |qp| (qp < 100).then(|| reference::hevc_level_scale(qp)),
+        |_, raw| raw,
+    );
+}
+
+/// The HRD's codes at every scale: the ends of `value_minus1`, the forbidden 2³² − 1, a run around 2³¹ and the
+/// powers of two, where a rate has several codes; the codes past scale 15.
+#[cfg(all(feature = "information", feature = "time"))]
+#[test]
+fn hrd_codes() {
+    let mut values: Vec<i128> = vec![0, 1, 2, 3, 0xFFFF_FFFD, 0xFFFF_FFFE, 0xFFFF_FFFF];
+    values.extend((0..32).map(|k| (1 << k) - 1));
+    values.extend((0x7FFF_FFF0..=0x8000_0010).step_by(1));
+    let codes = |extra: i128| {
+        let values = values.clone();
+        (0..=16)
+            .flat_map(move |s| values.clone().into_iter().map(move |v| (s << 32) | v))
+            .chain([extra])
+    };
+    // the lowest code of a value: the least scale whose mantissa is whole and in range
+    let lowest = |zero: i128| {
+        move |v: i128, _: i128| {
+            (0..16)
+                .find_map(|s| {
+                    let step = 1 << (zero + s);
+                    let m = v / step;
+                    (v % step == 0 && (1..1 << 32).contains(&m)).then_some((s << 32) | (m - 1))
+                })
+                .unwrap_or_else(|| panic!("{v} has a code"))
+        }
+    };
+    let want = |zero: i128| move |raw: i128| reference::hrd(raw >> 32, raw & 0xFFFF_FFFF, zero);
+    walk_mantissa_exponent::<HrdBitRate>(codes(i128::from(u64::MAX)), want(6), lowest(6));
+    walk_mantissa_exponent::<HrdCpbSize>(codes(i128::from(u64::MAX)), want(4), lowest(4));
+}
+
+/// `x` (a step of 2⁻⁴², or a level scale) encoded by `r` against every value the codec has, sorted: the closest on
+/// the side `r` takes, the nearer for the nearest modes (a tie to the greater value for `NearestCeil` and
+/// `NearestAway`, to the even code for `NearestEven`), `None` past the end on that side.
+fn encodes_by_rounding(values: &[(i128, i128)], x: i128, r: Rounding, got: Option<i128>) {
+    let below = values.iter().rev().find(|&&(v, _)| v <= x).copied();
+    let above = values.iter().find(|&&(v, _)| v >= x).copied();
+    let want = match (below, above) {
+        (Some(b), _) if b.0 == x => Some(b),
+        _ => match r {
+            Rounding::Floor | Rounding::Truncate => below,
+            Rounding::Ceil => above,
+            _ => match (below, above) {
+                (Some(b), Some(a)) => {
+                    let (db, da) = (x - b.0, a.0 - x);
+                    if db != da {
+                        Some(if db < da { b } else { a })
+                    } else if r == Rounding::NearestEven {
+                        Some(if b.1 % 2 == 0 { b } else { a })
+                    } else {
+                        Some(a)
+                    }
+                }
+                (one, other) => one.or(other),
+            },
+        },
+    };
+    assert_eq!(got, want.map(|(_, code)| code), "{x} by {r:?}");
+}
+
+/// Values with their codes, sorted by value.
+type ByValue = Vec<(i128, i128)>;
+
+/// Every value of [J2kStepSize] and [HevcLevelScale], with its code, sorted by value.
+fn sorted_values() -> (ByValue, ByValue) {
+    let mut j2k: Vec<_> = (0..=0xFFFF)
+        .map(|raw| (reference::j2k_step(raw), raw))
+        .collect();
+    j2k.sort_unstable();
+    let mut hevc: Vec<_> = (0..100)
+        .map(|qp| (reference::hevc_level_scale(qp), qp))
+        .collect();
+    hevc.sort_unstable();
+    (j2k, hevc)
+}
+
+/// A step between codes, encoded by each rounding, against every value of the codec.
+pub(crate) fn mantissa_exponent_rounds(j2k_x: u64, hevc_x: u32, r: Rounding) {
+    let (j2k, hevc) = sorted_values();
+    let got = J2kStepSize::encode(Fixed::new(j2k_x), r).map(i128::from);
+    encodes_by_rounding(&j2k, i128::from(j2k_x), r, got);
+    let got = HevcLevelScale::encode(Fixed::new(hevc_x), r).map(i128::from);
+    encodes_by_rounding(&hevc, i128::from(hevc_x), r, got);
+}
+
 #[cfg(not(any(kani, fuzzing)))]
 mod props {
     use proptest::prelude::*;
@@ -839,6 +1008,11 @@ mod props {
         #[test]
         fn point_transforms(x: i16, pt in 0i8..=15) {
             super::point_transforms(x, pt);
+        }
+
+        #[test]
+        fn mantissa_exponent_rounds(j2k in 0u64..1 << 44, hevc in 0u32..72 << 17, r in prop::sample::select(&super::super::reference::MODES[..])) {
+            super::mantissa_exponent_rounds(j2k, hevc, r);
         }
 
         #[test]

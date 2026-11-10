@@ -9,7 +9,8 @@
 //! - [CodecDef] names the [CodecShape] and the [spare](CodecDef::spare) codes: what a client without the trait
 //!   runs to decode the same bytes, as [UnitDef](crate::UnitDef) is a unit's definition as data. [MuLaw] and
 //!   [MuLawSingleZero] back [CodecShape::MuLaw], [CanFdDlc] (CAN FD's data length code) backs
-//!   [CodecShape::Table], video's narrow-range quantizers ([video]) back [CodecShape::Offset]; the other shapes
+//!   [CodecShape::Table], video's narrow-range quantizers ([video]) back [CodecShape::Offset], the streams' scales
+//!   ([J2kStepSize], [HevcLevelScale], `HrdBitRate`, `HrdCpbSize`) back [CodecShape::MantissaExponent]; the other shapes
 //!   are the plan for later codecs (LVL-4's named conversions) and have none yet, a gap this module's docs don't
 //!   hide.
 //! - [Coded]`<C, V>` holds the bytes of `C::Raw`, never a spare code: [get](Coded::get) decodes,
@@ -367,6 +368,28 @@ pub enum CodecShape<'i> {
         /// The code of the `Linear`'s zero (16 for 8-bit narrow-range Y′, 128 for C′B and C′R).
         zero: i128,
     },
+    /// A mantissa times a power of two, both read from the code: `code = e · radix + m`, `0 <= m < radix`, the
+    /// `Linear`'s raw value `mantissa(m) · 2^(exponent_zero + exponent_step · e)` for `e < exponents`, where
+    /// `mantissa(m)` is `mantissas[m]` or, with no table, `m + mantissa_offset`. A code past the last exponent, or
+    /// whose power is below 2⁰ (the `Linear`'s scale takes the least one), means no value. Exact both ways; encoding
+    /// takes the code of the value, or the one a named [Rounding] picks (the lowest code where two mean the same
+    /// value). The streams' scales are the cases: ITU-T T.800's quantization step, 5 + 11 bits with an implicit
+    /// leading 1 (eq. E-3, [J2kStepSize]), H.265's `levelScale[qP % 6] << (qP / 6)` (eq. 8-309, [HevcLevelScale])
+    /// and the HRD's `(value_minus1 + 1) · 2^(6 + scale)` (H.264 eq. E-81, [HrdBitRate]).
+    MantissaExponent {
+        /// The count of mantissa codes per exponent: 2¹¹ for 11 bits of mantissa, 6 for a QP.
+        radix: i128,
+        /// The count of exponent codes, from 0.
+        exponents: i128,
+        /// The mantissa of each mantissa code, `radix` of them; empty for `m + mantissa_offset`.
+        mantissas: &'i [i128],
+        /// What a mantissa code adds with no table: 2¹¹ for an implicit leading 1, 1 for a `value_minus1`.
+        mantissa_offset: i128,
+        /// The power of two of exponent code 0.
+        exponent_zero: i128,
+        /// What each exponent code adds to the power: 1, or −1 where a larger code is a finer step.
+        exponent_step: i128,
+    },
 }
 
 impl CodecShape<'_> {
@@ -393,6 +416,24 @@ impl CodecShape<'_> {
                 hit.filter(|_| whole)
             }
             CodecShape::Offset { zero } => raw.checked_sub(*zero),
+            CodecShape::MantissaExponent {
+                radix,
+                exponents,
+                mantissas,
+                mantissa_offset,
+                exponent_zero,
+                exponent_step,
+            } => {
+                let shape = MantissaExponentShape {
+                    radix: *radix,
+                    exponents: *exponents,
+                    mantissas,
+                    mantissa_offset: *mantissa_offset,
+                    exponent_zero: *exponent_zero,
+                    exponent_step: *exponent_step,
+                };
+                shape.decode(raw)
+            }
             CodecShape::ALaw => None,
             // a shape wire bytes named that this version doesn't know
             #[cfg(feature = "shrink_wrap")]
@@ -426,10 +467,123 @@ impl CodecShape<'_> {
             }
             CodecShape::Table(table) => table_encode(table, value, rounding, allowed),
             CodecShape::Offset { zero } => value.checked_add(*zero),
+            CodecShape::MantissaExponent {
+                radix,
+                exponents,
+                mantissas,
+                mantissa_offset,
+                exponent_zero,
+                exponent_step,
+            } => {
+                let shape = MantissaExponentShape {
+                    radix: *radix,
+                    exponents: *exponents,
+                    mantissas,
+                    mantissa_offset: *mantissa_offset,
+                    exponent_zero: *exponent_zero,
+                    exponent_step: *exponent_step,
+                };
+                shape.encode(value, rounding, allowed)
+            }
             CodecShape::ALaw => None,
             #[cfg(feature = "shrink_wrap")]
             _ => None,
         }
+    }
+}
+
+/// The fields of a [MantissaExponent](CodecShape::MantissaExponent), borrowed: its decode and encode, which the
+/// shape and the typed codecs of [mantissa] share.
+pub(crate) struct MantissaExponentShape<'a, 'i> {
+    pub(crate) radix: i128,
+    pub(crate) exponents: i128,
+    pub(crate) mantissas: &'a DefList<'i, i128>,
+    pub(crate) mantissa_offset: i128,
+    pub(crate) exponent_zero: i128,
+    pub(crate) exponent_step: i128,
+}
+
+/// The most exponent codes a [MantissaExponent](CodecShape::MantissaExponent) is read with: a power past 2¹²⁶
+/// overflows every value, so more would only be codes without one, and encoding walks the exponents.
+const MOST_EXPONENTS: i128 = 256;
+
+impl MantissaExponentShape<'_, '_> {
+    /// The count of the mantissa table's entries, 0 for none; `None` for a table that doesn't decode or isn't
+    /// `radix` long.
+    fn table_len(&self) -> Option<i128> {
+        let mut n = 0_i128;
+        if !for_each(self.mantissas, |_: i128| n = n.saturating_add(1)) {
+            return None;
+        }
+        (n == 0 || n == self.radix).then_some(n)
+    }
+
+    /// The mantissa of mantissa code `m`, `0 <= m < radix`.
+    fn mantissa(&self, m: i128) -> Option<i128> {
+        if self.table_len()? == 0 {
+            return m.checked_add(self.mantissa_offset);
+        }
+        let m = usize::try_from(m).ok()?;
+        table_values(self.mantissas).nth(m)
+    }
+
+    /// `2^p` for exponent code `e`, `None` where the power is below 2⁰ or past 2¹²⁶.
+    fn power(&self, e: i128) -> Option<i128> {
+        let p = self
+            .exponent_step
+            .checked_mul(e)?
+            .checked_add(self.exponent_zero)?;
+        let p = u32::try_from(p).ok().filter(|&p| p <= 126)?;
+        1_i128.checked_shl(p)
+    }
+
+    /// The value of `raw`.
+    pub(crate) fn decode(&self, raw: i128) -> Option<i128> {
+        if raw < 0 || self.radix <= 0 {
+            return None;
+        }
+        let (e, m) = (raw.checked_div(self.radix)?, raw.checked_rem(self.radix)?);
+        if e >= self.exponents.min(MOST_EXPONENTS) {
+            return None;
+        }
+        self.mantissa(m)?.checked_mul(self.power(e)?)
+    }
+
+    /// The code of `value`, or the one `rounding` picks among the codes `allowed` takes. At each exponent the
+    /// candidates are the two mantissas around the value (every mantissa of a table), so the closest code on each
+    /// side of it is among them.
+    pub(crate) fn encode(
+        &self,
+        value: i128,
+        rounding: Rounding,
+        allowed: impl Fn(i128) -> bool,
+    ) -> Option<i128> {
+        if self.radix <= 0 {
+            return None;
+        }
+        let table = self.table_len()? > 0;
+        let last = self.radix.checked_sub(1)?;
+        let around = |e: i128| -> [Option<i128>; 2] {
+            let near = self.power(e).and_then(|step| {
+                let q = value.div_euclid(step).checked_sub(self.mantissa_offset)?;
+                Some((q.clamp(0, last), q.saturating_add(1).clamp(0, last)))
+            });
+            match near {
+                Some((a, b)) if !table => [Some(a), (b != a).then_some(b)],
+                _ => [None, None],
+            }
+        };
+        let entries = (0..self.exponents.clamp(0, MOST_EXPONENTS))
+            .flat_map(|e| {
+                let every = (0..if table { self.radix } else { 0 }).map(Some);
+                every
+                    .chain(around(e))
+                    .flatten()
+                    .filter_map(move |m| e.checked_mul(self.radix)?.checked_add(m))
+            })
+            .filter(|&code| allowed(code))
+            .filter_map(|code| Some((code, self.decode(code)?)));
+        nearest_entry(entries, value, rounding)
     }
 }
 
@@ -1096,6 +1250,11 @@ impl Codec for CanFdDlc {
 }
 
 mod curve;
+#[cfg(any(
+    feature = "dimensionless",
+    all(feature = "information", feature = "time")
+))]
+mod mantissa;
 pub mod matrix;
 mod transfer;
 
@@ -1107,6 +1266,10 @@ pub use curve::{
     Curve, CurveDef, CurveForm, CurveKind, Domain, Enclosure, EncodeError, ExpBase, Quantizer,
     Referred, Segment,
 };
+#[cfg(feature = "dimensionless")]
+pub use mantissa::{HevcLevelScale, J2kStepSize};
+#[cfg(all(feature = "information", feature = "time"))]
+pub use mantissa::{HrdBitRate, HrdCpbSize};
 pub use transfer::{SignalStep, Transfer};
 
 #[cfg(test)]

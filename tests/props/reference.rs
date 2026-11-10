@@ -1274,7 +1274,6 @@ pub(crate) fn round_div_big(
     if up { f + 1 } else { f }
 }
 
-
 /// The integer arithmetic of image and video codecs, written out as the standards print it: floors by `div_euclid`,
 /// the roundings of T.871 and H.273 from their definitions, the lifting steps of T.800 and H.273 in `i128`.
 pub(crate) mod imaging {
@@ -1292,6 +1291,27 @@ pub(crate) mod imaging {
     /// H.273's Round(x) = Sign(x)·Floor(Abs(x) + 0.5) (eq. 8) of `x = p / d`, `d > 0`.
     pub(crate) fn round_h273(p: i128, d: i128) -> i128 {
         p.signum() * round_half_up(p.abs(), d)
+    }
+
+    /// T.800's quantization step over 2^Rb (eq. E-3) of its 16 bits (Table A.30), in steps of 2⁻⁴²: (2¹¹ + μb) ·
+    /// 2^(31 − εb).
+    pub(crate) fn j2k_step(raw: i128) -> i128 {
+        let (epsilon, mu) = (raw >> 11, raw & 0x07FF);
+        (2048 + mu) * (1 << (31 - epsilon))
+    }
+
+    /// H.265's levelScale[qP % 6] << (qP / 6) (eq. 8-309).
+    pub(crate) fn hevc_level_scale(qp: i128) -> i128 {
+        let table = [40, 45, 51, 57, 64, 72];
+        let k = usize::try_from(qp % 6).unwrap_or(0);
+        table.get(k).copied().unwrap_or(0) << (qp / 6)
+    }
+
+    /// The HRD's (value_minus1 + 1) · 2^(zero + scale) (H.264 eq. E-81 with zero 6, E-82 with zero 4); `None` for
+    /// the forbidden value_minus1 of 2³² − 1 and a scale past 4 bits.
+    pub(crate) fn hrd(scale: i128, value_minus1: i128, zero: i128) -> Option<i128> {
+        ((0..16).contains(&scale) && (0..=0xFFFF_FFFE).contains(&value_minus1))
+            .then(|| (value_minus1 + 1) << (zero + scale))
     }
 
     /// T.800's periodic symmetric extension PSE₀(i, 0, n) (eq. F-4), `n >= 2`.

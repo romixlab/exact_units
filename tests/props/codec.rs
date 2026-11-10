@@ -373,6 +373,14 @@ mod wire {
             CodecShape::ALaw,
             CodecShape::Offset { zero: -16 },
             CodecShape::Table(RefVec::Slice { slice: &table }),
+            CodecShape::MantissaExponent {
+                radix: 6,
+                exponents: 17,
+                mantissas: RefVec::Slice { slice: &table },
+                mantissa_offset: -3,
+                exponent_zero: 31,
+                exponent_step: -1,
+            },
         ] {
             for spare in [
                 &[][..],

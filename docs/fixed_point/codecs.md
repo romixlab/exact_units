@@ -94,7 +94,7 @@ unit's definition as data) and `spare`, the spare codes as spans of codes (`Code
 place a codec writes its spare codes: `decode`, `Coded` and a `Niched` read them from there. `CodecShape::MuLaw` has no parameters (the standard pins the formula); `ALaw` is declared, with no `Codec`
 behind it yet. `codes` is every code the `Raw` holds (`CodeSpan::all::<u8>()`), `nominal` the nominal range where a
 codec has one, and `curve` the transfer curve above the code (a `CurveDef`, see [Video codes and transfer
-curves](video.md)), `None` where the code's value is the meaning itself. `Table` has one: [the CAN FD DLC](#a-table-the-can-fd-dlc). `Offset { zero }`, a code that is the `Linear`'s raw value plus `zero`, has video's narrow-range quantizers: [Video codes and transfer curves](video.md).
+curves](video.md)), `None` where the code's value is the meaning itself. `Table` has one: [the CAN FD DLC](#a-table-the-can-fd-dlc). `Offset { zero }`, a code that is the `Linear`'s raw value plus `zero`, has video's narrow-range quantizers: [Video codes and transfer curves](video.md). `MantissaExponent` is a mantissa times a power of two, both read from the code, `code = e·radix + m`; it has the streams' scales: JPEG 2000's quantization step (`J2kStepSize`, ITU-T T.800 eq. E-3), H.265's `levelScale[qP % 6] << (qP / 6)` (`HevcLevelScale`, eq. 8-309) and the HRD's bit rate and CPB size of H.264 and H.265 (`HrdBitRate`, `HrdCpbSize`, eq. E-81 and E-82): [Image and video codecs](../recipes/image_codecs.md#mantissa-times-a-power-of-two).
 
 ```rust
 use exact_units::codec::{Codec, CodecShape, MuLaw};
