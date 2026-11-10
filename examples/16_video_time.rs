@@ -238,8 +238,8 @@ fn walk_a_day() {
     );
 }
 
-fn main() {
-    // Time bases: a scale is a Magnitude, so 1 080 000 / 27 000 000 is the same scale as 1/25.
+/// Time bases: a scale is a Magnitude, so 1 080 000 / 27 000 000 is the same scale as 1/25.
+fn time_bases() {
     assert_eq!(Tick27M::SCALE, <Rational<1, 25>>::SCALE);
     assert_eq!(
         Frame30k::SCALE,
@@ -257,8 +257,10 @@ fn main() {
         "an MP4 timescale this firmware wasn't built for"
     );
     assert_eq!(known_base(1, 0), None);
+}
 
-    // Between clocks: a frame is exactly 3003 ticks of 90 kHz, an H.264 tick (a field) is 1501.5 and has to round.
+/// Between clocks: a frame is exactly 3003 ticks of 90 kHz, an H.264 tick (a field) is 1501.5 and has to round.
+fn between_clocks() {
     let frame = Fixed::<Second, Frame30k, u64>::new(1);
     assert_eq!(frame.to::<Tick90k, u64>().unwrap().get(), 3003);
     let field = Fixed::<Second, Tick60k, u64>::new(1);
@@ -287,19 +289,16 @@ fn main() {
             .get(),
         25
     );
+}
 
-    // RTP's 32-bit timestamp wraps every 2³² ticks; a difference across the wrap is the short way round.
+/// RTP's 32-bit timestamp wraps every 2³² ticks; a difference across the wrap is the short way round.
+fn rtp() {
     let before = RtpTime::from_raw(u32::MAX - 1000);
     let after = before + Fixed::new(3003);
     assert_eq!(after.raw(), 2002);
     assert_eq!((after - before).get(), 3003_i32);
     assert_eq!((before - after).get(), -3003_i32);
-    println!(
-        "RTP {} + 1 frame = {} (raw {})",
-        before.raw(),
-        after.raw(),
-        after.raw()
-    );
+    println!("RTP {} + 1 frame = {}", before.raw(), after.raw());
     // A receiver unwraps it into a u64 count by adding each signed step: the typed unwrapper is ww_si's.
     let mut full = RtpUnwrapped::from_raw(u64::from(before.raw()));
     let step = after - before;
@@ -308,18 +307,23 @@ fn main() {
         Err(_) => full - Fixed::new(u64::from(step.get().unsigned_abs())),
     };
     assert_eq!(full.raw(), u64::from(u32::MAX) + 2003);
+}
 
-    // A 33-bit PTS in a u64 wraps at 2³³ by rem_euclid; `-` is again the short way round.
+/// A 33-bit PTS in a u64 wraps at 2³³ by rem_euclid; `-` is again the short way round.
+fn pts() {
     let pts = PtsTime::from_raw((1 << 33) - 1);
     let next = pts + Fixed::new(3003);
     assert_eq!(next.raw(), 3002);
     assert_eq!((next - pts).get(), 3003_i64);
-    // A raw value past the period isn't reduced by from_raw: it compares unequal to its own residue (a gap of PT-8).
+    // A raw value past the period isn't reduced by from_raw: it compares unequal to its own residue (PT-9).
     assert_ne!(PtsTime::from_raw(1 << 33), PtsTime::from_raw(0));
     assert_eq!((PtsTime::from_raw(1 << 33) - PtsTime::from_raw(0)).get(), 0);
+}
 
-    // Audio at 48 kHz against 30000/1001 frames/s: 8008/5 samples a frame. The running total is rounded; the
-    // rounding picks the cadence, every one gives 8008 samples in 5 frames.
+/// Audio at 48 kHz against 30000/1001 frames/s: 8008/5 samples a frame. The running total is rounded; the
+/// rounding picks the cadence, every one gives 8008 samples in 5 frames.
+fn audio() {
+    let frame = Fixed::<Second, Frame30k, u64>::new(1);
     assert_eq!(frame.to::<Sample48k, u64>(), None);
     assert_eq!(
         Fixed::<Second, Frame30k, u64>::new(5)
@@ -343,8 +347,10 @@ fn main() {
         assert_eq!(cadence, want, "{r:?}");
         println!("{r:?}: {cadence:?}");
     }
+}
 
-    // Drop-frame labels against true time.
+/// Drop-frame labels against true time.
+fn time_codes() {
     walk_a_day();
     for n in [1799, 1800, 17_981, 17_982, 107_892] {
         let tc = drop_frame_label(n);
@@ -360,7 +366,7 @@ fn main() {
             clock_timestamp(tc)
         );
     }
-    // Every ten minutes of labels are 17 982 frames, 3/5000 s short of ten minutes of true time.
+    // Every ten minutes of labels are 17 982 frames, 3/5000 s less than the ten minutes their labels say.
     let ten_minutes = Fixed::<Second, Frame30k, u64>::new(FRAMES_PER_10_MIN)
         .to::<Unit60k, i64>()
         .unwrap();
@@ -384,4 +390,13 @@ fn main() {
         .unwrap();
     assert_eq!(drift.get(), -86_400);
     println!("a day of drop-frame labels runs {drift} against true time");
+}
+
+fn main() {
+    time_bases();
+    between_clocks();
+    rtp();
+    pts();
+    audio();
+    time_codes();
 }
