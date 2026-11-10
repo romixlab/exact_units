@@ -7,6 +7,11 @@
 
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 use crate::MarkerIdOwned;
+mod interval;
+
+pub use interval::Enclosure;
+
+use crate::interval::Span;
 use crate::system::{for_each, slice_of};
 use crate::{Fraction, MarkerId, Unit};
 #[cfg(feature = "shrink_wrap")]
@@ -478,6 +483,18 @@ impl Quantizer {
 use crate::Rounding;
 use core::cmp::Ordering;
 
+/// What an encode compares the light with: the light of a code, of the signal halfway between a code and the next
+/// ([Domain::Signal]'s tie), or the midpoint of two codes' lights ([Domain::Light]'s).
+#[derive(Copy, Clone)]
+enum Probe {
+    Code(i128),
+    Half(i128),
+    Mid(i128),
+}
+
+/// Where the light lies against a [Probe]'s value, `None` where the comparison can't decide.
+type Oracle<'a> = &'a mut dyn FnMut(&Quantizer, Probe) -> Option<Ordering>;
+
 impl CurveDef<'_> {
     /// The code of `light` (in the curve's [unit](Self::unit)) among `q`'s codes, exactly: the code `rounding`
     /// picks in `domain`, decided by comparing `light` with exact decodes only, so it is the true answer even where
@@ -493,54 +510,137 @@ impl CurveDef<'_> {
         rounding: Rounding,
         domain: Domain,
     ) -> Result<i128, EncodeError<i128>> {
-        let q = q.within(self).ok_or(EncodeError::OutOfRange)?;
-        let at = |k: i128| -> Result<Fraction, EncodeError<i128>> {
-            q.signal(k)
-                .and_then(|s| self.decode_exact(s))
-                .ok_or(EncodeError::NotExact)
+        let mut exact = |q: &Quantizer, p: Probe| Some(light.compare(self.exact_at(q, p)?));
+        self.encode_by(q, light, rounding, domain, &mut exact, |_, _| {
+            EncodeError::NotExact
+        })
+    }
+
+    /// The code of `light` among `q`'s codes, certified and float-free: the code [encode_exact](Self::encode_exact)
+    /// gives wherever that answers, and elsewhere the true code too, decided by comparing `light` with intervals
+    /// that hold the irrational lights ([decode_interval](Self::decode_interval)), first at 64 bits of root
+    /// precision, then at 128. Integers only: no `libm`, no FPU, the same answer on every target.
+    ///
+    /// A rational `light` is never equal to an irrational tie, so a wide enough interval always decides; within
+    /// 128 bits this one decides unless `light` lies within the interval's width of a tie or a code's light: 2⁻¹¹⁶
+    /// of it relative, at worst, on PQ's 10-bit codes (a test pins it). There, and only there, it answers
+    /// [NearTie](EncodeError::NearTie), naming both candidates.
+    ///
+    /// # Errors
+    ///
+    /// [OutOfRange](EncodeError::OutOfRange) beyond the codes' lights, [NearTie](EncodeError::NearTie) as above,
+    /// [NotExact](EncodeError::NotExact) where a form can't be evaluated as an interval (an exponent's parts past
+    /// 2³², a form wire bytes named that this version doesn't know).
+    pub fn encode_certified(
+        &self,
+        q: &Quantizer,
+        light: Fraction,
+        rounding: Rounding,
+        domain: Domain,
+    ) -> Result<i128, EncodeError<i128>> {
+        let mut unknown = false;
+        let mut certified = |q: &Quantizer, p: Probe| {
+            if let Some(v) = self.exact_at(q, p) {
+                return Some(light.compare(v));
+            }
+            for bits in CERTIFIED_BITS {
+                let Some(s) = self.span_at_probe(q, p, bits) else {
+                    unknown = true;
+                    return None;
+                };
+                if let Some(o) = interval::light_against(light, s) {
+                    return Some(o);
+                }
+            }
+            None
         };
-        // an end decides alone where its light is exact: beyond it no code, at it that code (distinct codes have
+        let got = self.encode_by(
+            q,
+            light,
+            rounding,
+            domain,
+            &mut certified,
+            |below, above| EncodeError::NearTie { below, above },
+        );
+        match got {
+            Err(EncodeError::NearTie { .. }) if unknown => Err(EncodeError::NotExact),
+            got => got,
+        }
+    }
+
+    /// A probe's exact value, where it has one.
+    fn exact_at(&self, q: &Quantizer, p: Probe) -> Option<Fraction> {
+        let code = |k: i128| q.signal(k).and_then(|s| self.decode_exact(s));
+        match p {
+            Probe::Code(k) => code(k),
+            Probe::Half(k) => q.half(k).and_then(|s| self.decode_exact(s)),
+            Probe::Mid(k) => code(k)?
+                .checked_add(code(k.checked_add(1)?)?)?
+                .checked_div(Fraction::int(2)),
+        }
+    }
+
+    /// A probe's value as an interval, roots to `bits`.
+    fn span_at_probe(&self, q: &Quantizer, p: Probe, bits: u32) -> Option<Span> {
+        let code = |k: i128| self.span_at(q.signal(k)?, bits);
+        match p {
+            Probe::Code(k) => code(k),
+            Probe::Half(k) => self.span_at(q.half(k)?, bits),
+            Probe::Mid(k) => Some(interval::midpoint(code(k)?, code(k.checked_add(1)?)?)),
+        }
+    }
+
+    /// The encode, by whatever compares the light with a probe: exact comparisons for
+    /// [encode_exact](Self::encode_exact), exact-then-interval ones for [encode_certified](Self::encode_certified).
+    /// `undecided` names the error where a comparison it needs can't decide, from the two candidate codes.
+    fn encode_by(
+        &self,
+        q: &Quantizer,
+        light: Fraction,
+        rounding: Rounding,
+        domain: Domain,
+        cmp: Oracle<'_>,
+        undecided: fn(i128, i128) -> EncodeError<i128>,
+    ) -> Result<i128, EncodeError<i128>> {
+        let q = q.within(self).ok_or(EncodeError::OutOfRange)?;
+        // an end decides alone where its comparison does: beyond it no code, at it that code (distinct codes have
         // distinct lights on every curve here, the tests walk them)
-        if let Ok(first) = at(q.low) {
-            match light.compare(first) {
-                Ordering::Less => return Err(EncodeError::OutOfRange),
-                Ordering::Equal => return Ok(q.low),
-                Ordering::Greater => {}
-            }
+        match cmp(&q, Probe::Code(q.low)) {
+            Some(Ordering::Less) => return Err(EncodeError::OutOfRange),
+            Some(Ordering::Equal) => return Ok(q.low),
+            _ => {}
         }
-        if let Ok(last) = at(q.high) {
-            match light.compare(last) {
-                Ordering::Greater => return Err(EncodeError::OutOfRange),
-                Ordering::Equal => return Ok(q.high),
-                Ordering::Less => {}
-            }
+        match cmp(&q, Probe::Code(q.high)) {
+            Some(Ordering::Greater) => return Err(EncodeError::OutOfRange),
+            Some(Ordering::Equal) => return Ok(q.high),
+            _ => {}
         }
-        let (lo, hi) = self.narrow(&q, light);
-        // the highest code whose light is at most `light`: at(lo) <= light holds throughout
-        let (mut lo, mut hi) = (lo, hi);
+        let (mut lo, mut hi) = self.narrow(&q, light);
+        // the highest code whose light is at most `light`: at(lo) <= light holds throughout; `at_lo` is the
+        // comparison with lo once the search has made one
+        let mut at_lo = None;
         while lo < hi {
             let mid = lo
                 .midpoint(hi)
                 .checked_add(1)
                 .ok_or(EncodeError::OutOfRange)?;
-            if at(mid)? <= light {
-                lo = mid;
-            } else {
-                hi = mid.checked_sub(1).ok_or(EncodeError::OutOfRange)?;
+            match cmp(&q, Probe::Code(mid)) {
+                Some(Ordering::Less) => hi = mid.checked_sub(1).ok_or(EncodeError::OutOfRange)?,
+                Some(o) => (lo, at_lo) = (mid, Some(o)),
+                None => return near_code(&q, mid, light, rounding, domain, cmp, undecided),
             }
         }
         let k = lo;
-        let below = at(k)?;
-        if below > light {
-            // only where the lowest code's light wasn't exact up front: below every code
-            return Err(EncodeError::OutOfRange);
-        }
-        if below == light {
-            return Ok(k);
+        match at_lo.or_else(|| cmp(&q, Probe::Code(k))) {
+            // only where the lowest code's light wasn't decided up front: below every code
+            Some(Ordering::Less) => return Err(EncodeError::OutOfRange),
+            Some(Ordering::Equal) => return Ok(k),
+            Some(Ordering::Greater) => {}
+            None => return near_code(&q, k, light, rounding, domain, cmp, undecided),
         }
         if k == q.high {
-            // above the highest code's light, which wasn't exact up front
-            return Err(EncodeError::NotExact);
+            // above the highest code's light, which wasn't decided up front
+            return Err(undecided(k, k));
         }
         let up = k.checked_add(1).ok_or(EncodeError::OutOfRange)?;
         let steps = k.checked_sub(q.zero).ok_or(EncodeError::OutOfRange)?;
@@ -549,34 +649,23 @@ impl CurveDef<'_> {
             Rounding::Floor => k,
             Rounding::Ceil => up,
             Rounding::Truncate => pick(light.is_negative()),
-            _ => {
-                let tie = match domain {
-                    Domain::Signal => q
-                        .half(k)
-                        .and_then(|s| self.decode_exact(s))
-                        .ok_or(EncodeError::NotExact)?,
-                    Domain::Light => below
-                        .checked_add(at(up)?)
-                        .and_then(|s| s.checked_div(Fraction::int(2)))
-                        .ok_or(EncodeError::NotExact)?,
-                };
-                match light.compare(tie) {
-                    Ordering::Less => k,
-                    Ordering::Greater => up,
-                    Ordering::Equal => {
-                        let half = Fraction::checked_new(
-                            steps
-                                .checked_mul(2)
-                                .and_then(|s| s.checked_add(1))
-                                .ok_or(EncodeError::OutOfRange)?,
-                            2,
-                        )
-                        .ok_or(EncodeError::OutOfRange)?;
-                        let r = half.round(rounding).ok_or(EncodeError::OutOfRange)?;
-                        pick(r != steps)
-                    }
+            _ => match cmp(&q, tie_probe(domain, k)) {
+                Some(Ordering::Less) => k,
+                Some(Ordering::Greater) => up,
+                Some(Ordering::Equal) => {
+                    let half = Fraction::checked_new(
+                        steps
+                            .checked_mul(2)
+                            .and_then(|s| s.checked_add(1))
+                            .ok_or(EncodeError::OutOfRange)?,
+                        2,
+                    )
+                    .ok_or(EncodeError::OutOfRange)?;
+                    let r = half.round(rounding).ok_or(EncodeError::OutOfRange)?;
+                    pick(r != steps)
                 }
-            }
+                None => return Err(undecided(k, up)),
+            },
         })
     }
 
@@ -622,6 +711,51 @@ impl CurveDef<'_> {
         (lo, hi.max(lo))
     }
 }
+
+/// The probe that splits code `k` from `k + 1` for a `Nearest*` rounding in `domain`.
+fn tie_probe(domain: Domain, k: i128) -> Probe {
+    match domain {
+        Domain::Signal => Probe::Half(k),
+        Domain::Light => Probe::Mid(k),
+    }
+}
+
+/// The encode where the light can't be told from code `m`'s own: a directed rounding has the two codes on either
+/// side of it as candidates; a `Nearest*` one takes `m` where the light is decided to lie between the ties around
+/// it. At an end, the other candidate is the end itself, the light possibly beyond every code.
+fn near_code(
+    q: &Quantizer,
+    m: i128,
+    light: Fraction,
+    rounding: Rounding,
+    domain: Domain,
+    cmp: Oracle<'_>,
+    undecided: fn(i128, i128) -> EncodeError<i128>,
+) -> Result<i128, EncodeError<i128>> {
+    let down = m.saturating_sub(1).max(q.low);
+    let up = m.saturating_add(1).min(q.high);
+    match rounding {
+        Rounding::Ceil => Err(undecided(m, up)),
+        Rounding::Truncate if light.is_negative() => Err(undecided(m, up)),
+        Rounding::Floor | Rounding::Truncate => Err(undecided(down, m)),
+        _ => {
+            if m == q.low || m == q.high {
+                return Err(undecided(m, m));
+            }
+            let above_tie = cmp(q, tie_probe(domain, down)) == Some(Ordering::Greater);
+            let below_tie = cmp(q, tie_probe(domain, m)) == Some(Ordering::Less);
+            match (above_tie, below_tie) {
+                (true, true) => Ok(m),
+                (false, _) => Err(undecided(down, m)),
+                (true, false) => Err(undecided(m, up)),
+            }
+        }
+    }
+}
+
+/// The root precisions [CurveDef::encode_certified] tries in turn: the first decides almost every light, the last is
+/// what `u128` holds.
+const CERTIFIED_BITS: [u32; 2] = [64, 128];
 
 /// How far, in codes, the float edge's code position must be from a tie or a code boundary to be decided, 2⁻³⁰: well
 /// above `f64`'s error on every curve here (PQ's code position is off by about 2·10⁻¹¹ at worst, its inverse

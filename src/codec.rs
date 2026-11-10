@@ -1103,8 +1103,8 @@ pub use curve::CurveDefOwned;
 #[cfg(feature = "libm")]
 pub use curve::F64_MARGIN;
 pub use curve::{
-    Curve, CurveDef, CurveForm, CurveKind, Domain, EncodeError, ExpBase, Quantizer, Referred,
-    Segment,
+    Curve, CurveDef, CurveForm, CurveKind, Domain, Enclosure, EncodeError, ExpBase, Quantizer,
+    Referred, Segment,
 };
 pub use transfer::{SignalStep, Transfer};
 

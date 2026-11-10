@@ -4,6 +4,8 @@
 //! in decibels (`decibel::exact`), a transfer curve's light at a tie (`codec::curve`). `const` where it can be, no
 //! floats: `powf` and `log10` aren't `const`, and a float's rounding is not directed.
 
+use core::cmp::Ordering;
+
 /// `m · 2^e`, `m` normalized to its top bit (`2^127 <= m`): a positive number, nothing else is ever needed.
 #[derive(Copy, Clone)]
 pub(crate) struct Num {
@@ -404,6 +406,17 @@ impl Interval {
     }
 }
 
+/// `a` against `b`, in a `const fn`.
+const fn cmp_u128(a: u128, b: u128) -> Ordering {
+    if a < b {
+        Ordering::Less
+    } else if a > b {
+        Ordering::Greater
+    } else {
+        Ordering::Equal
+    }
+}
+
 /// Euler's number, `[lo, hi]` from 40 terms of its series: a constant, worked out once at compile time.
 pub(crate) const E: Interval = Interval::exp_frac(1, 1);
 
@@ -452,6 +465,58 @@ impl Num {
         )]
         let e = self.e - z as i64;
         Num::bump(m, e, up && dropped)
+    }
+
+    /// `self` against the exact `n / d` (`n, d > 0`), exactly: `m · d · 2^e` against `n`, the product in 256 bits.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "shifts are below 128 where they are used, -e and s - 128 only where e < 0 and s >= 128"
+    )]
+    pub(crate) const fn cmp_ratio(self, n: u128, d: u128) -> Ordering {
+        let (p_hi, p_lo) = mul_wide(self.m, d);
+        if self.e >= 0 {
+            // m · d · 2^e >= m >= 2^127, against n < 2^128
+            if p_hi != 0 || self.e >= 128 {
+                return Ordering::Greater;
+            }
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_sign_loss,
+                clippy::cast_possible_truncation,
+                reason = "const fn: From is not const on stable; 0 <= e < 128 here"
+            )]
+            let e = self.e as u32;
+            if e > p_lo.leading_zeros() {
+                return Ordering::Greater;
+            }
+            return cmp_u128(p_lo << e, n);
+        }
+        // m · d against n · 2^s
+        let s = self.e.unsigned_abs();
+        if s >= 256 {
+            return Ordering::Less;
+        }
+        #[expect(
+            clippy::as_conversions,
+            clippy::cast_possible_truncation,
+            reason = "const fn: From is not const on stable; s < 256 here"
+        )]
+        let s = s as u32;
+        let (n_hi, n_lo) = if s >= 128 {
+            if n.leading_zeros() < s - 128 {
+                // n · 2^s >= 2^256 > m · d
+                return Ordering::Less;
+            }
+            (n << (s - 128), 0)
+        } else if s == 0 {
+            (0, n)
+        } else {
+            (n >> (128 - s), n << s)
+        };
+        match cmp_u128(p_hi, n_hi) {
+            Ordering::Equal => cmp_u128(p_lo, n_lo),
+            o => o,
+        }
     }
 
     /// The `d`-th root, `d >= 1`, rounded down: the largest `y` on a grid of `tol` units of its last place whose
@@ -581,7 +646,7 @@ pub(crate) enum Real {
 
 impl Real {
     /// `−self`.
-    const fn neg(self) -> Real {
+    pub(crate) const fn neg(self) -> Real {
         match self {
             Real::Zero => Real::Zero,
             Real::Pos(n) => Real::Neg(n),
@@ -613,6 +678,34 @@ impl Real {
         }
     }
 
+    /// `self` against the exact `±n / d` (`d > 0`), exactly.
+    pub(crate) const fn cmp_ratio(self, neg: bool, n: u128, d: u128) -> Ordering {
+        match self {
+            Real::Zero if n == 0 => Ordering::Equal,
+            Real::Zero => {
+                if neg {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }
+            }
+            Real::Pos(m) => {
+                if neg || n == 0 {
+                    Ordering::Greater
+                } else {
+                    m.cmp_ratio(n, d)
+                }
+            }
+            Real::Neg(m) => {
+                if !neg || n == 0 {
+                    Ordering::Less
+                } else {
+                    m.cmp_ratio(n, d).reverse()
+                }
+            }
+        }
+    }
+
     /// Whether `self` is above 0.
     const fn is_pos(self) -> bool {
         matches!(self, Real::Pos(_))
@@ -624,7 +717,7 @@ impl Real {
     }
 
     /// `self + rhs`, rounded towards −∞ or +∞.
-    const fn add(self, rhs: Real, up: bool) -> Real {
+    pub(crate) const fn add(self, rhs: Real, up: bool) -> Real {
         match (self, rhs) {
             (Real::Zero, x) | (x, Real::Zero) => x,
             (Real::Pos(a), Real::Pos(b)) => Real::Pos(a.add(b, up)),
@@ -831,25 +924,14 @@ impl Span {
         (self.lo.to_f64(false), self.hi.to_f64(true))
     }
 
-    /// Where the true value lies against the exact `±n / d` (`d > 0`): `Some(Less)` where all of `self` is below it,
-    /// `Greater` above it, `Equal` where both are the same binary fraction; `None` where it lies inside.
-    pub(crate) const fn against(self, neg: bool, n: u128, d: u128) -> Option<core::cmp::Ordering> {
-        use core::cmp::Ordering;
-        let x = Span::ratio(neg, n, d);
-        if !x.lo.le(self.hi) {
-            Some(Ordering::Less)
-        } else if !self.lo.le(x.hi) {
-            Some(Ordering::Greater)
-        } else if self.lo.le(self.hi)
-            && self.hi.le(self.lo)
-            && x.lo.le(x.hi)
-            && x.hi.le(x.lo)
-            && self.lo.le(x.lo)
-            && x.lo.le(self.lo)
-        {
-            Some(Ordering::Equal)
-        } else {
-            None
+    /// Where the true value lies against the exact `±n / d` (`d > 0`), exactly: `Some(Less)` where all of `self`
+    /// is below it, `Greater` above it, `Equal` where both ends are it; `None` where it lies inside.
+    pub(crate) const fn against(self, neg: bool, n: u128, d: u128) -> Option<Ordering> {
+        match (self.hi.cmp_ratio(neg, n, d), self.lo.cmp_ratio(neg, n, d)) {
+            (Ordering::Less, _) => Some(Ordering::Less),
+            (_, Ordering::Greater) => Some(Ordering::Greater),
+            (Ordering::Equal, Ordering::Equal) => Some(Ordering::Equal),
+            _ => None,
         }
     }
 }
@@ -861,6 +943,7 @@ impl Span {
 )]
 mod tests {
     use super::*;
+    use core::f64::consts;
     use num_bigint::BigInt;
     use num_rational::BigRational;
 
@@ -1001,7 +1084,7 @@ mod tests {
     #[test]
     fn e_is_tight() {
         let (lo, hi) = Span::of(E).to_f64();
-        assert!(lo <= core::f64::consts::E && core::f64::consts::E <= hi);
+        assert!(lo <= consts::E && consts::E <= hi);
         assert_eq!(lo.next_up(), hi);
         assert!(big(E.hi) - big(E.lo) <= ulp(E.lo) * BigRational::from_integer(BigInt::from(64)));
     }

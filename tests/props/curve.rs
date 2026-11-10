@@ -1,5 +1,6 @@
 //! Transfer curves (LVL-9): a form's exact decode against big-rational powers, the exact encode against a scan of
-//! every code, the certified `f64` edge against the exact one, PQ and an HLG-shaped curve through the typed path.
+//! every code, the certified `f64` edge against the exact one, the float-free certified encode against both, PQ and
+//! an HLG-shaped curve through the typed path.
 #![cfg(not(any(kani, fuzzing)))]
 #![expect(
     clippy::arithmetic_side_effects,
@@ -417,6 +418,198 @@ fn pq_names_both_codes_at_a_tie() {
     assert!(near >= 4, "only {near} of 5 ties seen as ties");
 }
 
+/// BT.709's inverse OETF above its toe over the whole domain, `((V + 0.099)/1.099)^(20/9)`: a `Power` whose base has
+/// a scale, irrational almost everywhere, rising throughout (the toe left out: the standard's two segments don't
+/// meet, the power's light at V = 0.081 is below the toe's).
+const BT709_POWER: [Segment; 1] = [Segment {
+    from: Fraction::ZERO,
+    form: CurveForm::Power {
+        gain: Fraction::ONE,
+        scale: Fraction::new(1000, 1099),
+        shift: Fraction::new(99, 1099),
+        exponent: Fraction::new(20, 9),
+        offset: Fraction::ZERO,
+    },
+}];
+
+/// The root precisions the interval properties try, from coarse to what `u128` holds.
+const BITS: [u32; 4] = [8, 32, 64, 128];
+
+/// Every code from 64 to 940 and every half-code between them, as signals of the 10-bit narrow quantizer.
+fn codes_and_halves() -> impl Iterator<Item = Fraction> {
+    (2 * 64..=2 * 940).map(|twice| Fraction::new(twice - 128, 2 * 876))
+}
+
+/// The interval holds the exact value wherever `decode_exact` answers, at every precision: every code and half-code
+/// of `E′²/3` and of the HLG-shaped curve's lower half, PQ's black and white.
+#[test]
+fn the_interval_holds_the_exact_value() {
+    let mut seen = 0;
+    for c in [curve(&SQUARE), curve(&HLG), Pq::DEF] {
+        for x in codes_and_halves() {
+            let Some(want) = c.decode_exact(x) else {
+                continue;
+            };
+            for bits in BITS {
+                let got = c.decode_interval(x, bits).unwrap();
+                assert!(
+                    got.contains(want),
+                    "{x:?} at {bits}: {got:?} misses {want:?}"
+                );
+            }
+            seen += 1;
+        }
+    }
+    // the square curve's 1753, the HLG-shaped lower half's 877, PQ's 2
+    assert_eq!(seen, 1753 + 877 + 2);
+}
+
+/// Where the light is irrational (PQ between black and white, the HLG-shaped curve's upper half, BT.709's power), the
+/// interval holds the `f64` edge's value within that edge's own error, 10⁻¹² relative; at 128 bits its `f64` bounds
+/// are adjacent floats at most, the true value pinned to one `f64` gap.
+#[test]
+fn the_interval_holds_the_f64_value() {
+    for c in [Pq::DEF, curve(&HLG), curve(&BT709_POWER)] {
+        for x in codes_and_halves() {
+            if c.decode_exact(x).is_some() {
+                continue;
+            }
+            let f = c.decode_f64(x.to_f64()).unwrap();
+            for bits in BITS {
+                let (lo, hi) = c.decode_interval(x, bits).unwrap().to_f64();
+                let slack = f.abs() * 1e-12;
+                assert!(
+                    lo - slack <= f && f <= hi + slack,
+                    "{x:?} at {bits}: {f} not in {lo}..={hi}"
+                );
+            }
+            let (lo, hi) = c.decode_interval(x, 128).unwrap().to_f64();
+            // both positive: adjacent floats have adjacent bits
+            assert!(hi.to_bits() <= lo.to_bits() + 1, "{x:?}: {lo}..={hi}");
+        }
+    }
+}
+
+/// `encode_certified` of `y` equals `encode_exact` wherever that answers, by every rounding in both domains.
+fn certified_agrees_with_exact(c: &CurveDef<'_>, y: Fraction) {
+    for r in ROUNDINGS {
+        for d in [Domain::Signal, Domain::Light] {
+            if let Ok(k) = c.encode_exact(&NARROW10, y, r, d) {
+                assert_eq!(
+                    c.encode_certified(&NARROW10, y, r, d),
+                    Ok(k),
+                    "{y:?} by {r:?} in {d:?}"
+                );
+            }
+        }
+    }
+}
+
+/// On `E′²/3`, where every decode is exact, the certified encode is the exact one at every code's light and every
+/// tie's: the inputs where the roundings differ.
+#[test]
+fn the_certified_encode_is_the_exact_one_at_every_code_and_tie() {
+    let c = curve(&SQUARE);
+    for x in codes_and_halves() {
+        let y = c.decode_exact(x).unwrap();
+        certified_agrees_with_exact(&c, y);
+        assert!(
+            c.encode_exact(&NARROW10, y, Rounding::NearestEven, Domain::Signal)
+                .is_ok()
+        );
+    }
+}
+
+/// `encode_certified` of the light `y` (an `f64`, exact as a rational) never contradicts the certified `f64` edge:
+/// where that answers a code, the same code; where it names two, one of them. The certified encode itself never
+/// answers `NearTie` on these inputs, which lie nowhere near 2⁻¹¹⁶ of a tie.
+fn certified_agrees_with_f64(c: &CurveDef<'_>, y: f64) {
+    let exact = Fraction::from_f64(y).unwrap();
+    for r in ROUNDINGS {
+        for d in [Domain::Signal, Domain::Light] {
+            let got = c.encode_certified(&NARROW10, exact, r, d);
+            assert!(
+                !matches!(got, Err(EncodeError::NearTie { .. })),
+                "{y} by {r:?} in {d:?}: {got:?}"
+            );
+            match c.encode_f64(&NARROW10, y, r, d) {
+                Ok(k) => assert_eq!(got, Ok(k), "{y} by {r:?} in {d:?}"),
+                Err(EncodeError::NearTie { below, above }) => {
+                    let k = got.unwrap();
+                    assert!(
+                        k == below || k == above,
+                        "{y} by {r:?} in {d:?}: {k} not in {below}..={above}"
+                    );
+                }
+                Err(e) => assert_eq!(got, Err(e), "{y} by {r:?} in {d:?}"),
+            }
+        }
+    }
+}
+
+proptest! {
+    #[test]
+    fn the_certified_encode_is_the_exact_one(a in 0..=1000_i128, b in 1..=3000_u128) {
+        certified_agrees_with_exact(&curve(&SQUARE), Fraction::new(a, b));
+        certified_agrees_with_exact(&curve(&HLG), Fraction::new(a, b));
+    }
+
+    #[test]
+    fn the_certified_encode_never_contradicts_the_f64_one(y in 0.0..=10_000.0_f64) {
+        certified_agrees_with_f64(&Pq::DEF, y);
+        certified_agrees_with_f64(&curve(&HLG), y / 10_000.0);
+        certified_agrees_with_f64(&curve(&BT709_POWER), y / 10_000.0);
+    }
+
+    #[test]
+    fn the_certified_encode_decides_the_f64_ties(k in 64..940_i128, nudge in -4_i32..=4) {
+        // the f64 nearest a half-code's light, nudged by a few ulps: where the f64 edge names two codes
+        let e = (f64::from(i32::try_from(k - 64).unwrap()) + 0.5) / 876.0;
+        for c in [Pq::DEF, curve(&HLG), curve(&BT709_POWER)] {
+            let mut y = c.decode_f64(e).unwrap();
+            for _ in 0..nudge.unsigned_abs() {
+                y = if nudge > 0 { y.next_up() } else { y.next_down() };
+            }
+            certified_agrees_with_f64(&c, y);
+        }
+    }
+}
+
+/// PQ at whole cd/m², every 37th from 0 to 10 000 and its ends: the certified encode always decides, and agrees
+/// with the `f64` edge.
+#[test]
+fn pq_decides_whole_nits() {
+    for n in (0..=10_000).step_by(37).chain([1, 9_999, 10_000]) {
+        certified_agrees_with_f64(&Pq::DEF, f64::from(n));
+    }
+}
+
+/// Beyond the codes' lights, out of range; a light within 2⁻¹²⁰ of a PQ tie (a rational between the interval's
+/// bounds) is a `NearTie` naming both codes, never a guess.
+#[test]
+fn the_certified_encode_refuses_what_it_cant_decide() {
+    let pq = Pq::DEF;
+    let enc = |y| pq.encode_certified(&NARROW10, y, Rounding::NearestEven, Domain::Signal);
+    assert_eq!(enc(Fraction::int(10_001)), Err(EncodeError::OutOfRange));
+    assert_eq!(enc(Fraction::int(-1)), Err(EncodeError::OutOfRange));
+    // the tie between codes 500 and 501, bounded at 128 bits; a rational from its f64 bounds' midpoint sits within
+    // one f64 gap of it, so the 8-bit interval holds it and can't decide
+    let half = Fraction::new(2 * (500 - 64) + 1, 2 * 876);
+    let (lo, hi) = pq.decode_interval(half, 128).unwrap().to_f64();
+    let near = Fraction::from_f64(f64::midpoint(lo, hi)).unwrap();
+    assert!(pq.decode_interval(half, 8).unwrap().contains(near));
+    match enc(near) {
+        Ok(k) => assert!(k == 500 || k == 501),
+        Err(e) => assert_eq!(
+            e,
+            EncodeError::NearTie {
+                below: 500,
+                above: 501
+            }
+        ),
+    }
+}
+
 #[cfg(feature = "photometric")]
 mod typed {
     use exact_units::codec::video::{Narrow10, Pq};
@@ -455,6 +648,22 @@ mod typed {
         assert_eq!(enc(100).map(Coded::raw), Err(EncodeError::NotExact));
         assert_eq!(enc(10_001).map(Coded::raw), Err(EncodeError::OutOfRange));
         assert_eq!(PqCode::of(code(500).code()).raw(), 500);
+    }
+
+    /// The certified encode decides where the exact one can't: 100 cd/m² is code 509 by both edges.
+    #[test]
+    fn certified_between_black_and_white() {
+        let enc = |n| {
+            PqCode::from_light_certified(
+                Exact::<Nit>::int(n),
+                Rounding::NearestAway,
+                Domain::Signal,
+            )
+        };
+        assert_eq!(enc(100).map(Coded::raw), Ok(509));
+        assert_eq!(enc(10_000).map(Coded::raw), Ok(940));
+        assert_eq!(enc(0).map(Coded::raw), Ok(64));
+        assert_eq!(enc(10_001).map(Coded::raw), Err(EncodeError::OutOfRange));
     }
 }
 

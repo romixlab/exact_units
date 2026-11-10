@@ -235,6 +235,11 @@ required-features = ["q", "std"]
 name = "can_fd_size"
 required-features = ["information", "std"]
 
+# a PQ encode by the float-free certified edge against the f64 one, flash on thumbv7em: builds tools/curve_size
+[[test]]
+name = "curve_size"
+required-features = ["libm", "std"]
+
 # examples/NN_*.rs: one story each, in reading order; the README's Examples section lists them
 [[example]]
 # the unit and scale in the type: µs and ms don't mix, a conversion is exact or refused, and no_std

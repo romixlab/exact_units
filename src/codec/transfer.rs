@@ -194,6 +194,25 @@ where
             .map_err(typed)?;
         code_as(k).map(Coded::from_code)
     }
+
+    /// The code of `light`, certified and float-free ([CurveDef::encode_certified]): the true code wherever
+    /// [from_light_exact](Self::from_light_exact) answers and on irrational lights too, by integer interval
+    /// arithmetic, the same answer on every target.
+    ///
+    /// # Errors
+    ///
+    /// [NearTie](EncodeError::NearTie), naming both candidates, where `light` lies within about 2⁻¹¹⁶ of a tie,
+    /// relative; [OutOfRange](EncodeError::OutOfRange) beyond the codes' lights.
+    pub fn from_light_certified(
+        light: Exact<C::Light>,
+        rounding: Rounding,
+        domain: Domain,
+    ) -> Result<Self, EncodeError<Q::Raw>> {
+        let k = Self::CURVE
+            .encode_certified(&Transfer::<Q, C>::QUANTIZER, light.get(), rounding, domain)
+            .map_err(typed)?;
+        code_as(k).map(Coded::from_code)
+    }
 }
 
 #[cfg(feature = "libm")]

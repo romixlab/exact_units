@@ -166,6 +166,43 @@ The decode side rounds once more than the encode side: the exponents 1/m₁ = 81
 
 `Pq` implements `Curve` with `KIND = CurveKind::Float`, the first curve in the crate.
 
+### Without floats: the certified encode
+
+A light given exactly (an `Exact<Nit>`, a `Fraction`) has one true code, though the lights of the codes around it are irrational. `from_light_certified` finds it with integers alone: no `libm`, no FPU, the same answer on every target.
+
+```rust
+use exact_units::codec::{Coded, Domain, EncodeError, Transfer, video::{Narrow10, Pq}};
+use exact_units::{Exact, Rounding, units::Nit};
+
+type PqCode = Coded<Transfer<Narrow10, Pq>>;
+let enc = |n| PqCode::from_light_certified(Exact::<Nit>::int(n), Rounding::NearestEven, Domain::Signal);
+
+// SDR's reference white, where the exact encode can only say NotExact
+assert_eq!(enc(100).map(Coded::raw), Ok(509));
+assert_eq!(enc(10_000).map(Coded::raw), Ok(940));
+assert_eq!(enc(10_001).map(Coded::raw), Err(EncodeError::OutOfRange));
+```
+
+How it decides:
+
+1. It asks the exact path first. Wherever `from_light_exact` answers (black, white, a light equal to a rational decode), the certified encode gives that same code.
+2. Elsewhere it compares the light with intervals that hold the irrational lights: of the codes, in a binary search, and of the tie between the two codes it lands between. An interval's ends are binary fractions with 128-bit mantissas, each step rounded outward, so the true light is always inside. A root is a bisection on its power, never a float. It tries 64 bits of root precision first and 128 where that can't decide.
+3. A rational light is never equal to an irrational tie, so a wide enough interval always decides. At 128 bits, PQ's light is known to 116 bits on every 10-bit code and half-code (the cancellation in E′^(1/m₂) − c₁ near black costs the rest; a test pins the figure). Only a light within that width of a tie or of a code's light, 2⁻¹¹⁶ of it relative, can't be decided. There it answers `NearTie { below, above }` with both codes, never a guess.
+
+The tests check it on every input where something else knows the answer. It equals the exact encode wherever that answers, at every code's light and every tie's. It never contradicts the `f64` edge. And it decides the ties the `f64` edge can only name, and whole cd/m² across the range.
+
+`CurveDef::decode_interval(x, bits)` gives the interval itself as an `Enclosure`. It compares exactly against a `Fraction` and gives `f64` bounds rounded outward. The decode stays an edge: PQ's light between black and white has no exact value, only bounds.
+
+What it costs, against the certified `f64` edge (`from_light_f64`):
+
+| | Float-free certified | `f64` edge |
+|---|---|---|
+| Flash on a Cortex-M4F, one PQ encode, `opt-level = "s"`, LTO | 49 300 B | 47 290 B |
+| Time per PQ encode on an x86-64 desktop | about 0.4 ms | about 9 µs |
+| Needs | integers | `libm`, `f64` (in software on an M4F) |
+
+`tests/curve_size.rs` measures the flash. Most of either image is the exact path and `Fraction`'s 128-bit arithmetic, which both carry. The time goes to the roots: a PQ light takes a 2523rd and a 1305th root, each a bisection whose steps are powers of 128-bit numbers. The float-free edge is for a light given exactly once (a setting, a metadata field, a test vector), not for a stream of pixels.
+
 ## Other curves and the colour matrices
 
 These aren't in the crate yet; what each would be exact in:
