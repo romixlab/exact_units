@@ -344,7 +344,7 @@ required-features = ["time"]
 [[example]]
 # the integer maths of JPEG, JPEG 2000, H.264, H.265, H.273 and AV1: roundings, lossless lifting, exact matrices
 name = "17_image_codecs"
-required-features = ["dimensionless", "customary", "q"]
+required-features = ["dimensionless", "customary", "q", "information", "time"]
 
 [[example]]
 # Exif's APEX values as exact stops, the labels a camera marks, the meter's conventions named
