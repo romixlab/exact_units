@@ -10,9 +10,12 @@ use core::marker::PhantomData;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
 
+pub(crate) use bounds::for_each_run;
+#[cfg(any(feature = "dimensionless", feature = "q"))]
+pub(crate) use bounds::set_inward;
 pub use bounds::{
-    Bounds, Finite, MaybeNan, NanFree, OutOfBounds, OutOfRange, Range, RangeDec, RangeU64,
-    Saturating, Unbounded, Unlimited, Wrapping,
+    Bounds, Finite, MaybeNan, NanFree, OneOf, OutOfBounds, OutOfRange, Range, RangeDec, RangeU64,
+    Saturating, Unbounded, Unlimited, ValueSet, Wrapping,
 };
 #[cfg(feature = "shrink_wrap")]
 pub(crate) use bounds::{refused_by, refused_num};
@@ -29,7 +32,7 @@ pub(crate) use product::{Requant, check as check_product};
 mod exact_float;
 mod rounding;
 mod runtime;
-pub(crate) use rounding::{div_i128 as round_div_i128, settle as settle_i128};
+pub(crate) use rounding::{div_i128 as round_div_i128, nearest_entry, settle as settle_i128};
 #[cfg(feature = "levels")]
 pub(crate) use rounding::{round_f64, settle_f64};
 pub(crate) mod format;
@@ -808,6 +811,12 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
 
     #[inline(always)]
     fn clamped(mut x: T) -> Self {
+        const {
+            assert!(
+                B::SET.is_none(),
+                "saturating_* stops at the ends of a range, and a OneOf set has gaps between them: checked_*"
+            );
+        }
         if let Some(min) = B::MIN
             && x < min
         {
@@ -1785,8 +1794,27 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> core::error::Error
 {
 }
 
-/// `1..=5000`, `..=5000` or `1..=`.
+/// `1..=5000`, `..=5000` or `1..=`; a [OneOf] set as its values, a run of consecutive ones as its ends:
+/// `{0..=8, 12, 16}`.
 pub(crate) fn write_range<T: Storage, B: Bounds<T>>(f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    if let Some(set) = B::SET {
+        f.write_str("{")?;
+        let mut first = true;
+        let mut r = Ok(());
+        for_each_run(set, |lo, hi| {
+            let sep = if first { "" } else { ", " };
+            first = false;
+            r = r.and_then(|()| {
+                if lo == hi {
+                    write!(f, "{sep}{lo}")
+                } else {
+                    write!(f, "{sep}{lo}..={hi}")
+                }
+            });
+        });
+        r?;
+        return f.write_str("}");
+    }
     if let Some(min) = B::MIN {
         min.fmt_number(f)?;
     }

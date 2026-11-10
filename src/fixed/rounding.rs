@@ -82,6 +82,68 @@ round_div! {
     div_i8 i8; div_i16 i16; div_i32 i32; div_i64 i64; div_i128 i128;
 }
 
+/// The code of the entry `x` rounds to by `r`, among `entries` (code, value): an entry of value `x` exactly where
+/// there is one (the lowest code of them), else the nearest below or above `x` as `r` says. [Floor](Rounding::Floor)
+/// takes the one below, [Ceil](Rounding::Ceil) the one above, [Truncate](Rounding::Truncate) the one toward zero;
+/// the nearest modes the closer of the two, a tie to the even code ([NearestEven](Rounding::NearestEven), as a
+/// μ-law tie goes to the even mantissa) or to the value farther from zero ([NearestAway](Rounding::NearestAway)).
+/// `None` where no entry lies on the side `r` takes, or there is none. The entries need not be ordered: a
+/// [OneOf](super::OneOf) set's are its positions, a [Table](crate::codec::CodecShape::Table)'s its codes.
+pub(crate) fn nearest_entry(
+    entries: impl IntoIterator<Item = (i128, i128)>,
+    x: i128,
+    r: Rounding,
+) -> Option<i128> {
+    let mut below: Option<(i128, i128)> = None;
+    let mut above: Option<(i128, i128)> = None;
+    for (code, value) in entries {
+        if value == x {
+            return Some(code);
+        }
+        // the closest value on each side, the lowest code of an equal one
+        if value < x && below.is_none_or(|(_, b)| value > b) {
+            below = Some((code, value));
+        }
+        if value > x && above.is_none_or(|(_, a)| value < a) {
+            above = Some((code, value));
+        }
+    }
+    let pick = match r {
+        Rounding::Floor => below,
+        Rounding::Ceil => above,
+        Rounding::Truncate => {
+            if x > 0 {
+                below
+            } else {
+                above.filter(|_| x < 0)
+            }
+        }
+        Rounding::NearestEven | Rounding::NearestAway => match (below, above) {
+            (Some(b), Some(a)) => {
+                let (db, da) = (x.abs_diff(b.1), a.1.abs_diff(x));
+                if db != da {
+                    Some(if db < da { b } else { a })
+                } else if r == Rounding::NearestEven {
+                    // a tie: the even code, the lower one where both are even or both odd
+                    match (b.0 % 2 == 0, a.0 % 2 == 0) {
+                        (true, false) => Some(b),
+                        (false, true) => Some(a),
+                        _ => Some(if b.0 < a.0 { b } else { a }),
+                    }
+                } else {
+                    Some(if b.1.unsigned_abs() > a.1.unsigned_abs() {
+                        b
+                    } else {
+                        a
+                    })
+                }
+            }
+            (b, a) => b.or(a),
+        },
+    };
+    pick.map(|(code, _)| code)
+}
+
 /// `x` (a float) rounded to a whole number by `r`; `NaN` and infinities as they are. Without `std`, so by hand.
 #[inline]
 pub(crate) fn round_f64(x: f64, r: Rounding) -> f64 {

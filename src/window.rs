@@ -150,6 +150,8 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         // past the storage an end is cut to it, so a reach past i128 cuts the same
         let d = i128::try_from(d).unwrap_or(i128::MAX);
         let (lo, hi) = (b.saturating_sub(d).max(min), b.saturating_add(d).min(max));
+        // a OneOf set's window ends on its values: b is one, so some are within
+        let (lo, hi) = crate::fixed::set_inward(B::SET, lo, hi).unwrap_or((b, b));
         // min <= lo <= b <= hi <= max: both are values of T in the bounds, as b is
         let end = |x| Self::new_unchecked(T::from_int(x).unwrap_or(self.get()));
         Window {

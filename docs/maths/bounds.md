@@ -38,6 +38,7 @@ assert_eq!(LONG.get(), 5000);
 | `Range<MIN, MAX>` | `MIN ..= MAX`, `i64` bounds |
 | `RangeU64<MIN, MAX>` | the same for large unsigned values |
 | `RangeDec<MIN, MAX, EXP>` | decimal bounds for floats: `RangeDec<-5, 5, -1>` is $-0.5 \dots 0.5$ |
+| `OneOf<S>` | the values of a `ValueSet` `S`, with gaps between them: [A set of values](#a-set-of-values) |
 | `Finite` | every finite float: `f32` and `f64` without ±∞ and NaN |
 | `MaybeNan` | every float, NaN included: what float arithmetic gives |
 | `Saturating`, `Wrapping` | every value; they set what overflow does: [Overflow](overflow.md) |
@@ -61,6 +62,65 @@ use exact_units::{Fixed, Range, prefix::One, units::Ratio};
 
 type Bad = Fixed<Ratio, One, u8, Range<-5, 300>>;
 let _ = Bad::try_new(1);
+```
+
+## A set of values
+
+Some numbers come in fixed steps rather than a range: a CAN FD frame carries 0 to 8 data bytes, then 12, 16, 20,
+24, 32, 48 or 64, and nothing between. `OneOf<S>` holds such a set. `S` is a marker that implements `ValueSet` and
+lists the values once, ascending; stable Rust takes no slice as a const parameter, so the list lives in the marker.
+
+```rust
+use exact_units::{Fixed, OneOf, Rounding, ValueSet, prefix::One, units::Byte};
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+struct FdLengths;
+
+impl ValueSet for FdLengths {
+    const VALUES: &'static [i64] = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
+}
+
+type Len = Fixed<Byte, One, u8, OneOf<FdLengths>>;
+
+assert_eq!(Len::try_new(12).map(Len::get), Ok(12));
+let e = Len::try_new(13).unwrap_err();
+assert_eq!(e.to_string(), "13 B is out of {0..=8, 12, 16, 20, 24, 32, 48, 64} B (Byte, u8)");
+
+// rounding into the set is a step the code names
+assert_eq!(Len::try_new_rounded(13, Rounding::Ceil).map(Len::get), Some(16));
+assert_eq!(Len::try_new_rounded(13, Rounding::Floor).map(Len::get), Some(12));
+assert_eq!(Len::try_new_rounded(65, Rounding::Ceil), None);
+```
+
+- `try_new`, `bounded`, a `fixed!` constant, serde and the wire refuse a value off the set. A run of consecutive values reads as its ends in the error, `0..=8`.
+- The wire names a value past the ends as out of `0..=64`, and one in a gap as a number with no value there.
+- `try_new_rounded` takes a value off the set to the next one up (`Ceil`), down (`Floor`) or the nearest. A tie between two goes to the value at the even position of the set (`NearestEven`), or to the one farther from zero (`NearestAway`). There is no default rounding.
+- `checked_add` and its kin are `None` for a result in a gap. `saturating_add` is a compile error: it stops at the ends of a range, and a gap has no end to stop at without a rounding.
+- A window around a set value ends on set values.
+- The crate ships the CAN FD set as `codec::CanFdLengths`, and the 4-bit code that carries it as a codec: [Codecs](../fixed_point/codecs.md#a-table-the-can-fd-dlc).
+
+A constant off the set doesn't build:
+
+```rust,compile_fail
+use exact_units::codec::CanFdLengths;
+use exact_units::{Fixed, OneOf, fixed, prefix::One, units::Byte};
+
+const LEN: Fixed<Byte, One, u8, OneOf<CanFdLengths>> = fixed!(13);
+```
+
+Nor does a set that isn't ascending:
+
+```rust,compile_fail
+use exact_units::{Fixed, OneOf, ValueSet, prefix::One, units::Ratio};
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+struct Unsorted;
+
+impl ValueSet for Unsorted {
+    const VALUES: &'static [i64] = &[8, 4];
+}
+
+let _ = Fixed::<Ratio, One, u8, OneOf<Unsorted>>::try_new(4);
 ```
 
 ## Moving a bounded value

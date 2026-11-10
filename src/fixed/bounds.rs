@@ -1,8 +1,6 @@
 //! Bounds of a [Fixed](super::Fixed): [Unbounded] by default, or a range checked on construction and on every read.
 
-#[cfg(feature = "shrink_wrap")]
-use super::storage::Repr;
-use super::storage::Storage;
+use super::storage::{Repr, Storage};
 use crate::literal::Decimal;
 use crate::literal::big::BigDecimal;
 use crate::literal::steps::{FloatFormat, Value, float_parts};
@@ -26,7 +24,8 @@ use shrink_wrap::{Nibble, UNib32, UVlq32, UVlq64};
 /// bound that doesn't fit `T` is a compile error where the type is used. Bytes never change because of a bound.
 ///
 /// The markers of this crate are [Unbounded], [Range] (integers up to `i64`), [RangeU64] (the top of `u64`),
-/// [RangeDec] (floats), [Finite] (a float that is neither ±∞ nor NaN) and [MaybeNan] (a float that may be NaN). Every
+/// [RangeDec] (floats), [OneOf] (a set of integers, gaps between them), [Finite] (a float that is neither ±∞ nor
+/// NaN) and [MaybeNan] (a float that may be NaN). Every
 /// marker but [MaybeNan] refuses NaN. An API's own marker works in Rust, but introspection sees only its name, while
 /// dynamic clients read the limits of [Range], [RangeU64] and [RangeDec] from their parameters.
 pub trait Bounds<T: Storage>: Copy + Default + 'static {
@@ -48,7 +47,12 @@ pub trait Bounds<T: Storage>: Copy + Default + 'static {
     /// (`shrink_wrap::refused::Rule::Finite`) rather than as a value out of `MIN..=MAX`.
     const EVERY_FINITE: bool = false;
 
-    /// `MIN <= x <= MAX`, and not NaN unless [ALLOWS_NAN](Self::ALLOWS_NAN).
+    /// The values allowed where they are a set with gaps, ascending: `Some` only for [OneOf]. `MIN` and `MAX` are
+    /// then its first and last value, and a value between them that isn't in the set is refused too.
+    const SET: Option<&'static [i64]> = None;
+
+    /// `MIN <= x <= MAX`, one of [SET](Self::SET) where it is `Some`, and not NaN unless
+    /// [ALLOWS_NAN](Self::ALLOWS_NAN).
     #[inline(always)]
     #[expect(
         clippy::neg_cmp_op_on_partial_ord,
@@ -68,7 +72,10 @@ pub trait Bounds<T: Storage>: Copy + Default + 'static {
         {
             return false;
         }
-        true
+        match (Self::SET, x.to_repr()) {
+            (Some(set), Repr::Int(i)) => in_set(set, i),
+            _ => true,
+        }
     }
 }
 
@@ -169,6 +176,23 @@ impl<U, P, T: Eq, B> Eq for OutOfRange<U, P, T, B> {}
 impl<U, P, T: Storage + defmt::Format, B: Bounds<T>> defmt::Format for OutOfRange<U, P, T, B> {
     fn format(&self, f: defmt::Formatter<'_>) {
         defmt::write!(f, "{} is out of ", self.value);
+        if let Some(set) = B::SET {
+            defmt::write!(f, "{{");
+            let mut first = true;
+            for_each_run(set, |lo, hi| {
+                if !first {
+                    defmt::write!(f, ", ");
+                }
+                first = false;
+                if lo == hi {
+                    defmt::write!(f, "{=i64}", lo);
+                } else {
+                    defmt::write!(f, "{=i64}..={=i64}", lo, hi);
+                }
+            });
+            defmt::write!(f, "}} ({=str})", T::NAME);
+            return;
+        }
         if let Some(min) = B::MIN {
             defmt::write!(f, "{}", min);
         }
@@ -209,6 +233,11 @@ pub(crate) fn refused_by<T: Storage, B: Bounds<T>>(x: T) -> Refused {
     }
     if B::EVERY_FINITE {
         return Refused::new(value, Rule::Finite);
+    }
+    // a value between a set's first and last that isn't one of it: no range names that, it is a number without a
+    // value here, as a codec's spare code is
+    if B::SET.is_some() && B::MIN.is_some_and(|m| x >= m) && B::MAX.is_some_and(|m| x <= m) {
+        return Refused::new(value, Rule::NoValue);
     }
     let low = B::MIN.map_or_else(|| storage_end::<T>(false), refused_num);
     let high = B::MAX.map_or_else(|| storage_end::<T>(true), refused_num);
@@ -374,6 +403,8 @@ impl<const MIN: u64, const MAX: u64> NanFree for RangeU64<MIN, MAX> {}
 
 impl<const MIN: i64, const MAX: i64, const EXP: i8> NanFree for RangeDec<MIN, MAX, EXP> {}
 
+impl<S: ValueSet> NanFree for OneOf<S> {}
+
 /// A bounds marker without limits: [Unbounded], [Wrapping], [Saturating] or [MaybeNan]. The first three are the same values and
 /// convert into each other for free ([Fixed::with_overflow](super::Fixed::with_overflow)); they differ in what
 /// arithmetic does at the ends of the storage.
@@ -401,6 +432,211 @@ pub struct RangeU64<const MIN: u64, const MAX: u64>;
 /// below its normal range (0 aside) doesn't compile.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct RangeDec<const MIN: i64, const MAX: i64, const EXP: i8>;
+
+/// The values a [OneOf] allows, written once: an integer set with gaps between its values, ascending and without
+/// repeats (a compile error where it isn't, or where a value doesn't fit the storage). A marker of its own, as stable
+/// Rust takes no slice as a const parameter.
+///
+/// ```
+/// use exact_units::{Fixed, OneOf, ValueSet, prefix::One, units::Ratio};
+///
+/// /// USB full-speed bulk packet sizes.
+/// #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+/// struct BulkSizes;
+///
+/// impl ValueSet for BulkSizes {
+///     const VALUES: &'static [i64] = &[8, 16, 32, 64];
+/// }
+///
+/// type Packet = Fixed<Ratio, One, u8, OneOf<BulkSizes>>;
+/// assert_eq!(Packet::try_new(32).map(Packet::get), Ok(32));
+/// let e = Packet::try_new(24).unwrap_err();
+/// assert_eq!(e.to_string(), "24 is out of {8, 16, 32, 64} (Ratio, u8)");
+/// ```
+pub trait ValueSet:
+    Copy + Default + core::fmt::Debug + PartialEq + Eq + core::hash::Hash + 'static
+{
+    /// The values, ascending, each once.
+    const VALUES: &'static [i64];
+}
+
+/// One of the values of a [ValueSet] `S`, for an integer storage up to `i64` (the storages of [Range]): a length
+/// that comes in fixed steps (CAN FD's 0..=8, 12, 16, 20, 24, 32, 48 and 64 bytes,
+/// [CanFdLengths](crate::codec::CanFdLengths)), a clock divider, a packet size. [try_new](super::Fixed::try_new),
+/// [bounded](super::Fixed::bounded), a `fixed!` constant, serde and the wire refuse every other value, and [OutOfRange] lists the
+/// set: `13 B is out of {0..=8, 12, 16, 20, 24, 32, 48, 64} B (Byte, u8)`.
+///
+/// [Bounds::MIN] and [Bounds::MAX] are the set's first and last value, so what proves from them alone (a conversion
+/// [into_rounded](super::Fixed::into_rounded) proves, a [Niched](crate::niche::Niched)'s room) sees the whole range
+/// between, never less. `saturating_*` is a compile error: a sum can stop at an end of a range, but a value in a gap
+/// has no end to stop at without a rounding. `checked_*` is the way, `None` for a sum in a gap.
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, OneOf, ValueSet, prefix::One, units::Ratio};
+///
+/// #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+/// struct Steps;
+///
+/// impl ValueSet for Steps {
+///     const VALUES: &'static [i64] = &[1, 2, 4, 8];
+/// }
+///
+/// type Div = Fixed<Ratio, One, u8, OneOf<Steps>>;
+/// let _ = Div::bounded(2).saturating_add(Div::bounded(4)); // 6 is in a gap: checked_add
+/// ```
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct OneOf<S>(PhantomData<S>);
+
+impl<U, P, T: Storage, S: ValueSet> super::Fixed<U, P, T, OneOf<S>>
+where
+    OneOf<S>: Bounds<T>,
+{
+    /// `value` where it is one of the set, else the set's value `r` rounds it to: [Ceil](super::Rounding::Ceil) the
+    /// next one up (a CAN FD payload of 13 bytes goes in a frame of 16), [Floor](super::Rounding::Floor) the next
+    /// one down, the nearest modes the closer one, a tie to the value at the even position of the set
+    /// ([NearestEven](super::Rounding::NearestEven)) or to the one farther from zero
+    /// ([NearestAway](super::Rounding::NearestAway)). [try_new](super::Fixed::try_new) is the exact way, which
+    /// refuses 13.
+    ///
+    /// # Errors
+    ///
+    /// `None` where no value of the set lies on the side `r` takes: above the last for `Ceil`, below the first for
+    /// `Floor`.
+    ///
+    /// ```
+    /// use exact_units::{Fixed, OneOf, Rounding, ValueSet, prefix::One, units::Ratio};
+    ///
+    /// #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+    /// struct Steps;
+    ///
+    /// impl ValueSet for Steps {
+    ///     const VALUES: &'static [i64] = &[1, 2, 4, 8];
+    /// }
+    ///
+    /// type Div = Fixed<Ratio, One, u8, OneOf<Steps>>;
+    /// assert!(Div::try_new(5).is_err());
+    /// assert_eq!(Div::try_new_rounded(5, Rounding::Ceil).map(Div::get), Some(8));
+    /// assert_eq!(Div::try_new_rounded(5, Rounding::NearestEven).map(Div::get), Some(4));
+    /// assert_eq!(Div::try_new_rounded(6, Rounding::NearestEven).map(Div::get), Some(4)); // 4 is at position 2
+    /// assert_eq!(Div::try_new_rounded(9, Rounding::Ceil), None);
+    /// ```
+    #[must_use]
+    pub fn try_new_rounded(value: T, r: super::Rounding) -> Option<Self> {
+        let Repr::Int(x) = value.to_repr() else {
+            return None;
+        };
+        let set = <OneOf<S> as Bounds<T>>::SET?;
+        let entries = (0_i128..).zip(set.iter().map(|&v| i128::from(v)));
+        let code = super::nearest_entry(entries, x, r)?;
+        let at = set.get(usize::try_from(code).ok()?)?;
+        let v = T::from_int(i128::from(*at))?;
+        Some(Self::new_unchecked(v))
+    }
+}
+
+/// `values` checked: not empty, ascending, no value twice. A compile error where it isn't (this is only evaluated in
+/// a `const`).
+#[expect(
+    clippy::panic,
+    reason = "const fn evaluated only in a const item: the panic is a compile error naming the broken set"
+)]
+const fn checked_set(values: &'static [i64]) -> &'static [i64] {
+    let &[mut last, ref rest @ ..] = values else {
+        panic!("a ValueSet's VALUES is empty: no value would be allowed");
+    };
+    let mut rest = rest;
+    while let [x, tail @ ..] = rest {
+        assert!(
+            *x > last,
+            "a ValueSet's VALUES must be ascending, each value once"
+        );
+        last = *x;
+        rest = tail;
+    }
+    values
+}
+
+/// The first and last of a checked set.
+#[expect(
+    clippy::panic,
+    reason = "const fn evaluated only in a const item: checked_set refused an empty set first"
+)]
+const fn set_ends(values: &'static [i64]) -> (i64, i64) {
+    match checked_set(values) {
+        [first, .., last] => (*first, *last),
+        [only] => (*only, *only),
+        [] => panic!("a ValueSet's VALUES is empty"),
+    }
+}
+
+/// Whether `x` is one of `set` (ascending): a binary search, in `const` code too.
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable; an i64 widens into an i128 exactly"
+)]
+pub(crate) const fn in_set(set: &[i64], x: i128) -> bool {
+    let mut rest = set;
+    while let [_, ..] = rest {
+        let (low, high) = rest.split_at(rest.len() / 2);
+        let [mid, above @ ..] = high else {
+            return false;
+        };
+        let mid = *mid as i128;
+        if x == mid {
+            return true;
+        }
+        rest = if x < mid { low } else { above };
+    }
+    false
+}
+
+/// `lo ..= hi` narrowed to the values of `set` within it: the first value at or above `lo`, the last at or below
+/// `hi`. `None` where none is between them. Without a set, `lo ..= hi` as it is.
+#[cfg(any(feature = "dimensionless", feature = "q"))]
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable; an i64 widens into an i128 exactly"
+)]
+pub(crate) const fn set_inward(set: Option<&[i64]>, lo: i128, hi: i128) -> Option<(i128, i128)> {
+    let Some(mut rest) = set else {
+        return if lo <= hi { Some((lo, hi)) } else { None };
+    };
+    let mut first = None;
+    let mut last = None;
+    while let [x, tail @ ..] = rest {
+        let x = *x as i128;
+        if x >= lo && x <= hi {
+            if first.is_none() {
+                first = Some(x);
+            }
+            last = Some(x);
+        }
+        rest = tail;
+    }
+    match (first, last) {
+        (Some(a), Some(b)) => Some((a, b)),
+        _ => None,
+    }
+}
+
+/// Calls `f` with each run of consecutive values of `set` as its ends: `0..=8, 12, 16` is `(0, 8)`, `(12, 12)`,
+/// `(16, 16)`.
+pub(crate) fn for_each_run(set: &[i64], mut f: impl FnMut(i64, i64)) {
+    let mut run: Option<(i64, i64)> = None;
+    for &x in set {
+        run = match run {
+            Some((lo, hi)) if hi.checked_add(1) == Some(x) => Some((lo, x)),
+            Some((lo, hi)) => {
+                f(lo, hi);
+                Some((x, x))
+            }
+            None => Some((x, x)),
+        };
+    }
+    if let Some((lo, hi)) = run {
+        f(lo, hi);
+    }
+}
 
 impl<T: Storage> Bounds<T> for Unbounded {
     const MIN: Option<T> = None;
@@ -460,6 +696,40 @@ macro_rules! range {
             };
 
             const INT_RANGE: Option<(i128, i128)> = Some((MIN as i128, MAX as i128));
+        }
+
+        #[expect(
+            clippy::allow_attributes,
+            reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
+        )]
+        #[expect(clippy::as_conversions, reason = "const items: From is not const on stable")]
+        impl<S: ValueSet> Bounds<$ty> for OneOf<S> {
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "fits checked at compile time that the bound is in the storage's range"
+            )]
+            const MIN: Option<$ty> = {
+                let $x = fits(set_ends(S::VALUES).0 as i128, $min as i128, $max as i128);
+                Some($wrap)
+            };
+
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "fits checked at compile time that the bound is in the storage's range"
+            )]
+            const MAX: Option<$ty> = {
+                let $x = fits(set_ends(S::VALUES).1 as i128, $min as i128, $max as i128);
+                Some($wrap)
+            };
+
+            const INT_RANGE: Option<(i128, i128)> = {
+                let (first, last) = set_ends(S::VALUES);
+                Some((first as i128, last as i128))
+            };
+
+            const SET: Option<&'static [i64]> = Some(checked_set(S::VALUES));
         }
     )*};
 }
@@ -749,6 +1019,12 @@ macro_rules! bounded {
                     && v > $get
                 {
                     panic!("value above its bound");
+                }
+                #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable; widens into i128")]
+                if let Some(set) = B::SET
+                    && !in_set(set, v as i128)
+                {
+                    panic!("value not one of its bound's set");
                 }
                 Self::new_unchecked(value)
             }

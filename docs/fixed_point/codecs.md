@@ -92,8 +92,8 @@ assert_eq!(Coded::<MuLawSingleZero>::try_from_raw(0xFF).map(|c| c.get().get()), 
 `Codec::DEF` is a `CodecDef`: a `MarkerId`, a `CodecShape` (the algorithm named as data, the way `UnitDef` is a
 unit's definition as data) and `spare`, the spare codes as spans of codes (`CodeSpan { low, high }`). It is the one
 place a codec writes its spare codes: `decode`, `Coded` and a `Niched` read them from there. `CodecShape::MuLaw` has no parameters (the standard pins the formula); the crate also
-declares the shapes later codecs will need — `ALaw`, `Power { gamma }`, `PiecewisePower`, `Exp { base, offset }`
-and `Table` — with no `Codec` behind any of them yet.
+declares the shapes later codecs will need — `ALaw`, `Power { gamma }`, `PiecewisePower` and `Exp { base, offset }`
+— with no `Codec` behind any of them yet. `Table` has one: [the CAN FD DLC](#a-table-the-can-fd-dlc).
 
 ```rust
 use exact_units::codec::{Codec, CodecShape, MuLaw};
@@ -124,6 +124,48 @@ assert_eq!(MuLawSingleZero::DEF.decode(0x7F), None);
 With `shrink_wrap` on, `CodecDef` and `CodecShape` are on the wire too, every shape included (`Power`'s `gamma`,
 `Exp`'s `base` and `offset`, `Table`'s slice, each exact data, never a float standing in for a parameter), and the
 spare codes with them. A `Coded` read from the wire refuses a spare code, as `try_from_raw` does.
+
+## A table: the CAN FD DLC
+
+A CAN FD frame says how many data bytes it carries in a 4-bit data length code (DLC). Codes 0 to 8 are the length
+itself; 9 to 15 are 12, 16, 20, 24, 32, 48 and 64 bytes. That is ISO 11898-1:2015's DLC coding of an FD frame. The
+same table is Linux's `can_fd_dlc2len` (`drivers/net/can/dev/length.c`). A classic CAN frame reads 9 to 15 as 8
+bytes: a different codec.
+
+`CanFdDlc` is this table as a `Codec`, the first behind `CodecShape::Table`:
+
+- `Raw` is `u8`, the field as a register or a frame byte holds it. Codes 16 to 255 are spare: `try_from_raw` and the wire refuse them, and a niche may claim them.
+- `Linear` is `Fixed<Byte, One, u8, OneOf<CanFdLengths>>`, a length from [the set](../maths/bounds.md#a-set-of-values). Every such length has its code, so encoding is exact.
+- A length off the set (13 bytes) is no `Linear`. `try_new` refuses it, and `try_new_rounded(13, Rounding::Ceil)` names the step up to the 16-byte frame the 13 bytes are sent in.
+
+```rust
+use exact_units::codec::{CanFdDlc, CanFdLengths, Codec, Coded};
+use exact_units::{Fixed, OneOf, Rounding, prefix::One, units::Byte};
+
+type Len = Fixed<Byte, One, u8, OneOf<CanFdLengths>>;
+
+// DLC 9 is 12 bytes, exactly
+assert_eq!(Coded::<CanFdDlc>::try_from_raw(9).map(|d| d.get().get()), Ok(12));
+assert!(Coded::<CanFdDlc>::try_from_raw(16).is_err());
+
+// 13 bytes: refused, or rounded up by a rounding the code names
+assert!(Len::try_new(13).is_err());
+let len = Len::try_new_rounded(13, Rounding::Ceil).unwrap();
+assert_eq!(Coded::<CanFdDlc>::try_new(len, Rounding::Ceil).map(Coded::raw), Ok(10));
+
+// the data path runs the same table, and rounds the same way
+assert_eq!(CanFdDlc::DEF.decode(9), Some(12));
+assert_eq!(CanFdDlc::DEF.encode(13, Rounding::Ceil), Some(10));
+assert_eq!(CanFdDlc::DEF.encode(13, Rounding::Floor), Some(9));
+assert_eq!(CanFdDlc::DEF.encode(65, Rounding::Ceil), None);
+```
+
+A `Table` shape lists the value of each code from 0. A code past the end means no value. Encoding takes the code of
+the value, or the one a named `Rounding` picks among the codes that aren't spare. A tie goes to the even code
+(`NearestEven`, as a μ-law tie goes to the even mantissa) or to the value farther from zero (`NearestAway`). The
+entries need not be ascending, and where two codes mean one value, encoding takes the lower code.
+`tests/props/can_fd.rs` walks every byte as a DLC and every `u8` length by every rounding against the table written
+out from the standard, and checks that the typed path and the data path agree.
 
 ## Composing with `Niched`
 

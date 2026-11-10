@@ -483,6 +483,8 @@ impl<A: Amount, const FIT: u8> LiteralTolerance<A, FIT, ABSOLUTE> {
         let min = B::MIN.map_or(T::MIN_INT, |m| as_int(m).max(T::MIN_INT));
         let max = B::MAX.map_or(T::MAX_INT, |m| as_int(m).min(T::MAX_INT));
         let (lo, hi) = (b.saturating_sub(d).max(min), b.saturating_add(d).min(max));
+        // a OneOf set's window ends on its values: b is one, so some are within
+        let (lo, hi) = crate::fixed::set_inward(B::SET, lo, hi).unwrap_or((b, b));
         let end = |x| Fixed::new_unchecked(T::from_int(x).unwrap_or(target.get()));
         Window::from_sorted(end(lo), end(hi))
     }

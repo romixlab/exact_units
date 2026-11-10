@@ -2,6 +2,8 @@
 
 ### 🚀 Features
 
+- `OneOf<S>`, a bound for a set of values with gaps between them (NUM-31, P2401#10nov-1005). A `ValueSet` marker lists the values once, ascending (`const VALUES: &'static [i64]`; stable Rust takes no slice as a const parameter), checked at compile time. `try_new`, `bounded`, `fixed!`, serde and the wire read refuse a value off the set, and `OutOfRange` lists it: `13 B is out of {0..=8, 12, 16, 20, 24, 32, 48, 64} B (Byte, u8)`. `try_new_rounded(value, Rounding)` rounds into the set by a named rounding. `saturating_*` on a `OneOf` value is a compile error, `checked_*` is `None` in a gap, and windows end on set values. `Bounds` gains `SET: Option<&'static [i64]>`, defaulted to `None`, so an API's own bounds marker keeps compiling. Book: [A set of values](docs/maths/bounds.md#a-set-of-values).
+- `codec::CanFdDlc`, the CAN FD data length code, the first `CodecShape::Table` codec (feature `information`), and `codec::CanFdLengths`, the set of CAN FD payload lengths (0..=8, 12, 16, 20, 24, 32, 48, 64 bytes, ISO 11898-1:2015). A `u8` code 0..=15 decodes to `Fixed<Byte, One, u8, OneOf<CanFdLengths>>`, DLC 9 to 12 bytes exactly, and codes 16..=255 are spare. `CodecShape::Table` now decodes and encodes from the data alone: entry `i` is code `i`'s value, encoding picks a code by a named `Rounding` among the codes that aren't spare. Book: [A table: the CAN FD DLC](docs/fixed_point/codecs.md#a-table-the-can-fd-dlc).
 - `Point`, `Index`, `IndexFrom1` and `Seq` gain `series(cells)` (PT-7, SW-60, API-50), the transparent series
   `Fixed` already has: a `Series` of a `Point` field has the same bytes as the plain number it holds and reads
   back the same values (`tests/series.rs`). This lets `ww_si::Timed<V, Tm>` derive `series(cells)` with

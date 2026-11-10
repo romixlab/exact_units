@@ -8,8 +8,9 @@
 //!   value is beyond every code's range, never a spare code).
 //! - [CodecDef] names the [CodecShape] and the [spare](CodecDef::spare) codes: what a client without the trait
 //!   runs to decode the same bytes, as [UnitDef](crate::UnitDef) is a unit's definition as data. [MuLaw] and
-//!   [MuLawSingleZero] back [CodecShape::MuLaw]; the other shapes are the plan for later codecs (LVL-4's named
-//!   conversions, IO-3's SFLOAT) and have none yet, a gap this module's docs don't hide.
+//!   [MuLawSingleZero] back [CodecShape::MuLaw], [CanFdDlc] (CAN FD's data length code) backs
+//!   [CodecShape::Table]; the other shapes are the plan for later codecs (LVL-4's named conversions) and have none
+//!   yet, a gap this module's docs don't hide.
 //! - [Coded]`<C, V>` holds the bytes of `C::Raw`, never a spare code: [get](Coded::get) decodes,
 //!   [try_new](Coded::try_new) encodes, [try_from_raw](Coded::try_from_raw) refuses a spare code ([SpareCode]).
 //!   Its spare codes are where a [Niched](niche::Niched) puts its own: `Niched<Coded<MuLawSingleZero>,
@@ -34,15 +35,17 @@
 
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 use crate::MarkerIdOwned;
-#[cfg(feature = "dimensionless")]
+#[cfg(any(feature = "dimensionless", feature = "information"))]
 use crate::fixed::Fixed;
 #[cfg(feature = "dimensionless")]
 use crate::fixed::prefix::Pow2;
-use crate::fixed::{OutOfBounds, Repr, Storage};
+#[cfg(feature = "information")]
+use crate::fixed::{OneOf, prefix::One};
+use crate::fixed::{OutOfBounds, Repr, Storage, ValueSet, nearest_entry};
 use crate::niche::{self, RawValue};
-#[cfg(feature = "dimensionless")]
+#[cfg(any(feature = "dimensionless", feature = "information"))]
 use crate::system::def_list;
-use crate::system::{for_each, slice_of};
+use crate::system::{DefList, for_each, slice_of};
 use crate::{Magnitude, MarkerId, Rounding};
 use core::fmt;
 use core::hash::{Hash, Hasher};
@@ -199,7 +202,7 @@ impl CodecDef<'_> {
     #[must_use]
     pub fn encode(&self, value: i128, rounding: Rounding) -> Option<i128> {
         self.shape
-            .encode(value, rounding)
+            .encode_where(value, rounding, |raw| !self.is_spare(raw))
             .filter(|&raw| !self.is_spare(raw))
     }
 
@@ -319,8 +322,11 @@ pub enum CodecShape<'i> {
         /// Added before raising to `base`.
         offset: Magnitude,
     },
-    /// The linear value of every code, ascending by raw code: IEEE 11073 SFLOAT's shape, where the codes outside a
-    /// formula (NaN, ±∞, "not at this resolution") are the common case. No [Codec] in this crate yet (IO-3).
+    /// The linear value of every code, by raw code from 0: entry `i` is what code `i` means, a code past the end
+    /// means no value. Decoding looks the code up; encoding takes the code of the value, or the one a named
+    /// [Rounding] picks among the codes that aren't spare (the lowest code where two mean the same value). The
+    /// entries need not be ascending. [CanFdDlc] is the worked [Codec]; IEEE 11073 SFLOAT (IO-3), whose codes
+    /// outside a formula (NaN, ±∞, "not at this resolution") are the common case, is the next.
     Table(&'i [i128]),
 }
 
@@ -328,13 +334,25 @@ impl CodecShape<'_> {
     /// `raw` decoded by this shape, as its [Codec] would, but from the shape alone: a dynamic client's path, the
     /// same algorithm as the typed one, never a separate implementation of it. `None` for a shape with no
     /// algorithm here yet ([ALaw](Self::ALaw), [Power](Self::Power), [PiecewisePower](Self::PiecewisePower),
-    /// [Exp](Self::Exp), [Table](Self::Table)); never `None` for [MuLaw](Self::MuLaw), whose decode is total.
+    /// [Exp](Self::Exp)), and for a [Table](Self::Table) code past its end (or an entry read from the wire that
+    /// doesn't decode); never `None` for [MuLaw](Self::MuLaw), whose decode is total.
     #[must_use]
     pub fn decode(&self, raw: i128) -> Option<i128> {
         match self {
             CodecShape::MuLaw => {
                 let byte = u8::try_from(raw).ok()?;
                 Some(i128::from(mu_law_decode(byte)))
+            }
+            CodecShape::Table(table) => {
+                let mut code = 0_i128;
+                let mut hit = None;
+                let whole = for_each(table, |v: i128| {
+                    if code == raw {
+                        hit = Some(v);
+                    }
+                    code = code.saturating_add(1);
+                });
+                hit.filter(|_| whole)
             }
             // every other shape today (ALaw, Power, PiecewisePower, Exp, Table), and (feature shrink_wrap) a
             // shape wire bytes named that this version doesn't know
@@ -350,14 +368,55 @@ impl CodecShape<'_> {
     /// `Linear`'s storage (`i16`); otherwise never refuses for [MuLaw](Self::MuLaw).
     #[must_use]
     pub fn encode(&self, value: i128, rounding: Rounding) -> Option<i128> {
+        self.encode_where(value, rounding, |_| true)
+    }
+
+    /// [encode](Self::encode) among the codes `allowed` takes: a [Table](Self::Table) skips the others (a
+    /// [CodecDef]'s spare codes), so a value rounds to the nearest code that is a value.
+    fn encode_where(
+        &self,
+        value: i128,
+        rounding: Rounding,
+        allowed: impl Fn(i128) -> bool,
+    ) -> Option<i128> {
         match self {
             CodecShape::MuLaw => {
                 let value = i16::try_from(value).ok()?;
                 Some(i128::from(mu_law_encode(value, rounding)))
             }
+            CodecShape::Table(table) => table_encode(table, value, rounding, allowed),
             _ => None,
         }
     }
+}
+
+/// `value` encoded by a [Table](CodecShape::Table) of entries `table`, among the codes `allowed` takes: the code of
+/// `value`, or the one `rounding` picks. `None` for a table read from the wire with an entry that doesn't decode.
+fn table_encode(
+    table: &DefList<'_, i128>,
+    value: i128,
+    rounding: Rounding,
+    allowed: impl Fn(i128) -> bool,
+) -> Option<i128> {
+    if !for_each(table, |_: i128| {}) {
+        return None;
+    }
+    let entries = (0_i128..)
+        .zip(table_values(table))
+        .filter(|&(code, _)| allowed(code));
+    nearest_entry(entries, value, rounding)
+}
+
+/// The entries of a table, each decoded (a caller checked that each does).
+#[cfg(feature = "shrink_wrap")]
+fn table_values<'a>(table: &'a DefList<'_, i128>) -> impl Iterator<Item = i128> + 'a {
+    table.iter().filter_map(Result::ok)
+}
+
+/// The entries of a table.
+#[cfg(not(feature = "shrink_wrap"))]
+fn table_values<'a>(table: &'a DefList<'_, i128>) -> impl Iterator<Item = i128> + 'a {
+    table.iter().copied()
 }
 
 /// A value given by a [Codec]'s code instead of a linear step: the bytes of `C::Raw`, nothing more (`size_of` is
@@ -867,6 +926,112 @@ impl Codec for MuLawSingleZero {
     #[inline]
     fn encode(value: Self::Linear, rounding: Rounding) -> Option<u8> {
         Some(mu_law_encode(value.get(), rounding))
+    }
+}
+
+/// The data lengths of a CAN FD frame, in bytes: 0..=8, 12, 16, 20, 24, 32, 48 and 64, the lengths its 4-bit
+/// [data length code](CanFdDlc) can say (ISO 11898-1:2015, the DLC coding of an FD frame). A [ValueSet] for
+/// [OneOf]: `Fixed<Byte, One, u8, OneOf<CanFdLengths>>` is a payload length that a frame can carry,
+/// and nothing else.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct CanFdLengths;
+
+impl ValueSet for CanFdLengths {
+    const VALUES: &'static [i64] = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
+}
+
+/// The data length code (DLC) of a CAN FD frame: 4 bits that say how many data bytes follow, 0..=8 as themselves and
+/// 9..=15 as 12, 16, 20, 24, 32, 48 and 64 bytes (ISO 11898-1:2015's DLC coding of an FD frame; the same table is
+/// Linux's `can_fd_dlc2len`, `drivers/net/can/dev/length.c`). The first [CodecShape::Table] codec: its [DEF](Codec::DEF)
+/// carries the table, and the typed path encodes through the same table and the same rounding as a client that
+/// has only the data.
+///
+/// - [Raw](Codec::Raw) is `u8`, the field as a controller's register or a byte of a frame holds it: codes
+///   16..=255 are [spare](CodecDef::spare), no DLC, refused by [Coded::try_from_raw] and free for a niche.
+/// - [Linear](Codec::Linear) is `Fixed<Byte, One, u8, OneOf<CanFdLengths>>`: every value of it has its code, so
+///   [encode](Codec::encode) is exact whatever [Rounding] it is given, and a length between two of the set
+///   (13 bytes) is no `Linear` at all: [try_new](crate::Fixed::try_new) refuses it, and
+///   [try_new_rounded](crate::Fixed::try_new_rounded) with [Rounding::Ceil] names the step up to 16, the frame
+///   the 13 bytes are sent in (padded).
+///
+/// Only for an FD frame: a classic CAN frame reads the codes 9..=15 as 8 bytes, a different codec.
+///
+/// ```
+/// use exact_units::codec::{CanFdDlc, CanFdLengths, Coded};
+/// use exact_units::{Fixed, OneOf, Rounding, prefix::One, units::Byte};
+///
+/// type Len = Fixed<Byte, One, u8, OneOf<CanFdLengths>>;
+///
+/// // DLC 9 is 12 bytes, exactly
+/// let dlc = Coded::<CanFdDlc>::try_from_raw(9).unwrap();
+/// assert_eq!(dlc.get().get(), 12);
+///
+/// // 13 bytes is no FD length: refused, or rounded up by a rounding the code names
+/// assert_eq!(Len::try_new(13).unwrap_err().to_string(), "13 B is out of {0..=8, 12, 16, 20, 24, 32, 48, 64} B (Byte, u8)");
+/// let len = Len::try_new_rounded(13, Rounding::Ceil).unwrap();
+/// assert_eq!(len.get(), 16);
+/// assert_eq!(Coded::<CanFdDlc>::try_new(len, Rounding::Ceil).map(Coded::raw), Ok(10));
+///
+/// // 16 and above is no DLC
+/// assert!(Coded::<CanFdDlc>::try_from_raw(16).is_err());
+/// ```
+#[cfg(feature = "information")]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct CanFdDlc;
+
+/// [CanFdDlc]'s table: the length of each code 0..=15, in bytes.
+const CAN_FD_DLC: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
+
+/// [CAN_FD_DLC] as a [CodecShape::Table]'s entries, widened in `const` code: one table, two types.
+#[cfg_attr(
+    not(feature = "information"),
+    expect(dead_code, reason = "CanFdDlc needs `information`")
+)]
+#[expect(
+    clippy::as_conversions,
+    clippy::indexing_slicing,
+    reason = "a const item: From is not const on stable, a u8 widens into an i128 exactly; i < 16, both arrays' length"
+)]
+const CAN_FD_DLC_TABLE: [i128; 16] = {
+    let mut t = [0_i128; 16];
+    let mut i = 0;
+    while i < 16 {
+        t[i] = CAN_FD_DLC[i] as i128;
+        i += 1;
+    }
+    t
+};
+
+#[cfg(feature = "information")]
+impl Codec for CanFdDlc {
+    type Raw = u8;
+    type Linear = Fixed<crate::units::Byte, One, u8, OneOf<CanFdLengths>>;
+
+    const DEF: CodecDef<'static> = CodecDef {
+        id: MarkerId {
+            crate_name: "exact_units",
+            name: "CanFdDlc",
+        },
+        shape: CodecShape::Table(def_list(&CAN_FD_DLC_TABLE)),
+        spare: def_list(&[CodeSpan { low: 16, high: 255 }]),
+    };
+
+    /// The length of the low 4 bits of `raw`, as a controller reads the field: a spare code (16 and above) means
+    /// nothing, [decode](Codec::decode) refuses it.
+    #[inline]
+    fn formula(raw: u8) -> Self::Linear {
+        let len = CAN_FD_DLC
+            .get(usize::from(raw & 0x0F))
+            .copied()
+            .unwrap_or_default();
+        // every entry of the table is one of CanFdLengths: the tests walk them
+        Fixed::new_unchecked(len)
+    }
+
+    #[inline]
+    fn encode(value: Self::Linear, rounding: Rounding) -> Option<u8> {
+        let code = Self::DEF.encode(i128::from(value.get()), rounding)?;
+        u8::try_from(code).ok()
     }
 }
 

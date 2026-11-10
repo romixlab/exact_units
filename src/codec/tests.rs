@@ -99,3 +99,41 @@ fn raw_value_try_from_raw_refuses_the_spare_code() {
         assert_eq!(v.is_err(), raw == 0x7F, "{raw:#04x}");
     }
 }
+
+/// A [CodecShape::Table](super::CodecShape::Table) need not be ordered: decode looks the code up, encode takes the
+/// lowest code of a value that two codes mean, and a rounding never lands on a spare code but on the nearest code
+/// that is a value.
+#[test]
+fn a_table_decodes_by_code_and_encodes_around_spare_codes() {
+    use super::{CodeSpan, CodecDef, CodecShape};
+    use crate::MarkerId;
+    use crate::system::def_list;
+
+    const TABLE: [i128; 5] = [50, 10, 30, 30, 20];
+    const SPARE: [CodeSpan; 1] = [CodeSpan::one(4)];
+    let def = CodecDef {
+        id: MarkerId {
+            crate_name: "test",
+            name: "Table",
+        },
+        shape: CodecShape::Table(def_list(&TABLE)),
+        spare: def_list(&SPARE),
+    };
+    assert_eq!(def.decode(0), Some(50));
+    assert_eq!(def.decode(3), Some(30));
+    assert_eq!(def.decode(4), None); // spare
+    assert_eq!(def.decode(5), None); // past the table
+    assert_eq!(def.encode(30, Rounding::Floor), Some(2)); // the lower of codes 2 and 3
+    // 20 is code 4's, which is spare: 20 rounds among the others, 10 or 30
+    assert_eq!(def.encode(20, Rounding::Floor), Some(1));
+    assert_eq!(def.encode(20, Rounding::Ceil), Some(2));
+    // 20 is halfway between 10 (code 1) and 30 (code 2): the even code, or the value farther from zero
+    assert_eq!(def.encode(20, Rounding::NearestEven), Some(2));
+    assert_eq!(def.encode(40, Rounding::NearestEven), Some(0)); // 30 (code 2) or 50 (code 0): both even, the lower code
+    assert_eq!(def.encode(40, Rounding::NearestAway), Some(0)); // 50, farther from zero
+    assert_eq!(def.encode(15, Rounding::NearestAway), Some(1)); // 10 (code 1) or 20, which is spare: 10
+    assert_eq!(def.encode(-5, Rounding::Truncate), Some(1)); // toward zero: up to 10
+    assert_eq!(def.encode(60, Rounding::Ceil), None);
+    // without the spare codes, the shape alone takes code 4
+    assert_eq!(def.shape.encode(20, Rounding::Floor), Some(4));
+}

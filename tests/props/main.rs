@@ -11,6 +11,8 @@
 )]
 
 mod arith;
+#[cfg(feature = "information")]
+mod can_fd;
 #[cfg(feature = "dimensionless")]
 mod codec;
 #[cfg(feature = "levels")]
