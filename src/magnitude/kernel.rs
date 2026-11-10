@@ -11,14 +11,21 @@ use crate::{Overflow, Rounding};
 use core::cmp::Ordering;
 
 /// A rational magnitude as the kernel applies it: `5^(pow10/2) · 2^((pow10 + pow2)/2) · ∏ prime^(exp/2)`, read from the
-/// magnitude in place (a copy of one is 138 bytes). Made by [Exact::of], which checks that every exponent is whole.
+/// magnitude in place (a copy of one is 202 bytes). Made by [Exact::of], which checks that every exponent is whole and
+/// every prime below 2³², the kernel's limb.
 #[derive(Copy, Clone)]
 pub(crate) struct Exact<'a>(&'a Magnitude);
 
 impl<'a> Exact<'a> {
-    /// The magnitude for the kernel, `None` when it isn't a fraction of integers.
+    /// The magnitude for the kernel, `None` when it isn't a fraction of integers or has a prime of 2³² or more: the
+    /// kernel multiplies and divides by `u32` limbs, so a firmware links no 128-bit division (only a measured value
+    /// resolved from a set has such a prime, CODATA 2022's proton mass in kg).
     pub(crate) const fn of(m: &'a Magnitude) -> Option<Exact<'a>> {
-        if whole(m) { Some(Exact(m)) } else { None }
+        if whole(m) && limb_primes(m) {
+            Some(Exact(m))
+        } else {
+            None
+        }
     }
 
     /// The whole exponents of 5 and 2.
@@ -34,12 +41,39 @@ impl<'a> Exact<'a> {
     }
 }
 
-/// A prime and its whole exponent, `None` for an empty slot: the end of the primes.
+/// A prime and its whole exponent, `None` for an empty slot: the end of the primes. Every prime of an [Exact] fits a
+/// `u32` ([limb_primes]).
 fn prime(f: Option<PrimePower>) -> Option<(u32, i32)> {
-    f.map(|f| (f.prime, i32::from(f.exp) / 2))
+    let f = f?;
+    Some((u32::try_from(f.prime).ok()?, i32::from(f.exp) / 2))
 }
 
-/// Whether `m` is a fraction of integers: no power of a symbol (π, ln 2, ln 10, μ₀, G), every exponent whole (its doubled form even).
+/// Whether every prime of `m` is below 2³².
+#[expect(
+    clippy::indexing_slicing,
+    reason = "i < MAX_FACTORS, the loop bound and the array's length"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "i < MAX_FACTORS, the loop bound"
+)]
+const fn limb_primes(m: &Magnitude) -> bool {
+    let Some(rest) = &m.rest else {
+        return true;
+    };
+    let mut i = 0;
+    while i < MAX_FACTORS {
+        if let Some(f) = rest.factors[i]
+            && f.prime > 0xffff_ffff
+        {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+/// Whether `m` is a fraction of integers: no power of a symbol (π, ln 2, ln 10, μ₀, G, m_u), every exponent whole (its doubled form even).
 #[expect(
     clippy::indexing_slicing,
     reason = "i < MAX_FACTORS, the loop bound and the array's length"

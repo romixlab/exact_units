@@ -109,7 +109,7 @@ impl<S: System, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Crossing<S, U,
             .and_then(Fixed::from_number)
     }
 
-    /// [convert](Self::convert) with μ₀ and G taken from the named set `C` ([constants](crate::constants)), as
+    /// [convert](Self::convert) with μ₀, G and m_u taken from the named set `C` ([constants](crate::constants)), as
     /// [Fixed::convert_with]: an oersted in A/m under [Ampere1948](crate::constants::Ampere1948) or
     /// [Codata2022](crate::constants::Codata2022).
     #[inline(always)]

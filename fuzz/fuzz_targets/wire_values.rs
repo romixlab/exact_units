@@ -11,7 +11,7 @@ use props::wire::{self, Expr};
 enum Input {
     Numbers(i16, u32),
     Series(Vec<(u32, i16, u8)>),
-    Magnitude(i8, i8, [i8; 5], Vec<(u32, i8)>),
+    Magnitude(i8, i8, [i8; 6], Vec<(u64, i8)>),
     Prefix(u8, i8, u16),
     Dim(Vec<i8>, Vec<(String, i8)>),
     Unit(Expr),

@@ -27,7 +27,7 @@ impl Number {
                     let m = x.unsigned_abs().checked_mul(num)?;
                     Some(Self::ratio(x < 0, m, den))
                 });
-                // NaN for a scale with μ₀ or G left in it: no value without a named set
+                // NaN for a scale with μ₀, G or m_u left in it: no value without a named set
                 exact
                     .unwrap_or_else(|| Number::Float(scale.apply_f64(x as f64).unwrap_or(f64::NAN)))
             }

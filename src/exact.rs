@@ -1,9 +1,12 @@
 //! [Exact]: a value of a unit known at compile time as an exact fraction chosen at run time.
 
+use crate::constants::Constants;
 use crate::fixed::FixedScale;
 use crate::tree::{is_ratio, takes_bare_prefix, write_unit};
 use crate::units::{Per, Times};
-use crate::{Bounds, Fixed, Magnitude, NanFree, Prefix, Repr, Rounding, Storage, Unit};
+use crate::{
+    Bounds, Fixed, Magnitude, MagnitudeError, NanFree, Prefix, Repr, Rounding, Storage, Unit,
+};
 use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{Hash, Hasher};
@@ -300,6 +303,32 @@ impl<U> Exact<U> {
     reason = "a compile error in const code (evaluated in const blocks), as documented"
 )]
 const fn factor<U: Unit, U2: Unit>() -> Fraction {
+    let m = magnitude::<U, U2>();
+    if m.has_measured() {
+        MagnitudeError::Measured.panic();
+    }
+    match Fraction::from_magnitude(&m) {
+        Some(f) => f,
+        None => panic!("the factor between these units is not a fraction of u128s (π, a root)"),
+    }
+}
+
+/// As [factor], with the measured constants in it (μ₀, G, m_u) replaced by the values of the set `S`.
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (evaluated in const blocks), as documented"
+)]
+const fn factor_with<S: Constants, U: Unit, U2: Unit>() -> Fraction {
+    match Fraction::from_magnitude(&magnitude::<U, U2>().resolve::<S>().value) {
+        Some(f) => f,
+        None => panic!(
+            "the factor between these units under this set is not a fraction of u128s (π, a root, past u128)"
+        ),
+    }
+}
+
+/// The magnitude from `U` to `U2`: same dimension and kind, no offset, both exact, else a compile error.
+const fn magnitude<U: Unit, U2: Unit>() -> Magnitude {
     if !U::DIM.same_typed(U2::DIM) {
         crate::conv_error::dim_mismatch::<U, U2>("an Exact");
     }
@@ -309,10 +338,7 @@ const fn factor<U: Unit, U2: Unit>() -> Fraction {
     let (Some(from), Some(to)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
         crate::conv_error::no_exact_factor::<U, U2>("an Exact")
     };
-    match Fraction::from_magnitude(&from.div(to)) {
-        Some(f) => f,
-        None => panic!("the factor between these units is not a fraction of u128s (π, a root)"),
-    }
+    from.div(to)
 }
 
 /// `1 / (U · U2)`: the factor of a reciprocal from `U` into `U2`, whose dimension is the reciprocal of `U`'s.
@@ -355,6 +381,34 @@ impl<U: Unit> Exact<U> {
     #[must_use]
     pub fn convert<U2: Unit>(self) -> Option<Exact<U2>> {
         let k = const { factor::<U, U2>() };
+        Some(Exact::of(self.value.checked_mul(k)?))
+    }
+
+    /// The same value in `U2` with the measured constants of the factor (μ₀, G, m_u) taken from the set `S`, if it
+    /// fits: a mass in daltons in grams, an oersted in A/m. As [convert](Self::convert) otherwise; a set that lacks a
+    /// constant the factor needs doesn't compile, nor does [convert](Self::convert) where the factor has one.
+    ///
+    /// ```
+    /// use exact_units::Exact;
+    /// use exact_units::constants::{Codata2018, Codata2022};
+    /// use exact_units::units::Gram;
+    ///
+    /// exact_units::unit! {
+    ///     /// The dalton, 1 Da = m_u: measured, a symbol until a set gives it a value.
+    ///     pub struct Dalton = "Da", [kg 1], Exact(1 / 1, m_u 1);
+    /// }
+    ///
+    /// let one = Exact::<Dalton>::int(1);
+    /// // CODATA 2018: 1.660 539 066 60·10⁻²⁷ kg, exactly as printed
+    /// let g18 = one.convert_with::<Codata2018, Gram>().unwrap();
+    /// assert_eq!(g18, Exact::new(166_053_906_660, 10u128.pow(35)));
+    /// // CODATA 2022 moved it by 2.32·10⁻³⁶ kg
+    /// let g22 = one.convert_with::<Codata2022, Gram>().unwrap();
+    /// assert_eq!((g22 - g18).unwrap(), Exact::new(232, 10u128.pow(35)));
+    /// ```
+    #[must_use]
+    pub fn convert_with<S: Constants, U2: Unit>(self) -> Option<Exact<U2>> {
+        let k = const { factor_with::<S, U, U2>() };
         Some(Exact::of(self.value.checked_mul(k)?))
     }
 

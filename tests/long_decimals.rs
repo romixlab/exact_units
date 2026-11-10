@@ -29,6 +29,50 @@ const ALLOWED: &[(&str, &str)] = &[
         "μ₀ as CODATA 2022 prints it: the set's exact value (constants::Codata2022)",
     ),
     (
+        "1.66053906660",
+        "m_u as CODATA 2018 prints it, in kg: the set's exact value (constants::Codata2018)",
+    ),
+    (
+        "1.66053906892",
+        "m_u as CODATA 2022 prints it, in kg: the set's exact value (constants::Codata2022)",
+    ),
+    (
+        "9.1093837015",
+        "m_e as CODATA 2018 prints it, in kg: the set's exact value (constants::Codata2018)",
+    ),
+    (
+        "9.1093837139",
+        "m_e as CODATA 2022 prints it, in kg: the set's exact value (constants::Codata2022)",
+    ),
+    (
+        "1.67262192369",
+        "m_p as CODATA 2018 prints it, in kg: the set's exact value (constants::Codata2018)",
+    ),
+    (
+        "1.67262192595",
+        "m_p as CODATA 2022 prints it, in kg: the set's exact value (constants::Codata2022)",
+    ),
+    (
+        "5.48579909065",
+        "A_r(e) as CODATA 2018 prints it: the set's exact value (constants::Codata2018)",
+    ),
+    (
+        "5.485799090441",
+        "A_r(e) as CODATA 2022 prints it: the set's exact value (constants::Codata2022)",
+    ),
+    (
+        "1.007276466621",
+        "A_r(p) as CODATA 2018 prints it: the set's exact value (constants::Codata2018)",
+    ),
+    (
+        "1.0072764665789",
+        "A_r(p) as CODATA 2022 prints it: the set's exact value (constants::Codata2022)",
+    ),
+    (
+        "0.99999999965",
+        "M_u as CODATA 2018 prints it, in g/mol: N_A·m_u of the set, checked against it",
+    ),
+    (
         "7.2973525693",
         "α as CODATA 2018 prints it, what α from μ₀ is checked against",
     ),

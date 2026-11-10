@@ -35,10 +35,11 @@
 ///   the [System](crate::System) marker (in scope) and its bases by their symbols: `[Gaussian: g 1/2, cm -1/2, s -1]`
 ///   for the gauss ([systems](crate::systems)); its scale is then the factor to that system's coherent unit.
 /// - The scale, an exact [Magnitude](crate::Magnitude), one when left out: `Pow10(-3)`, `Exact(1 / 180, pi 1)`
-///   (`num / den`, then optionally `pow10 e`, `pow2 e`, `pi e`, `ln2 e`, `ln10 e`, `mu0 e`, `g e` in that order, see
-///   [Magnitude::new](crate::Magnitude::new); the decibel is `Exact(1 / 20, ln10 1)` of the neper), so every reader
-///   computes the same value. The measured constants μ₀ and G stay symbols ([constants](crate::constants)), their
-///   exponent whole or a half (`mu0 1 / 2`): an oersted is `Exact(1 / 1, pow10 -4, mu0 -1)` A/m. A unit has no offset: a scale with a zero of its own is an origin of points
+///   (`num / den`, then optionally `pow10 e`, `pow2 e`, `pi e`, `ln2 e`, `ln10 e`, `mu0 e`, `g e`, `m_u e` in that order,
+///   see [Magnitude::new](crate::Magnitude::new); the decibel is `Exact(1 / 20, ln10 1)` of the neper), so every
+///   reader computes the same value. The measured constants μ₀, G and m_u stay symbols ([constants](crate::constants)),
+///   their exponent whole or a half (`mu0 1 / 2`): an oersted is `Exact(1 / 1, pow10 -4, mu0 -1)` A/m, the dalton
+///   `Exact(1 / 1, m_u 1)` kg. A unit has no offset: a scale with a zero of its own is an origin of points
 ///   ([origin!](crate::origin)), and a float factor isn't a unit's scale.
 ///
 ///   ```compile_fail
@@ -550,14 +551,14 @@ macro_rules! __scale_runtime {
     };
 }
 
-/// `num / den, pow10 a, pow2 b, pi c, ln2 d, ln10 e, mu0 f, g h` as a [Magnitude](crate::Magnitude).
+/// `num / den, pow10 a, pow2 b, pi c, ln2 d, ln10 e, mu0 f, g h, m_u k` as a [Magnitude](crate::Magnitude).
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __magnitude {
     (
         $num:literal / $den:literal $(, pow10 $p10:literal)? $(, pow2 $p2:literal)? $(, pi $pi:literal)?
             $(, ln2 $ln2:literal)? $(, ln10 $ln10:literal)? $(, mu0 $mu0:literal $(/ $mu0d:literal)?)?
-            $(, g $g:literal $(/ $gd:literal)?)? $(,)?
+            $(, g $g:literal $(/ $gd:literal)?)? $(, m_u $mu:literal $(/ $mud:literal)?)? $(,)?
     ) => {
         $crate::Magnitude::new(
             $num,
@@ -570,6 +571,7 @@ macro_rules! __magnitude {
         .mul($crate::Magnitude::LN10.powi($crate::__or_zero!($($ln10)?)))
         .mul($crate::__symbol_pow!(MU0 $(, $mu0 $(/ $mu0d)?)?))
         .mul($crate::__symbol_pow!(G $(, $g $(/ $gd)?)?))
+        .mul($crate::__symbol_pow!(M_U $(, $mu $(/ $mud)?)?))
     };
 }
 

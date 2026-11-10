@@ -684,7 +684,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
             .and_then(Fixed::from_number)
     }
 
-    /// The same value in another unit `U2`, as [convert](Self::convert), with the measured constants μ₀ and G of the
+    /// The same value in another unit `U2`, as [convert](Self::convert), with the measured constants μ₀, G and m_u of the
     /// factor taken from the named set `S` ([constants](crate::constants)): an oersted in A/m, a solar mass in kg.
     /// Exact or `None` as `convert`; under a CODATA set such a factor has half powers of large primes, so between
     /// integer storages it needs [convert_rounded_with](Self::convert_rounded_with) and a named rounding. A factor
@@ -1346,7 +1346,7 @@ impl Conversion {
         Self::by::<T, T2>(from.mul(P::SCALE).div(to.mul(P2::SCALE)), rounding)
     }
 
-    /// As [between](Self::between), with μ₀ and G in the factor replaced by the values of the set `S`.
+    /// As [between](Self::between), with μ₀, G and m_u in the factor replaced by the values of the set `S`.
     const fn between_with<
         S: crate::constants::Constants,
         U: Unit,
@@ -1387,7 +1387,7 @@ impl Conversion {
         Self::by::<T, T2>(Self::across_factor::<S, U, P, U2, P2>(), rounding)
     }
 
-    /// As [across](Self::across), with μ₀ and G in the factor replaced by the values of the set `C`.
+    /// As [across](Self::across), with μ₀, G and m_u in the factor replaced by the values of the set `C`.
     const fn across_with<
         C: crate::constants::Constants,
         S: crate::System,
@@ -1439,7 +1439,7 @@ impl Conversion {
     )]
     const fn by<T: Storage, T2: Storage>(m: Magnitude, rounding: bool) -> Self {
         if m.has_measured() {
-            // μ₀ or G left in the factor: no value without a named set, also for floats (convert_with)
+            // μ₀, G or m_u left in the factor: no value without a named set, also for floats (convert_with)
             crate::MagnitudeError::Measured.panic();
         }
         let ratio = m.to_ratio();

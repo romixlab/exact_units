@@ -348,6 +348,14 @@ fn in_spans<T: Storage>(spare: &[CodeSpan], raw: T) -> bool {
 )]
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(
+    not(feature = "shrink_wrap"),
+    expect(
+        clippy::large_enum_variant,
+        reason = "const data a codec names once in its `DEF` and a client reads through a reference; a Box needs \
+                  alloc (with shrink_wrap an unknown variant from the wire is as large)"
+    )
+)]
 pub enum CodecShape<'i> {
     /// ITU-T G.711 μ-law: 8 segments of 16 steps, doubling in size. [MuLaw] is the worked [Codec].
     MuLaw,

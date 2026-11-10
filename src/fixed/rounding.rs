@@ -691,7 +691,7 @@ enum Exact {
 impl Requantizer {
     /// The requantizer by `factor` into `to`, rounded by `r`, overflowing by `o`: [requantize] of each value. A
     /// [StorageKind::Int] whose `bits` isn't 1 to 64 converts nothing: [apply](Self::apply) gives `None`. Nor does a
-    /// factor with μ₀ or G left in it ([Magnitude::has_measured]), which has no value without a named set
+    /// factor with μ₀, G or m_u left in it ([Magnitude::has_measured]), which has no value without a named set
     /// ([Magnitude::resolve]).
     #[must_use]
     pub fn new(factor: &Magnitude, to: StorageKind, r: Rounding, o: Overflow) -> Self {

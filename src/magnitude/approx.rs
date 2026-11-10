@@ -72,7 +72,7 @@ impl Wide {
         clippy::arithmetic_side_effects,
         reason = "-z, z <= 128 a leading-zero count"
     )]
-    const fn int(x: u32) -> Wide {
+    const fn int(x: u64) -> Wide {
         let z = (x as u128).leading_zeros();
         Wide {
             m: (x as u128) << z,
@@ -246,7 +246,7 @@ impl Magnitude {
     ///
     /// # Panics
     ///
-    /// For a magnitude with μ₀ or G left in it ([has_measured](Self::has_measured)): a measured constant has no
+    /// For a magnitude with μ₀, G or m_u left in it ([has_measured](Self::has_measured)): a measured constant has no
     /// value without a named set ([resolve](Self::resolve)). At compile time in a `const`, as every caller is.
     #[must_use]
     #[expect(

@@ -1,7 +1,7 @@
 //! [Magnitude]: one canonical exact factor for every scale, a product of prime powers and powers of the symbols π,
-//! ln 2, ln 10, μ₀ and G, so every reader computes the same value from it and two magnitudes compare equal however they
-//! were spelled (`Milli`, `Pow10<-3>`, `Rational<1, 1000>`). The measured constants μ₀ and G stay symbols: a number for
-//! them comes only from a named set ([constants](crate::constants)).
+//! ln 2, ln 10, μ₀, G and m_u, so every reader computes the same value from it and two magnitudes compare equal
+//! however they were spelled (`Milli`, `Pow10<-3>`, `Rational<1, 1000>`). The measured constants μ₀, G and m_u stay
+//! symbols: a number for them comes only from a named set ([constants](crate::constants)).
 
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
@@ -13,8 +13,8 @@ use crate::unit::write_superscript;
 /// constants h, c, e and k_B take 9 together, μ₀ of CODATA 2022 three more and G two: 14, resolved together.
 pub const MAX_FACTORS: usize = 16;
 
-/// How many symbols a [Magnitude] holds: π, ln 2, ln 10, μ₀ and G ([Symbols]).
-const SYMBOLS: usize = 5;
+/// How many symbols a [Magnitude] holds: π, ln 2, ln 10, μ₀, G and m_u ([Symbols]).
+const SYMBOLS: usize = 6;
 
 /// An exact positive factor: `10^a · 2^b · π^c · ln2^d · ln10^e · μ₀^f · G^g · ∏ pᵢ^kᵢ` over primes `pᵢ` other than 2
 /// and 5, every exponent a whole or half number (`√2`, `10^(3/2)` for √(kHz), `√μ₀`). `10⁻⁶` (µ), `2¹⁰` (Ki), `1/65535` (a 16-bit duty,
@@ -31,7 +31,7 @@ const SYMBOLS: usize = 5;
 /// `const` data without lifetimes, so a `&'static Magnitude` can be held at run time; [Fixed](crate::Fixed) uses it
 /// only at compile time.
 ///
-/// On the wire every exponent is twice the exponent as an `i8`, the primes as [UNib32]: `pow10` alone is 9 bits
+/// On the wire every exponent is twice the exponent as an `i8`, the primes as [UVlq64]: `pow10` alone is 9 bits
 /// (Milli `fa 00`), the rest behind an option bit, its symbols behind one more, an empty prime slot one bit.
 /// `self_describing`: the bytes end by themselves, so a magnitude can be the field of an enum variant
 /// ([Prefix](crate::Prefix)'s `Exact`).
@@ -58,7 +58,7 @@ pub struct Magnitude {
 pub struct MagnitudeRest {
     /// Twice the exponent of 2.
     pow2: i8,
-    /// π, ln 2, ln 10, μ₀ and G, `None` when all their exponents are 0.
+    /// π, ln 2, ln 10, μ₀, G and m_u, `None` when all their exponents are 0.
     symbols: Option<Symbols>,
     /// Primes other than 2 and 5, ascending, used slots first.
     factors: [Option<PrimePower>; MAX_FACTORS],
@@ -69,9 +69,10 @@ pub struct MagnitudeRest {
 /// so they cancel exactly: `(T/μ₀)·μ₀` is `T`.
 ///
 /// π, ln 2 and ln 10 are mathematics: their value is known, and a factor with them converts by a named rounding. μ₀
-/// (the magnetic constant) and G (the Newtonian constant of gravitation) are measured since the 2019 SI: a factor with
-/// either left in it has no value until a named, versioned set gives one ([resolve](Magnitude::resolve)). ε₀ =
-/// 1/(μ₀c²), Z₀ = μ₀c and α = μ₀e²c/(2h) are expressions over μ₀ with the exact c, e and h, not symbols of their own.
+/// (the magnetic constant), G (the Newtonian constant of gravitation) and m_u (the atomic mass constant, the dalton in
+/// kg) are measured since the 2019 SI: a factor with one left in it has no value until a named, versioned set gives
+/// one ([resolve](Magnitude::resolve)). ε₀ = 1/(μ₀c²), Z₀ = μ₀c and α = μ₀e²c/(2h) are expressions over μ₀ with the
+/// exact c, e and h, the molar mass constant M_u = N_A·m_u one over m_u: not symbols of their own.
 #[cfg_attr(
     feature = "shrink_wrap",
     derive_shrink_wrap(borrowed, owned(feature = "std"), self_describing)
@@ -89,6 +90,8 @@ pub struct Symbols {
     pub mu0: i8,
     /// Twice the exponent of G, the Newtonian constant of gravitation (measured).
     pub g: i8,
+    /// Twice the exponent of m_u, the atomic mass constant (measured): 1 Da = 1 u = m_u.
+    pub m_u: i8,
 }
 
 impl Symbols {
@@ -99,23 +102,29 @@ impl Symbols {
         ln10: 0,
         mu0: 0,
         g: 0,
+        m_u: 0,
     };
 
-    /// The doubled exponents in the order of [Magnitude]'s symbols: π, ln 2, ln 10, μ₀, G.
+    /// The doubled exponents in the order of [Magnitude]'s symbols: π, ln 2, ln 10, μ₀, G, m_u.
     const fn to_array(self) -> [i8; SYMBOLS] {
-        [self.pi, self.ln2, self.ln10, self.mu0, self.g]
+        [self.pi, self.ln2, self.ln10, self.mu0, self.g, self.m_u]
     }
 
     /// Whether every exponent is 0.
     #[must_use]
     pub const fn is_none(&self) -> bool {
-        self.pi == 0 && self.ln2 == 0 && self.ln10 == 0 && self.mu0 == 0 && self.g == 0
+        self.pi == 0
+            && self.ln2 == 0
+            && self.ln10 == 0
+            && self.mu0 == 0
+            && self.g == 0
+            && self.m_u == 0
     }
 
-    /// Whether a measured constant, μ₀ or G, is left in.
+    /// Whether a measured constant, μ₀, G or m_u, is left in.
     #[must_use]
     pub const fn has_measured(&self) -> bool {
-        self.mu0 != 0 || self.g != 0
+        self.mu0 != 0 || self.g != 0 || self.m_u != 0
     }
 }
 
@@ -125,13 +134,14 @@ impl Symbols {
     derive_shrink_wrap(borrowed, owned(feature = "std"), self_describing)
 )]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-// 6 bytes, so an `Option` of it is 8: half the size of a `Magnitude`. Packed, so `defmt::Format` is written out below
-// (a derive would take references to its fields).
+// 10 bytes, so an `Option` of it is 12. Packed, so `defmt::Format` is written out below (a derive would take references
+// to its fields).
 #[repr(C, packed(2))]
 pub struct PrimePower {
-    /// The prime: 3, 7, 11, ..
-    #[cfg_attr(feature = "shrink_wrap", wire(UNib32))]
-    pub prime: u32,
+    /// The prime: 3, 7, 11, .. up to the largest below 2⁶⁴, so a measured value printed with up to 19 digits always
+    /// factors (CODATA 2022's proton mass in kg has 33452438519, its A_r(e) 5485799090441).
+    #[cfg_attr(feature = "shrink_wrap", wire(UVlq64))]
+    pub prime: u64,
     /// Twice its exponent.
     pub exp: i8,
 }
@@ -150,8 +160,6 @@ impl defmt::Format for PrimePower {
 pub enum MagnitudeError {
     /// A factor of 0: a magnitude is positive.
     Zero,
-    /// A prime factor above `u32::MAX` (only from a `u64` written by hand; no unit definition has one).
-    PrimeTooLarge,
     /// More than [MAX_FACTORS] primes other than 2 and 5.
     TooManyFactors,
     /// An exponent outside ±63½.
@@ -160,7 +168,7 @@ pub enum MagnitudeError {
     NotSquare,
     /// A prime factor given by its parts that isn't a prime other than 2 and 5 ([Magnitude::from_parts_x2]).
     NotPrime,
-    /// A value asked of a magnitude with a measured constant (μ₀, G) left in it: it has none without a named set
+    /// A value asked of a magnitude with a measured constant (μ₀, G, m_u) left in it: it has none without a named set
     /// ([Magnitude::resolve]).
     Measured,
     /// A set asked for a measured constant it doesn't give ([Ampere1948](crate::constants::Ampere1948) has no G).
@@ -175,9 +183,6 @@ impl MagnitudeError {
     pub(crate) const fn panic(self) -> ! {
         match self {
             MagnitudeError::Zero => panic!("a magnitude is not zero"),
-            MagnitudeError::PrimeTooLarge => {
-                panic!("a prime factor of a magnitude is above u32::MAX")
-            }
             MagnitudeError::TooManyFactors => {
                 panic!("a magnitude has more than MAX_FACTORS primes other than 2 and 5")
             }
@@ -187,8 +192,8 @@ impl MagnitudeError {
             }
             MagnitudeError::NotPrime => panic!("a prime factor of a magnitude is not a prime"),
             MagnitudeError::Measured => panic!(
-                "this factor has a measured constant (μ₀ or G) left in it, so it has no value without a named set: \
-                 resolve it with one (Magnitude::resolve::<Codata2022>(), Fixed::convert_with::<Codata2022, ..>())"
+                "this factor has a measured constant (μ₀, G or m_u) left in it, so it has no value without a named \
+                 set: resolve it with one (Magnitude::resolve::<Codata2022>(), Fixed::convert_with::<Codata2022, ..>())"
             ),
             MagnitudeError::NotInSet => {
                 panic!(
@@ -205,7 +210,7 @@ struct Work {
     pow10: i32,
     pow2: i32,
     irr: [i32; SYMBOLS],
-    primes: [u32; WORK],
+    primes: [u64; WORK],
     exps: [i32; WORK],
     len: usize,
 }
@@ -263,10 +268,6 @@ impl Work {
 
     /// `prime^(exp2 / 2)` multiplied in, `prime` a prime.
     #[expect(
-        clippy::as_conversions,
-        reason = "const fn: From is not const on stable"
-    )]
-    #[expect(
         clippy::indexing_slicing,
         reason = "every index is below self.len, at most WORK (a full Work refuses another prime)"
     )]
@@ -289,14 +290,6 @@ impl Work {
             self.pow2 -= exp2;
             return Ok(());
         }
-        if prime > u32::MAX as u64 {
-            return Err(MagnitudeError::PrimeTooLarge);
-        }
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "checked against u32::MAX above"
-        )]
-        let prime = prime as u32;
         let mut i = 0;
         while i < self.len && self.primes[i] < prime {
             i += 1;
@@ -387,10 +380,6 @@ impl Work {
     }
 
     #[expect(
-        clippy::as_conversions,
-        reason = "const fn: From is not const on stable"
-    )]
-    #[expect(
         clippy::indexing_slicing,
         reason = "i < SYMBOLS for irr, i < rhs.len <= WORK for the primes"
     )]
@@ -408,7 +397,7 @@ impl Work {
         }
         let mut i = 0;
         while i < rhs.len {
-            if let Err(e) = self.add_prime(rhs.primes[i] as u64, sign * rhs.exps[i]) {
+            if let Err(e) = self.add_prime(rhs.primes[i], sign * rhs.exps[i]) {
                 return Err(e);
             }
             i += 1;
@@ -522,6 +511,7 @@ impl Work {
             ln10: irr[2],
             mu0: irr[3],
             g: irr[4],
+            m_u: irr[5],
         };
         let symbols = if sym.is_none() { None } else { Some(sym) };
         let rest = if pow2 == 0 && symbols.is_none() && self.len == 0 {
@@ -645,7 +635,8 @@ const fn mul_mod32(a: u64, b: u64, m: u64) -> u64 {
 }
 
 /// [is_prime] for a `u32`, in 64 bits: Miller-Rabin with the bases 2, 7 and 61, which decide every number below
-/// 4,759,123,141 (Jaeschke, 1993), so no 128-bit product. What a magnitude read from the wire checks its primes with.
+/// 4,759,123,141 (Jaeschke, 1993), so no 128-bit product. What a magnitude read from the wire checks its primes below
+/// 2³² with.
 #[expect(
     clippy::as_conversions,
     reason = "const fn: From is not const on stable"
@@ -776,6 +767,15 @@ impl Magnitude {
         ..Symbols::NONE
     });
 
+    /// m_u, the atomic mass constant: one twelfth of the mass of a ¹²C atom at rest, measured in kg, so a symbol as
+    /// [MU0](Self::MU0) is. The dalton (unified atomic mass unit) is `M_U` kg; the molar mass constant M_u is
+    /// `N_A·m_u` ([MOLAR_MASS_CONSTANT](crate::constants::MOLAR_MASS_CONSTANT)), the energy of 1 u `m_u·c²`
+    /// ([M_U_C2](crate::constants::M_U_C2)).
+    pub const M_U: Magnitude = Self::symbol(Symbols {
+        m_u: 2,
+        ..Symbols::NONE
+    });
+
     /// One symbol's power alone.
     const fn symbol(symbols: Symbols) -> Magnitude {
         Magnitude {
@@ -836,7 +836,7 @@ impl Magnitude {
         unwrap(Self::checked_ratio(num, den))
     }
 
-    /// `num / den`, factored into primes; an error for 0, a prime factor above `u32::MAX`, too many primes or an
+    /// `num / den`, factored into primes; an error for 0, too many primes or an
     /// exponent out of range.
     pub const fn checked_ratio(num: u64, den: u64) -> Result<Self, MagnitudeError> {
         let mut w = Work::ONE;
@@ -970,11 +970,11 @@ impl Magnitude {
         Work::of(&self).scale(e_x2 as i32).halve()
     }
 
-    /// The magnitude with μ₀ and G taken out: the part whose value is known.
+    /// The magnitude with μ₀, G and m_u taken out: the part whose value is known.
     #[must_use]
     pub(crate) const fn without_measured(&self) -> Magnitude {
         let mut w = Work::of(self);
-        (w.irr[3], w.irr[4]) = (0, 0);
+        (w.irr[3], w.irr[4], w.irr[5]) = (0, 0, 0);
         // fewer factors than self, the other exponents its own: packs
         unwrap(w.pack())
     }
@@ -995,7 +995,7 @@ impl Magnitude {
         clippy::arithmetic_side_effects,
         reason = "the stored exponents are i8, so a sum of two fits i32; i < w.len, the loop bound"
     )]
-    pub const fn exp_x2(&self, prime: u32) -> i16 {
+    pub const fn exp_x2(&self, prime: u64) -> i16 {
         let w = Work::of(self);
         match prime {
             2 => (w.pow10 + w.pow2) as i16,
@@ -1013,7 +1013,7 @@ impl Magnitude {
         }
     }
 
-    /// Twice the exponents of π, ln 2, ln 10, μ₀ and G.
+    /// Twice the exponents of π, ln 2, ln 10, μ₀, G and m_u.
     #[must_use]
     pub const fn symbols_x2(&self) -> Symbols {
         match &self.rest {
@@ -1024,7 +1024,7 @@ impl Magnitude {
         }
     }
 
-    /// Whether a measured constant, μ₀ or G, is left in: then the magnitude has no value ([to_f64](Self::to_f64)
+    /// Whether a measured constant, μ₀, G or m_u, is left in: then the magnitude has no value ([to_f64](Self::to_f64)
     /// and [fixed_point](Self::fixed_point) refuse) until a named set [resolves](Self::resolve) it.
     #[must_use]
     pub const fn has_measured(&self) -> bool {
@@ -1057,7 +1057,7 @@ impl Magnitude {
         }
     }
 
-    /// Whether the magnitude is a fraction of integers: no power of a symbol (π, ln 2, ln 10, μ₀, G), no half
+    /// Whether the magnitude is a fraction of integers: no power of a symbol (π, ln 2, ln 10, μ₀, G, m_u), no half
     /// exponent.
     #[must_use]
     pub const fn is_rational(&self) -> bool {
@@ -1082,7 +1082,7 @@ impl Magnitude {
         }
         let (mut num, mut den) = (1u128, 1u128);
         // 10^a · 2^b = 5^a · 2^(a + b)
-        let mut bases = [0u32; WORK + 2];
+        let mut bases = [0u64; WORK + 2];
         let mut exps = [0i32; WORK + 2];
         bases[0] = 2;
         exps[0] = w.pow10 + w.pow2;
@@ -1123,7 +1123,7 @@ impl Magnitude {
     ///
     /// # Panics
     ///
-    /// For a magnitude with μ₀ or G left in it ([has_measured](Self::has_measured)), which has no value without a
+    /// For a magnitude with μ₀, G or m_u left in it ([has_measured](Self::has_measured)), which has no value without a
     /// named set: at compile time in a `const`, so a float conversion through μ₀ doesn't compile.
     /// [checked_to_f64](Self::checked_to_f64) is `None` there instead.
     #[must_use]
@@ -1134,12 +1134,16 @@ impl Magnitude {
         }
     }
 
-    /// The factor as an `f64` (rounded), `None` with μ₀ or G left in it: a measured constant has no value without a
+    /// The factor as an `f64` (rounded), `None` with μ₀, G or m_u left in it: a measured constant has no value without a
     /// named set ([resolve](Self::resolve)).
     #[must_use]
     #[expect(
         clippy::as_conversions,
         reason = "const fn: From is not const on stable"
+    )]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a prime above 2⁵³ rounds to the nearest f64: one rounding more in a product of rounded powers"
     )]
     #[expect(clippy::indexing_slicing, reason = "i < MAX_FACTORS, the loop bound")]
     #[expect(clippy::arithmetic_side_effects, reason = "i < w.len, the loop bound")]
@@ -1178,7 +1182,7 @@ impl Magnitude {
         (x / den).checked_mul(num)
     }
 
-    /// `x · self` in floats, `None` with μ₀ or G left in the magnitude ([checked_to_f64](Self::checked_to_f64)).
+    /// `x · self` in floats, `None` with μ₀, G or m_u left in the magnitude ([checked_to_f64](Self::checked_to_f64)).
     #[must_use]
     pub fn apply_f64(&self, x: f64) -> Option<f64> {
         Some(match self.to_ratio() {
@@ -1208,10 +1212,14 @@ impl Magnitude {
         w.pow2 = i32::from(pow2_x2);
         w.irr = symbols_x2.to_array().map(i32::from);
         for f in primes {
-            if f.prime == 2 || f.prime == 5 || !is_prime_u32(f.prime) {
+            let prime = match u32::try_from(f.prime) {
+                Ok(p) => is_prime_u32(p),
+                Err(_) => is_prime(f.prime),
+            };
+            if f.prime == 2 || f.prime == 5 || !prime {
                 return Err(MagnitudeError::NotPrime);
             }
-            w.add_prime(u64::from(f.prime), i32::from(f.exp))?;
+            w.add_prime(f.prime, i32::from(f.exp))?;
         }
         w.pack()
     }
@@ -1248,8 +1256,10 @@ struct MagnitudeParts {
     mu0: i8,
     #[serde(default, skip_serializing_if = "is_zero")]
     g: i8,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    m_u: i8,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    primes: Vec<(u32, i8)>,
+    primes: Vec<(u64, i8)>,
 }
 
 #[cfg(all(feature = "serde", feature = "std"))]
@@ -1274,6 +1284,7 @@ impl serde::Serialize for Magnitude {
             ln10: sym.ln10,
             mu0: sym.mu0,
             g: sym.g,
+            m_u: sym.m_u,
             primes: self.primes().map(|f| (f.prime, f.exp)).collect(),
         }
         .serialize(serializer)
@@ -1293,6 +1304,7 @@ impl<'de> serde::Deserialize<'de> for Magnitude {
                 ln10: p.ln10,
                 mu0: p.mu0,
                 g: p.g,
+                m_u: p.m_u,
             },
             p.primes
                 .into_iter()
@@ -1351,11 +1363,11 @@ impl core::fmt::Display for Magnitude {
         if sym.has_measured() {
             // the known part as usual, then each measured symbol as a factor of its own
             let mut w = Work::of(self);
-            (w.irr[3], w.irr[4]) = (0, 0);
+            (w.irr[3], w.irr[4], w.irr[5]) = (0, 0, 0);
             if let Ok(known) = w.pack() {
                 known.fmt(f)?;
             }
-            for (name, e) in [("μ₀", sym.mu0), ("G", sym.g)] {
+            for (name, e) in [("μ₀", sym.mu0), ("G", sym.g), ("m_u", sym.m_u)] {
                 match e {
                     0 => {}
                     1 => write!(f, "·√{name}")?,
@@ -1387,7 +1399,7 @@ impl core::fmt::Display for Magnitude {
         // whole and half parts of every prime power, numerator and denominator apart
         let (mut num, mut den, mut root_num, mut root_den) = (1u128, 1u128, 1u128, 1u128);
         let mut fits = true;
-        let mut bases = [0u32; WORK + 2];
+        let mut bases = [0u64; WORK + 2];
         let mut exps = [0i32; WORK + 2];
         (bases[0], exps[0], bases[1], exps[1]) = (2, w.pow10 + w.pow2, 5, w.pow10);
         let primes = w.primes.iter().zip(&w.exps).take(w.len);
@@ -1472,7 +1484,7 @@ fn write_symbols(
 
 /// Every power on its own: `2⁻¹⁶·3·7²·π`.
 fn write_powers(
-    bases: &[u32],
+    bases: &[u64],
     exps: &[i32],
     irr: &[i32; 3],
     f: &mut core::fmt::Formatter<'_>,

@@ -6,7 +6,7 @@ level: basic
 
 "Exact" in `exact_units` is a promise with seven parts. Each is a rule you can test the crate against, and each has an example below that runs as a test. In short: nothing is hidden, everything that loses information is written down, and the safe way is the short way.
 
-1. **Every scale is exact.** A scale is an exact fraction times powers of exact symbols ($\pi$, $\ln 2$, $\ln 10$, and the measured $\mu_0$ and $G$), never a float.
+1. **Every scale is exact.** A scale is an exact fraction times powers of exact symbols ($\pi$, $\ln 2$, $\ln 10$, and the measured $\mu_0$, $G$ and $m_u$), never a float.
 2. **Exact, or refused.** A conversion, a literal or a parse gives the exact value, or it refuses: `None`, an error, or a compile error where the compiler can tell.
 3. **Every lossy step is named.** Rounding, saturating, wrapping, truncating and going to a float each happen only in a call or a type that names its policy.
 4. **Measured constants stay symbols.** A constant of nature that is measured is never a number baked into a scale. A number for it appears only at an explicit edge that says where it comes from.
@@ -16,7 +16,7 @@ level: basic
 
 ## 1. Every scale is exact
 
-A scale is a [`Magnitude`](../nomicon/magnitude.md): a product of powers of primes, $\pi$, $\ln 2$ and $\ln 10$, and of the measured constants $\mu_0$ and $G$ (rule 4). It has no float in it, so every reader, on every target, gets the same value. Two scales are equal however they are spelled, and $\pi$ stays $\pi$:
+A scale is a [`Magnitude`](../nomicon/magnitude.md): a product of powers of primes, $\pi$, $\ln 2$ and $\ln 10$, and of the measured constants $\mu_0$, $G$ and $m_u$ (rule 4). It has no float in it, so every reader, on every target, gets the same value. Two scales are equal however they are spelled, and $\pi$ stays $\pi$:
 
 ```rust
 use exact_units::{FixedScale, Magnitude, prefix::{Milli, Pow10, Rational}};
@@ -133,7 +133,7 @@ assert_eq!((Bam16::of(49152) + Bam16::of(32768)).get(), 16384);
 
 Since the SI of 2019, the speed of light $c$, Planck's constant $h$, the elementary charge $e$ and the Boltzmann constant $k_B$ have exact values by definition. A unit built on them is exact: the electronvolt is $1.602176634 \cdot 10^{-19}$ J, a fraction.
 
-Other constants are measured: the magnetic constant $\mu_0$, the gravitational constant $G$, the electron mass. Their best values change with each CODATA release. Baking one into a scale as a number would make the crate wrong a little, silently, and differently from release to release. So a measured constant stays a symbol, as $\pi$ does, and a number for it appears only at an explicit step that names its source and edition.
+Other constants are measured: the magnetic constant $\mu_0$, the gravitational constant $G$, the atomic mass constant $m_u$, the electron mass. Their best values change with each CODATA release. Baking one into a scale as a number would make the crate wrong a little, silently, and differently from release to release. So a measured constant stays a symbol, as $\pi$ does, and a number for it appears only at an explicit step that names its source and edition.
 
 A unit that is fixed by a measured property (a calorie at 15 °C, an inch of mercury at 32 °F) says so. Its scale is the value a named source prints, and its provenance carries that source:
 
@@ -152,7 +152,7 @@ assert_eq!(def.provenance, Provenance::Conventional { source: "NIST SP 811", yea
 
 A client reading the unit off the wire sees the same provenance, so it knows this scale is a convention and not a definition.
 
-The measured constants themselves are symbols of `Magnitude`: $\mu_0$ (`Magnitude::MU0`) and $G$ (`Magnitude::G`). The electric constant $\varepsilon_0 = 1/(\mu_0 c^2)$, the impedance of free space $Z_0 = \mu_0 c$ and the fine-structure constant $\alpha = \mu_0 e^2 c / (2h)$ are exact expressions over $\mu_0$. An oersted is $10^{-4}/\mu_0$ A/m, exactly. A conversion through it needs a value for $\mu_0$, so it names a set: CODATA 2018 or 2022, or the old convention $\mu_0 = 4\pi \cdot 10^{-7}$ as `Ampere1948`. There is no default and no "latest".
+The measured constants a scale keeps are symbols of `Magnitude`: $\mu_0$ (`Magnitude::MU0`), $G$ (`Magnitude::G`) and $m_u$ (`Magnitude::M_U`, the dalton in kg). The electric constant $\varepsilon_0 = 1/(\mu_0 c^2)$, the impedance of free space $Z_0 = \mu_0 c$ and the fine-structure constant $\alpha = \mu_0 e^2 c / (2h)$ are exact expressions over $\mu_0$. An oersted is $10^{-4}/\mu_0$ A/m, exactly. A conversion through it needs a value for $\mu_0$, so it names a set: CODATA 2018 or 2022, or the old convention $\mu_0 = 4\pi \cdot 10^{-7}$ as `Ampere1948`. There is no default and no "latest".
 
 ```rust
 use exact_units::{Fixed, Magnitude, Rounding, prefix::{Micro, Milli}, units::{Ampere, Meter, Per}};
@@ -304,5 +304,4 @@ These places break a rule above. Each is known and tracked, and until it is fixe
 - **`to_rounded` across $\pi$, $\ln 2$ or $\ln 10$** works with a 64-bit approximation of the factor, so within $|x| \cdot 2^{-64}$ of a rounding step it can be one step off.
 - **`Exact` and `Fraction` on `u128` are checked by drawn inputs, not proved.** That every operation is exact or refused only past `u128`, that `to_f64` is the nearest float and that every printed form reads back are properties drawn against `BigRational` and fuzzed. The same arithmetic code is walked whole on `u8`, and its pieces (the 256-bit multiply, add, division and the gcd) are Kani proofs on `u8` limbs, but no proof or walk covers the `u128` operations themselves.
 - **A logarithm, a root or π in `f64`.** `to_level` (a gain's ln), `over` (a rate times a length), `log_decrement` and `from_log_decrement` work their value in `f64` and then round it once by the `Rounding` you pass. The mode is named, but the number rounded is the `f64` one, so within an ulp of a rounding step the result can be one step off. `over` between integer storages could be worked exactly; it isn't yet.
-- **A measured mass has no set yet.** μ₀ and G come only from a named CODATA set, but m_u (the dalton), M_u, m_e and m_p have no place in one: a mass in u becomes an energy only through m_u·c² digits you write, with the edition in a comment ([nuclear physics](../recipes/nuclear.md#a-mass-in-u-is-a-ratio-its-energy-needs-a-named-edition)).
 - **`{:#}` printing** falls back to a float where the exact decimal doesn't end, without marking the text as approximate.

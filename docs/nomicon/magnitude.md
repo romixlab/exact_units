@@ -70,9 +70,9 @@ They are exact symbols beside the primes:
 
 A root halves the exponents: $\sqrt{\mathrm{mHz}} = 10^{-3/2}\ \mathrm{Hz}^{1/2}$. The root of a half power is refused (`MagnitudeError::NotSquare`).
 
-## μ₀ and G, measured symbols
+## μ₀, G and m_u, measured symbols
 
-The magnetic constant $\mu_0$ and the gravitational constant $G$ are symbols too, and cancel the same way: $(T/\mu_0)\cdot\mu_0$ is T. They differ from π in one thing: their value is measured, so a magnitude with $\mu_0$ or $G$ left in it has no number. `to_f64` and `fixed_point` refuse it (a compile error in a `const`), `checked_to_f64` is `None`, and a conversion over such a factor doesn't compile. A named set gives the number: see [Measured constants](constants.md).
+The magnetic constant $\mu_0$, the gravitational constant $G$ and the atomic mass constant $m_u$ (the dalton in kg) are symbols too, and cancel the same way: $(T/\mu_0)\cdot\mu_0$ is T. They differ from π in one thing: their value is measured, so a magnitude with $\mu_0$, $G$ or $m_u$ left in it has no number. `to_f64` and `fixed_point` refuse it (a compile error in a `const`), `checked_to_f64` is `None`, and a conversion over such a factor doesn't compile. A named set gives the number: see [Measured constants](constants.md).
 
 The display writes them last, each a factor of its own: `·10⁻⁴·μ₀⁻¹`, `·√μ₀`.
 
@@ -87,7 +87,7 @@ assert_eq!(oersted.checked_to_f64(), None);
 
 ## Factoring at compile time
 
-`Rational<N, D>` takes `u64` parameters and factors them at compile time: trial division up to $2^{16}$, then Miller–Rabin and Pollard's rho. So any fraction a datasheet writes works. A prime factor above `u32::MAX` doesn't compile; no unit definition has one.
+`Rational<N, D>` takes `u64` parameters and factors them at compile time: trial division up to $2^{16}$, then Miller–Rabin and Pollard's rho. So any fraction a datasheet writes works, and so does any measured value printed with up to 19 digits: a prime slot holds any prime below $2^{64}$. CODATA 2022's proton mass in kg needs one, $1.67262192595 \cdot 10^{-27} = 5 \cdot 33452438519 \cdot 10^{-38}$.
 
 ## What a magnitude is not
 
@@ -98,6 +98,6 @@ assert_eq!(oersted.checked_to_f64(), None);
 
 ## In memory and on the wire
 
-A `Magnitude` is plain `const` data, 138 bytes, so a firmware can hold a `&'static Magnitude`. `Fixed` uses it only at compile time.
+A `Magnitude` is plain `const` data, 202 bytes, so a firmware can hold a `&'static Magnitude`. `Fixed` uses it only at compile time. A firmware that keeps the whole unit catalogue for look-ups by name (`units::by_name`, about 300 definitions with every group and `customary`) holds one per unit: 129 kB of flash on a Cortex-M0, 19 kB of it the 64-bit prime slots. The run-time kernel (`Fixed::from_prefix`, `cmp_scaled`) works in 32-bit limbs and refuses a magnitude with a prime of $2^{32}$ or more, so no 128-bit division is linked; only a measured value resolved from a set has one.
 
-On the wire every exponent is twice the exponent as an `i8`. A decimal prefix is 2 bytes (`Milli` is `fa 00`), `Kibi` 6, a degree 13, the pound 17. A magnitude that isn't canonical is refused on decode.
+On the wire every exponent is twice the exponent as an `i8`, a prime a `UVlq64`. A decimal prefix is 2 bytes (`Milli` is `fa 00`), `Kibi` 6, a degree 15, the pound 18. A magnitude that isn't canonical is refused on decode.

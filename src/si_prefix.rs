@@ -584,7 +584,7 @@ impl Prefix {
 
     /// `x` in units of this prefix as a number in the unit itself: `Prefix::Milli.scale_f64(3300.0)` is 3.3, one
     /// multiplication or division by an exact power of ten (or by the exact fraction of another scale). NaN for
-    /// [Unknown](Prefix::Unknown), and for a scale with μ₀ or G left in it, which has no value without a named set.
+    /// [Unknown](Prefix::Unknown), and for a scale with μ₀, G or m_u left in it, which has no value without a named set.
     #[must_use]
     pub fn scale_f64(&self, x: f64) -> f64 {
         match (self.si_pow10(), self.magnitude()) {

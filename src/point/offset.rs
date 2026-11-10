@@ -44,7 +44,7 @@ impl Offset {
         Self::ratio(n, 1)
     }
 
-    /// `num / den`. Panics (at compile time in a `const`) for `den == 0` or a prime factor above `u32::MAX`.
+    /// `num / den`. Panics (at compile time in a `const`) for `den == 0`.
     #[must_use]
     pub const fn ratio(num: i64, den: u64) -> Self {
         if num == 0 {
@@ -219,7 +219,7 @@ impl Offset {
     ///
     /// # Panics
     ///
-    /// For a magnitude with μ₀ or G left in it, as [Magnitude::to_f64]: at compile time in a `const`.
+    /// For a magnitude with μ₀, G or m_u left in it, as [Magnitude::to_f64]: at compile time in a `const`.
     /// [checked_to_f64](Self::checked_to_f64) is `None` there instead.
     #[must_use]
     pub const fn to_f64(&self) -> f64 {
@@ -229,7 +229,7 @@ impl Offset {
         }
     }
 
-    /// The offset as an `f64` (rounded), `None` for a magnitude with μ₀ or G left in it, which has no value without
+    /// The offset as an `f64` (rounded), `None` for a magnitude with μ₀, G or m_u left in it, which has no value without
     /// a named set ([Magnitude::resolve]).
     #[must_use]
     pub const fn checked_to_f64(&self) -> Option<f64> {

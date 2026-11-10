@@ -23,7 +23,7 @@ use std::hash::DefaultHasher;
 pub(crate) fn factor_of(m: Magnitude) -> Factor {
     let mut f = Factor::one();
     for p in m.primes() {
-        f.add(Key::Prime(u64::from(p.prime)), i32::from(p.exp));
+        f.add(Key::Prime(p.prime), i32::from(p.exp));
     }
     let (p10, p2) = m.pow10_pow2_x2();
     f.add(Key::Prime(2), i32::from(p10) + i32::from(p2));

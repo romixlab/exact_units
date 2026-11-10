@@ -32,6 +32,7 @@ mod leap;
 mod level;
 mod literal;
 mod magnitude;
+mod masses;
 #[cfg(not(kani))]
 mod nan;
 mod niche;

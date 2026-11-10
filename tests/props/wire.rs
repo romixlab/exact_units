@@ -169,13 +169,14 @@ pub(crate) struct Row {
 
 /// A magnitude from its parts ([Magnitude::from_parts_x2], what serde and a hand-edited file go through) is an error
 /// or a magnitude that round-trips, shows, and is rebuilt from its own parts.
-pub(crate) fn magnitude(pow10: i8, pow2: i8, irr: [i8; 5], primes: &[(u32, i8)]) {
+pub(crate) fn magnitude(pow10: i8, pow2: i8, irr: [i8; 6], primes: &[(u64, i8)]) {
     let symbols = Symbols {
         pi: irr[0],
         ln2: irr[1],
         ln10: irr[2],
         mu0: irr[3],
         g: irr[4],
+        m_u: irr[5],
     };
     let parts = primes.iter().map(|&(prime, exp)| PrimePower { prime, exp });
     let Ok(m) = Magnitude::from_parts_x2(pow10, pow2, symbols, parts) else {
@@ -676,10 +677,10 @@ mod tests {
         fn magnitudes(
             pow10: i8,
             pow2: i8,
-            irr in any::<[i8; 5]>(),
+            irr in any::<[i8; 6]>(),
             primes in vec((prop_oneof![
-                proptest::sample::select(&[3u32, 7, 11, 13, 2, 5, 9, 65_521, 4_294_967_291][..]),
-                any::<u32>(),
+                proptest::sample::select(&[3u64, 7, 11, 13, 2, 5, 9, 65_521, 4_294_967_291, 33_452_438_519, (1 << 61) - 1][..]),
+                any::<u64>(),
             ], any::<i8>()), 0..6),
         ) {
             super::magnitude(pow10, pow2, irr, &primes);

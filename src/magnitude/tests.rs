@@ -136,11 +136,26 @@ fn large_and_refused() {
     assert_eq!((m.exp_x2(65537), m.exp_x2(65539)), (2, 2));
     let m = Magnitude::ratio(65537 * 65539 * 65543, 1);
     assert_eq!(m.exp_x2(65543), 2);
-    // the largest u32 prime is a factor, a larger one is refused
+    // the largest u32 prime is a factor, and so are larger ones: 2⁶¹ − 1, the largest u64 prime, and CODATA 2022's
+    // proton mass in kg, 1.672 621 925 95·10⁻²⁷ = 5 · 33452438519 · 10⁻³⁸
     assert_eq!(Magnitude::ratio(4294967291, 1).exp_x2(4294967291), 2);
+    assert_eq!(Magnitude::ratio((1 << 61) - 1, 1).exp_x2((1 << 61) - 1), 2);
+    let largest = u64::MAX - 58;
+    assert_eq!(Magnitude::ratio(largest, 1).exp_x2(largest), 2);
     assert_eq!(
-        Magnitude::checked_ratio((1 << 61) - 1, 1),
-        Err(MagnitudeError::PrimeTooLarge)
+        Magnitude::ratio(167_262_192_595, 1).exp_x2(33_452_438_519),
+        2
+    );
+    // the run-time kernel works in u32 limbs: a prime of 2³² or more is refused there, not divided in 128 bits; the
+    // i128 and u128 paths take it
+    let big = Magnitude::ratio(33_452_438_519, 1);
+    assert_eq!(big.cmp_scaled(1, 2), None);
+    assert_eq!(big.apply_int(2), Some(66_904_877_038));
+    assert_eq!(big.to_ratio(), Some((33_452_438_519, 1)));
+    let below = Magnitude::ratio(4294967291, 1);
+    assert_eq!(
+        below.cmp_scaled(1i64, 4_294_967_291),
+        Some(core::cmp::Ordering::Equal)
     );
     assert_eq!(Magnitude::checked_ratio(0, 1), Err(MagnitudeError::Zero));
     assert_eq!(Magnitude::checked_ratio(1, 0), Err(MagnitudeError::Zero));
@@ -285,8 +300,8 @@ fn display_of_a_root_past_u128() {
 #[test]
 fn sizes() {
     // what a `&'static Magnitude` costs a firmware that holds one at run time
-    assert_eq!(size_of::<PrimePower>(), 6);
-    assert_eq!(size_of::<Magnitude>(), 138);
+    assert_eq!(size_of::<PrimePower>(), 10);
+    assert_eq!(size_of::<Magnitude>(), 202);
 }
 
 #[cfg(feature = "shrink_wrap")]
@@ -300,10 +315,10 @@ fn wire() {
     let bytes = |m: Magnitude, buf: &mut [u8]| m.to_ww_bytes(buf).unwrap().to_vec();
     assert_eq!(bytes(Magnitude::pow10(-3), &mut buf), [0xfa, 0x00]);
     assert_eq!(bytes(Magnitude::ONE, &mut buf), [0x00, 0x00]);
-    // the sizes docs/nomicon/magnitude.md gives: Kibi 6, a degree 13, the pound 17
+    // the sizes docs/nomicon/magnitude.md gives: Kibi 6, a degree 15, the pound 18
     assert_eq!(bytes(Magnitude::pow2(10), &mut buf).len(), 6);
-    assert_eq!(bytes(Magnitude::new(1, 180, 0, 0, 1), &mut buf).len(), 13);
-    assert_eq!(bytes(LB, &mut buf).len(), 17);
+    assert_eq!(bytes(Magnitude::new(1, 180, 0, 0, 1), &mut buf).len(), 15);
+    assert_eq!(bytes(LB, &mut buf).len(), 18);
     for m in [
         Magnitude::ONE,
         Magnitude::pow2(10),

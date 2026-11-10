@@ -954,3 +954,121 @@ pub(crate) mod curve {
         })
     }
 }
+
+/// CODATA's measured masses as its tables print them, the digit groups joined by `_` where the paper leaves a space:
+/// 2018 Table XXXI (Tiesinga et al., Rev. Mod. Phys. 93, 025010, 2021), 2022 Table XXXIII (Mohr et al., Rev. Mod.
+/// Phys. 97, 025002, 2025), the same digits as NIST's `allascii.txt` of each adjustment.
+pub(crate) mod codata {
+    /// One printed value: the value and its standard uncertainty, in the unit the table gives.
+    pub(crate) struct Printed {
+        pub(crate) value: &'static str,
+        pub(crate) u: &'static str,
+    }
+
+    /// The constants of one edition, as printed.
+    pub(crate) struct Edition {
+        pub(crate) year: u16,
+        /// m_u, kg.
+        pub(crate) m_u: Printed,
+        /// m_e, kg.
+        pub(crate) m_e: Printed,
+        /// m_p, kg.
+        pub(crate) m_p: Printed,
+        /// A_r(e).
+        pub(crate) ar_e: Printed,
+        /// A_r(p).
+        pub(crate) ar_p: Printed,
+        /// M_u, kg/mol: N_A·m_u, printed rounded on its own.
+        pub(crate) molar: Printed,
+        /// m_u·c² in MeV: printed rounded on its own.
+        pub(crate) m_u_c2_mev: Printed,
+    }
+
+    pub(crate) const CODATA_2018: Edition = Edition {
+        year: 2018,
+        m_u: Printed {
+            value: "1.660_539_066_60e-27",
+            u: "0.000_000_000_50e-27",
+        },
+        m_e: Printed {
+            value: "9.109_383_7015e-31",
+            u: "0.000_000_0028e-31",
+        },
+        m_p: Printed {
+            value: "1.672_621_923_69e-27",
+            u: "0.000_000_000_51e-27",
+        },
+        ar_e: Printed {
+            value: "5.485_799_090_65e-4",
+            u: "0.000_000_000_16e-4",
+        },
+        ar_p: Printed {
+            value: "1.007_276_466_621",
+            u: "0.000_000_000_053",
+        },
+        molar: Printed {
+            value: "0.999_999_999_65e-3",
+            u: "0.000_000_000_30e-3",
+        },
+        m_u_c2_mev: Printed {
+            value: "931.494_102_42",
+            u: "0.000_000_28",
+        },
+    };
+
+    pub(crate) const CODATA_2022: Edition = Edition {
+        year: 2022,
+        m_u: Printed {
+            value: "1.660_539_068_92e-27",
+            u: "0.000_000_000_52e-27",
+        },
+        m_e: Printed {
+            value: "9.109_383_7139e-31",
+            u: "0.000_000_0028e-31",
+        },
+        m_p: Printed {
+            value: "1.672_621_925_95e-27",
+            u: "0.000_000_000_52e-27",
+        },
+        ar_e: Printed {
+            value: "5.485_799_090_441e-4",
+            u: "0.000_000_000_097e-4",
+        },
+        ar_p: Printed {
+            value: "1.007_276_466_5789",
+            u: "0.000_000_000_0083",
+        },
+        molar: Printed {
+            value: "1.000_000_001_05e-3",
+            u: "0.000_000_000_31e-3",
+        },
+        m_u_c2_mev: Printed {
+            value: "931.494_103_72",
+            u: "0.000_000_29",
+        },
+    };
+
+    /// A printed decimal as an exact rational, and the place of its last digit, `10^last`.
+    #[cfg(not(any(kani, fuzzing)))]
+    #[expect(
+        clippy::expect_used,
+        reason = "the digits above are decimals; a typo fails the test"
+    )]
+    pub(crate) fn exact(s: &str) -> (num_rational::BigRational, i128) {
+        let (digits, pow10) = super::decimal(s).expect("CODATA's digits are a decimal");
+        (pow10_rational(digits, pow10), pow10)
+    }
+
+    /// `digits · 10^pow10` exactly.
+    #[cfg(not(any(kani, fuzzing)))]
+    pub(crate) fn pow10_rational(digits: i128, pow10: i128) -> num_rational::BigRational {
+        let ten = num_bigint::BigInt::from(10)
+            .pow(u32::try_from(pow10.unsigned_abs()).unwrap_or(u32::MAX));
+        let d = num_bigint::BigInt::from(digits);
+        if pow10 < 0 {
+            num_rational::BigRational::new(d, ten)
+        } else {
+            num_rational::BigRational::from_integer(d * ten)
+        }
+    }
+}

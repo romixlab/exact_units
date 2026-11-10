@@ -1,11 +1,11 @@
-//! Properties of the symbols of a [Magnitude] (π, ln 2, ln 10, μ₀, G), against [Doubled], a model that keeps one
+//! Properties of the symbols of a [Magnitude] (π, ln 2, ln 10, μ₀, G, m_u), against [Doubled], a model that keeps one
 //! doubled exponent per base, the symbols as bases of their own beside the primes, with no number anywhere: a
 //! product or quotient has the model's exponents, so the symbols cancel exactly; a half power is the model's halved,
-//! refused exactly where an exponent would be a quarter; a magnitude with μ₀ or G left in it has no value
+//! refused exactly where an exponent would be a quarter; a magnitude with μ₀, G or m_u left in it has no value
 //! (`checked_to_f64` is `None`) and every other has one; and resolving with a set is the model with the set's value
 //! of each constant put in, its uncertainty `|k|` times the constant's.
 //!
-//! A plain test walks every pair of exponents of μ₀ and G in a small square whole; a proptest draws the rest.
+//! A plain test walks every triple of exponents of μ₀, G and m_u in a small cube whole; a proptest draws the rest.
 #![cfg(not(kani))]
 #![expect(
     clippy::arithmetic_side_effects,
@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 /// A base of the model: a prime, or one of the symbols by name.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Base {
-    Prime(u32),
+    Prime(u64),
     Symbol(&'static str),
 }
 
@@ -29,7 +29,7 @@ struct Doubled(BTreeMap<Base, i32>);
 
 impl Doubled {
     /// The model of a magnitude made from parts: 10 split into 2 and 5, each symbol its own base.
-    fn of(pow10_x2: i8, sym: Symbols, primes: &[(u32, i8)]) -> Doubled {
+    fn of(pow10_x2: i8, sym: Symbols, primes: &[(u64, i8)]) -> Doubled {
         let mut m = Doubled(BTreeMap::new());
         m.add(Base::Prime(2), i32::from(pow10_x2));
         m.add(Base::Prime(5), i32::from(pow10_x2));
@@ -39,6 +39,7 @@ impl Doubled {
             ("ln10", sym.ln10),
             ("mu0", sym.mu0),
             ("g", sym.g),
+            ("m_u", sym.m_u),
         ] {
             m.add(Base::Symbol(name), i32::from(e));
         }
@@ -92,7 +93,9 @@ impl Doubled {
     }
 
     fn measured(&self) -> bool {
-        self.exp(Base::Symbol("mu0")) != 0 || self.exp(Base::Symbol("g")) != 0
+        ["mu0", "g", "m_u"]
+            .into_iter()
+            .any(|s| self.exp(Base::Symbol(s)) != 0)
     }
 
     /// The model with a symbol taken out.
@@ -104,14 +107,14 @@ impl Doubled {
 }
 
 /// A magnitude from its parts, `None` where they don't make one (out of range).
-fn make(pow10_x2: i8, sym: Symbols, primes: &[(u32, i8)]) -> Option<Magnitude> {
+fn make(pow10_x2: i8, sym: Symbols, primes: &[(u64, i8)]) -> Option<Magnitude> {
     let parts = primes.iter().map(|&(prime, exp)| PrimePower { prime, exp });
     Magnitude::from_parts_x2(pow10_x2, 0, sym, parts).ok()
 }
 
 /// A product and a quotient have the model's exponents: the symbols cancel, `a · b / b` is `a`, and a magnitude has
-/// no value exactly where μ₀ or G is left.
-pub(crate) fn cancel(a: (i8, Symbols, &[(u32, i8)]), b: (i8, Symbols, &[(u32, i8)])) {
+/// no value exactly where μ₀, G or m_u is left.
+pub(crate) fn cancel(a: (i8, Symbols, &[(u64, i8)]), b: (i8, Symbols, &[(u64, i8)])) {
     let (Some(ma), Some(mb)) = (make(a.0, a.1, a.2), make(b.0, b.1, b.2)) else {
         return;
     };
@@ -136,7 +139,7 @@ pub(crate) fn cancel(a: (i8, Symbols, &[(u32, i8)]), b: (i8, Symbols, &[(u32, i8
 }
 
 /// `m^(k/2)` is the model's, refused exactly where it is a quarter power; `√m · √m` is `m`.
-pub(crate) fn half(a: (i8, Symbols, &[(u32, i8)]), k: i8) {
+pub(crate) fn half(a: (i8, Symbols, &[(u64, i8)]), k: i8) {
     let Some(m) = make(a.0, a.1, a.2) else { return };
     let want = Doubled::read(&m).pow_x2(i32::from(k));
     match (m.checked_pow_x2(k), want) {
@@ -158,13 +161,16 @@ pub(crate) fn half(a: (i8, Symbols, &[(u32, i8)]), k: i8) {
 
 /// Resolving with a set is the model with the set's value of each constant put in, and `|k|` times its relative
 /// uncertainty; a set without the constant refuses.
-pub(crate) fn resolve<S: Constants>(a: (i8, Symbols, &[(u32, i8)])) {
+pub(crate) fn resolve<S: Constants>(a: (i8, Symbols, &[(u64, i8)])) {
     let Some(m) = make(a.0, a.1, a.2) else { return };
     let d = Doubled::read(&m);
     let got = m.checked_resolve::<S>();
-    let mut want = d.without("mu0").without("g");
-    let mut rel_u = [None, None];
-    for (i, (name, c)) in [("mu0", S::MU0), ("g", S::G)].into_iter().enumerate() {
+    let mut want = d.without("mu0").without("g").without("m_u");
+    let mut rel_u = [None, None, None];
+    for (i, (name, c)) in [("mu0", S::MU0), ("g", S::G), ("m_u", S::M_U)]
+        .into_iter()
+        .enumerate()
+    {
         let k = d.exp(Base::Symbol(name));
         if k == 0 {
             continue;
@@ -197,27 +203,29 @@ pub(crate) fn resolve<S: Constants>(a: (i8, Symbols, &[(u32, i8)])) {
     };
     assert_eq!(Doubled::read(&r.value), want, "{m:?}");
     assert!(!r.value.has_measured());
-    assert_eq!([r.mu0_rel_u, r.g_rel_u], rel_u);
+    assert_eq!([r.mu0_rel_u, r.g_rel_u, r.m_u_rel_u], rel_u);
 }
 
-/// Every pair of exponents of μ₀ and G in `-4..=4` (halves included), against every other: cancelling and half
-/// powers walked whole, with π and a prime beside them.
+/// Every triple of exponents of μ₀, G and m_u in `-3..=3` (halves included), against every other: cancelling and
+/// half powers walked whole, with π and a prime beside them.
 #[test]
-fn every_small_pair() {
-    let range = -4i8..=4;
+fn every_small_triple() {
+    let range = -3i8..=3;
     let syms: Vec<Symbols> = range
         .clone()
-        .flat_map(|mu0| {
-            range.clone().map(move |g| Symbols {
+        .flat_map(|mu0| range.clone().map(move |g| (mu0, g)))
+        .flat_map(|(mu0, g)| {
+            range.clone().map(move |m_u| Symbols {
                 pi: 1,
                 mu0,
                 g,
+                m_u,
                 ..Symbols::NONE
             })
         })
         .collect();
     for &s in &syms {
-        let a = (-6, s, &[(3u32, 1i8)][..]);
+        let a = (-6, s, &[(3u64, 1i8)][..]);
         half(a, 1);
         half(a, -3);
         resolve::<Codata2022>(a);
@@ -262,20 +270,21 @@ mod strategy {
     /// Symbols with small exponents, the measured ones often 0.
     pub(super) fn symbols() -> impl Strategy<Value = Symbols> {
         let e = || prop_oneof![Just(0i8), -6i8..=6, any::<i8>()];
-        (e(), e(), e(), e(), e()).prop_map(|(pi, ln2, ln10, mu0, g)| Symbols {
+        (e(), e(), e(), e(), e(), e()).prop_map(|(pi, ln2, ln10, mu0, g, m_u)| Symbols {
             pi,
             ln2,
             ln10,
             mu0,
             g,
+            m_u,
         })
     }
 
     /// A few primes other than 2 and 5, doubled exponents.
-    pub(super) fn primes() -> impl Strategy<Value = Vec<(u32, i8)>> {
+    pub(super) fn primes() -> impl Strategy<Value = Vec<(u64, i8)>> {
         proptest::collection::vec(
             (
-                proptest::sample::select(&[3u32, 7, 11, 127, 661, 1_496_941, 31, 2153][..]),
+                proptest::sample::select(&[3u64, 7, 11, 127, 661, 1_496_941, 31, 2153][..]),
                 -8i8..=8,
             ),
             0..=4,

@@ -1,13 +1,17 @@
 //! Physical constants as exact [Magnitude]s, and the named sets that give the measured ones a value.
 //!
 //! Since the 2019 SI, c, h, e, k_B, N_A, Δν_Cs and K_cd are exact numbers: [C], [H], [E], [K_B] and [N_A] here are
-//! plain magnitudes. The magnetic constant μ₀ and the Newtonian constant of gravitation G are measured: they stay
-//! symbols in a [Magnitude] ([Magnitude::MU0], [Magnitude::G]), as π is, so a factor with them is exact and cancels
-//! exactly (`(T/μ₀)·μ₀` is `T`), and ε₀, Z₀ and α are expressions over μ₀ ([EPSILON0], [Z0], [ALPHA]), not numbers.
+//! plain magnitudes. The magnetic constant μ₀, the Newtonian constant of gravitation G and the atomic mass constant
+//! m_u are measured: they stay symbols in a [Magnitude] ([Magnitude::MU0], [Magnitude::G], [Magnitude::M_U]), as π
+//! is, so a factor with them is exact and cancels exactly (`(T/μ₀)·μ₀` is `T`), and ε₀, Z₀ and α are expressions over
+//! μ₀ ([EPSILON0], [Z0], [ALPHA]), the molar mass constant M_u and the energy of a dalton expressions over m_u
+//! ([MOLAR_MASS_CONSTANT], [M_U_C2]), not numbers.
 //!
-//! A number for μ₀ or G appears only at an explicit edge: a [Constants] set named by the caller, a versioned
-//! edition ([Codata2018], [Codata2022]) or the old convention [Ampere1948]. There is no "latest" set and no default:
-//! a newer edition is a new type, so a result never changes under the code that asked for it.
+//! A number for one appears only at an explicit edge: a [Constants] set named by the caller, a versioned edition
+//! ([Codata2018], [Codata2022]) or the old convention [Ampere1948]. There is no "latest" set and no default: a newer
+//! edition is a new type, so a result never changes under the code that asked for it. A set also gives the electron
+//! and proton masses ([Constants::M_E], [Constants::M_P]) and their relative atomic masses ([Constants::AR_E],
+//! [Constants::AR_P]) as values, not symbols: no scale needs them yet.
 //!
 //! ```
 //! use exact_units::Magnitude;
@@ -22,8 +26,9 @@
 //! assert!((alpha.rel_u_f64() - 1.6e-10).abs() < 0.1e-10); // μ₀¹: all of μ₀'s uncertainty
 //! ```
 //!
-//! A conversion whose factor keeps μ₀ or G doesn't compile without a set, floats included; with one it is
-//! [Fixed::convert_with](crate::Fixed::convert_with) or [convert_rounded_with](crate::Fixed::convert_rounded_with).
+//! A conversion whose factor keeps μ₀, G or m_u doesn't compile without a set, floats included; with one it is
+//! [Fixed::convert_with](crate::Fixed::convert_with), [convert_rounded_with](crate::Fixed::convert_rounded_with) or
+//! [Exact::convert_with](crate::Exact::convert_with).
 
 use crate::{Magnitude, MagnitudeError};
 
@@ -56,6 +61,15 @@ pub const ALPHA: Magnitude = Magnitude::MU0
     .mul(C)
     .div(H.mul(Magnitude::ratio(2, 1)));
 
+/// The molar mass constant M_u = N_A·m_u in kg/mol: exact, an expression over the symbol m_u. 1 g/mol exactly only
+/// before the 2019 SI; CODATA 2018 puts it below, CODATA 2022 above.
+pub const MOLAR_MASS_CONSTANT: Magnitude = N_A.mul(Magnitude::M_U);
+
+/// The energy equivalent of the atomic mass constant, m_u·c², in J: exact, an expression over m_u. In eV it is
+/// `M_U_C2.div(E)`, about 931.494 MeV; a set's value is its m_u in kg times the exact c²/e, which agrees with the
+/// MeV value CODATA prints beside it to within the rounding of the two (a few 10⁻¹² relative).
+pub const M_U_C2: Magnitude = Magnitude::M_U.mul(C).mul(C);
+
 /// A measured constant's value in one [Constants] set, in coherent SI units: exact as the set prints it, with its
 /// standard uncertainty relative to the value.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -71,18 +85,51 @@ pub struct Measured {
     pub year: u16,
 }
 
-/// A named, versioned set of values for the measured constants: where a number for μ₀ or G comes from, chosen by
-/// name at the edge where a value is needed ([Magnitude::resolve]). A constant the set doesn't give is `None`, and
+/// A named, versioned set of values for the measured constants: where a number for μ₀, G or m_u comes from, chosen
+/// by name at the edge where a value is needed ([Magnitude::resolve]). A constant the set doesn't give is `None`, and
 /// a factor that needs it doesn't resolve (a compile error in a `const`).
 pub trait Constants {
     /// μ₀, the magnetic constant, in N/A².
     const MU0: Option<Measured>;
     /// G, the Newtonian constant of gravitation, in m³/(kg·s²).
     const G: Option<Measured>;
+    /// m_u, the atomic mass constant (1 Da, 1 u), in kg.
+    const M_U: Option<Measured>;
+    /// m_e, the electron mass, in kg. A value, not a symbol of [Magnitude].
+    const M_E: Option<Measured>;
+    /// m_p, the proton mass, in kg. A value, not a symbol of [Magnitude].
+    const M_P: Option<Measured>;
+    /// A_r(e) = m_e/m_u, the electron's relative atomic mass: the electron mass in u, known about ten times better
+    /// than m_e in kg (what an atomic mass table takes off per electron).
+    const AR_E: Option<Measured>;
+    /// A_r(p) = m_p/m_u, the proton's relative atomic mass: the proton mass in u.
+    const AR_P: Option<Measured>;
 }
 
-/// The CODATA 2018 recommended values (Tiesinga et al., Rev. Mod. Phys. 93, 025010, 2021):
-/// μ₀ = 1.256 637 062 12(19)·10⁻⁶ N/A², G = 6.674 30(15)·10⁻¹¹ m³/(kg·s²).
+/// A [Measured] of `source` and `year` from the digits as printed: `digits·10^pow10` with the standard uncertainty
+/// `u·10^pow10` in the same last digits.
+const fn codata(digits: u64, pow10: i8, u: u64, year: u16) -> Measured {
+    Measured {
+        value: Magnitude::ratio(digits, 1).mul(Magnitude::pow10(pow10)),
+        rel_u: Some(Magnitude::ratio(u, digits)),
+        source: "CODATA",
+        year,
+    }
+}
+
+/// The CODATA 2018 recommended values (Tiesinga et al., Rev. Mod. Phys. 93, 025010, 2021), Table XXXI:
+///
+/// | constant | value |
+/// |---|---|
+/// | μ₀ | 1.256 637 062 12(19)·10⁻⁶ N/A² |
+/// | G | 6.674 30(15)·10⁻¹¹ m³/(kg·s²) |
+/// | m_u | 1.660 539 066 60(50)·10⁻²⁷ kg |
+/// | m_e | 9.109 383 7015(28)·10⁻³¹ kg |
+/// | m_p | 1.672 621 923 69(51)·10⁻²⁷ kg |
+/// | A_r(e) | 5.485 799 090 65(16)·10⁻⁴ |
+/// | A_r(p) | 1.007 276 466 621(53) |
+///
+/// The atomic mass evaluation AME2020 and NUBASE2020 use this edition's m_u.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Codata2018;
 
@@ -100,10 +147,29 @@ impl Constants for Codata2018 {
         source: "CODATA",
         year: 2018,
     });
+
+    const M_U: Option<Measured> = Some(codata(166_053_906_660, -38, 50, 2018));
+
+    const M_E: Option<Measured> = Some(codata(91_093_837_015, -41, 28, 2018));
+
+    const M_P: Option<Measured> = Some(codata(167_262_192_369, -38, 51, 2018));
+
+    const AR_E: Option<Measured> = Some(codata(548_579_909_065, -15, 16, 2018));
+
+    const AR_P: Option<Measured> = Some(codata(1_007_276_466_621, -12, 53, 2018));
 }
 
-/// The CODATA 2022 recommended values (Mohr et al., Rev. Mod. Phys. 97, 025002, 2025):
-/// μ₀ = 1.256 637 061 27(20)·10⁻⁶ N/A², G = 6.674 30(15)·10⁻¹¹ m³/(kg·s²).
+/// The CODATA 2022 recommended values (Mohr et al., Rev. Mod. Phys. 97, 025002, 2025), Table XXXIII:
+///
+/// | constant | value |
+/// |---|---|
+/// | μ₀ | 1.256 637 061 27(20)·10⁻⁶ N/A² |
+/// | G | 6.674 30(15)·10⁻¹¹ m³/(kg·s²) |
+/// | m_u | 1.660 539 068 92(52)·10⁻²⁷ kg |
+/// | m_e | 9.109 383 7139(28)·10⁻³¹ kg |
+/// | m_p | 1.672 621 925 95(52)·10⁻²⁷ kg |
+/// | A_r(e) | 5.485 799 090 441(97)·10⁻⁴ |
+/// | A_r(p) | 1.007 276 466 5789(83) |
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Codata2022;
 
@@ -121,11 +187,21 @@ impl Constants for Codata2022 {
         source: "CODATA",
         year: 2022,
     });
+
+    const M_U: Option<Measured> = Some(codata(166_053_906_892, -38, 52, 2022));
+
+    const M_E: Option<Measured> = Some(codata(91_093_837_139, -41, 28, 2022));
+
+    const M_P: Option<Measured> = Some(codata(167_262_192_595, -38, 52, 2022));
+
+    const AR_E: Option<Measured> = Some(codata(5_485_799_090_441, -16, 97, 2022));
+
+    const AR_P: Option<Measured> = Some(codata(10_072_764_665_789, -13, 83, 2022));
 }
 
 /// The convention of the 1948 definition of the ampere, in force until the 2019 SI: μ₀ = 4π·10⁻⁷ N/A² exactly, with
-/// no uncertainty. What Gaussian tables and older datasheets assume; an opt-in, never a default. It gives no G, so a
-/// factor that needs G doesn't resolve with it.
+/// no uncertainty. What Gaussian tables and older datasheets assume; an opt-in, never a default. It gives no G and no
+/// masses, so a factor that needs G or m_u doesn't resolve with it.
 ///
 /// ```compile_fail
 /// use exact_units::Magnitude;
@@ -145,27 +221,39 @@ impl Constants for Ampere1948 {
     });
 
     const G: Option<Measured> = None;
+
+    const M_U: Option<Measured> = None;
+
+    const M_E: Option<Measured> = None;
+
+    const M_P: Option<Measured> = None;
+
+    const AR_E: Option<Measured> = None;
+
+    const AR_P: Option<Measured> = None;
 }
 
 /// A magnitude with its measured constants replaced by a set's values ([Magnitude::resolve]): symbol-free, with
 /// the relative uncertainty each constant brings in.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Resolved {
-    /// The value: no μ₀ or G left in it, so [Magnitude::to_f64] and the conversions take it.
+    /// The value: no μ₀, G or m_u left in it, so [Magnitude::to_f64] and the conversions take it.
     pub value: Magnitude,
     /// The relative uncertainty μ₀ brings in, `|k|` times μ₀'s for `μ₀^k` (half of it for `√μ₀`); `None` where
     /// there is no μ₀ or the set has it exact.
     pub mu0_rel_u: Option<Magnitude>,
     /// The relative uncertainty G brings in, as `mu0_rel_u`.
     pub g_rel_u: Option<Magnitude>,
+    /// The relative uncertainty m_u brings in, as `mu0_rel_u`.
+    pub m_u_rel_u: Option<Magnitude>,
 }
 
 impl Resolved {
-    /// The relative standard uncertainty of the value to first order, as an `f64`: the sum of the two parts, which
-    /// is at least their root-sum-square (μ₀ and G are uncorrelated in CODATA). 0 where nothing uncertain went in.
+    /// The relative standard uncertainty of the value to first order, as an `f64`: the sum of the parts, at least
+    /// their root-sum-square whatever their correlation in CODATA. 0 where nothing uncertain went in.
     #[must_use]
     pub fn rel_u_f64(&self) -> f64 {
-        [self.mu0_rel_u, self.g_rel_u]
+        [self.mu0_rel_u, self.g_rel_u, self.m_u_rel_u]
             .into_iter()
             .flatten()
             .map(|u| u.to_f64())
@@ -203,7 +291,7 @@ const fn power(
 }
 
 impl Magnitude {
-    /// This magnitude with μ₀ and G replaced by the values of the set `S`, half powers included (`√μ₀` is the square
+    /// This magnitude with μ₀, G and m_u replaced by the values of the set `S`, half powers included (`√μ₀` is the square
     /// root of the set's μ₀, exact), and the uncertainty they bring in. A magnitude without them is itself, with no
     /// uncertainty. Panics (at compile time in a `const`) where [checked_resolve](Self::checked_resolve) is an error.
     ///
@@ -234,7 +322,10 @@ impl Magnitude {
     pub const fn checked_resolve<S: Constants>(&self) -> Result<Resolved, MagnitudeError> {
         let sym = self.symbols_x2();
         // a constant the set lacks first, whatever else would fail
-        if (sym.mu0 != 0 && S::MU0.is_none()) || (sym.g != 0 && S::G.is_none()) {
+        if (sym.mu0 != 0 && S::MU0.is_none())
+            || (sym.g != 0 && S::G.is_none())
+            || (sym.m_u != 0 && S::M_U.is_none())
+        {
             return Err(MagnitudeError::NotInSet);
         }
         let (mu0, mu0_rel_u) = match power(S::MU0.as_ref(), sym.mu0) {
@@ -245,17 +336,27 @@ impl Magnitude {
             Ok(p) => p,
             Err(e) => return Err(e),
         };
+        let (m_u, m_u_rel_u) = match power(S::M_U.as_ref(), sym.m_u) {
+            Ok(p) => p,
+            Err(e) => return Err(e),
+        };
         let value = match self.without_measured().checked_mul(mu0) {
-            Ok(v) => match v.checked_mul(g) {
-                Ok(v) => v,
-                Err(e) => return Err(e),
-            },
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let value = match value.checked_mul(g) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let value = match value.checked_mul(m_u) {
+            Ok(v) => v,
             Err(e) => return Err(e),
         };
         Ok(Resolved {
             value,
             mu0_rel_u,
             g_rel_u,
+            m_u_rel_u,
         })
     }
 }
