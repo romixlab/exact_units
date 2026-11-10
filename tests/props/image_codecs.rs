@@ -13,11 +13,12 @@
     clippy::arithmetic_side_effects,
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
+#![expect(clippy::panic, reason = "a property fails by panicking")]
 
 use super::reference::imaging as reference;
 use exact_units::prefix::{One, Pow2};
 use exact_units::units::Ratio;
-use exact_units::{Fixed, Rounding};
+use exact_units::{Fixed, Overflow, Prefix, Rounding};
 
 /// `x / 2`, rounded by `r`: `x >> 1` for `Floor`.
 fn half(x: i32, r: Rounding) -> i32 {
@@ -202,6 +203,141 @@ fn ycgco_r_every_8_bit_colour() {
     }
 }
 
+/// `p / 2^k` rounded by `r`, with `k` known at run time: `p` in steps of 2⁻ᵏ rescaled to whole ones.
+fn shift(p: i32, k: i8, r: Rounding) -> i32 {
+    Prefix::from_pow2(-k)
+        .and_then(|from| from.rescale(p, Prefix::Unit, r, Overflow::Checked))
+        .unwrap_or_else(|| panic!("{p} / 2^{k} fits an i32"))
+}
+
+/// T.81's two point transforms (A.4) of `x` by `pt`: the integer divide of lossless samples and AC coefficients is
+/// `Truncate`, the arithmetic shift of DC coefficients is `Floor`.
+pub(crate) fn point_transforms(x: i16, pt: i8) {
+    let x = i32::from(x);
+    assert_eq!(shift(x, pt, Rounding::Truncate), x / (1 << pt), "{x} / 2^{pt}");
+    assert_eq!(shift(x, pt, Rounding::Floor), x >> pt, "{x} >> {pt}");
+}
+
+/// H.273's Round (eq. 8), Sign(x)·Floor(Abs(x) + 0.5), of `x = p / 2^k` is `NearestAway`.
+pub(crate) fn h273_round_is_nearest_away(p: i16, k: i8) {
+    let p = i32::from(p);
+    let want = reference::round_h273(i128::from(p), 1 << k);
+    assert_eq!(i128::from(shift(p, k, Rounding::NearestAway)), want, "Round({p} / 2^{k})");
+}
+
+/// JFIF's Round(x) = ⌊x + 0.5⌋ (T.871 clause 7) of `x = p / 2^k`, AV1's Round2(p, k) (4.7) and the add-half-then-shift
+/// of H.264 (eq. 8-337) and H.265 (eq. 8-309): `Floor` of `p` plus half a step, until `NearestCeil` names it.
+pub(crate) fn round_half_up_is_floor_of_half_more(p: i16, k: i8) {
+    let p = i32::from(p);
+    let want = reference::round_half_up(i128::from(p), 1 << k);
+    let half_step = if k == 0 { 0 } else { 1 << (k - 1) };
+    assert_eq!(i128::from(shift(p + half_step, k, Rounding::Floor)), want, "Round2({p}, {k})");
+    // AV1 prints it as (x + (1 << (n - 1))) >> n, for n > 0
+    assert_eq!(i128::from((p + half_step) >> k), want);
+}
+
+/// K.10's table (T.81 Annex K): 8-bit DC values before the level shift, after it, divided by 2 and shifted right
+/// by 1. The divide truncates the magnitude, the shift the LSB: from −1 down they part.
+#[test]
+fn k10_every_row() {
+    const ROWS: [[i32; 4]; 9] = [
+        [131, 3, 1, 1],
+        [130, 2, 1, 1],
+        [129, 1, 0, 0],
+        [128, 0, 0, 0],
+        [127, -1, 0, -1],
+        [126, -2, -1, -1],
+        [125, -3, -1, -2],
+        [124, -4, -2, -2],
+        [123, -5, -2, -3],
+    ];
+    for [before, shifted, divided, arithmetic] in ROWS {
+        assert_eq!(before - 128, shifted, "the level shift 2^(P−1) (A.3.1)");
+        assert_eq!(shift(shifted, 1, Rounding::Truncate), divided, "divide {shifted} by 2");
+        assert_eq!(shift(shifted, 1, Rounding::Floor), arithmetic, "{shifted} >> 1");
+        // A.4: the shift "is equivalent to dividing by 2^Pt before the level shift"
+        assert_eq!((before >> 1) - (128 >> 1), arithmetic);
+    }
+}
+
+/// A.4's claim in full: for P = 8 and 12 and every Pt below P, the arithmetic shift of a level-shifted sample is the
+/// unsigned sample divided by 2^Pt, less the shifted level.
+#[test]
+fn shift_before_the_level_shift() {
+    for p in [8, 12] {
+        for pt in 0..p {
+            for x in 0..1 << p {
+                let level = 1 << (p - 1);
+                assert_eq!(shift(x - level, pt, Rounding::Floor), (x >> pt) - (level >> pt));
+            }
+        }
+    }
+}
+
+#[test]
+fn point_transforms_every_i16() {
+    for x in i16::MIN..=i16::MAX {
+        for pt in [0, 1, 2, 7, 15] {
+            point_transforms(x, pt);
+        }
+    }
+}
+
+#[test]
+fn h273_round_and_round_half_up_every_i16() {
+    for p in i16::MIN..=i16::MAX {
+        for k in [0, 1, 2, 12] {
+            h273_round_is_nearest_away(p, k);
+            round_half_up_is_floor_of_half_more(p, k);
+        }
+    }
+}
+
+/// None of today's five roundings is JFIF's ⌊x + 0.5⌋: each parts from it in quarters from −1.5 to 1.5 (`Ceil`,
+/// which agrees on every half, at 0.25). H.273's Round and JFIF's agree from 0 up and part on a negative half.
+#[test]
+fn no_mode_is_round_half_up() {
+    for r in super::reference::MODES {
+        let differs = (-6..=6).any(|p| {
+            i128::from(shift(p, 2, r)) != reference::round_half_up(i128::from(p), 4)
+        });
+        assert!(differs, "{r:?} is ⌊x + 0.5⌋ on halves");
+    }
+    assert_eq!(reference::round_half_up(-1, 2), 0);
+    assert_eq!(reference::round_h273(-1, 2), -1);
+}
+
+/// H.273's YCgCo (eq. 51 to 53), as its NOTE 3 warns: Cb and Cr reach 1 << BitDepthC, one past the chroma's
+/// range, and only there: Cb = 256 at G = 255, R = B = 0 and Cr = 256 at R = 255, B = 0, on 8 bits.
+#[test]
+fn ycgco_reaches_one_past_the_chroma_range() {
+    let (mut cb_max, mut cr_max) = ((0, [0; 3]), (0, [0; 3]));
+    for r in 0..=255 {
+        for g in 0..=255 {
+            for b in [0, 1, 127, 128, 254, 255, r] {
+                let cb = quarter(2 * g - r - b, Rounding::NearestAway) + 128;
+                let cr = half(r - b, Rounding::NearestAway) + 128;
+                assert_eq!(
+                    i128::from(cb - 128),
+                    reference::round_h273(i128::from(2 * g - r - b), 4)
+                );
+                if cb > cb_max.0 {
+                    cb_max = (cb, [r, g, b]);
+                }
+                if cr > cr_max.0 {
+                    cr_max = (cr, [r, g, b]);
+                }
+            }
+        }
+    }
+    assert_eq!(cb_max, (1 << 8, [0, 255, 0]));
+    assert_eq!(cr_max, (1 << 8, [255, 0, 0]));
+    assert!(u8::try_from(cb_max.0).is_err());
+    // a Floor, or NearestEven, would keep Cb within 8 bits: 255/2 is 127.5, which rounds to 128 away from zero only
+    assert_eq!(quarter(2 * 255, Rounding::NearestEven) + 128, 1 << 8);
+    assert_eq!(quarter(2 * 255, Rounding::Floor) + 128, 255);
+}
+
 #[cfg(not(any(kani, fuzzing)))]
 mod props {
     use proptest::prelude::*;
@@ -222,6 +358,17 @@ mod props {
         fn ycgco_r(rgb in any::<[u16; 3]>(), bits in 8u32..=16) {
             super::ycgco_r_is_lossless(rgb, bits);
         }
+
+        #[test]
+        fn point_transforms(x: i16, pt in 0i8..=15) {
+            super::point_transforms(x, pt);
+        }
+
+        #[test]
+        fn roundings(p: i16, k in 0i8..=15) {
+            super::h273_round_is_nearest_away(p, k);
+            super::round_half_up_is_floor_of_half_more(p, k);
+        }
     }
 }
 
@@ -236,6 +383,13 @@ mod proofs {
     #[kani::proof]
     fn rct() {
         super::rct_is_lossless(kani::any());
+    }
+
+    #[kani::proof]
+    fn point_transforms() {
+        let pt: i8 = kani::any();
+        kani::assume((0..=15).contains(&pt));
+        super::point_transforms(kani::any(), pt);
     }
 
     #[kani::proof]
