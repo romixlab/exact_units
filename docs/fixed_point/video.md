@@ -6,17 +6,17 @@ level: advanced
 
 A digital video component is two steps away from the light it stands for. A *transfer curve* turns linear light into a non-linear signal E′, between 0 (black) and 1 (nominal white), or −½ and ½ for a colour difference. A *quantizer* then turns E′ into an integer code. The quantizer is exact in both directions. Most transfer curves are not, and the crate keeps the two apart so that each says what it is.
 
-- `codec::video::Narrow8`, `NarrowChroma8`, `Narrow10` and `NarrowChroma10` are the narrow-range quantizers of ITU-R BT.709, BT.2020 and BT.2100, as [codecs](codecs.md) whose `Linear` is E′.
+- `codec::video::Narrow8`, `NarrowChroma8`, `Narrow10` and `NarrowChroma10` are the narrow-range quantizers of ITU-R BT.709 and BT.2100, as [codecs](codecs.md) whose `Linear` is E′.
 - `codec::video::Pq` is the PQ curve of BT.2100 (first published as SMPTE ST 2084): exact constants, and the curve itself as a float edge that says so in its name.
 
 ## Narrow range
 
-BT.709-6 Part 2 item 4.6 codes a component on n bits as
+BT.709-6 Part 2 item 3.4 codes a component on n bits as
 
 - `D = INT[(219·E′ + 16)·2ⁿ⁻⁸]` for Y′, R′, G′ and B′,
 - `D = INT[(224·E′ + 128)·2ⁿ⁻⁸]` for C′B and C′R.
 
-BT.2020 and BT.2100 (Table 9, "narrow range") use the same formulas. Some software calls this "limited range". On 8 bits, black is code 16 and nominal white 235; a colour difference is 128 at zero and 16 or 240 at its nominal extremes.
+BT.2100-3 Table 9 ("narrow range") uses the same formulas on 10 and 12 bits, with Round instead of INT. Some software calls this "limited range". On 8 bits (item 4.6), black is code 16 and nominal white 235; a colour difference is 128 at zero and 16 or 240 at its nominal extremes.
 
 Codes outside the nominal range are still values. Item 4.7 makes codes 1 to 254 video data: 1 to 15 (footroom) and 236 to 254 (headroom) carry a signal's undershoot and overshoot, and a filter or a camera puts real values there. Only 0 and 255 are no value: the serial interfaces use them for timing references. On 10 bits the data is 4 to 1019, and 0 to 3 and 1020 to 1023 are the timing references.
 
@@ -65,7 +65,7 @@ assert_eq!(Narrow10::DEF.decode(1020), None);           // a timing reference
 
 ### From E′ to a code
 
-The rounding is the step before the codec: a real E′ becomes a `Linear` by a named rounding, the standard's INT. INT rounds a half up, and on the luma formula's argument, which is never negative, that is `Rounding::NearestAway`:
+The rounding is the step before the codec: a real E′ becomes a `Linear` by a named rounding. The two standards name two roundings. BT.709's INT (note 2 of item 3.5) gives 0 for a fraction of 0 to 0.4999… and +1 for 0.5 to 0.9999…: a half up, with nothing said about a negative argument. BT.2100's Round (below Table 9) is `Sign(x)·Floor(|x| + 0.5)`: a half away from zero, `Rounding::NearestAway`. Both round the code, whose argument is never negative for luma, so there they agree:
 
 ```rust
 use exact_units::codec::{Coded, video::{Narrow8, NarrowSignal8}};
@@ -79,7 +79,7 @@ let signal = NarrowSignal8::try_new(step.get()).unwrap();
 assert_eq!(Coded::<Narrow8>::try_new(signal, Rounding::NearestAway).map(Coded::raw), Ok(126));
 ```
 
-A colour difference can be negative, and there the two part ways: INT rounds a tie toward +∞, `NearestAway` away from zero, so an E′ of −1/448 (a tie between two chroma codes) (224·E′ + 128 = 127.5) gives code 128 by INT and 127 by `NearestAway`. The crate has no rounding toward +∞ on a tie. `tests/props/video.rs` walks every E′ from −0.2 to 1.3 in steps of 1/4096 through all four codecs against the standard's INT written out in integers, and finds exactly these negative ties apart.
+A colour difference can be negative, and there the order of the steps shows. Both standards round the code, 224·E′ + 128, which is positive: an E′ of −1/448 is code 127.5, and INT and Round both give 128. The crate rounds the `Linear`, 224·E′ = −0.5, before the offset, and `NearestAway` takes that tie to −1: code 127. The crate has no rounding toward +∞ on a tie; where a negative tie matters, round the code, not E′. `tests/props/video.rs` walks every E′ from −0.2 to 1.3 in steps of 1/4096 through all four codecs against the standard's INT written out in integers, and finds exactly these negative ties apart.
 
 ### Timing references as niches
 
@@ -106,7 +106,7 @@ assert_eq!(Sample::try_from_raw(255).map(Sample::get), Ok(Reading::Niche(TimingR
 assert_eq!(size_of::<Sample>(), 1);
 ```
 
-Full range (BT.2100 Table 9, `D = Round((2ⁿ − 1)·E′)`) is another convention with another scale, 1/255 or 1/1023, and would be a codec of its own: the crate picks neither for you.
+Full range (BT.2100-3 Table 9, on 10 and 12 bits only: `D = Round((2ⁿ − 1)·E′)`, chroma `+ 2ⁿ⁻¹`) is another convention with another scale, 1/1023 or 1/4095, and no reserved codes: its video data is 0 to 1023, and chroma's −½ is code 1. It would be a codec of its own: the crate picks neither for you.
 
 ## PQ
 

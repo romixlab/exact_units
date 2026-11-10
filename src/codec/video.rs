@@ -1,9 +1,9 @@
-//! Video codes: narrow-range quantization of a video signal (ITU-R BT.709, BT.2020, BT.2100) as exact [Codec]s, and
+//! Video codes: narrow-range quantization of a video signal (ITU-R BT.709, BT.2100) as exact [Codec]s, and
 //! the PQ transfer curve (BT.2100, first SMPTE ST 2084) as exact constants and a named float edge.
 //!
 //! A video component's digital code is two layers. The *quantizer* turns the non-linear signal E′ (0 is black, 1
 //! nominal white; −½..=½ for a colour difference) into a code: `D = INT[(219·E′ + 16)·2ⁿ⁻⁸]` for Y′, R′, G′, B′,
-//! `D = INT[(224·E′ + 128)·2ⁿ⁻⁸]` for C′B, C′R (ITU-R BT.709-6 Part 2 item 4.6; BT.2100-3 Table 9's narrow range).
+//! `D = INT[(224·E′ + 128)·2ⁿ⁻⁸]` for C′B, C′R (ITU-R BT.709-6 Part 2 item 3.4; on 10 and 12 bits BT.2100-3 Table 9's narrow range).
 //! That is affine, so exact both ways: [Narrow8], [NarrowChroma8], [Narrow10] and [NarrowChroma10] are its codecs,
 //! [CodecShape::Offset] its shape, and their `Linear` is E′ itself, `Fixed<Ratio, Rational<1, 219>, ..>`. The
 //! *transfer curve* turns E′ into light: BT.709's or sRGB's power, PQ ([Pq]), HLG. Those are not exact (a PQ code
@@ -64,13 +64,13 @@ fn offset_formula(raw: i32, zero: i32, min: i32, max: i32) -> i16 {
 }
 
 /// The narrow-range quantizer of a Y′, R′, G′ or B′ component on 8 bits, `D = 219·E′ + 16` (ITU-R BT.709-6 Part 2
-/// item 4.6, BT.2020-2 and BT.2100-3 Table 9 the same): codes 1..=254 are video data, [NarrowSignal8]; 0 and 255
+/// item 3.4; black 16 and nominal peak 235 in item 4.6): codes 1..=254 are video data, [NarrowSignal8]; 0 and 255
 /// are the timing references (item 4.7), [spare](CodecDef::spare). Exact both ways: every `Linear` has its code, so
 /// [encode](Codec::encode) ignores its [Rounding]. The rounding of the standard's INT is the step before, from a
 /// real E′ to a `Linear` (`NarrowSignal8::try_new_rounded`).
 ///
-/// "Limited range" in some software. The other choice, full range (BT.2100-3 Table 9, `D = 255·E′`), is a different
-/// codec, not this one.
+/// "Limited range" in some software. Full range (BT.2100-3 Table 9, on 10 and 12 bits only, `D = Round((2ⁿ −
+/// 1)·E′)`, no reserved codes) is a different codec, not this one.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Narrow8;
 
@@ -107,7 +107,7 @@ impl Codec for Narrow8 {
 }
 
 /// The narrow-range quantizer of a C′B or C′R component on 8 bits, `D = 224·E′ + 128` (ITU-R BT.709-6 Part 2 item
-/// 4.6): codes 1..=254 are video data, [NarrowChromaSignal8], 16 and 240 the nominal extremes (item 4.7); 0 and 255
+/// 3.4): codes 1..=254 are video data, [NarrowChromaSignal8], 16 and 240 the nominal extremes (item 4.6); 0 and 255
 /// are the timing references, [spare](CodecDef::spare). Exact both ways, as [Narrow8].
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct NarrowChroma8;
@@ -148,7 +148,7 @@ impl Codec for NarrowChroma8 {
 }
 
 /// The narrow-range quantizer of a Y′, R′, G′ or B′ component on 10 bits, `D = (219·E′ + 16)·4 = 876·E′ + 64`
-/// (ITU-R BT.709-6 Part 2 item 4.6, BT.2100-3 Table 9): codes 4..=1019 are video data, [NarrowSignal10]; 0..=3 and
+/// (ITU-R BT.709-6 Part 2 item 3.4, BT.2100-3 Table 9): codes 4..=1019 are video data, [NarrowSignal10]; 0..=3 and
 /// 1020..=1023 are the timing references (item 4.7) and every `u16` above 1023 is no 10-bit code, all
 /// [spare](CodecDef::spare). The code layer of [Pq]. Exact both ways, as [Narrow8].
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -193,8 +193,8 @@ impl Codec for Narrow10 {
 }
 
 /// The narrow-range quantizer of a C′B or C′R component on 10 bits, `D = (224·E′ + 128)·4 = 896·E′ + 512` (ITU-R
-/// BT.709-6 Part 2 item 4.6, BT.2100-3 Table 9): codes 4..=1019 are video data, [NarrowChromaSignal10], 64 and 960
-/// the nominal extremes; 0..=3, 1020..=1023 and every `u16` above 1023 are [spare](CodecDef::spare).
+/// BT.709-6 Part 2 item 3.4, BT.2100-3 Table 9): codes 4..=1019 are video data, [NarrowChromaSignal10], 64 and 960
+/// the nominal extremes (item 4.6); 0..=3, 1020..=1023 and every `u16` above 1023 are [spare](CodecDef::spare).
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct NarrowChroma10;
 
@@ -378,8 +378,8 @@ impl Pq {
     }
 
     /// The 10-bit narrow-range PQ code of a luminance, through [inverse_eotf_f64](Self::inverse_eotf_f64), the
-    /// quantizer's `876·E′` rounded by `rounding` (the standard's INT is a half up, [Rounding::NearestAway] here,
-    /// as `876·E′` is never negative). `None` for a luminance below 0 or above 10 000 cd/m². A float edge: a
+    /// quantizer's `876·E′` rounded by `rounding` (BT.2100-3 Table 9's Round is a half away from zero,
+    /// [Rounding::NearestAway]). `None` for a luminance below 0 or above 10 000 cd/m². A float edge: a
     /// luminance within `pow`'s error of a tie between two codes may round to the other; every whole cd/m² from 0
     /// to 10 000 is far enough from one (the tests walk them).
     ///

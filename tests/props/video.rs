@@ -1,6 +1,6 @@
 //! Property: video's narrow-range quantizers ([Narrow8], [NarrowChroma8], [Narrow10], [NarrowChroma10]) against the
 //! standard's formula written out here in i128, `D = INT[(219·E′ + 16)·2ⁿ⁻⁸]` and `D = INT[(224·E′ + 128)·2ⁿ⁻⁸]`
-//! (ITU-R BT.709-6 Part 2 item 4.6), INT rounding a half up, and its levels (item 4.7: video data 1..=254, 4..=1019 on
+//! (ITU-R BT.709-6 Part 2 item 3.4), INT rounding a half up (note 2 of item 3.5), and its levels (item 4.7: video data 1..=254, 4..=1019 on
 //! 10 bits; the rest is timing reference). Every code of each quantizer is walked by the typed path and the data path
 //! (`CodecDef`), every `Linear` by every rounding, and every E′ in steps of 1/4096 from −0.2 to 1.3 through
 //! `to_rounded` and `encode`. And PQ ([Pq], BT.2100-3 Table 4): the `f64` constants are the exact rationals, the ends
@@ -146,9 +146,11 @@ fn every_code_decodes_and_encodes_back() {
 
 /// E′ = `x`/4096 quantized by the crate (`to_rounded` to the codec's step by `NearestAway`, then `encode`) against
 /// the standard's INT: the same code, or refused exactly where the standard's code isn't video data. The one
-/// difference is a tie below E′ = 0: INT rounds a half up, toward +∞, and `NearestAway` away from zero, so a
-/// negative tie (a chroma E′ such as −1/448, between two codes) comes out one code lower. The crate has no
-/// rounding toward +∞ on a tie; where it matters, quantize the code (always positive) rather than E′.
+/// difference is a tie below E′ = 0: the standard rounds the code, `224·E′ + 128`, which is positive, so its tie
+/// goes up; the crate rounds the `Linear`, `224·E′`, before the offset, and `NearestAway` takes a negative tie
+/// down. So a chroma E′ such as −1/448 (code 127.5) comes out one code lower, 127 for INT's 128. BT.2100's Round, a
+/// half away from zero, gives 128 too: it also rounds the code. The crate has no rounding toward +∞ on a tie;
+/// where it matters, round the code rather than E′.
 fn quantize_matches_int<C, P: FixedScale, B>(q: Quantizer, x: i32) -> bool
 where
     C: Codec<Linear = Fixed<Ratio, P, i16, B>>,
