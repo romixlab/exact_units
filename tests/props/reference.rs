@@ -1368,3 +1368,149 @@ pub(crate) mod imaging {
         [b + co - mid, g, b]
     }
 }
+
+/// Closed intervals of exact rationals: a real number known only between two bounds (a root, π), and the bounds of
+/// what is computed from it, every operation exact. Where a value of the standards is irrational, its printed digits
+/// are checked against such an interval.
+pub(crate) mod interval {
+    use num_bigint::BigInt;
+    use num_rational::BigRational;
+
+    /// `lo ..= hi`, `lo <= hi`.
+    #[derive(Clone, Debug)]
+    pub(crate) struct Interval {
+        pub(crate) lo: BigRational,
+        pub(crate) hi: BigRational,
+    }
+
+    /// `n / d` exactly.
+    pub(crate) fn q(n: i64, d: i64) -> BigRational {
+        BigRational::new(n.into(), d.into())
+    }
+
+    impl Interval {
+        /// The single value `x`.
+        pub(crate) fn exact(x: BigRational) -> Self {
+            Interval {
+                lo: x.clone(),
+                hi: x,
+            }
+        }
+
+        /// `n / d` alone.
+        pub(crate) fn of(n: i64, d: i64) -> Self {
+            Interval::exact(q(n, d))
+        }
+
+        /// `self + o`.
+        pub(crate) fn add(&self, o: &Interval) -> Interval {
+            Interval {
+                lo: &self.lo + &o.lo,
+                hi: &self.hi + &o.hi,
+            }
+        }
+
+        /// `-self`.
+        pub(crate) fn neg(&self) -> Interval {
+            Interval {
+                lo: -&self.hi,
+                hi: -&self.lo,
+            }
+        }
+
+        /// `self - o`.
+        pub(crate) fn sub(&self, o: &Interval) -> Interval {
+            self.add(&o.neg())
+        }
+
+        /// `self · o`: the least and greatest of the four products of the ends.
+        pub(crate) fn mul(&self, o: &Interval) -> Interval {
+            let p = [
+                &self.lo * &o.lo,
+                &self.lo * &o.hi,
+                &self.hi * &o.lo,
+                &self.hi * &o.hi,
+            ];
+            let lo = p.iter().min().cloned().unwrap_or_default();
+            let hi = p.iter().max().cloned().unwrap_or_default();
+            Interval { lo, hi }
+        }
+
+        /// `self / o`, `None` where `o` holds 0.
+        pub(crate) fn div(&self, o: &Interval) -> Option<Interval> {
+            let zero = BigRational::default();
+            if o.lo <= zero && zero <= o.hi {
+                return None;
+            }
+            let recip = Interval {
+                lo: o.hi.recip(),
+                hi: o.lo.recip(),
+            };
+            Some(self.mul(&recip))
+        }
+
+        /// The `n`-th root of a positive interval, by bisection on `t^n` to within 2^-`bits` at each end.
+        pub(crate) fn root(&self, n: i32, bits: u32) -> Interval {
+            // the greatest t (on the grid) with t^n <= x, and the least with t^n >= x
+            let below = |x: &BigRational| {
+                let (mut lo, mut hi) = (
+                    BigRational::default(),
+                    BigRational::from_integer(1.into()).max(x.clone()),
+                );
+                let step = BigRational::new(1.into(), BigInt::from(1) << bits);
+                while &hi - &lo > step {
+                    let mid = (&lo + &hi) / BigRational::from_integer(2.into());
+                    if mid.pow(n) <= *x {
+                        lo = mid;
+                    } else {
+                        hi = mid;
+                    }
+                }
+                (lo, hi)
+            };
+            Interval {
+                lo: below(&self.lo).0,
+                hi: below(&self.hi).1,
+            }
+        }
+    }
+
+    /// π between its first 50 decimals and one more in the last place (π = 3.14159 26535 89793 23846 26433 83279
+    /// 50288 41971 69399 37510 58209…).
+    pub(crate) fn pi() -> Interval {
+        let digits: BigInt = "314159265358979323846264338327950288419716939937510"
+            .parse()
+            .unwrap_or_default();
+        let den = BigInt::from(10).pow(50);
+        Interval {
+            lo: BigRational::new(digits.clone(), den.clone()),
+            hi: BigRational::new(digits + 1, den),
+        }
+    }
+
+    /// cos `x` for `0 <= x <= 2`, as an interval: the Taylor series to x^40/40!, whose terms alternate in sign and
+    /// fall from there on, so the true value lies between that sum and the sum with the next term.
+    pub(crate) fn cos_point(x: &BigRational) -> Interval {
+        let mut sum = BigRational::default();
+        let mut term = BigRational::from_integer(1.into());
+        let x2 = x * x;
+        for j in 1..=21_i64 {
+            sum += &term;
+            term = -(term * &x2) / BigRational::from_integer(((2 * j - 1) * (2 * j)).into());
+        }
+        // `term` is the first left out: the true value is between sum and sum + term
+        let other = &sum + &term;
+        Interval {
+            lo: sum.clone().min(other.clone()),
+            hi: sum.max(other),
+        }
+    }
+
+    /// cos over `x`, `0 <= x.lo <= x.hi <= π/2`, where cos falls.
+    pub(crate) fn cos(x: &Interval) -> Interval {
+        Interval {
+            lo: cos_point(&x.hi).lo,
+            hi: cos_point(&x.lo).hi,
+        }
+    }
+}

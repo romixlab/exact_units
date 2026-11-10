@@ -16,9 +16,11 @@
 #![expect(clippy::panic, reason = "a property fails by panicking")]
 
 use super::reference::imaging as reference;
-use exact_units::prefix::{One, Pow2};
+use exact_units::prefix::{One, Pow2, Pow10};
+#[cfg(feature = "q")]
+use exact_units::q;
 use exact_units::units::Ratio;
-use exact_units::{Fixed, Overflow, Prefix, Rounding};
+use exact_units::{Exact, Fixed, Overflow, Prefix, Rounding};
 
 /// `x / 2`, rounded by `r`: `x >> 1` for `Floor`.
 fn half(x: i32, r: Rounding) -> i32 {
@@ -75,7 +77,11 @@ pub(crate) fn lifting_53_is_lossless<const N: usize>(x: [i16; N]) {
     #[cfg(not(kani))]
     {
         let wide = x.map(i128::from);
-        assert_eq!(y.map(i128::from).to_vec(), reference::fdwt53(&wide, 2), "{x:?}");
+        assert_eq!(
+            y.map(i128::from).to_vec(),
+            reference::fdwt53(&wide, 2),
+            "{x:?}"
+        );
         assert_eq!(reference::idwt53(&reference::fdwt53(&wide, 2)), wide);
     }
     assert_eq!(idwt53(&y), x);
@@ -84,11 +90,7 @@ pub(crate) fn lifting_53_is_lossless<const N: usize>(x: [i16; N]) {
 /// T.800's forward RCT (G.2.1, eq. G-3 to G-5): `[Y0, Y1, Y2]`.
 pub(crate) fn rct(i: [i32; 3]) -> [i32; 3] {
     let [i0, i1, i2] = i;
-    [
-        quarter(i0 + 2 * i1 + i2, Rounding::Floor),
-        i2 - i1,
-        i0 - i1,
-    ]
+    [quarter(i0 + 2 * i1 + i2, Rounding::Floor), i2 - i1, i0 - i1]
 }
 
 /// T.800's inverse RCT (G.2.2, eq. G-6 to G-8): `[I0, I1, I2]`.
@@ -138,8 +140,15 @@ pub(crate) fn ycgco_r_is_lossless(rgb: [u16; 3], bits: u32) {
     #[cfg(not(kani))]
     {
         let wide = rgb.map(i128::from);
-        assert_eq!(ycc.map(i128::from), reference::ycgco_r(wide, bits + 1), "{rgb:?}");
-        assert_eq!(reference::ycgco_r_inverse(reference::ycgco_r(wide, bits + 1), bits + 1), wide);
+        assert_eq!(
+            ycc.map(i128::from),
+            reference::ycgco_r(wide, bits + 1),
+            "{rgb:?}"
+        );
+        assert_eq!(
+            reference::ycgco_r_inverse(reference::ycgco_r(wide, bits + 1), bits + 1),
+            wide
+        );
     }
     let [y, cg, co] = ycc;
     assert!((0..1 << bits).contains(&y), "Y {y} of {rgb:?}");
@@ -214,7 +223,11 @@ fn shift(p: i32, k: i8, r: Rounding) -> i32 {
 /// `Truncate`, the arithmetic shift of DC coefficients is `Floor`.
 pub(crate) fn point_transforms(x: i16, pt: i8) {
     let x = i32::from(x);
-    assert_eq!(shift(x, pt, Rounding::Truncate), x / (1 << pt), "{x} / 2^{pt}");
+    assert_eq!(
+        shift(x, pt, Rounding::Truncate),
+        x / (1 << pt),
+        "{x} / 2^{pt}"
+    );
     assert_eq!(shift(x, pt, Rounding::Floor), x >> pt, "{x} >> {pt}");
 }
 
@@ -222,7 +235,11 @@ pub(crate) fn point_transforms(x: i16, pt: i8) {
 pub(crate) fn h273_round_is_nearest_away(p: i16, k: i8) {
     let p = i32::from(p);
     let want = reference::round_h273(i128::from(p), 1 << k);
-    assert_eq!(i128::from(shift(p, k, Rounding::NearestAway)), want, "Round({p} / 2^{k})");
+    assert_eq!(
+        i128::from(shift(p, k, Rounding::NearestAway)),
+        want,
+        "Round({p} / 2^{k})"
+    );
 }
 
 /// JFIF's Round(x) = ⌊x + 0.5⌋ (T.871 clause 7) of `x = p / 2^k`, AV1's Round2(p, k) (4.7) and the add-half-then-shift
@@ -231,7 +248,11 @@ pub(crate) fn round_half_up_is_floor_of_half_more(p: i16, k: i8) {
     let p = i32::from(p);
     let want = reference::round_half_up(i128::from(p), 1 << k);
     let half_step = if k == 0 { 0 } else { 1 << (k - 1) };
-    assert_eq!(i128::from(shift(p + half_step, k, Rounding::Floor)), want, "Round2({p}, {k})");
+    assert_eq!(
+        i128::from(shift(p + half_step, k, Rounding::Floor)),
+        want,
+        "Round2({p}, {k})"
+    );
     // AV1 prints it as (x + (1 << (n - 1))) >> n, for n > 0
     assert_eq!(i128::from((p + half_step) >> k), want);
 }
@@ -253,8 +274,16 @@ fn k10_every_row() {
     ];
     for [before, shifted, divided, arithmetic] in ROWS {
         assert_eq!(before - 128, shifted, "the level shift 2^(P−1) (A.3.1)");
-        assert_eq!(shift(shifted, 1, Rounding::Truncate), divided, "divide {shifted} by 2");
-        assert_eq!(shift(shifted, 1, Rounding::Floor), arithmetic, "{shifted} >> 1");
+        assert_eq!(
+            shift(shifted, 1, Rounding::Truncate),
+            divided,
+            "divide {shifted} by 2"
+        );
+        assert_eq!(
+            shift(shifted, 1, Rounding::Floor),
+            arithmetic,
+            "{shifted} >> 1"
+        );
         // A.4: the shift "is equivalent to dividing by 2^Pt before the level shift"
         assert_eq!((before >> 1) - (128 >> 1), arithmetic);
     }
@@ -268,7 +297,10 @@ fn shift_before_the_level_shift() {
         for pt in 0..p {
             for x in 0..1 << p {
                 let level = 1 << (p - 1);
-                assert_eq!(shift(x - level, pt, Rounding::Floor), (x >> pt) - (level >> pt));
+                assert_eq!(
+                    shift(x - level, pt, Rounding::Floor),
+                    (x >> pt) - (level >> pt)
+                );
             }
         }
     }
@@ -298,9 +330,8 @@ fn h273_round_and_round_half_up_every_i16() {
 #[test]
 fn no_mode_is_round_half_up() {
     for r in super::reference::MODES {
-        let differs = (-6..=6).any(|p| {
-            i128::from(shift(p, 2, r)) != reference::round_half_up(i128::from(p), 4)
-        });
+        let differs = (-6..=6)
+            .any(|p| i128::from(shift(p, 2, r)) != reference::round_half_up(i128::from(p), 4));
         assert!(differs, "{r:?} is ⌊x + 0.5⌋ on halves");
     }
     assert_eq!(reference::round_half_up(-1, 2), 0);
@@ -311,7 +342,7 @@ fn no_mode_is_round_half_up() {
 /// range, and only there: Cb = 256 at G = 255, R = B = 0 and Cr = 256 at R = 255, B = 0, on 8 bits.
 #[test]
 fn ycgco_reaches_one_past_the_chroma_range() {
-    let (mut cb_max, mut cr_max) = ((0, [0; 3]), (0, [0; 3]));
+    let (mut top_blue, mut top_red) = ((0, [0; 3]), (0, [0; 3]));
     for r in 0..=255 {
         for g in 0..=255 {
             for b in [0, 1, 127, 128, 254, 255, r] {
@@ -321,21 +352,194 @@ fn ycgco_reaches_one_past_the_chroma_range() {
                     i128::from(cb - 128),
                     reference::round_h273(i128::from(2 * g - r - b), 4)
                 );
-                if cb > cb_max.0 {
-                    cb_max = (cb, [r, g, b]);
+                if cb > top_blue.0 {
+                    top_blue = (cb, [r, g, b]);
                 }
-                if cr > cr_max.0 {
-                    cr_max = (cr, [r, g, b]);
+                if cr > top_red.0 {
+                    top_red = (cr, [r, g, b]);
                 }
             }
         }
     }
-    assert_eq!(cb_max, (1 << 8, [0, 255, 0]));
-    assert_eq!(cr_max, (1 << 8, [255, 0, 0]));
-    assert!(u8::try_from(cb_max.0).is_err());
+    assert_eq!(top_blue, (1 << 8, [0, 255, 0]));
+    assert_eq!(top_red, (1 << 8, [255, 0, 0]));
+    assert!(u8::try_from(top_blue.0).is_err());
     // a Floor, or NearestEven, would keep Cb within 8 bits: 255/2 is 127.5, which rounds to 128 away from zero only
     assert_eq!(quarter(2 * 255, Rounding::NearestEven) + 128, 1 << 8);
     assert_eq!(quarter(2 * 255, Rounding::Floor) + 128, 255);
+}
+
+/// T.800's 9/7 parameters (F.3.8.2.1) from their closed forms, Tables F.5 to F.7, each an interval of exact
+/// rationals: √15 and the cube roots of Table F.7 by bisection, the rest by exact arithmetic on the ends. In the
+/// order of the tables: A, B, x₁, ℜx₂, |x₂|², g₀ to g₄, r₀, r₁, s₀, t₀, α, β, γ, δ, K.
+#[cfg(not(kani))]
+pub(crate) fn taps_97() -> Vec<(&'static str, super::reference::interval::Interval)> {
+    use super::reference::interval::Interval;
+    let i = Interval::of;
+    let div = |a: &Interval, b: &Interval| a.div(b).unwrap_or_else(|| panic!("{b:?} holds 0"));
+    let sqrt15 = i(15, 1).root(2, 140);
+    let den = i(1080, 1).mul(&sqrt15);
+    let a = div(&i(63, 1).sub(&i(14, 1).mul(&sqrt15)), &den).root(3, 130);
+    let b = div(&i(63, 1).add(&i(14, 1).mul(&sqrt15)), &den)
+        .root(3, 130)
+        .neg();
+    let sum = a.add(&b);
+    let x1 = sum.sub(&i(1, 6));
+    let re_x2 = sum.mul(&i(-1, 2)).sub(&i(1, 6));
+    let half_more = sum.mul(&i(1, 2)).add(&i(1, 6));
+    let diff = a.sub(&b);
+    let abs_x2 = half_more
+        .mul(&half_more)
+        .add(&i(3, 4).mul(&diff.mul(&diff)));
+    let five_x1 = i(5, 1).mul(&x1);
+    let g0 = five_x1
+        .mul(
+            &i(48, 1)
+                .mul(&abs_x2)
+                .sub(&i(16, 1).mul(&re_x2))
+                .add(&i(3, 1)),
+        )
+        .mul(&i(1, 32));
+    let g1 = five_x1
+        .neg()
+        .mul(&i(8, 1).mul(&abs_x2).sub(&re_x2))
+        .mul(&i(1, 8));
+    let g2 = five_x1
+        .mul(&i(4, 1).mul(&abs_x2).add(&i(4, 1).mul(&re_x2)).sub(&i(1, 1)))
+        .mul(&i(1, 16));
+    let g3 = five_x1.neg().mul(&re_x2).mul(&i(1, 8));
+    let g4 = five_x1.mul(&i(1, 64));
+    let g1g4_g3 = div(&g1.mul(&g4), &g3);
+    let r0 = g0.neg().add(&i(2, 1).mul(&g1g4_g3));
+    let r1 = g2.neg().add(&g4).add(&g1g4_g3);
+    let s0 = g1.sub(&g3).sub(&div(&g3.mul(&r0), &r1));
+    let t0 = r0.sub(&i(2, 1).mul(&r1));
+    let alpha = div(&g4.neg(), &g3);
+    let beta = div(&g3, &r1);
+    let gamma = div(&r1, &s0);
+    let delta = div(&s0, &t0);
+    let k = div(&i(1, 1), &t0);
+    vec![
+        ("A", a),
+        ("B", b),
+        ("x1", x1),
+        ("Re x2", re_x2),
+        ("|x2|^2", abs_x2),
+        ("g0", g0),
+        ("g1", g1),
+        ("g2", g2),
+        ("g3", g3),
+        ("g4", g4),
+        ("r0", r0),
+        ("r1", r1),
+        ("s0", s0),
+        ("t0", t0),
+        ("alpha", alpha),
+        ("beta", beta),
+        ("gamma", gamma),
+        ("delta", delta),
+        ("K", k),
+    ]
+}
+
+/// `x` between the ends of `v`, widened to whole steps of 10⁻³⁰, as two [Exact]s.
+#[cfg(not(kani))]
+fn exact_ends(v: &super::reference::interval::Interval) -> [Exact<Ratio>; 2] {
+    use num_bigint::BigInt;
+    use num_rational::BigRational;
+    let den = BigInt::from(10).pow(30);
+    let scale = BigRational::from_integer(den.clone());
+    let n = |x: BigRational| i128::try_from(x.to_integer()).unwrap_or_else(|_| panic!("fits"));
+    let den = u128::try_from(den).unwrap_or_else(|_| panic!("10^30 fits"));
+    [
+        Exact::new(n((&v.lo * &scale).floor()), den),
+        Exact::new(n((&v.hi * &scale).ceil()), den),
+    ]
+}
+
+/// `v` rounded to 15 decimals by `r`, the same for every value in it: `None` where its ends round apart.
+#[cfg(not(kani))]
+fn decimals_15(v: &super::reference::interval::Interval, r: Rounding) -> Option<i64> {
+    let [lo, hi] = exact_ends(v).map(|e| e.to_rounded::<Pow10<-15>, i64>(r).map(Fixed::get));
+    lo.filter(|lo| Some(*lo) == hi)
+}
+
+/// Tables F.4 to F.7 print each parameter "including approximations up to 15 decimal points" (F.3.8.2.1). Each is
+/// the closed form rounded to 15 decimals, but r₀ (Table F.6), 1.449513704087942|3…, printed …943, and γ (Table
+/// F.4), 0.882911075530933|29…, printed …934: one in the last place each.
+#[cfg(not(kani))]
+#[test]
+fn taps_97_are_their_closed_forms_rounded() {
+    const PRINTED: [i64; 19] = [
+        128_030_244_703_494,
+        -303_747_672_895_197,
+        -342_384_094_858_369,
+        -78_807_952_570_815,
+        146_034_820_982_800,
+        -602_949_018_236_360,
+        266_864_118_442_875,
+        78_223_266_528_990,
+        -16_864_118_442_875,
+        -26_748_757_410_810,
+        1_449_513_704_087_943,
+        318_310_318_985_991,
+        360_523_644_801_462,
+        812_893_066_115_961,
+        -1_586_134_342_059_924,
+        -52_980_118_572_961,
+        882_911_075_530_934,
+        443_506_852_043_971,
+        1_230_174_104_914_001,
+    ];
+    let taps = taps_97();
+    assert_eq!(taps.len(), PRINTED.len());
+    for ((name, v), printed) in taps.iter().zip(PRINTED) {
+        let even = decimals_15(v, Rounding::NearestEven);
+        // no parameter is within 10⁻³⁰ of a tie: every nearest rounding gives the same digits
+        assert_eq!(even, decimals_15(v, Rounding::NearestAway), "{name}");
+        let true_digits = even.unwrap_or_else(|| panic!("{name} is known to 15 decimals"));
+        match *name {
+            "r0" | "gamma" => assert_eq!(true_digits, printed - 1, "{name}"),
+            _ => assert_eq!(true_digits, printed, "{name}"),
+        }
+    }
+    // the misprinted two, with the digits they have, and as printed they are not
+    #[cfg(feature = "q")]
+    {
+        let r0 = exact_ends(&taps[10].1);
+        let gamma = exact_ends(&taps[16].1);
+        assert!(r0.iter().all(|e| e.is_in(q!(1.4495137040879423...Ratio))));
+        assert!(
+            gamma
+                .iter()
+                .all(|e| e.is_in(q!(0.8829110755309332...Ratio)))
+        );
+        assert!(!gamma.iter().any(|e| e.is_in(q!(0.882911075530934...Ratio))));
+    }
+}
+
+/// AV1's Cos128_Lookup (7.13.2), "4096 * cos( angle * pi / 128 ) rounded to the nearest integer" by its note: every
+/// entry is that rounding of an interval holding the true value, which lies strictly between two halves, so the
+/// unnamed tie never matters. sin128 is cos128(angle − 64) by the same note.
+#[cfg(not(kani))]
+#[test]
+fn cos128_every_entry() {
+    use super::reference::interval::{Interval, cos, pi};
+    const COS128: [i32; 65] = [
+        4096, 4095, 4091, 4085, 4076, 4065, 4052, 4036, 4017, 3996, 3973, 3948, 3920, 3889, 3857,
+        3822, 3784, 3745, 3703, 3659, 3612, 3564, 3513, 3461, 3406, 3349, 3290, 3229, 3166, 3102,
+        3035, 2967, 2896, 2824, 2751, 2675, 2598, 2520, 2440, 2359, 2276, 2191, 2106, 2019, 1931,
+        1842, 1751, 1660, 1567, 1474, 1380, 1285, 1189, 1092, 995, 897, 799, 700, 601, 501, 401,
+        301, 201, 101, 0,
+    ];
+    for (k, want) in (0_i64..).zip(COS128) {
+        let v = Interval::of(4096, 1).mul(&cos(&pi().mul(&Interval::of(k, 128))));
+        let [lo, hi] = exact_ends(&v);
+        for r in [Rounding::NearestEven, Rounding::NearestAway] {
+            let got = [lo, hi].map(|e| e.to_rounded::<One, i32>(r).map(Fixed::get));
+            assert_eq!(got, [Some(want); 2], "cos128({k})");
+        }
+    }
 }
 
 #[cfg(not(any(kani, fuzzing)))]
