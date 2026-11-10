@@ -25,12 +25,13 @@ use exact_units::units::Ratio;
 use exact_units::{Bounds, Fixed, FixedScale, niches};
 
 /// Every rounding.
-const ROUNDINGS: [Rounding; 5] = [
+const ROUNDINGS: [Rounding; 6] = [
     Rounding::Truncate,
     Rounding::Floor,
     Rounding::Ceil,
     Rounding::NearestEven,
     Rounding::NearestAway,
+    Rounding::NearestCeil,
 ];
 
 /// One narrow-range quantizer as the standard writes it: E′'s factor (219 or 224), the offset at 8 bits (16 or 128)
@@ -144,14 +145,14 @@ fn every_code_decodes_and_encodes_back() {
     walk_codes::<NarrowChroma10, _, _>(CHROMA10);
 }
 
-/// E′ = `x`/4096 quantized by the crate (`to_rounded` to the codec's step by `NearestAway`, then `encode`) against
-/// the standard's INT: the same code, or refused exactly where the standard's code isn't video data. The one
-/// difference is a tie below E′ = 0: the standard rounds the code, `224·E′ + 128`, which is positive, so its tie
-/// goes up; the crate rounds the `Linear`, `224·E′`, before the offset, and `NearestAway` takes a negative tie
-/// down. So a chroma E′ such as −1/448 (code 127.5) comes out one code lower, 127 for INT's 128. BT.2100's Round, a
-/// half away from zero, gives 128 too: it also rounds the code. The crate has no rounding toward +∞ on a tie;
-/// where it matters, round the code rather than E′.
-fn quantize_matches_int<C, P: FixedScale, B>(q: Quantizer, x: i32) -> bool
+/// E′ = `x`/4096 quantized by the crate (`to_rounded` to the codec's step by `r`, then `encode`) against the
+/// standard's INT: by `NearestCeil` the same code, or refused exactly where the standard's code isn't video data. The
+/// standard rounds the code, `224·E′ + 128`, which is positive, so its tie goes up; the crate rounds the `Linear`,
+/// `224·E′`, before the offset, and a tie toward +∞ commutes with a whole offset. `NearestAway` doesn't: it takes a
+/// tie below E′ = 0 down, so a chroma E′ such as −1/448 (code 127.5) comes out one code lower, 127 for INT's 128
+/// (BT.2100's Round, a half away from zero, gives 128 too: it also rounds the code). Returns whether `x` is such a
+/// negative tie.
+fn quantize_matches_int<C, P: FixedScale, B>(q: Quantizer, x: i32, r: Rounding) -> bool
 where
     C: Codec<Linear = Fixed<Ratio, P, i16, B>>,
     C::Raw: Into<i128>,
@@ -162,42 +163,66 @@ where
     let negative_tie =
         x < 0 && (2 * q.steps_per_unit() * i128::from(x)).rem_euclid(2 * 4096) == 4096;
     let got = e
-        .to_rounded::<P, i16>(Rounding::NearestAway)
+        .to_rounded::<P, i16>(r)
         .and_then(|v| Fixed::<Ratio, P, i16, B>::try_new(v.get()).ok())
-        .and_then(|v| C::encode(v, Rounding::NearestAway))
+        .and_then(|v| C::encode(v, r))
         .map(Into::into);
-    if negative_tie {
-        let below = want - 1;
-        assert_eq!(
-            got,
-            q.is_data(below).then_some(below),
-            "E' = {x}/4096, a negative tie"
-        );
+    let want = if negative_tie && r == Rounding::NearestAway {
+        want - 1
     } else {
-        assert_eq!(got, q.is_data(want).then_some(want), "E' = {x}/4096");
-    }
+        want
+    };
+    assert_eq!(got, q.is_data(want).then_some(want), "E' = {x}/4096 {r:?}");
     negative_tie
 }
 
-/// Every E′ from −0.2 to 1.3 in steps of 1/4096, quantized by each codec as the standard's INT does.
+/// Every E′ from −0.2 to 1.3 in steps of 1/4096, quantized by each codec: by `NearestCeil` as the standard's INT
+/// does, by `NearestAway` one code lower on a negative tie.
 #[test]
 fn quantizing_e_prime_is_the_standards_int() {
-    let mut ties = 0;
-    for x in -820..=5325 {
-        quantize_matches_int::<Narrow8, Rational<1, 219>, _>(LUMA8, x);
-        quantize_matches_int::<Narrow10, Rational<1, 876>, _>(LUMA10, x);
-        // chroma's E' is -0.5..=0.5: the same walk shifted down
-        ties += u32::from(quantize_matches_int::<NarrowChroma8, Rational<1, 224>, _>(
-            CHROMA8,
-            x - 2560,
-        ));
-        ties += u32::from(quantize_matches_int::<NarrowChroma10, Rational<1, 896>, _>(
-            CHROMA10,
-            x - 2560,
-        ));
+    for r in [Rounding::NearestCeil, Rounding::NearestAway] {
+        let mut ties = 0;
+        for x in -820..=5325 {
+            quantize_matches_int::<Narrow8, Rational<1, 219>, _>(LUMA8, x, r);
+            quantize_matches_int::<Narrow10, Rational<1, 876>, _>(LUMA10, x, r);
+            // chroma's E' is -0.5..=0.5: the same walk shifted down
+            ties += u32::from(quantize_matches_int::<NarrowChroma8, Rational<1, 224>, _>(
+                CHROMA8,
+                x - 2560,
+                r,
+            ));
+            ties += u32::from(quantize_matches_int::<NarrowChroma10, Rational<1, 896>, _>(
+                CHROMA10,
+                x - 2560,
+                r,
+            ));
+        }
+        // the negative ties are real, not a case the walk never reaches
+        assert!(ties > 0);
     }
-    // the difference to INT is real, not a case the walk never reaches
-    assert!(ties > 0);
+}
+
+/// The negative chroma tie of the book's page: E′ = −1/448 is code 127.5, which INT and Round take to 128.
+/// `NearestCeil` rounds the `Linear` −0.5 to 0, code 128; `NearestAway` to −1, code 127.
+#[test]
+fn negative_chroma_tie_is_128() {
+    let e = Fixed::<Ratio, Rational<1, 896>, i32>::new(-2);
+    let code = |r| {
+        e.to_rounded::<Rational<1, 224>, i16>(r)
+            .and_then(|v| NarrowChromaSignal8::try_new(v.get()).ok())
+            .and_then(|v| NarrowChroma8::encode(v, r))
+    };
+    assert_eq!(code(Rounding::NearestCeil), Some(128));
+    assert_eq!(code(Rounding::NearestAway), Some(127));
+    // 10 bits: E′ = −1/1792 is code 896·E′ + 512 = 511.5, which INT takes to 512
+    let e = Fixed::<Ratio, Rational<1, 1792>, i32>::new(-1);
+    let code10 = |r| {
+        e.to_rounded::<Rational<1, 896>, i16>(r)
+            .and_then(|v| NarrowChromaSignal10::try_new(v.get()).ok())
+            .and_then(|v| NarrowChroma10::encode(v, r))
+    };
+    assert_eq!(code10(Rounding::NearestCeil), Some(512));
+    assert_eq!(code10(Rounding::NearestAway), Some(511));
 }
 
 /// The named levels are the standard's codes.

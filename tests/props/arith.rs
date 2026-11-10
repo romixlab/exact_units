@@ -166,7 +166,7 @@ mod proofs {
     /// Every pair of Q15, every mode and policy: the product rounded back into Q15.
     #[kani::proof]
     fn q15_times() {
-        let r = MODES[usize::from(kani::any_where(|i: &u8| *i < 5))];
+        let r = MODES[usize::from(kani::any_where(|i: &u8| usize::from(*i) < MODES.len()))];
         let o = POLICIES[usize::from(kani::any_where(|i: &u8| *i < 3))];
         super::times::<Pow2<-15>, Pow2<-15>, i16, i16>(kani::any(), kani::any(), 1, 1 << 15, r, o);
     }
@@ -174,7 +174,7 @@ mod proofs {
     /// Every pair of i16 mV · mA into mW of an i16, every mode, under one policy: 30 s to 3 minutes each, 6 minutes
     /// for the three against 10 for all policies in one proof; a pair of i32 takes over 10 minutes.
     fn milli_times_i16(o: exact_units::Overflow) {
-        let r = MODES[usize::from(kani::any_where(|i: &u8| *i < 5))];
+        let r = MODES[usize::from(kani::any_where(|i: &u8| usize::from(*i) < MODES.len()))];
         super::times::<Milli, Milli, i16, i16>(kani::any(), kani::any(), 1, 1000, r, o);
     }
 

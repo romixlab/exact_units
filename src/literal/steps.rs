@@ -179,12 +179,15 @@ const fn rounds_up(r: Rounding, neg: bool, half: i8, odd: bool) -> bool {
         Rounding::Truncate => false,
         Rounding::Floor => neg,
         Rounding::Ceil => !neg,
-        Rounding::NearestEven | Rounding::NearestAway if half == 2 => panic!(
-            "this value is too close to halfway between two stored values to round at compile time: write one \
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil if half == 2 => {
+            panic!(
+                "this value is too close to halfway between two stored values to round at compile time: write one \
              more decimal"
-        ),
+            )
+        }
         Rounding::NearestEven => half > 0 || (half == 0 && odd),
         Rounding::NearestAway => half >= 0,
+        Rounding::NearestCeil => half > 0 || (half == 0 && !neg),
     }
 }
 
@@ -783,11 +786,11 @@ const fn refuse(src: &Src, pair: Pair) -> ! {
             t.push(name);
             t.push("(");
             t.push(args);
-            t.push(", Floor | Ceil | Truncate | NearestEven | NearestAway)");
+            t.push(", Floor | Ceil | Truncate | NearestEven | NearestAway | NearestCeil)");
         }
         Src::Fn { name } => {
             t.push(name);
-            t.push("_rounded(.., Rounding::Floor | Ceil | Truncate | NearestEven | NearestAway)");
+            t.push("_rounded(.., Rounding::Floor | Ceil | Truncate | NearestEven | NearestAway | NearestCeil)");
         }
     }
     panic!("{}", t.as_str())

@@ -70,7 +70,8 @@ fn offset_formula(raw: i32, zero: i32, min: i32, max: i32) -> i16 {
 /// item 3.4; black 16 and nominal peak 235 in item 4.6): codes 1..=254 are video data, [NarrowSignal8]; 0 and 255
 /// are the timing references (item 4.7), [spare](CodecDef::spare). Exact both ways: every `Linear` has its code, so
 /// [encode](Codec::encode) ignores its [Rounding]. The rounding of the standard's INT is the step before, from a
-/// real E′ to a `Linear` (`NarrowSignal8::try_new_rounded`).
+/// real E′ to a `Linear` (`NarrowSignal8::try_new_rounded`): [Rounding::NearestCeil], a tie toward +∞, which
+/// commutes with the offset, gives INT's code (and BT.2100's Round's) for every E′.
 ///
 /// "Limited range" in some software. Full range (BT.2100-3 Table 9, on 10 and 12 bits only, `D = Round((2ⁿ −
 /// 1)·E′)`, no reserved codes) is a different codec, not this one.

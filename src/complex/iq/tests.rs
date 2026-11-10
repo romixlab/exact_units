@@ -11,12 +11,13 @@ use super::*;
 use crate::prefix::{One, Pow2};
 use std::vec::Vec;
 
-const MODES: [Rounding; 5] = [
+const MODES: [Rounding; 6] = [
     Rounding::Truncate,
     Rounding::Floor,
     Rounding::Ceil,
     Rounding::NearestEven,
     Rounding::NearestAway,
+    Rounding::NearestCeil,
 ];
 
 /// `x / 2^s` rounded by `r`, worked out from the floor quotient and the remainder: the reference.
@@ -29,6 +30,7 @@ fn round_shift(x: i128, s: u32, r: Rounding) -> i128 {
         Rounding::Truncate => x < 0 && rem != 0,
         Rounding::NearestEven => rem > d / 2 || (rem == d / 2 && q % 2 != 0),
         Rounding::NearestAway => rem > d / 2 || (rem == d / 2 && x >= 0),
+        Rounding::NearestCeil => rem >= d / 2,
     };
     q + i128::from(up)
 }
@@ -181,7 +183,7 @@ fn random_products_against_the_reference() {
     let mut rng = lcg(91);
     for _ in 0..50_000 {
         let v: Vec<u64> = (&mut rng).take(4).collect();
-        let r = MODES[(v[0] % 5) as usize];
+        let r = MODES[(v[0] % 6) as usize];
         let (a, b, c, d) = (v[0] as i16, v[1] as i16, v[2] as i16, v[3] as i16);
         let (x, y) = (q15(a, b), q15(c, d));
         let w = |v: (i16, i16)| (i128::from(v.0), i128::from(v.1));

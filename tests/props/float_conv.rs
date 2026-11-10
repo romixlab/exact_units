@@ -99,6 +99,7 @@ pub(crate) fn round_float<F: Float>(v: &BigRational, r: Rounding) -> (Option<f64
         Rounding::Floor => neg,
         Rounding::Ceil => !neg,
         Rounding::NearestAway => half.is_ge(),
+        Rounding::NearestCeil => half.is_gt() || (half.is_eq() && !neg),
         Rounding::NearestEven => half.is_gt() || (half.is_eq() && lo & 1 == 1),
     };
     if !up {
@@ -124,6 +125,7 @@ fn round_int(v: &BigRational, r: Rounding) -> Option<i128> {
         Rounding::Truncate => neg && !is_whole,
         Rounding::NearestEven => half.is_gt() || (half.is_eq() && &f % 2 != BigInt::from(0)),
         Rounding::NearestAway => half.is_gt() || (half.is_eq() && !neg),
+        Rounding::NearestCeil => half.is_ge(),
     };
     let q = if up { f + 1 } else { f };
     i128::try_from(q).ok()

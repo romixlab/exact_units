@@ -535,8 +535,9 @@ pub(crate) fn set_position<T: Storage>(set: &[T], x: T) -> Option<usize> {
 /// The value of `set` (ascending) `x` rounds to by `r`, with its position: `x` itself where it is one, else the next
 /// one below ([Floor](super::Rounding::Floor)), above ([Ceil](super::Rounding::Ceil)), toward zero
 /// ([Truncate](super::Rounding::Truncate)), or the nearer of the two, a tie to the even position
-/// ([NearestEven](super::Rounding::NearestEven)) or to the one farther from zero
-/// ([NearestAway](super::Rounding::NearestAway)). `dist` is the distance of two values of `T`, `zero` its zero:
+/// ([NearestEven](super::Rounding::NearestEven)), to the one farther from zero
+/// ([NearestAway](super::Rounding::NearestAway)) or to the greater one ([NearestCeil](super::Rounding::NearestCeil)).
+/// `dist` is the distance of two values of `T`, `zero` its zero:
 /// all in `T`. `None` where no value of the set lies on the side `r` takes.
 #[inline]
 pub(crate) fn round_in_set<T: Storage, D: Ord>(
@@ -565,19 +566,22 @@ pub(crate) fn round_in_set<T: Storage, D: Ord>(
                 None
             }
         }
-        Rounding::NearestEven | Rounding::NearestAway => match (below, above) {
-            (Some(b), Some(a)) => match dist(x, b.1).cmp(&dist(a.1, x)) {
-                core::cmp::Ordering::Less => Some(b),
-                core::cmp::Ordering::Greater => Some(a),
-                // a tie: b and a are next to each other, so one position is even; else b < x < a, and the one
-                // farther from zero is b exactly where x < 0
-                core::cmp::Ordering::Equal if r == Rounding::NearestEven => {
-                    Some(if b.0 & 1 == 0 { b } else { a })
-                }
-                core::cmp::Ordering::Equal => Some(if x < zero { b } else { a }),
-            },
-            (b, a) => b.or(a),
-        },
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
+            match (below, above) {
+                (Some(b), Some(a)) => match dist(x, b.1).cmp(&dist(a.1, x)) {
+                    core::cmp::Ordering::Less => Some(b),
+                    core::cmp::Ordering::Greater => Some(a),
+                    // a tie: b and a are next to each other, so one position is even; else b < x < a, and the one
+                    // farther from zero is b exactly where x < 0
+                    core::cmp::Ordering::Equal if r == Rounding::NearestEven => {
+                        Some(if b.0 & 1 == 0 { b } else { a })
+                    }
+                    core::cmp::Ordering::Equal if r == Rounding::NearestCeil => Some(a),
+                    core::cmp::Ordering::Equal => Some(if x < zero { b } else { a }),
+                },
+                (b, a) => b.or(a),
+            }
+        }
     }
 }
 
@@ -1037,8 +1041,9 @@ macro_rules! bounded {
             /// [Ceil](super::Rounding::Ceil) the next one up (a CAN FD payload of 13 bytes goes in a frame of 16),
             /// [Floor](super::Rounding::Floor) the next one down, [Truncate](super::Rounding::Truncate) the next one
             /// toward zero, the nearest modes the closer one, a tie to the value at the even position of the set
-            /// ([NearestEven](super::Rounding::NearestEven)) or to the one farther from zero
-            /// ([NearestAway](super::Rounding::NearestAway)). [try_new](super::Fixed::try_new) is the exact way,
+            /// ([NearestEven](super::Rounding::NearestEven)), to the one farther from zero
+            /// ([NearestAway](super::Rounding::NearestAway)) or to the greater one
+            /// ([NearestCeil](super::Rounding::NearestCeil)). [try_new](super::Fixed::try_new) is the exact way,
             /// which refuses 13. A binary search in the storage itself; [OneOf] shows it at work.
             ///
             /// # Errors

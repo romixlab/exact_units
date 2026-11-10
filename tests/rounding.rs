@@ -18,12 +18,13 @@ use exact_units::{
     Storage, StorageKind, requantize,
 };
 
-const MODES: [Rounding; 5] = [
+const MODES: [Rounding; 6] = [
     Rounding::Truncate,
     Rounding::Floor,
     Rounding::Ceil,
     Rounding::NearestEven,
     Rounding::NearestAway,
+    Rounding::NearestCeil,
 ];
 
 /// `p / d` rounded by `r`, from the Euclidean floor.
@@ -44,26 +45,29 @@ fn reference(p: i128, d: i128, r: Rounding) -> i128 {
                 f
             }
         }
-        Rounding::NearestEven | Rounding::NearestAway => match (2 * rem).cmp(&d) {
-            core::cmp::Ordering::Less => f,
-            core::cmp::Ordering::Greater => c,
-            core::cmp::Ordering::Equal => match r {
-                Rounding::NearestAway => {
-                    if p < 0 {
-                        f
-                    } else {
-                        c
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
+            match (2 * rem).cmp(&d) {
+                core::cmp::Ordering::Less => f,
+                core::cmp::Ordering::Greater => c,
+                core::cmp::Ordering::Equal => match r {
+                    Rounding::NearestCeil => c,
+                    Rounding::NearestAway => {
+                        if p < 0 {
+                            f
+                        } else {
+                            c
+                        }
                     }
-                }
-                _ => {
-                    if f % 2 == 0 {
-                        f
-                    } else {
-                        c
+                    _ => {
+                        if f % 2 == 0 {
+                            f
+                        } else {
+                            c
+                        }
                     }
-                }
-            },
-        },
+                },
+            }
+        }
     }
 }
 
@@ -207,11 +211,13 @@ fn floats_round_once() {
     let r = |r| v.to_rounded::<One, i16>(r).map(Fixed::get);
     assert_eq!(r(Rounding::NearestEven), Some(2));
     assert_eq!(r(Rounding::NearestAway), Some(3));
+    assert_eq!(r(Rounding::NearestCeil), Some(3));
     assert_eq!(r(Rounding::Floor), Some(2));
     let v: Fixed<Volt, One, f64> = Fixed::<_, _, f64>::bounded(-2.5);
     let r = |r| v.to_rounded::<One, i16>(r).map(Fixed::get);
     assert_eq!(r(Rounding::NearestEven), Some(-2));
     assert_eq!(r(Rounding::NearestAway), Some(-3));
+    assert_eq!(r(Rounding::NearestCeil), Some(-2));
     assert_eq!(r(Rounding::Truncate), Some(-2));
     assert_eq!(r(Rounding::Ceil), Some(-2));
     assert_eq!(r(Rounding::Floor), Some(-3));
@@ -352,6 +358,10 @@ fn requantizer_float_sources_and_targets() {
         (2.5, Rounding::Ceil, 3),
         (-2.5, Rounding::NearestEven, -2),
         (-2.5, Rounding::NearestAway, -3),
+        (2.5, Rounding::NearestCeil, 3),
+        (-2.5, Rounding::NearestCeil, -2),
+        (-2.4999, Rounding::NearestCeil, -2),
+        (-2.5001, Rounding::NearestCeil, -3),
         (-2.5, Rounding::Truncate, -2),
         (-2.5, Rounding::Floor, -3),
         (3.5, Rounding::NearestEven, 4),
@@ -489,6 +499,10 @@ fn requantizer_fixed_point_factors() {
     );
     assert_eq!(
         tie(Rounding::NearestAway),
+        Some(Repr::Int((low + 1).cast_signed()))
+    );
+    assert_eq!(
+        tie(Rounding::NearestCeil),
         Some(Repr::Int((low + 1).cast_signed()))
     );
     assert_eq!(tie(Rounding::Floor), Some(Repr::Int(low.cast_signed())));
@@ -644,6 +658,7 @@ fn degrees_to_radians() {
                 Rounding::Ceil => urad.ceil(),
                 Rounding::NearestEven => urad.round_ties_even(),
                 Rounding::NearestAway => urad.round(),
+                Rounding::NearestCeil => (urad + 0.5).floor(),
             };
             // f64 is within 1e-9 of the truth here, nowhere near a rounding step for x != 0
             assert_eq!(f64::from(got), want, "{x} m° {r:?}");
@@ -812,29 +827,29 @@ fn requantizer_denominators_past_i128() {
         signed: true,
     };
     let at = |x: i128, r| requantize(Repr::Int(x), &factor, i64_kind, r, Overflow::Checked);
-    let all = |x: i128, want: [i128; 5]| {
+    let all = |x: i128, want: [i128; 6]| {
         for (r, want) in MODES.into_iter().zip(want) {
             assert_eq!(at(x, r), Some(Repr::Int(want)), "{x} {r:?}");
         }
     };
-    // MODES: Truncate, Floor, Ceil, NearestEven, NearestAway
+    // MODES: Truncate, Floor, Ceil, NearestEven, NearestAway, NearestCeil
     // 0.8947 of a step above, and below
-    all(i128::MAX, [0, 0, 1, 1, 1]);
-    all(i128::MIN, [0, -1, 0, -1, -1]);
+    all(i128::MAX, [0, 0, 1, 1, 1, 1]);
+    all(i128::MIN, [0, -1, 0, -1, -1, -1]);
     // 0.4733 and -0.4733: under half
     let under = 90_000_000_000_000_000_000_000_000_000_000_000_000i128;
-    all(under, [0, 0, 1, 0, 0]);
-    all(-under, [0, -1, 0, 0, 0]);
-    // exactly half a step: the even neighbour is 0, away from zero is 1
+    all(under, [0, 0, 1, 0, 0, 0]);
+    all(-under, [0, -1, 0, 0, 0, 0]);
+    // exactly half a step: the even neighbour is 0, away from zero is 1, toward +∞ 1 above and 0 below
     let half = i128::try_from(den / 2).unwrap();
-    all(half, [0, 0, 1, 0, 1]);
-    all(-half, [0, -1, 0, 0, -1]);
+    all(half, [0, 0, 1, 0, 1, 1]);
+    all(-half, [0, -1, 0, 0, -1, 0]);
     // just over and under half
-    all(half + 1, [0, 0, 1, 1, 1]);
-    all(half - 1, [0, 0, 1, 0, 0]);
-    all(-half - 1, [0, -1, 0, -1, -1]);
-    all(-half + 1, [0, -1, 0, 0, 0]);
-    all(0, [0; 5]);
-    all(1, [0, 0, 1, 0, 0]);
-    all(-1, [0, -1, 0, 0, 0]);
+    all(half + 1, [0, 0, 1, 1, 1, 1]);
+    all(half - 1, [0, 0, 1, 0, 0, 0]);
+    all(-half - 1, [0, -1, 0, -1, -1, -1]);
+    all(-half + 1, [0, -1, 0, 0, 0, 0]);
+    all(0, [0; 6]);
+    all(1, [0, 0, 1, 0, 0, 0]);
+    all(-1, [0, -1, 0, 0, 0, 0]);
 }

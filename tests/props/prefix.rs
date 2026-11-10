@@ -279,7 +279,7 @@ mod proofs {
     use super::*;
 
     fn mode() -> Rounding {
-        MODES[usize::from(kani::any_where(|i: &u8| *i < 5))]
+        MODES[usize::from(kani::any_where(|i: &u8| usize::from(*i) < MODES.len()))]
     }
 
     fn policy() -> Overflow {

@@ -134,7 +134,7 @@ fn check_root(x: u32, n: u32, r: Rounding) {
         Rounding::Truncate | Rounding::Floor => n * n <= x && (n + 1) * (n + 1) > x,
         Rounding::Ceil => n * n >= x && (n == 0 || (n - 1) * (n - 1) < x),
         // n² - n < x ≤ n² + n
-        Rounding::NearestEven | Rounding::NearestAway => {
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
             (n == 0 || n * n - n < x) && n * n + n >= x
         }
     };
@@ -457,14 +457,14 @@ mod proofs {
     /// Every u32 and mode: √x rounded.
     #[kani::proof]
     fn isqrt_u32() {
-        let r = MODES[usize::from(kani::any_where(|i: &u8| *i < 5))];
+        let r = MODES[usize::from(kani::any_where(|i: &u8| usize::from(*i) < MODES.len()))];
         super::isqrt_u32(kani::any(), r);
     }
 
     /// Every i8 pair and mode: |z| rounded, through the u16 norm.
     #[kani::proof]
     fn abs_8() {
-        let r = MODES[usize::from(kani::any_where(|i: &u8| *i < 5))];
+        let r = MODES[usize::from(kani::any_where(|i: &u8| usize::from(*i) < MODES.len()))];
         super::abs_8(kani::any(), kani::any(), r);
     }
 

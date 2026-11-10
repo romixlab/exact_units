@@ -15,7 +15,7 @@ assert_eq!(v.to_rounded::<Deci, i16>(Rounding::NearestEven).map(|x| x.get()), So
 assert_eq!(v.to_rounded::<Deci, i16>(Rounding::NearestAway).map(|x| x.get()), Some(13));
 ```
 
-## The five modes
+## The six modes
 
 | `Rounding` | Rule | 2.5 | −2.5 | 2.4 | Where you meet it |
 |---|---|---|---|---|---|
@@ -24,8 +24,9 @@ assert_eq!(v.to_rounded::<Deci, i16>(Rounding::NearestAway).map(|x| x.get()), So
 | `Ceil` | $\lceil x \rceil$, toward $+\infty$ | 3 | −2 | 3 | buffer sizes |
 | `NearestEven` | nearest, a tie to the even one | 2 | −2 | 2 | IEEE 754's default, Python's `round` |
 | `NearestAway` | nearest, a tie away from 0 | 3 | −3 | 2 | C's `round` and `lround` |
+| `NearestCeil` | nearest, a tie toward $+\infty$ | 3 | −2 | 2 | BT.709's INT, JavaScript's `Math.round` |
 
-The modes differ only where $x$ is not whole, and the two nearest modes only at a tie, $x = k + \tfrac12$:
+The modes differ only where $x$ is not whole, and the three nearest modes only at a tie, $x = k + \tfrac12$. `NearestCeil` is the one that commutes with a whole offset: $x + k$ rounds to the rounded $x$ plus $k$ for every whole $k$, so a value rounded before an offset (a video code's 16 or 128) gives the code rounded after it. `NearestAway` doesn't: −0.5 goes to −1, 127.5 to 128.
 
 <figure class="eu-figure" markdown="0">
 --8<-- "figures/rounding_numberline.svg"
@@ -47,6 +48,7 @@ Each mode has its own bias: the average error per rounding, in steps $q$ of the 
 | `Ceil` | $+q/2$ | always up |
 | `Truncate` | $-q/2$ for positive values, $+q/2$ for negative | `Floor` above 0, `Ceil` below: magnitudes shrink |
 | `NearestAway` | $+q/4$ with one bit dropped, near 0 with many | biased on ties only, and ties get rare as more bits are dropped |
+| `NearestCeil` | $+q/4$ with one bit dropped, near 0 with many | biased on ties only; its ties go up for either sign, where `NearestAway`'s cancel over a range symmetric about 0 |
 | `NearestEven` | 0 | ties go up as often as down |
 
 A bias adds up: a sum of $n$ rounded values is off by $n$ times it, while unbiased errors grow only as $\sqrt{n}$.

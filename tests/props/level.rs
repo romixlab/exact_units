@@ -131,7 +131,9 @@ pub(crate) fn rate_over(a: i16, b: i16, r: Rounding) {
     let got: Option<Fixed<Loss<Decibel>, Milli, i32>> = rate.over(length, r);
     let got = got.map(|f| i128::from(f.get()));
     let on_step = match r {
-        Rounding::NearestEven | Rounding::NearestAway => p.rem_euclid(100) == 50,
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
+            p.rem_euclid(100) == 50
+        }
         Rounding::Floor | Rounding::Ceil | Rounding::Truncate => p.rem_euclid(100) == 0,
     };
     if on_step {

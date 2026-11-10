@@ -49,7 +49,7 @@ const BUSY: Fixed<Ratio, Pow2<-30>, i64> = fixed!(0.1);
 ```
 
 ```text
-fixed!(0.1) is not a step of its storage: the steps around it are 107374182 = 0.09999999962747097015380859375 and 107374183 = 0.100000000558793544769287109375; write one of them, or name a rounding: fixed!(0.1, Floor | Ceil | Truncate | NearestEven | NearestAway)
+fixed!(0.1) is not a step of its storage: the steps around it are 107374182 = 0.09999999962747097015380859375 and 107374183 = 0.100000000558793544769287109375; write one of them, or name a rounding: fixed!(0.1, Floor | Ceil | Truncate | NearestEven | NearestAway | NearestCeil)
 ```
 
 - Each decimal is the step's whole value, every digit: a step of $2^{-k}$ or $10^{-k}$ always has a finite decimal. Pasted back, it is exactly that step, however many digits it takes:
@@ -63,7 +63,7 @@ assert_eq!(BUSY.get(), 107_374_183);
 
 - A float storage works the same way, with the two floats around the literal: `fixed!(0.1)` is no `f32`, and the error names 0.0999999940395355224609375 and 0.100000001490116119384765625.
 - A step whose value isn't a finite decimal (a scale of 1/3) is named by its stored value only: the call needs a rounding.
-- A tie is a choice too: 2.5 steps needs `NearestEven` (2) or `NearestAway` (3), named by the caller.
+- A tie is a choice too: 2.5 steps needs `NearestEven` (2), `NearestAway` (3) or `NearestCeil` (3; −2.5 steps is −2), named by the caller.
 - The error names all five, with none picked out: pick the one the value calls for. A threshold usually wants
   `Floor` or `Ceil`, the safe side, not a nearest one that can round either way.
 - The literal is checked against the storage and its bounds before any rounding: `fixed!(10.4, NearestEven)` into a `Range<0, 10>` doesn't compile, although it would round to 10.

@@ -5,7 +5,7 @@
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
 
-use super::reference::{MODES, POLICIES, assert_rounded, range, round_div, settle};
+use super::reference::{MODES, POLICIES, assert_rounded, range, round_div, round_half_up, settle};
 use exact_units::units::Ratio;
 use exact_units::{
     Fixed, FixedScale, Magnitude, Overflow, Repr, Requantizer, Rounding, Storage, StorageKind,
@@ -122,7 +122,7 @@ pub(crate) fn requantizes_at_run_time(
 }
 
 /// A float `x` into an integer `T2` of the same scale, rounded by `r` and settled by `o`, against std's own rounding
-/// of a float (`floor`, `ceil`, `trunc`, `round_ties_even`, `round`): `NaN` is 0 and `None` for [Overflow::Checked],
+/// of a float (`floor`, `ceil`, `trunc`, `round_ties_even`, `round`, and `⌊x⌋` plus one where `x − ⌊x⌋ ≥ ½` for `NearestCeil`): `NaN` is 0 and `None` for [Overflow::Checked],
 /// what has no `i128` (infinities, from 2¹²⁷ on) is the end of its sign saturated and 0 modulo 2⁶⁴ wrapped.
 #[cfg(not(kani))]
 pub(crate) fn float_requantizes<T2: Int>(x: f64, r: Rounding, o: Overflow) {
@@ -140,6 +140,7 @@ pub(crate) fn float_requantizes<T2: Int>(x: f64, r: Rounding, o: Overflow) {
         Rounding::Truncate => x.trunc(),
         Rounding::NearestEven => x.round_ties_even(),
         Rounding::NearestAway => x.round(),
+        Rounding::NearestCeil => round_half_up(x),
     };
     let want = if x.is_nan() {
         (o != Overflow::Checked).then_some(0)
@@ -201,6 +202,7 @@ fn scaled(x: i64, m: u64, shift: i32, r: Rounding) -> (bool, Option<i128>, i128)
             Rounding::Floor => neg && p != 0,
             Rounding::Ceil => !neg && p != 0,
             Rounding::NearestAway => above || tie,
+            Rounding::NearestCeil => above || (tie && !neg),
             Rounding::NearestEven => above,
         };
         i128::from(up) * if neg { -1 } else { 1 }
@@ -400,7 +402,7 @@ mod proofs {
     use exact_units::prefix::{Deci, Milli, One, Rational};
 
     fn mode() -> Rounding {
-        MODES[usize::from(kani::any_where(|i: &u8| *i < 5))]
+        MODES[usize::from(kani::any_where(|i: &u8| usize::from(*i) < MODES.len()))]
     }
 
     fn policy() -> Overflow {

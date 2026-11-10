@@ -65,7 +65,7 @@ assert_eq!(Narrow10::DEF.decode(1020), None);           // a timing reference
 
 ### From E′ to a code
 
-The rounding is the step before the codec: a real E′ becomes a `Linear` by a named rounding. The two standards name two roundings. BT.709's INT (note 2 of item 3.5) gives 0 for a fraction of 0 to 0.4999… and +1 for 0.5 to 0.9999…: a half up, with nothing said about a negative argument. BT.2100's Round (below Table 9) is `Sign(x)·Floor(|x| + 0.5)`: a half away from zero, `Rounding::NearestAway`. Both round the code, whose argument is never negative for luma, so there they agree:
+The rounding is the step before the codec: a real E′ becomes a `Linear` by a named rounding, and the one that gives the standards' code is `Rounding::NearestCeil`, a tie toward +∞. BT.709's INT (note 2 of item 3.5) gives 0 for a fraction of 0 to 0.4999… and +1 for 0.5 to 0.9999…: a half up. BT.2100's Round (below Table 9) is `Sign(x)·Floor(|x| + 0.5)`, a half away from zero. Both round the code, whose argument is never negative, and on a non-negative argument both are a half up. The crate rounds the `Linear`, before the offset; a tie toward +∞ commutes with a whole offset, so rounding the `Linear` by `NearestCeil` and adding the offset is the standards' code for every E′:
 
 ```rust
 use exact_units::codec::{Coded, video::{Narrow8, NarrowSignal8}};
@@ -73,13 +73,28 @@ use exact_units::{Fixed, Rounding, prefix::{Pow2, Rational}, units::Ratio};
 
 // E' = 1/2, in steps of 1/4096
 let e = Fixed::<Ratio, Pow2<-12>, i32>::new(2048);
-let step = e.to_rounded::<Rational<1, 219>, i16>(Rounding::NearestAway).unwrap();
+let step = e.to_rounded::<Rational<1, 219>, i16>(Rounding::NearestCeil).unwrap();
 let signal = NarrowSignal8::try_new(step.get()).unwrap();
 // 219 · ½ + 16 = 125.5, a half up: 126
-assert_eq!(Coded::<Narrow8>::try_new(signal, Rounding::NearestAway).map(Coded::raw), Ok(126));
+assert_eq!(Coded::<Narrow8>::try_new(signal, Rounding::NearestCeil).map(Coded::raw), Ok(126));
 ```
 
-A colour difference can be negative, and there the order of the steps shows. Both standards round the code, 224·E′ + 128, which is positive: an E′ of −1/448 is code 127.5, and INT and Round both give 128. The crate rounds the `Linear`, 224·E′ = −0.5, before the offset, and `NearestAway` takes that tie to −1: code 127. The crate has no rounding toward +∞ on a tie; where a negative tie matters, round the code, not E′. `tests/props/video.rs` walks every E′ from −0.2 to 1.3 in steps of 1/4096 through all four codecs against the standard's INT written out in integers, and finds exactly these negative ties apart.
+A colour difference can be negative, and there the choice shows. An E′ of −1/448 is code 224·E′ + 128 = 127.5, and INT and Round both give 128. Rounded by `NearestCeil`, the `Linear` 224·E′ = −0.5 goes to 0: code 128, the same. `NearestAway` takes that tie to −1, code 127, one lower: a tie away from zero doesn't commute with the offset. `tests/props/video.rs` walks every E′ from −0.2 to 1.3 in steps of 1/4096 through all four codecs against the standard's INT written out in integers: `NearestCeil` gives its code everywhere, `NearestAway` the code one lower on exactly these negative ties.
+
+```rust
+use exact_units::codec::{Coded, video::{NarrowChroma8, NarrowChromaSignal8}};
+use exact_units::{Fixed, Rounding, prefix::Rational, units::Ratio};
+
+// E' = -1/448 = -2/896
+let e = Fixed::<Ratio, Rational<1, 896>, i32>::new(-2);
+let code = |r| {
+    let step = e.to_rounded::<Rational<1, 224>, i16>(r).unwrap();
+    let signal = NarrowChromaSignal8::try_new(step.get()).unwrap();
+    Coded::<NarrowChroma8>::try_new(signal, r).map(Coded::raw)
+};
+assert_eq!(code(Rounding::NearestCeil), Ok(128)); // INT and Round: 127.5 is 128
+assert_eq!(code(Rounding::NearestAway), Ok(127)); // a half away from zero before the offset
+```
 
 ### Timing references as niches
 

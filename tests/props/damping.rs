@@ -191,7 +191,7 @@ mod proofs {
     /// `rem_euclid`), which ran past 25 minutes for i16 pairs; a constant one folds away. `damping_ratio_sweeps` and
     /// the proptest cover the divisors. ζ ↔ Q and the time constant are walked whole by `every_i16`.
     fn at(w: i16) {
-        let r = MODES[usize::from(kani::any_where(|i: &u8| *i < 5))];
+        let r = MODES[usize::from(kani::any_where(|i: &u8| usize::from(*i) < MODES.len()))];
         damping_ratio(kani::any(), w, r);
     }
 

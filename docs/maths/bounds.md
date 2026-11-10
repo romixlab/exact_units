@@ -95,7 +95,7 @@ assert_eq!(Len::try_new_rounded(65, Rounding::Ceil), None);
 
 - `try_new`, `bounded`, a `fixed!` constant, serde and the wire refuse a value off the set. A run of consecutive values reads as its ends in the error, `0..=8`.
 - The wire names a value past the ends as out of `0..=64`, and one in a gap as a number with no value there.
-- `try_new_rounded` takes a value off the set to the next one up (`Ceil`), down (`Floor`) or the nearest. A tie between two goes to the value at the even position of the set (`NearestEven`), or to the one farther from zero (`NearestAway`). There is no default rounding.
+- `try_new_rounded` takes a value off the set to the next one up (`Ceil`), down (`Floor`) or the nearest. A tie between two goes to the value at the even position of the set (`NearestEven`), to the one farther from zero (`NearestAway`), or to the greater one (`NearestCeil`). There is no default rounding.
 - `checked_add` and its kin are `None` for a result in a gap. `saturating_add` is a compile error: it stops at the ends of a range, and a gap has no end to stop at without a rounding.
 - A window around a set value ends on set values.
 - The set is a table of `T` in flash, 16 bytes for the CAN FD lengths in `u8`. `try_new` and `try_new_rounded` search it in `T` itself, no wider integer on the way: on a Cortex-M4F they take no more flash than the same written by hand on a `u8` and a table of 16 (`tests/can_fd_size.rs` builds both and compares).

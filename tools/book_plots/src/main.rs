@@ -53,7 +53,7 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// Five small panels, one per mode: x from -3 to 3 in tenths, the whole number `to_rounded` makes of it, with the
+/// Six small panels, one per mode: x from -3 to 3 in tenths, the whole number `to_rounded` makes of it, with the
 /// line y = x behind.
 fn rounding() -> String {
     let modes = [
@@ -62,13 +62,14 @@ fn rounding() -> String {
         (Rounding::Ceil, "Ceil"),
         (Rounding::NearestEven, "NearestEven"),
         (Rounding::NearestAway, "NearestAway"),
+        (Rounding::NearestCeil, "NearestCeil"),
     ];
     let (pw, ph, gap, left, top) = (150.0, 150.0, 22.0, 34.0, 30.0);
-    let width = left + 5.0 * pw + 4.0 * gap + 10.0;
+    let width = left + 6.0 * pw + 5.0 * gap + 10.0;
     let mut s = Svg::new(
         width,
         top + ph + 34.0,
-        "Staircases of the five rounding modes from -3 to 3",
+        "Staircases of the six rounding modes from -3 to 3",
     );
     for (i, (mode, name)) in modes.into_iter().enumerate() {
         let x0 = left + f64::from(u8::try_from(i).unwrap_or(0)) * (pw + gap);

@@ -300,6 +300,9 @@ impl Quotient {
             Rounding::Ceil => !self.neg && inexact,
             Rounding::NearestEven => ord == Ordering::Greater || (ord == Ordering::Equal && odd),
             Rounding::NearestAway => ord != Ordering::Less,
+            Rounding::NearestCeil => {
+                ord == Ordering::Greater || (ord == Ordering::Equal && !self.neg)
+            }
         }
     }
 

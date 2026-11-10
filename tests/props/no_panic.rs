@@ -485,7 +485,7 @@ mod proofs {
     /// Every i32 of 3·2⁻⁶³ into kilo: the denominator 2⁶⁶·125, past i64.
     #[kani::proof]
     fn tiny_to_kilo_i32() {
-        let r = MODES[usize::from(kani::any_where(|i: &u8| *i < 5))];
+        let r = MODES[usize::from(kani::any_where(|i: &u8| usize::from(*i) < MODES.len()))];
         far_below_a_step::<Tiny, Kilo, i32>(kani::any(), r);
     }
 }

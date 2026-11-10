@@ -18,12 +18,13 @@ type Len = Fixed<Byte, One, u8, OneOf<CanFdLengths>>;
 const DLC_LENGTHS: [i128; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
 
 /// Every rounding.
-const ROUNDINGS: [Rounding; 5] = [
+const ROUNDINGS: [Rounding; 6] = [
     Rounding::Truncate,
     Rounding::Floor,
     Rounding::Ceil,
     Rounding::NearestEven,
     Rounding::NearestAway,
+    Rounding::NearestCeil,
 ];
 
 /// The DLC whose length is `x`, if one is.
@@ -33,7 +34,7 @@ fn dlc_of(x: i128) -> Option<usize> {
 
 /// The DLC `x` rounds to by `r`, worked out by brute force over the 16 lengths: the exact one, else the largest
 /// below (`Floor`, `Truncate` of a positive `x`; of a negative one the smallest above), the smallest above (`Ceil`), or the closest, a tie to the even DLC
-/// (`NearestEven`) or to the larger length (`NearestAway`: every length is positive).
+/// (`NearestEven`) or to the larger length (`NearestAway`, every length being positive, and `NearestCeil`).
 fn dlc_rounded(x: i128, r: Rounding) -> Option<usize> {
     if let Some(d) = dlc_of(x) {
         return Some(d);
@@ -51,21 +52,23 @@ fn dlc_rounded(x: i128, r: Rounding) -> Option<usize> {
             core::cmp::Ordering::Less => above,
             core::cmp::Ordering::Equal => None,
         },
-        Rounding::NearestEven | Rounding::NearestAway => match (below, above) {
-            (Some(b), Some(a)) => {
-                let (db, da) = (x.abs_diff(len(b)), len(a).abs_diff(x));
-                Some(if db < da {
-                    b
-                } else if da < db {
-                    a
-                } else if r == Rounding::NearestEven {
-                    if b % 2 == 0 { b } else { a }
-                } else {
-                    a
-                })
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
+            match (below, above) {
+                (Some(b), Some(a)) => {
+                    let (db, da) = (x.abs_diff(len(b)), len(a).abs_diff(x));
+                    Some(if db < da {
+                        b
+                    } else if da < db {
+                        a
+                    } else if r == Rounding::NearestEven {
+                        if b % 2 == 0 { b } else { a }
+                    } else {
+                        a
+                    })
+                }
+                (b, a) => b.or(a),
             }
-            (b, a) => b.or(a),
-        },
+        }
     }
 }
 
@@ -160,7 +163,7 @@ impl ValueSet<i16> for Signed {
 
 /// The value of `set` `x` rounds to by `r`, by brute force in `i128`: the exact one, else the largest below or the
 /// smallest above as `r` says, the nearer of the two, a tie to the even position (`NearestEven`) or the value
-/// farther from zero (`NearestAway`; the one above where both are as far).
+/// farther from zero (`NearestAway`; the one above where both are as far) or the greater one (`NearestCeil`).
 fn set_rounded(set: &[i128], x: i128, r: Rounding) -> Option<i128> {
     if set.contains(&x) {
         return Some(x);
@@ -176,23 +179,27 @@ fn set_rounded(set: &[i128], x: i128, r: Rounding) -> Option<i128> {
             core::cmp::Ordering::Less => above,
             core::cmp::Ordering::Equal => None,
         },
-        Rounding::NearestEven | Rounding::NearestAway => match (below, above) {
-            (Some(b), Some(a)) => {
-                let (db, da) = (x.abs_diff(at(b)), at(a).abs_diff(x));
-                Some(if db < da {
-                    b
-                } else if da < db {
-                    a
-                } else if r == Rounding::NearestEven {
-                    if b % 2 == 0 { b } else { a }
-                } else if at(b).unsigned_abs() > at(a).unsigned_abs() {
-                    b
-                } else {
-                    a
-                })
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
+            match (below, above) {
+                (Some(b), Some(a)) => {
+                    let (db, da) = (x.abs_diff(at(b)), at(a).abs_diff(x));
+                    Some(if db < da {
+                        b
+                    } else if da < db {
+                        a
+                    } else if r == Rounding::NearestEven {
+                        if b % 2 == 0 { b } else { a }
+                    } else if r == Rounding::NearestCeil {
+                        a
+                    } else if at(b).unsigned_abs() > at(a).unsigned_abs() {
+                        b
+                    } else {
+                        a
+                    })
+                }
+                (b, a) => b.or(a),
             }
-            (b, a) => b.or(a),
-        },
+        }
     };
     pick.map(at)
 }

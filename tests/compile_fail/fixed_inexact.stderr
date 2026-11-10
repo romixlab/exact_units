@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: fixed!(0.1) is not a step of its storage: the steps around it are 107374182 = 0.09999999962747097015380859375 and 107374183 = 0.100000000558793544769287109375; write one of them, or name a rounding: fixed!(0.1, Floor | Ceil | Truncate | NearestEven | NearestAway)
+error[E0080]: evaluation panicked: fixed!(0.1) is not a step of its storage: the steps around it are 107374182 = 0.09999999962747097015380859375 and 107374183 = 0.100000000558793544769287109375; write one of them, or name a rounding: fixed!(0.1, Floor | Ceil | Truncate | NearestEven | NearestAway | NearestCeil)
  --> src/literal.rs
   |
   |                 Self::of_value(&value, M::ROUNDING, &src::<L>(true))
@@ -39,7 +39,7 @@ note: erroneous constant encountered
    |
    = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0080]: evaluation panicked: fixed!(-0.7071) is not a step of its storage: the steps around it are -23171 = -0.707122802734375 and -23170 = -0.70709228515625; write one of them, or name a rounding: fixed!(-0.7071, Floor | Ceil | Truncate | NearestEven | NearestAway)
+error[E0080]: evaluation panicked: fixed!(-0.7071) is not a step of its storage: the steps around it are -23171 = -0.707122802734375 and -23170 = -0.70709228515625; write one of them, or name a rounding: fixed!(-0.7071, Floor | Ceil | Truncate | NearestEven | NearestAway | NearestCeil)
  --> src/literal.rs
   |
   |                 Self::of_value(&value, M::ROUNDING, &src::<L>(true))
@@ -80,7 +80,7 @@ note: erroneous constant encountered
    |
    = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0080]: evaluation panicked: fixed!(0.1) is not a value of its float storage: the values around it are 0.0999999940395355224609375 and 0.100000001490116119384765625; write one of them, or name a rounding: fixed!(0.1, Floor | Ceil | Truncate | NearestEven | NearestAway)
+error[E0080]: evaluation panicked: fixed!(0.1) is not a value of its float storage: the values around it are 0.0999999940395355224609375 and 0.100000001490116119384765625; write one of them, or name a rounding: fixed!(0.1, Floor | Ceil | Truncate | NearestEven | NearestAway | NearestCeil)
  --> src/literal.rs
   |
   |                 Self::of_value(&value, M::ROUNDING, &src::<L>(true))
@@ -127,7 +127,7 @@ note: erroneous constant encountered
    |
    = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0080]: evaluation panicked: fixed!(2.5) is not a step of its storage: the steps around it are 7 and 8, and their values aren't finite decimals; name a rounding: fixed!(2.5, Floor | Ceil | Truncate | NearestEven | NearestAway)
+error[E0080]: evaluation panicked: fixed!(2.5) is not a step of its storage: the steps around it are 7 and 8, and their values aren't finite decimals; name a rounding: fixed!(2.5, Floor | Ceil | Truncate | NearestEven | NearestAway | NearestCeil)
  --> src/literal.rs
   |
   |                 Self::of_value(&value, M::ROUNDING, &src::<L>(true))

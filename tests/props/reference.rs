@@ -8,12 +8,13 @@
 use exact_units::{Overflow, Rounding};
 
 /// Every rounding mode.
-pub(crate) const MODES: [Rounding; 5] = [
+pub(crate) const MODES: [Rounding; 6] = [
     Rounding::Truncate,
     Rounding::Floor,
     Rounding::Ceil,
     Rounding::NearestEven,
     Rounding::NearestAway,
+    Rounding::NearestCeil,
 ];
 
 /// Every overflow policy.
@@ -31,21 +32,24 @@ pub(crate) fn round_div(p: i128, d: i128, r: Rounding) -> i128 {
         Rounding::Ceil => true,
         Rounding::Truncate => p < 0,
         // rem against d - rem: 2 · rem can overflow where d is near i128::MAX
-        Rounding::NearestEven | Rounding::NearestAway => match rem.cmp(&(d - rem)) {
-            core::cmp::Ordering::Less => false,
-            core::cmp::Ordering::Greater => true,
-            core::cmp::Ordering::Equal => match r {
-                Rounding::NearestAway => p > 0,
-                _ => f % 2 != 0,
-            },
-        },
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
+            match rem.cmp(&(d - rem)) {
+                core::cmp::Ordering::Less => false,
+                core::cmp::Ordering::Greater => true,
+                core::cmp::Ordering::Equal => match r {
+                    Rounding::NearestAway => p > 0,
+                    Rounding::NearestCeil => true,
+                    _ => f % 2 != 0,
+                },
+            }
+        }
     };
     f + i128::from(up)
 }
 
 /// Asserts that `q` is `p / d` rounded by `r` (`d > 0`), from what the mode promises rather than from a second
 /// rounding: Floor at or below, Ceil at or above, Truncate toward zero, each within one step; the nearest ones
-/// within half a step, a tie to the even neighbour or away from zero.
+/// within half a step, a tie to the even neighbour, away from zero or toward +∞.
 #[expect(
     clippy::expect_used,
     reason = "a property fails by panicking: q · d past i128 is a result far off"
@@ -62,7 +66,7 @@ pub(crate) fn assert_rounded(p: i128, d: i128, r: Rounding, q: i128) {
             // toward zero: q·d between 0 and p
             assert!(e == 0 || (e > 0) == (p > 0), "truncate {p}/{d}: {q}");
         }
-        Rounding::NearestEven | Rounding::NearestAway => {
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
             // |e| against d - |e|, as in round_div
             let off = e.abs();
             assert!(
@@ -72,6 +76,9 @@ pub(crate) fn assert_rounded(p: i128, d: i128, r: Rounding, q: i128) {
             if off == d - off {
                 if r == Rounding::NearestEven {
                     assert!(q % 2 == 0, "a tie {p}/{d} to even: {q}");
+                } else if r == Rounding::NearestCeil {
+                    // toward +∞: q·d above p
+                    assert!(e < 0, "a tie {p}/{d} toward +∞: {q}");
                 } else {
                     // away from zero: |q·d| > |p|
                     assert!((e > 0) != (p > 0), "a tie {p}/{d} away from zero: {q}");
@@ -92,6 +99,7 @@ pub(crate) fn assert_rounded_f64(x: f64, tol: f64, r: Rounding, q: Option<i128>,
         Rounding::Truncate => y.trunc(),
         Rounding::NearestEven => y.round_ties_even(),
         Rounding::NearestAway => y.round(),
+        Rounding::NearestCeil => round_half_up(y),
     };
     let (lo, hi) = (step(x - tol), step(x + tol));
     #[expect(
@@ -105,6 +113,13 @@ pub(crate) fn assert_rounded_f64(x: f64, tol: f64, r: Rounding, q: Option<i128>,
         qf.is_some_and(|qf| (qf - lo).abs() < 0.5 || (qf - hi).abs() < 0.5),
         "{what}: {x} ± {tol} {r:?} is {lo} or {hi}, not {q:?}"
     );
+}
+
+/// `y` to the nearest whole number, a tie toward +∞: `(y + 0.5).floor()` rounds the sum for a `y` just below a half,
+/// `y - ⌊y⌋` is exact.
+pub(crate) fn round_half_up(y: f64) -> f64 {
+    let f = y.floor();
+    if y - f >= 0.5 { f + 1.0 } else { f }
 }
 
 /// `x` into `min..=max` by `o`; wrapping is modulo the span, as two's complement is for a full-width storage.

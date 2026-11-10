@@ -489,7 +489,7 @@ macro_rules! isqrt {
     ($($name:ident $t:ty;)*) => {$(
         #[doc = concat!("√`x` as a `", stringify!($t), "`, rounded by `r`, exactly: `", stringify!($t),
             "::isqrt` is the floor, the other modes step up from it. A root is never a tie (n² < x < (n + ½)² ",
-            "or above), so `NearestEven` and `NearestAway` are one. The root of the largest `x` rounded up is ",
+            "or above), so `NearestEven`, `NearestAway` and `NearestCeil` are one. The root of the largest `x` rounded up is ",
             "2^(bits/2), so the result keeps `x`'s width; below that it fits the type of half the bits.")]
         ///
         /// ```
@@ -510,7 +510,7 @@ macro_rules! isqrt {
                 Rounding::Truncate | Rounding::Floor => false,
                 Rounding::Ceil => n * n != x,
                 // √x > n + ½ is x > n² + n + ¼, for an integer x: x > n² + n
-                Rounding::NearestEven | Rounding::NearestAway => x - n * n > n,
+                Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => x - n * n > n,
             };
             n + up as $t
         }

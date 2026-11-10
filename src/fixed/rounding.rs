@@ -20,6 +20,11 @@ pub enum Rounding {
     NearestEven,
     /// To the nearest, a tie away from zero (C's `round` and `lround`): 2.5 is 3, -2.5 is -3.
     NearestAway,
+    /// To the nearest, a tie toward +∞ (ITU-R BT.709's INT, JavaScript's `Math.round`): 2.5 is 3, -2.5 is -2. An
+    /// integer offset commutes with it, as it doesn't with [NearestAway](Rounding::NearestAway): `x + k` rounds to
+    /// the rounded `x` plus `k` for every whole `k`, so rounding a value before or after the offset of a video code
+    /// gives the same code.
+    NearestCeil,
 }
 
 /// What a conversion or an operation does with a result the storage can't hold.
@@ -60,13 +65,16 @@ macro_rules! round_div {
                 Rounding::Truncate => p < 0 && rem != 0,
                 Rounding::Floor => false,
                 Rounding::Ceil => rem != 0,
-                Rounding::NearestEven | Rounding::NearestAway => {
+                Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
                     // against half a step, a constant once d is: a tie only for an even d
                     let half = d / 2;
                     if rem != half || d % 2 != 0 {
                         rem > half
                     } else if matches!(r, Rounding::NearestAway) {
                         p >= 0
+                    } else if matches!(r, Rounding::NearestCeil) {
+                        // the floor quotient and a tie: up is toward +∞ whatever the sign
+                        true
                     } else {
                         q % 2 != 0
                     }
@@ -86,7 +94,8 @@ round_div! {
 /// there is one (the lowest code of them), else the nearest below or above `x` as `r` says. [Floor](Rounding::Floor)
 /// takes the one below, [Ceil](Rounding::Ceil) the one above, [Truncate](Rounding::Truncate) the one toward zero;
 /// the nearest modes the closer of the two, a tie to the even code ([NearestEven](Rounding::NearestEven), as a
-/// μ-law tie goes to the even mantissa) or to the value farther from zero ([NearestAway](Rounding::NearestAway)).
+/// μ-law tie goes to the even mantissa), to the value farther from zero ([NearestAway](Rounding::NearestAway)) or to
+/// the greater value ([NearestCeil](Rounding::NearestCeil)).
 /// `None` where no entry lies on the side `r` takes, or there is none. The entries need not be ordered: a
 /// [OneOf](super::OneOf) set's are its positions, a [Table](crate::codec::CodecShape::Table)'s its codes.
 pub(crate) fn nearest_entry(
@@ -118,28 +127,32 @@ pub(crate) fn nearest_entry(
                 above.filter(|_| x < 0)
             }
         }
-        Rounding::NearestEven | Rounding::NearestAway => match (below, above) {
-            (Some(b), Some(a)) => {
-                let (db, da) = (x.abs_diff(b.1), a.1.abs_diff(x));
-                if db != da {
-                    Some(if db < da { b } else { a })
-                } else if r == Rounding::NearestEven {
-                    // a tie: the even code, the lower one where both are even or both odd
-                    match (b.0 % 2 == 0, a.0 % 2 == 0) {
-                        (true, false) => Some(b),
-                        (false, true) => Some(a),
-                        _ => Some(if b.0 < a.0 { b } else { a }),
-                    }
-                } else {
-                    Some(if b.1.unsigned_abs() > a.1.unsigned_abs() {
-                        b
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
+            match (below, above) {
+                (Some(b), Some(a)) => {
+                    let (db, da) = (x.abs_diff(b.1), a.1.abs_diff(x));
+                    if db != da {
+                        Some(if db < da { b } else { a })
+                    } else if r == Rounding::NearestCeil {
+                        Some(a)
+                    } else if r == Rounding::NearestEven {
+                        // a tie: the even code, the lower one where both are even or both odd
+                        match (b.0 % 2 == 0, a.0 % 2 == 0) {
+                            (true, false) => Some(b),
+                            (false, true) => Some(a),
+                            _ => Some(if b.0 < a.0 { b } else { a }),
+                        }
                     } else {
-                        a
-                    })
+                        Some(if b.1.unsigned_abs() > a.1.unsigned_abs() {
+                            b
+                        } else {
+                            a
+                        })
+                    }
                 }
+                (b, a) => b.or(a),
             }
-            (b, a) => b.or(a),
-        },
+        }
     };
     pick.map(|(code, _)| code)
 }
@@ -186,13 +199,17 @@ pub(crate) fn round_f64(x: f64, r: Rounding) -> f64 {
             clippy::cast_possible_truncation,
             reason = "t is whole and below 2⁵², an i64 exactly (a float has no TryFrom)"
         )]
-        Rounding::NearestEven | Rounding::NearestAway => {
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
             let a = if neg { -frac } else { frac };
             if a > 0.5 {
                 away
             } else if a < 0.5 {
                 t
-            } else if r == Rounding::NearestAway || (t as i64) % 2 != 0 {
+            } else if r == Rounding::NearestAway || (r == Rounding::NearestCeil && !neg) {
+                away
+            } else if r == Rounding::NearestCeil {
+                t
+            } else if (t as i64) % 2 != 0 {
                 away
             } else {
                 t
@@ -326,6 +343,7 @@ pub(crate) const fn mul_fixed_point(x: i128, m: u64, shift: i32, r: Rounding) ->
         Rounding::Floor => neg && rem != 0,
         Rounding::Ceil => !neg && rem != 0,
         Rounding::NearestAway => above || tie,
+        Rounding::NearestCeil => above || (tie && !neg),
         Rounding::NearestEven => above || (tie && q & 1 == 1),
     };
     Scaled {
@@ -366,6 +384,7 @@ pub(crate) const fn mul_fixed_point_narrow(x: i64, m: u64, shift: i32, r: Roundi
             Rounding::Floor => neg && (half || below),
             Rounding::Ceil => !neg && (half || below),
             Rounding::NearestAway => half,
+            Rounding::NearestCeil => half && (below || !neg),
             Rounding::NearestEven => half && (below || q & 1 == 1),
         };
         // below 2⁶² + 1
@@ -539,6 +558,7 @@ fn div_wide(p: i128, den: u128, r: Rounding) -> i128 {
         Rounding::Floor => neg,
         Rounding::Ceil => !neg,
         Rounding::NearestAway => above || tie,
+        Rounding::NearestCeil => above || (tie && !neg),
         Rounding::NearestEven => above,
     };
     if up { sign } else { 0 }
@@ -771,8 +791,39 @@ impl Requantizer {
 
 #[cfg(test)]
 mod tests {
-    use super::{Overflow, Repr, Requantizer, Rounding, StorageKind, requantize};
+    use super::{
+        Overflow, Repr, Requantizer, Rounding, StorageKind, nearest_entry, requantize, round_f64,
+    };
     use crate::Magnitude;
+
+    /// A tie below 0: `NearestCeil` takes the greater value, `NearestAway` the one farther from zero.
+    #[test]
+    fn a_negative_tie_toward_positive_infinity() {
+        let entries = [(0, -10), (1, 0), (2, 10)];
+        assert_eq!(nearest_entry(entries, -5, Rounding::NearestCeil), Some(1));
+        assert_eq!(nearest_entry(entries, -5, Rounding::NearestAway), Some(0));
+        assert_eq!(nearest_entry(entries, 5, Rounding::NearestCeil), Some(2));
+        assert_eq!(nearest_entry(entries, -6, Rounding::NearestCeil), Some(0));
+        for (x, want) in [
+            (-2.5, -2.0),
+            (-0.5, 0.0),
+            (0.5, 1.0),
+            (2.5, 3.0),
+            (-2.6, -3.0),
+            (-2.4, -2.0),
+        ] {
+            assert_eq!(
+                round_f64(x, Rounding::NearestCeil).to_bits(),
+                f64::to_bits(want),
+                "{x}"
+            );
+        }
+        assert_eq!(super::div_i8(-5, 2, Rounding::NearestCeil), -2);
+        assert_eq!(super::div_i8(-128, 2, Rounding::NearestCeil), -64);
+        assert_eq!(super::div_i8(-127, 2, Rounding::NearestCeil), -63);
+        assert_eq!(super::div_u8(255, 2, Rounding::NearestCeil), 128);
+        assert_eq!(super::div_i32(-7, 6, Rounding::NearestCeil), -1);
+    }
 
     #[test]
     fn int_kind_outside_1_to_64_bits_converts_nothing() {

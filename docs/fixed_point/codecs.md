@@ -164,8 +164,8 @@ assert_eq!(CanFdDlc::DEF.encode(65, Rounding::Ceil), None);
 
 A `Table` shape lists the value of each code from 0. A code past the end means no value. Encoding takes the code of
 the value, or the one a named `Rounding` picks among the codes that aren't spare. A tie goes to the even code
-(`NearestEven`, as a μ-law tie goes to the even mantissa) or to the value farther from zero (`NearestAway`). The
-entries need not be ascending, and where two codes mean one value, encoding takes the lower code.
+(`NearestEven`, as a μ-law tie goes to the even mantissa), to the value farther from zero (`NearestAway`) or to the
+greater value (`NearestCeil`). The entries need not be ascending, and where two codes mean one value, encoding takes the lower code.
 `tests/props/can_fd.rs` walks every byte as a DLC and every `u8` length by every rounding against the table written
 out from the standard, and checks that the typed path and the data path agree.
 

@@ -1,4 +1,4 @@
-error[E0080]: evaluation panicked: fixed!(90 in Degree) is not a step of its storage: the steps around it are 1570796 = 1.570796 and 1570797 = 1.570797; write one of them as fixed!(..), or name a rounding: fixed!(90 in Degree, Floor | Ceil | Truncate | NearestEven | NearestAway)
+error[E0080]: evaluation panicked: fixed!(90 in Degree) is not a step of its storage: the steps around it are 1570796 = 1.570796 and 1570797 = 1.570797; write one of them as fixed!(..), or name a rounding: fixed!(90 in Degree, Floor | Ceil | Truncate | NearestEven | NearestAway | NearestCeil)
  --> src/literal.rs
   |
   |                 Self::of_value(&value, M::ROUNDING, &src::<L>(false))
@@ -39,7 +39,7 @@ note: erroneous constant encountered
    |
    = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0080]: evaluation panicked: fixed!(359.9 km/h) is not a step of its storage: the steps around it are 9997 = 99.97 and 9998 = 99.98; write one of them as fixed!(..), or name a rounding: fixed!(359.9 km/h, Floor | Ceil | Truncate | NearestEven | NearestAway)
+error[E0080]: evaluation panicked: fixed!(359.9 km/h) is not a step of its storage: the steps around it are 9997 = 99.97 and 9998 = 99.98; write one of them as fixed!(..), or name a rounding: fixed!(359.9 km/h, Floor | Ceil | Truncate | NearestEven | NearestAway | NearestCeil)
  --> src/literal.rs
   |
   |                 Self::of_value(&value, M::ROUNDING, &src::<L>(false))
@@ -80,7 +80,7 @@ note: erroneous constant encountered
    |
    = note: this note originates in the macro `$crate::__fixed_at` which comes from the expansion of the macro `fixed` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0080]: evaluation panicked: db!(6) is not a step of its storage: the steps around it are 1995262 = 1.995262 and 1995263 = 1.995263; write one of them as fixed!(..), or name a rounding: db!(6, Floor | Ceil | Truncate | NearestEven | NearestAway)
+error[E0080]: evaluation panicked: db!(6) is not a step of its storage: the steps around it are 1995262 = 1.995262 and 1995263 = 1.995263; write one of them as fixed!(..), or name a rounding: db!(6, Floor | Ceil | Truncate | NearestEven | NearestAway | NearestCeil)
  --> src/decibel.rs
   |
   |                 Self::of_value(&value, M::ROUNDING, &Src::Macro { name: "db!", args: L::ARGS, direct: false })
@@ -121,7 +121,7 @@ note: erroneous constant encountered
    |
    = note: this note originates in the macro `$crate::__level_at` which comes from the expansion of the macro `db` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0080]: evaluation panicked: np!(-1) is not a step of its storage: the steps around it are 367879 = 0.367879 and 367880 = 0.36788; write one of them as fixed!(..), or name a rounding: np!(-1, Floor | Ceil | Truncate | NearestEven | NearestAway)
+error[E0080]: evaluation panicked: np!(-1) is not a step of its storage: the steps around it are 367879 = 0.367879 and 367880 = 0.36788; write one of them as fixed!(..), or name a rounding: np!(-1, Floor | Ceil | Truncate | NearestEven | NearestAway | NearestCeil)
  --> src/decibel.rs
   |
   |                 Self::of_value(&value, M::ROUNDING, &Src::Macro { name: "np!", args: L::ARGS, direct: false })

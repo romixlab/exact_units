@@ -95,12 +95,13 @@ pub(crate) fn mu_law_dynamic_encode_matches_typed(target: i16) {
 }
 
 /// Every rounding.
-pub(crate) const ROUNDINGS: [Rounding; 5] = [
+pub(crate) const ROUNDINGS: [Rounding; 6] = [
     Rounding::Truncate,
     Rounding::Floor,
     Rounding::Ceil,
     Rounding::NearestEven,
     Rounding::NearestAway,
+    Rounding::NearestCeil,
 ];
 
 /// Encoding `target` by `rounding` never gives the negative zero `0x7F`, by either codec or by the data path, and

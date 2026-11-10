@@ -356,19 +356,20 @@ fn check_isqrt(x: u128, n: u128, r: Rounding) {
         }
         Rounding::Ceil => sq(n) >= x && (n == 0 || sq(n - 1) < x),
         // (n - ½)² < x < (n + ½)², for whole numbers n² - n < x ≤ n² + n
-        Rounding::NearestEven | Rounding::NearestAway => {
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
             (n == 0 || sq(n) - n < x) && sq(n).saturating_add(n) >= x
         }
     };
     assert!(ok, "isqrt({x}, {r:?}) = {n}");
 }
 
-const ROUNDINGS: [Rounding; 5] = [
+const ROUNDINGS: [Rounding; 6] = [
     Rounding::Truncate,
     Rounding::Floor,
     Rounding::Ceil,
     Rounding::NearestEven,
     Rounding::NearestAway,
+    Rounding::NearestCeil,
 ];
 
 #[test]

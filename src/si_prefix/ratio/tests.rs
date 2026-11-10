@@ -21,12 +21,13 @@ use std::format;
 use std::vec;
 use std::vec::Vec;
 
-const MODES: [Rounding; 5] = [
+const MODES: [Rounding; 6] = [
     Rounding::Truncate,
     Rounding::Floor,
     Rounding::Ceil,
     Rounding::NearestEven,
     Rounding::NearestAway,
+    Rounding::NearestCeil,
 ];
 
 const POLICIES: [Overflow; 3] = [Overflow::Checked, Overflow::Saturate, Overflow::Wrap];
@@ -107,24 +108,27 @@ fn round(q: &BigRational, r: Rounding) -> BigInt {
                 floor
             }
         }
-        Rounding::NearestEven | Rounding::NearestAway => match frac.cmp(&half) {
-            Ordering::Less => floor,
-            Ordering::Greater => up,
-            Ordering::Equal if r == Rounding::NearestAway => {
-                if neg {
-                    floor
-                } else {
-                    up
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
+            match frac.cmp(&half) {
+                Ordering::Less => floor,
+                Ordering::Greater => up,
+                Ordering::Equal if r == Rounding::NearestCeil => up,
+                Ordering::Equal if r == Rounding::NearestAway => {
+                    if neg {
+                        floor
+                    } else {
+                        up
+                    }
+                }
+                Ordering::Equal => {
+                    if &floor % 2 == BigInt::from(0) {
+                        floor
+                    } else {
+                        up
+                    }
                 }
             }
-            Ordering::Equal => {
-                if &floor % 2 == BigInt::from(0) {
-                    floor
-                } else {
-                    up
-                }
-            }
-        },
+        }
     }
 }
 

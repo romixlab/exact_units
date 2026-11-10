@@ -5,8 +5,8 @@
 //! - Exact, or refused: a literal that is a stored value is that value. One that isn't (0.1 in steps of 2⁻³⁰) is a
 //!   compile error that names the two stored values around it, each with its exact decimal ready to paste:
 //!   `107374182 = 0.09999999962747097015380859375 and 107374183 = 0.100000000558793544769287109375`.
-//! - A rounding is named in the call: `fixed!(0.1, NearestEven)`, or `Floor`, `Ceil`, `Truncate`, `NearestAway`
-//!   ([Rounding]). A tie is a choice the caller names too.
+//! - A rounding is named in the call: `fixed!(0.1, NearestEven)`, or `Floor`, `Ceil`, `Truncate`, `NearestAway`,
+//!   `NearestCeil` ([Rounding]). A tie is a choice the caller names too.
 //! - Any scale that is a fraction of integers: `Pow2`, `Pow10`, `Rational`, the SI prefixes and their products. A
 //!   scale with π or a root in it is a compile error: its stored values aren't decimals.
 //! - Float storages the same way, with the two floats around the literal; a literal past the float's range or
@@ -336,7 +336,7 @@ pub mod mode {
         )*};
     }
 
-    modes!(Truncate Floor Ceil NearestEven NearestAway);
+    modes!(Truncate Floor Ceil NearestEven NearestAway NearestCeil);
 }
 
 /// A decimal literal in the unit of its context, `L` its source and `M` its rounding: what `fixed!(0.1)` and

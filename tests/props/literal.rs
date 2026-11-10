@@ -72,12 +72,13 @@ decimal_types! {
 }
 
 /// Every rounding.
-pub(crate) const MODES: [Rounding; 5] = [
+pub(crate) const MODES: [Rounding; 6] = [
     Rounding::Truncate,
     Rounding::Floor,
     Rounding::Ceil,
     Rounding::NearestEven,
     Rounding::NearestAway,
+    Rounding::NearestCeil,
 ];
 
 /// `num · 10^exp` in steps of `snum / sden`, rounded by `r`; `None` where the exact quotient needs more than `i128`.
@@ -180,8 +181,8 @@ fn float_is(num: i64, exp: i16, f: f64) -> Option<bool> {
 
 /// A float storage's `from_decimal_rounded(.., NearestEven)` is the nearest float, ties to even, as Rust's own
 /// correctly rounded parser has it: wherever that is a normal number and the decimal is within the normal range.
-/// `Floor` and `Ceil` are the floats around it, the same float or neighbours, `Truncate` and `NearestAway` one of
-/// them; `from_decimal` is the decimal where it is a float, as integers tell, and refuses it elsewhere.
+/// `Floor` and `Ceil` are the floats around it, the same float or neighbours, `Truncate`, `NearestAway` and
+/// `NearestCeil` one of them, the last two the same for a positive decimal; `from_decimal` is the decimal where it is a float, as integers tell, and refuses it elsewhere.
 #[cfg(not(kani))]
 pub(crate) fn float_from_decimal_is_nearest(num: i64, exp: i16) {
     // a literal whose whole value needs more than 128 bits is refused, as documented
@@ -211,6 +212,9 @@ pub(crate) fn float_from_decimal_is_nearest(num: i64, exp: i16) {
                 assert_eq!(got(Rounding::Truncate).to_bits(), toward_zero.to_bits(), "{text}");
                 let away = got(Rounding::NearestAway);
                 assert!(away.to_bits() == lo.to_bits() || away.to_bits() == hi.to_bits(), "{text}");
+                let up = got(Rounding::NearestCeil);
+                assert!(up.to_bits() == lo.to_bits() || up.to_bits() == hi.to_bits(), "{text}");
+                assert!(num < 0 || up.to_bits() == away.to_bits(), "{text}: a positive tie toward +∞ is away from 0");
                 let exact = std::panic::catch_unwind(|| F::from_decimal(d).get());
                 assert_eq!(exact.is_ok(), same, "{text}: exact one way, not the other");
                 if let Some(is) = float_is(num, exp, f64::from(want)) {

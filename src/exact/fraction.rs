@@ -674,6 +674,11 @@ impl Fraction {
                     Ordering::Equal => q % 2 != 0,
                 },
                 Rounding::NearestAway => rem >= self.den.checked_sub(rem)?,
+                Rounding::NearestCeil => match rem.cmp(&self.den.checked_sub(rem)?) {
+                    Ordering::Less => false,
+                    Ordering::Greater => true,
+                    Ordering::Equal => !self.neg,
+                },
             };
         let m = if up { q.checked_add(1)? } else { q };
         if self.neg {

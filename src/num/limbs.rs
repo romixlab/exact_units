@@ -338,6 +338,7 @@ pub(crate) const fn round_up(r: Rounding, neg: bool, odd: bool, half: bool, stic
         Rounding::Floor => neg && (half || sticky),
         Rounding::Ceil => !neg && (half || sticky),
         Rounding::NearestAway => half,
+        Rounding::NearestCeil => half && (sticky || !neg),
         Rounding::NearestEven => half && (sticky || odd),
     }
 }
