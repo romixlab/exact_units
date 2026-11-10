@@ -16,11 +16,13 @@
 #![expect(clippy::panic, reason = "a property fails by panicking")]
 
 use super::reference::imaging as reference;
-use exact_units::prefix::{One, Pow2, Pow10};
+use exact_units::codec::{CodeSpan, Codec, CodecDef, CodecShape, Coded};
+use exact_units::prefix::{One, Pow2, Pow10, Rational};
 #[cfg(feature = "q")]
 use exact_units::q;
+use exact_units::system::def_list;
 use exact_units::units::Ratio;
-use exact_units::{Exact, Fixed, Overflow, Prefix, Rounding};
+use exact_units::{Exact, Fixed, MarkerId, Overflow, Prefix, Rounding};
 
 /// `x / 2`, rounded by `r`: `x >> 1` for `Floor`.
 fn half(x: i32, r: Rounding) -> i32 {
@@ -539,6 +541,206 @@ fn cos128_every_entry() {
             let got = [lo, hi].map(|e| e.to_rounded::<One, i32>(r).map(Fixed::get));
             assert_eq!(got, [Some(want); 2], "cos128({k})");
         }
+    }
+}
+
+/// H.264's sample aspect ratio indicator (Table E-1, H.265 Table E.1 the same): codes 1 to 16 are ratios, every
+/// one a whole number of 1/198; 0 is Unspecified, 17 to 254 Reserved and 255 Extended_SAR (the ratio follows in
+/// `sar_width` and `sar_height`), so all of them are spare.
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct Sar;
+
+/// [Sar]'s table, in 1/198: entry `i` is code `i`'s ratio, code 0's entry a placeholder for a spare code.
+const SAR: [i128; 17] = [
+    0, 198, 216, 180, 288, 240, 432, 360, 576, 480, 324, 270, 384, 320, 264, 297, 396,
+];
+
+/// Table E-1's ratios as printed, `width:height`, code 1 to 16.
+const SAR_PRINTED: [(i128, u128); 16] = [
+    (1, 1),
+    (12, 11),
+    (10, 11),
+    (16, 11),
+    (40, 33),
+    (24, 11),
+    (20, 11),
+    (32, 11),
+    (80, 33),
+    (18, 11),
+    (15, 11),
+    (64, 33),
+    (160, 99),
+    (4, 3),
+    (3, 2),
+    (2, 1),
+];
+
+impl Codec for Sar {
+    type Raw = u8;
+    type Linear = Fixed<Ratio, Rational<1, 198>, u16>;
+
+    const DEF: CodecDef<'static> = CodecDef {
+        id: MarkerId {
+            crate_name: "props",
+            name: "Sar",
+        },
+        shape: CodecShape::Table(def_list(&SAR)),
+        spare: def_list(&[
+            CodeSpan::one(0),
+            CodeSpan { low: 17, high: 254 },
+            CodeSpan::one(255),
+        ]),
+        codes: CodeSpan::all::<u8>(),
+        nominal: None,
+        curve: None,
+    };
+
+    fn formula(raw: u8) -> Self::Linear {
+        let ratio = SAR.get(usize::from(raw)).copied().unwrap_or_default();
+        Fixed::new(u16::try_from(ratio).unwrap_or_default())
+    }
+
+    fn encode(value: Self::Linear, rounding: Rounding) -> Option<u8> {
+        let code = Self::DEF.encode(i128::from(value.get()), rounding)?;
+        u8::try_from(code).ok()
+    }
+}
+
+/// Every code of [Sar], by the typed path and the data path: codes 1 to 16 are Table E-1's ratios exactly, and each
+/// encodes back to its code by every rounding; every other code is spare.
+#[test]
+fn sar_every_code() {
+    for raw in 0..=u8::MAX {
+        let want = SAR_PRINTED
+            .get(usize::from(raw).wrapping_sub(1))
+            .map(|&(w, h)| Exact::<Ratio>::new(w, h).to::<Rational<1, 198>, u16>());
+        let typed = Sar::decode(raw);
+        assert_eq!(typed.map(Some), want, "code {raw}");
+        assert_eq!(
+            Sar::DEF.decode(i128::from(raw)),
+            typed.map(|v| i128::from(v.get()))
+        );
+        assert_eq!(Coded::<Sar>::try_from_raw(raw).is_ok(), typed.is_some());
+        if let Some(v) = typed {
+            for r in super::reference::MODES {
+                assert_eq!(Sar::encode(v, r), Some(raw), "code {raw} by {r:?}");
+            }
+        }
+    }
+    // between 40:33 and 4:3, a ratio no code has goes to the nearer, or up or down as named
+    let between = Fixed::<Ratio, Rational<1, 198>, u16>::new(250);
+    assert_eq!(Sar::encode(between, Rounding::NearestEven), Some(5));
+    assert_eq!(Sar::encode(between, Rounding::Ceil), Some(14));
+}
+
+/// BT.601's luma weights, exact: K_R = 0.299, K_B = 0.114 (T.871 clause 7, T.800 G.3).
+const KR: (i128, i128) = (299, 1000);
+/// See [KR].
+const KB: (i128, i128) = (114, 1000);
+
+/// The Y′C_BC_R matrix of `K_R` and `K_B`, forward (rows Y, C_B, C_R over R, G, B) and inverse (rows R, G, B over
+/// Y, C_B, C_R), every entry an exact rational.
+#[cfg(not(kani))]
+fn ycbcr_matrices() -> [[[num_rational::BigRational; 3]; 3]; 2] {
+    use num_rational::BigRational;
+    let q = |(n, d): (i128, i128)| BigRational::new(n.into(), d.into());
+    let one = BigRational::from_integer(1.into());
+    let half = BigRational::new(1.into(), 2.into());
+    let (kr, kb) = (q(KR), q(KB));
+    let kg = &one - &kr - &kb;
+    let cb = (&one - &kb) * BigRational::from_integer(2.into()); // 1.772
+    let cr = (&one - &kr) * BigRational::from_integer(2.into()); // 1.402
+    let forward = [
+        [kr.clone(), kg.clone(), kb.clone()],
+        [-&kr / &cb, -&kg / &cb, half.clone()],
+        [half, -&kg / &cr, -&kb / &cr],
+    ];
+    let zero = BigRational::default();
+    let inverse = [
+        [one.clone(), zero.clone(), cr.clone()],
+        [one.clone(), -(&kb * &cb / &kg), -(&kr * &cr / &kg)],
+        [one, cb, zero],
+    ];
+    [forward, inverse]
+}
+
+/// `a · b` of 3×3 matrices.
+#[cfg(not(kani))]
+fn product(
+    a: &[[num_rational::BigRational; 3]; 3],
+    b: &[[num_rational::BigRational; 3]; 3],
+) -> [[num_rational::BigRational; 3]; 3] {
+    let column = |j: usize| b.iter().filter_map(move |r| r.get(j));
+    a.each_ref()
+        .map(|row| core::array::from_fn(|j| row.iter().zip(column(j)).map(|(x, y)| x * y).sum()))
+}
+
+/// `x` rounded to `places` decimals as text, through [Exact::rounded].
+#[cfg(not(kani))]
+fn decimals(x: &num_rational::BigRational, places: u8) -> String {
+    let n = i128::try_from(x.numer().clone()).unwrap_or_else(|_| panic!("fits"));
+    let d = u128::try_from(x.denom().clone()).unwrap_or_else(|_| panic!("fits"));
+    format!(
+        "{:#}",
+        Exact::<Ratio>::new(n, d).rounded(places, Rounding::NearestEven)
+    )
+}
+
+/// The forward and inverse matrices from K_R and K_B are each other's inverse, exactly. JFIF prints them to four
+/// decimals (T.871 clause 7), and every one is the exact entry rounded. T.800 prints them to five or six (G.3), with
+/// three last digits off: G-10's 0,16875 and 0,331260 (the exact entries round to 0.16874 and 0.331264) and G-13's
+/// 0,34413 (0.34414). G-9 prints Y0 = −0,299·I0 − 0,587·I1 + 0,114·I2: with those signs the inverse G-12 to G-14 does
+/// not undo it, with plus signs it does.
+#[cfg(not(kani))]
+#[test]
+fn ycbcr_matrices_from_kr_and_kb() {
+    use num_rational::BigRational;
+    let [forward, inverse] = ycbcr_matrices();
+    let one = BigRational::from_integer(1.into());
+    let identity: [[BigRational; 3]; 3] = core::array::from_fn(|i| {
+        core::array::from_fn(|j| {
+            if i == j {
+                one.clone()
+            } else {
+                BigRational::default()
+            }
+        })
+    });
+    assert_eq!(product(&inverse, &forward), identity);
+    assert_eq!(product(&forward, &inverse), identity);
+    let mut printed_g9 = forward.clone();
+    if let Some(y0) = printed_g9.first_mut() {
+        for k in y0.iter_mut().take(2) {
+            *k = -&*k;
+        }
+    }
+    assert_ne!(product(&inverse, &printed_g9), identity);
+    let [[_, _, _], [blue_r, blue_g, _], [_, red_g, red_b]] = &forward;
+    let [_, [_, green_blue, green_red], _] = &inverse;
+    // JFIF, four decimals: every entry
+    let jfif = [
+        (blue_r, "-0.1687"),
+        (blue_g, "-0.3313"),
+        (red_g, "-0.4187"),
+        (red_b, "-0.0813"),
+        (green_blue, "-0.3441"),
+        (green_red, "-0.7141"),
+    ];
+    for (x, printed) in jfif {
+        assert_eq!(decimals(x, 4), printed);
+    }
+    // T.800, as printed, and the exact entry to as many places
+    let t800 = [
+        (blue_r, "-0.16875", "-0.16874"),
+        (blue_g, "-0.331260", "-0.331264"),
+        (red_g, "-0.41869", "-0.41869"),
+        (red_b, "-0.08131", "-0.08131"),
+        (green_blue, "-0.34413", "-0.34414"),
+        (green_red, "-0.71414", "-0.71414"),
+    ];
+    for (x, printed, exact) in t800 {
+        let places = u8::try_from(printed.len() - 3).unwrap_or(0);
+        assert_eq!(decimals(x, places), exact, "{printed}");
     }
 }
 
