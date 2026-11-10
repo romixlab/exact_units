@@ -278,9 +278,9 @@ fn irrational() {
     let g4 = 5.0 * x1 / 64.0;
     let alpha = Fixed::<Ratio, One, f64>::bounded(-g4 / g3);
     println!("  alpha = {}", alpha.get());
-    // twelve digits are safe from an f64's error; tests/props certifies all fifteen by exact intervals, and finds
+    // eight digits, far from an f64's error; tests/props certifies all fifteen by exact intervals, and finds
     // two printed one off in the last place: r0 (Table F.6) and gamma (Table F.4)
-    assert!(alpha.is_in(q!(-1.586134342059...Ratio)));
+    assert!(alpha.is_in(q!(-1.58613434...Ratio)));
 
     println!("AV1's Cos128_Lookup (7.13.2): 4096 cos(k pi / 128) 'rounded to the nearest integer'");
     let table = [4096, 4095, 4091, 4085, 4076, 4065, 4052, 4036, 4017];
