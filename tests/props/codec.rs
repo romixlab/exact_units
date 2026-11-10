@@ -301,7 +301,8 @@ mod wire {
                 from: f(1, 25),
                 form: CurveForm::Power {
                     gain: Fraction::ONE,
-                    shift: f(11, 200),
+                    scale: f(200, 211),
+                    shift: f(11, 211),
                     exponent: f(12, 5),
                     offset: f(-1, 3),
                 },

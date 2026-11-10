@@ -70,6 +70,7 @@ const SQUARE: [Segment; 1] = [Segment {
     from: Fraction::ZERO,
     form: CurveForm::Power {
         gain: Fraction::new(1, 3),
+        scale: Fraction::ONE,
         shift: Fraction::ZERO,
         exponent: Fraction::int(2),
         offset: Fraction::ZERO,
@@ -110,6 +111,7 @@ fn a_power_is_exact_where_the_reference_is() {
     ] {
         let form = CurveForm::Power {
             gain: Fraction::ONE,
+            scale: Fraction::ONE,
             shift: Fraction::ZERO,
             exponent: Fraction::new(i128::from(p), u128::from(q)),
             offset: Fraction::ZERO,
@@ -129,6 +131,7 @@ fn a_power_is_exact_where_the_reference_is() {
 fn a_power_clamps_its_base_at_zero() {
     let form = CurveForm::Power {
         gain: Fraction::ONE,
+        scale: Fraction::ONE,
         shift: Fraction::new(-1, 4),
         exponent: Fraction::int(2),
         offset: Fraction::new(1, 10),
@@ -433,4 +436,26 @@ mod typed {
         assert_eq!(enc(10_001).map(Coded::raw), Err(EncodeError::OutOfRange));
         assert_eq!(PqCode::of(code(500).code()).raw(), 500);
     }
+}
+
+/// BT.709's inverse OETF above its toe, `((V + 0.099)/1.099)^(20/9)`, as a `Power` whose base carries the divisor:
+/// exact at V = 1 (base 1) and at V = 0.099·k-free points only where the base is a rational's 9th power; the `f64`
+/// inverse brings a value back.
+#[test]
+fn a_power_with_a_divisor_in_its_base() {
+    let form = CurveForm::Power {
+        gain: Fraction::ONE,
+        scale: Fraction::new(1000, 1099),
+        shift: Fraction::new(99, 1099),
+        exponent: Fraction::new(20, 9),
+        offset: Fraction::ZERO,
+    };
+    assert_eq!(form.decode_exact(Fraction::ONE), Some(Fraction::ONE));
+    // base (1/2 + 0.099)/1.099 = 599/1099, no 9th power
+    assert_eq!(form.decode_exact(Fraction::new(1, 2)), None);
+    // base 512/1099·… : V with (1000·V + 99)/1099 = 1/512 is V = (1099/512 − 99)/1000, below the toe but exact
+    let v = Fraction::new(1099 - 99 * 512, 512_000);
+    assert_eq!(form.decode_exact(v), Some(Fraction::new(1, 1 << 20)));
+    let y = form.decode_f64(0.5).unwrap();
+    assert!((form.inverse_f64(y).unwrap() - 0.5).abs() < 1e-15);
 }

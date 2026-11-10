@@ -127,12 +127,16 @@ pub enum CurveForm {
         /// The value at `x = 0`.
         offset: Fraction,
     },
-    /// `y = gain·max(x + shift, 0)^exponent + offset`: exact where `x + shift` is a rational's q-th power, the
-    /// exponent being p/q (sRGB's `((V + 0.055)/1.055)^(12/5)`, HLG's lower half `E′²/3`, CIE L*'s cube).
+    /// `y = gain·max(scale·x + shift, 0)^exponent + offset`: exact where `scale·x + shift` is a rational's q-th
+    /// power, the exponent being p/q. The base carries its own scale, so a divisor inside the power stays rational:
+    /// BT.709's `((V + 0.099)/1.099)^(20/9)` is scale 1/1.099 and shift 0.099/1.099 (a gain outside would be
+    /// 1.099^(−20/9), irrational); sRGB's `((V + 0.055)/1.055)^(12/5)` likewise, HLG's lower half `E′²/3` scale 1.
     Power {
         /// The factor of the power.
         gain: Fraction,
-        /// Added to `x` before the power.
+        /// The factor of `x` in the base.
+        scale: Fraction,
+        /// Added to `scale·x` in the base.
         shift: Fraction,
         /// The exponent, a rational.
         exponent: Fraction,
@@ -329,11 +333,12 @@ impl CurveForm {
             CurveForm::Affine { gain, offset } => gain.checked_mul(x)?.checked_add(offset),
             CurveForm::Power {
                 gain,
+                scale,
                 shift,
                 exponent,
                 offset,
             } => {
-                let base = non_negative(x.checked_add(shift)?);
+                let base = non_negative(scale.checked_mul(x)?.checked_add(shift)?);
                 gain.checked_mul(pow_exact(base, exponent)?)?
                     .checked_add(offset)
             }
@@ -636,11 +641,16 @@ impl CurveForm {
             CurveForm::Affine { gain, offset } => gain.to_f64() * x + offset.to_f64(),
             CurveForm::Power {
                 gain,
+                scale,
                 shift,
                 exponent,
                 offset,
             } => {
-                gain.to_f64() * libm::pow((x + shift.to_f64()).max(0.0), exponent.to_f64())
+                gain.to_f64()
+                    * libm::pow(
+                        (scale.to_f64() * x + shift.to_f64()).max(0.0),
+                        exponent.to_f64(),
+                    )
                     + offset.to_f64()
             }
             CurveForm::Exp {
@@ -678,14 +688,16 @@ impl CurveForm {
             CurveForm::Affine { gain, offset } => (y - offset.to_f64()) / gain.to_f64(),
             CurveForm::Power {
                 gain,
+                scale,
                 shift,
                 exponent,
                 offset,
             } => {
-                libm::pow(
+                (libm::pow(
                     (y - offset.to_f64()) / gain.to_f64(),
                     1.0 / exponent.to_f64(),
-                ) - shift.to_f64()
+                ) - shift.to_f64())
+                    / scale.to_f64()
             }
             CurveForm::Exp {
                 gain,
