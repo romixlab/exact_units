@@ -5,6 +5,8 @@
 thm = "thm"
 # a fraction's numerator, as num-rational names it (`Fraction::numer`, `BigRational::numer`)
 numer = "numer"
+# barium, the element (¹³⁷Ba, the daughter of ¹³⁷Cs in the nuclear-physics example)
+Ba = "Ba"
 
 [default.extend-identifiers]
 # an opaque Google Fonts kit id (docs_ext/eu_docs_ext/vendor.py), not a word
