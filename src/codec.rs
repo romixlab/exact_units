@@ -328,6 +328,14 @@ pub enum CodecShape<'i> {
     /// entries need not be ascending. [CanFdDlc] is the worked [Codec]; IEEE 11073 SFLOAT (IO-3), whose codes
     /// outside a formula (NaN, ±∞, "not at this resolution") are the common case, is the next.
     Table(&'i [i128]),
+    /// A code that is the `Linear`'s raw value plus a fixed `zero`: the `Linear` is `code − zero`, its scale in the
+    /// `Linear`'s own [Fixed] (`Rational<1, 219>`). Affine, so exact both ways, and encoding needs no rounding.
+    /// Video's narrow-range quantization is the case ([Narrow8](video::Narrow8): E′ = (D − 16)/219, ITU-R BT.709-6
+    /// Part 2 item 4.6), where codes past the nominal range are values and the timing references are spare.
+    Offset {
+        /// The code of the `Linear`'s zero (16 for 8-bit narrow-range Y′, 128 for C′B and C′R).
+        zero: i128,
+    },
 }
 
 impl CodecShape<'_> {
@@ -354,7 +362,8 @@ impl CodecShape<'_> {
                 });
                 hit.filter(|_| whole)
             }
-            // every other shape today (ALaw, Power, PiecewisePower, Exp, Table), and (feature shrink_wrap) a
+            CodecShape::Offset { zero } => raw.checked_sub(*zero),
+            // every other shape today (ALaw, Power, PiecewisePower, Exp), and (feature shrink_wrap) a
             // shape wire bytes named that this version doesn't know
             _ => None,
         }
@@ -385,6 +394,7 @@ impl CodecShape<'_> {
                 Some(i128::from(mu_law_encode(value, rounding)))
             }
             CodecShape::Table(table) => table_encode(table, value, rounding, allowed),
+            CodecShape::Offset { zero } => value.checked_add(*zero),
             _ => None,
         }
     }
@@ -1062,3 +1072,6 @@ pub trait Curve: Copy + 'static {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(feature = "dimensionless")]
+pub mod video;
