@@ -9,8 +9,9 @@
 //! - [CodecDef] names the [CodecShape] and the [spare](CodecDef::spare) codes: what a client without the trait
 //!   runs to decode the same bytes, as [UnitDef](crate::UnitDef) is a unit's definition as data. [MuLaw] and
 //!   [MuLawSingleZero] back [CodecShape::MuLaw], [CanFdDlc] (CAN FD's data length code) backs
-//!   [CodecShape::Table]; the other shapes are the plan for later codecs (LVL-4's named conversions) and have none
-//!   yet, a gap this module's docs don't hide.
+//!   [CodecShape::Table], video's narrow-range quantizers ([video]) back [CodecShape::Offset]; the other shapes
+//!   are the plan for later codecs (LVL-4's named conversions) and have none yet, a gap this module's docs don't
+//!   hide.
 //! - [Coded]`<C, V>` holds the bytes of `C::Raw`, never a spare code: [get](Coded::get) decodes,
 //!   [try_new](Coded::try_new) encodes, [try_from_raw](Coded::try_from_raw) refuses a spare code ([SpareCode]).
 //!   Its spare codes are where a [Niched](niche::Niched) puts its own: `Niched<Coded<MuLawSingleZero>,
@@ -1064,7 +1065,7 @@ pub enum CurveKind {
 /// A named, non-linear conversion between two quantities: AWG, mpg ↔ L/100 km, Beaufort, Richter, shoe sizes
 /// (LVL-4), marked by [CurveKind] so a client never has to guess which it is. Declared here, beside [Codec], as
 /// the foundation; LVL-4 gives it a conversion (`convert` or similar, not fixed yet) and implements the first
-/// curves. No `Curve` in this crate yet.
+/// curves. [Pq](video::Pq), the PQ transfer curve of HDR video, is the first, [CurveKind::Float].
 pub trait Curve: Copy + 'static {
     /// Whether this curve is exact, tabled or a float approximation.
     const KIND: CurveKind;

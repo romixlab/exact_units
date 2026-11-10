@@ -93,7 +93,7 @@ assert_eq!(Coded::<MuLawSingleZero>::try_from_raw(0xFF).map(|c| c.get().get()), 
 unit's definition as data) and `spare`, the spare codes as spans of codes (`CodeSpan { low, high }`). It is the one
 place a codec writes its spare codes: `decode`, `Coded` and a `Niched` read them from there. `CodecShape::MuLaw` has no parameters (the standard pins the formula); the crate also
 declares the shapes later codecs will need — `ALaw`, `Power { gamma }`, `PiecewisePower` and `Exp { base, offset }`
-— with no `Codec` behind any of them yet. `Table` has one: [the CAN FD DLC](#a-table-the-can-fd-dlc).
+— with no `Codec` behind any of them yet. `Table` has one: [the CAN FD DLC](#a-table-the-can-fd-dlc). `Offset { zero }`, a code that is the `Linear`'s raw value plus `zero`, has video's narrow-range quantizers: [Video codes and transfer curves](video.md).
 
 ```rust
 use exact_units::codec::{Codec, CodecShape, MuLaw};
@@ -218,4 +218,4 @@ Non-linear conversions that aren't a code on the wire but a *named relationship 
 mpg ↔ L/100 km, Beaufort, Richter, shoe sizes) get their own trait, `Curve`, marked by `CurveKind`: `Exact` (mpg
 ↔ L/100 km, a reciprocal), `Tabled` (AWG, Beaufort: named points, not a formula) or `Float` (Richter: the one kind
 that isn't exact, named so a client never has to guess). `Curve` is declared here, beside `Codec`, with no
-conversion method yet and no curve implementing it: LVL-4 gives it one and writes the first curves.
+conversion method yet: LVL-4 gives it one. The first curve implementing it is PQ, `CurveKind::Float` ([Video codes and transfer curves](video.md#pq)).

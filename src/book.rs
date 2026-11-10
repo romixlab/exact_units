@@ -39,6 +39,8 @@ pages! {
     Products = "fixed_point/products.md";
     #[cfg(feature = "dimensionless")]
     Codecs = "fixed_point/codecs.md";
+    #[cfg(all(feature = "dimensionless", feature = "photometric", feature = "libm"))]
+    Video = "fixed_point/video.md";
     Points = "points/points.md";
     Wrapping = "points/wrapping.md";
     Registers = "points/registers.md";

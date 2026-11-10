@@ -31,7 +31,7 @@
 //! assert_eq!(Coded::<NarrowChroma8>::try_new(NarrowChroma8::ZERO, Rounding::NearestEven).map(Coded::raw), Ok(128));
 //! ```
 
-use super::{Codec, CodeSpan, CodecDef, CodecShape, Curve, CurveKind};
+use super::{CodeSpan, Codec, CodecDef, CodecShape, Curve, CurveKind};
 use crate::fixed::{Fixed, Range, prefix::Rational};
 use crate::system::def_list;
 use crate::units::Ratio;
@@ -344,10 +344,7 @@ impl Pq {
             return None;
         }
         let ym = libm::pow(y, PQ_M1);
-        Some(libm::pow(
-            (PQ_C1 + PQ_C2 * ym) / (1.0 + PQ_C3 * ym),
-            PQ_M2,
-        ))
+        Some(libm::pow((PQ_C1 + PQ_C2 * ym) / (1.0 + PQ_C3 * ym), PQ_M2))
     }
 }
 

@@ -57,6 +57,7 @@ nav = [
                     "fixed_point/products.md",
                     "fixed_point/cost.md",
                     "fixed_point/codecs.md",
+                    "fixed_point/video.md",
                 ]
             },
         ]

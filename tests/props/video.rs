@@ -15,8 +15,8 @@
 
 use exact_units::Rounding;
 use exact_units::codec::video::{
-    Narrow8, Narrow10, NarrowChroma8, NarrowChroma10, NarrowChromaSignal8, NarrowChromaSignal10, NarrowSignal8,
-    NarrowSignal10,
+    Narrow8, Narrow10, NarrowChroma8, NarrowChroma10, NarrowChromaSignal8, NarrowChromaSignal10,
+    NarrowSignal8, NarrowSignal10,
 };
 use exact_units::codec::{Codec, Coded};
 use exact_units::niche::{Niched, Reading};
@@ -117,9 +117,19 @@ where
         if let Some(v) = C::decode(code) {
             for r in ROUNDINGS {
                 let back = C::encode(v, r).map(Into::into);
-                assert_eq!(back, Some(raw), "{} encodes code {raw}'s value by {r:?}", C::DEF.id.name);
+                assert_eq!(
+                    back,
+                    Some(raw),
+                    "{} encodes code {raw}'s value by {r:?}",
+                    C::DEF.id.name
+                );
                 let data = C::DEF.encode(i128::from(v.get()), r);
-                assert_eq!(data, Some(raw), "{}'s DEF encodes code {raw}'s value by {r:?}", C::DEF.id.name);
+                assert_eq!(
+                    data,
+                    Some(raw),
+                    "{}'s DEF encodes code {raw}'s value by {r:?}",
+                    C::DEF.id.name
+                );
             }
         }
     }
@@ -147,7 +157,8 @@ where
 {
     let e = Fixed::<Ratio, Pow2<-12>, i32>::new(x);
     let want = q.code_of(i128::from(x), 4096);
-    let negative_tie = x < 0 && (2 * q.steps_per_unit() * i128::from(x)).rem_euclid(2 * 4096) == 4096;
+    let negative_tie =
+        x < 0 && (2 * q.steps_per_unit() * i128::from(x)).rem_euclid(2 * 4096) == 4096;
     let got = e
         .to_rounded::<P, i16>(Rounding::NearestAway)
         .and_then(|v| Fixed::<Ratio, P, i16, B>::try_new(v.get()).ok())
@@ -155,7 +166,11 @@ where
         .map(Into::into);
     if negative_tie {
         let below = want - 1;
-        assert_eq!(got, q.is_data(below).then_some(below), "E' = {x}/4096, a negative tie");
+        assert_eq!(
+            got,
+            q.is_data(below).then_some(below),
+            "E' = {x}/4096, a negative tie"
+        );
     } else {
         assert_eq!(got, q.is_data(want).then_some(want), "E' = {x}/4096");
     }
@@ -170,8 +185,14 @@ fn quantizing_e_prime_is_the_standards_int() {
         quantize_matches_int::<Narrow8, Rational<1, 219>, _>(LUMA8, x);
         quantize_matches_int::<Narrow10, Rational<1, 876>, _>(LUMA10, x);
         // chroma's E' is -0.5..=0.5: the same walk shifted down
-        ties += u32::from(quantize_matches_int::<NarrowChroma8, Rational<1, 224>, _>(CHROMA8, x - 2560));
-        ties += u32::from(quantize_matches_int::<NarrowChroma10, Rational<1, 896>, _>(CHROMA10, x - 2560));
+        ties += u32::from(quantize_matches_int::<NarrowChroma8, Rational<1, 224>, _>(
+            CHROMA8,
+            x - 2560,
+        ));
+        ties += u32::from(quantize_matches_int::<NarrowChroma10, Rational<1, 896>, _>(
+            CHROMA10,
+            x - 2560,
+        ));
     }
     // the difference to INT is real, not a case the walk never reaches
     assert!(ties > 0);
@@ -181,7 +202,10 @@ fn quantizing_e_prime_is_the_standards_int() {
 #[test]
 fn named_levels() {
     let code8 = |v: NarrowSignal8| Narrow8::encode(v, Rounding::NearestEven);
-    assert_eq!((code8(Narrow8::BLACK), code8(Narrow8::WHITE)), (Some(16), Some(235)));
+    assert_eq!(
+        (code8(Narrow8::BLACK), code8(Narrow8::WHITE)),
+        (Some(16), Some(235))
+    );
     let chroma8 = |v: NarrowChromaSignal8| NarrowChroma8::encode(v, Rounding::NearestEven);
     assert_eq!(
         (
@@ -192,7 +216,10 @@ fn named_levels() {
         (Some(16), Some(128), Some(240))
     );
     let code10 = |v: NarrowSignal10| Narrow10::encode(v, Rounding::NearestEven);
-    assert_eq!((code10(Narrow10::BLACK), code10(Narrow10::WHITE)), (Some(64), Some(940)));
+    assert_eq!(
+        (code10(Narrow10::BLACK), code10(Narrow10::WHITE)),
+        (Some(64), Some(940))
+    );
     let chroma10 = |v: NarrowChromaSignal10| NarrowChroma10::encode(v, Rounding::NearestEven);
     assert_eq!(
         (
@@ -225,7 +252,9 @@ fn timing_references_are_niches() {
         let want = match raw {
             0 => Reading::Niche(TimingReference::Zero),
             255 => Reading::Niche(TimingReference::Full),
-            _ => Reading::Value(Coded::<Narrow8>::try_from_raw(raw).unwrap_or_else(|_| panic!("{raw} is data"))),
+            _ => Reading::Value(
+                Coded::<Narrow8>::try_from_raw(raw).unwrap_or_else(|_| panic!("{raw} is data")),
+            ),
         };
         assert_eq!(read, Ok(want), "byte {raw}");
     }
@@ -293,7 +322,10 @@ mod pq {
         assert_eq!(Pq::to_nits_f64(code(940)).map(Fixed::get), Some(10_000.0));
         assert_eq!(Pq::to_nits_f64(code(63)), None);
         assert_eq!(Pq::to_nits_f64(code(941)), None);
-        assert_eq!(Pq::from_nits_f64(nits(10_000.5), Rounding::NearestAway), None);
+        assert_eq!(
+            Pq::from_nits_f64(nits(10_000.5), Rounding::NearestAway),
+            None
+        );
         assert_eq!(Pq::from_nits_f64(nits(-0.5), Rounding::NearestAway), None);
     }
 
