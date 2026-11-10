@@ -482,6 +482,28 @@
   margin-bottom: 0.2rem;
 }
 
+/* A unit symbol in prose (the `[[symbol]]` markup, docs_ext/eu_docs_ext/unit_markup.py): upright, in the body
+   font (not code's monospace, so it doesn't read as a value), a subtle tint, a tooltip with its name and
+   quantity, linked to its row in docs/start/symbols.md. No underline until hover, so a sentence full of them
+   doesn't turn into a row of links. */
+.md-typeset .eu-unit-expr {
+  white-space: nowrap;
+}
+.md-typeset a.eu-unit {
+  padding: 0.05em 0.3em;
+  border-radius: 0.3em;
+  background-color: var(--eu-faint);
+  color: var(--eu-ink);
+  font-family: var(--md-text-font);
+  font-style: normal;
+  text-decoration: none;
+}
+.md-typeset a.eu-unit:hover,
+.md-typeset a.eu-unit:focus {
+  color: var(--eu-accent-text);
+  text-decoration: underline;
+}
+
 /* Bit layouts, the `bits` fence (docs_ext/eu_docs_ext/bits.py): every bit in a cell with its number above, coloured
    by the kind of its field, a bar where a field starts; then a key and a table of the fields. */
 [data-md-color-scheme="default"] .md-typeset .eu-bits {

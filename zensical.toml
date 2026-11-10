@@ -215,6 +215,9 @@ name = "API reference on docs.rs"
 abbr = {}
 # `rust,compile_fail` blocks (the pages are doctests) shown as Rust that doesn't compile (docs_ext/eu_docs_ext/rustdoc.py)
 "eu_docs_ext.rustdoc" = {}
+# `[[symbol]]`: a unit symbol in prose, styled, tooltipped and linked to its row in docs/start/symbols.md, checked
+# against q!'s table (docs_ext/eu_docs_ext/unit_markup.py)
+"eu_docs_ext.unit_markup" = {}
 admonition = {}
 attr_list = {}
 def_list = {}
