@@ -301,8 +301,9 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   kg with c² below it, and N_A times a molar mass with CODATA's M_u, give `None` today. P2401#10nov-1910b.
 - 📋 **NUM-34 Quantity steps on `Exact`** — `as_quantity`, `up` and `to_system` as `Fixed` has them: λ·N to Bq and
   eV to `systems::Natural` go through a `Fixed` today. P2401#10nov-1911.
-- 💡 **NUM-35 A run-time exact value with symbols** — a fraction times powers of π, ln 2 and ln 10 at run time, so
-  A = ln 2 · N/T½ stays exact until a named edge (and 2⁻ᵏ after k half-lives is exact). P2401#10nov-1911e.
+- ✅ **NUM-35 A run-time exact value with symbols** — the symbol lives in the unit: `units::Ln2` and `Ln10` (feature
+  `dimensionless`), so A = ln 2 · N/T½ is an `Exact<Per<Ln2, Second>>`-shaped value that stays exact until a named edge
+  (NUM-38). `ln 2·a + b` and `convert` to a plain ratio don't compile. `tests/symbol_units.rs`. P2401#10nov-1911e, #10nov-1442.
 
 ## Units and markers (`UNIT`)
 

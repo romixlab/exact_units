@@ -585,6 +585,45 @@ crate::unit! {
     #[cfg(feature = "dimensionless")]
     pub struct Ratio = "", [];
 
+    /// The number ln 2 as a unit, dimensionless: `Exact<Ln2>::int(3)` is exactly 3·ln 2. A decay constant λ = ln 2/T½ is
+    /// an `Exact<Times<Ln2, Per<Ratio, Second>>>` holding 1/T½, so ln 2 stays exact in the type and `ln 2 · a + b` (two
+    /// different units) doesn't compile. `convert` between an `Ln2` unit and a [Ratio] one doesn't compile, as the factor ln 2 is no fraction.
+    ///
+    /// ```
+    /// use exact_units::{Exact, units::{Ln2, Ratio, Second}};
+    ///
+    /// // λ = ln 2 / T½ for T½ = 4 s: 1/4 of ln 2 per second
+    /// let t_half = Exact::<Second>::int(4);
+    /// let lambda = (Exact::<Ln2>::int(1) / t_half).unwrap();
+    /// assert_eq!(lambda.get(), Exact::<Ratio>::new(1, 4).get());
+    /// // a whole number of ln 2 per whole number of ln 2 is a plain ratio
+    /// assert_eq!(
+    ///     (Exact::<Ln2>::int(3) / Exact::<Ln2>::int(2)).unwrap().convert::<Ratio>(),
+    ///     Some(Exact::new(3, 2)),
+    /// );
+    /// ```
+    ///
+    /// Adding a multiple of ln 2 to a plain number has no exact form, and neither does the conversion, so neither compiles:
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Exact, units::{Ln2, Ratio}};
+    ///
+    /// let _ = Exact::<Ln2>::int(1) + Exact::<Ratio>::int(1);
+    /// ```
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Exact, units::{Ln2, Ratio}};
+    ///
+    /// let _ = Exact::<Ln2>::int(1).convert::<Ratio>();
+    /// ```
+    #[cfg(feature = "dimensionless")]
+    pub struct Ln2 = "ln 2", [], Exact(1 / 1, ln2 1);
+
+    /// The number ln 10 as a unit, dimensionless: the same as [Ln2] for a natural log of ten, as in a level in nepers
+    /// from one in bels.
+    #[cfg(feature = "dimensionless")]
+    pub struct Ln10 = "ln 10", [], Exact(1 / 1, ln10 1);
+
     // Information
 
     /// Information in bits, bit: the base of information, so a size never mixes with a [Ratio] or a count of things.

@@ -334,6 +334,8 @@ These `unit!` symbols are no `q!` symbol: a compound one is written with operato
 | C/kg | `Exposure` |
 | Gy/s | `AbsorbedDoseRate` |
 | Sv/h | `SievertPerHour` |
+| ln 2 | `Ln2` |
+| ln 10 | `Ln10` |
 | cable (US) | `CableUs` |
 | ft (US survey) | `FootUsSurvey` |
 | mi (US survey) | `MileUsSurvey` |
