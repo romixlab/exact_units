@@ -550,7 +550,8 @@ impl<U, T: Storage + Int> Scaled<U, T> {
     /// // two fields are a frame, 3003 ticks of 90 kHz; one is 1501.5
     /// assert_eq!(Ticks::<u32>::new(2, field).rescale::<u32>(rtp).map(|t| t.get()), Some(3003));
     /// assert_eq!(Ticks::<u32>::new(1, field).rescale::<u32>(rtp), None);
-    /// assert_eq!(Ticks::<u32>::new(1, field).rescale_rounded::<u32>(rtp, Rounding::NearestEven).map(|t| t.get()), Some(1502));
+    /// let half = Ticks::<u32>::new(1, field).rescale_rounded::<u32>(rtp, Rounding::NearestEven);
+    /// assert_eq!(half.map(|t| t.get()), Some(1502));
     /// # }
     /// ```
     #[must_use]

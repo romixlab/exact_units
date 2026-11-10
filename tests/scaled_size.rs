@@ -3,7 +3,7 @@
 //! three images for `thumbv7em-none-eabihf` (Cortex-M4F) and `thumbv6m-none-eabi` (Cortex-M0+) at a firmware's
 //! release profile (`opt-level = "s"`, LTO) and checks what they link. The run-time scale costs at most 6 KiB of
 //! flash on either core (the compile-time one folds to a few instructions), and links no float routine and no 128-bit
-//! arithmetic: the kernel's 32-bit limbs and the core's own `u64` division. `docs/numbers/run_time_scale.md` quotes
+//! arithmetic: the kernel's 32-bit limbs and the core's own `u64` division. `docs/maths/run_time_scales.md` quotes
 //! the numbers this prints. Skipped, with a note, where a target isn't installed (`rustup target add ..`); CI's
 //! `test` job installs both.
 

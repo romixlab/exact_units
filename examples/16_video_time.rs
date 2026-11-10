@@ -3,7 +3,9 @@
 //! H.264 and H.265 give a stream's clock tick as tc = num_units_in_tick ÷ time_scale (H.264 C-1 with its semantics in
 //! E.2.1, H.265 C-1 with E.3.1; AV1 6.4.3 the same with num_units_in_display_tick). Their own examples are exact
 //! rationals: 30000/1001 Hz from time_scale 60 000 and num_units_in_tick 1001, and 25 Hz from a 27 MHz clock with
-//! 1 080 000. Each is a scale marker here, `Rational<1001, 60000>`, and a tick count at that base is a `Fixed`. A
+//! 1 080 000. A base the firmware knows when it is built is a scale marker, `Rational<1001, 60000>`, and a tick count
+//! at it a `Fixed`; a base read from the stream is a `RunScale`, and a count at it `Ticks<u64>`: the MP4 timescale
+//! 15360 no firmware lists in advance converts the same way, exact or by a named rounding. A
 //! frame lasts 2·tc in H.264 (DeltaTfiDivisor 2 for a frame, Table E-6) but one elemental interval in H.265
 //! (DeltaToDivisor 1, Table E.7): the two standards' own examples count a tick differently, so a frame period is
 //! named per standard, never assumed.
@@ -40,7 +42,9 @@
 
 use exact_units::prefix::{FixedScale, Rational};
 use exact_units::units::Second;
-use exact_units::{Fixed, Modulo, Offset, Point, Reference, ReferenceHow, Rounding};
+use exact_units::{
+    Fixed, Modulo, Offset, Point, Reference, ReferenceHow, Rounding, RunScale, Ticks,
+};
 use exact_units::{TimeCounting, TimeScaleDef, TimeZero, origin};
 
 /// H.264's and H.265's example tick for 30000/1001 Hz: num_units_in_tick 1001, time_scale 60 000 (H.264 E.2.1).
@@ -101,32 +105,10 @@ type RtpTime = Point<Rtp90k, Fixed<Second, Tick90k, u32>>;
 type PtsTime = Point<Pts33, Fixed<Second, Tick90k, u64>>;
 type RtpUnwrapped = Point<Rtp90kUnwrapped, Fixed<Second, Tick90k, u64>>;
 
-/// A stream's time base, matched against the bases this firmware knows at build time. Any other pair is refused: a
-/// base known only at run time has no type in the crate yet (the design call of PT-8).
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-enum KnownBase {
-    /// 1001/60000 s: 30000/1001 frames/s in H.264.
-    Ntsc,
-    /// 1/25 s: 25 frames/s in H.265's example.
-    Pal,
-    /// 1/90000 s.
-    Mpeg,
-}
-
-/// The base of a VUI's num_units_in_tick ÷ time_scale, any spelling of it (2002/120000 is 1001/60000).
-fn known_base(num_units_in_tick: u32, time_scale: u32) -> Option<KnownBase> {
-    let (n, d) = (u64::from(num_units_in_tick), u64::from(time_scale));
-    // n/d = a/b exactly when n·b = a·d: no division, no rounding.
-    let is = |a: u64, b: u64| d != 0 && n * b == a * d;
-    if is(1001, 60_000) {
-        Some(KnownBase::Ntsc)
-    } else if is(1, 25) {
-        Some(KnownBase::Pal)
-    } else if is(1, 90_000) {
-        Some(KnownBase::Mpeg)
-    } else {
-        None
-    }
+/// A stream's time base as its VUI states it, num_units_in_tick ÷ time_scale: any pair of `u32` fields, a value
+/// known only at run time. A zero is no base.
+fn stream_base(num_units_in_tick: u32, time_scale: u32) -> Option<RunScale> {
+    RunScale::ratio(num_units_in_tick, time_scale)
 }
 
 /// A time code label hh:mm:ss;ff at 30 labels a second.
@@ -238,7 +220,8 @@ fn walk_a_day() {
     );
 }
 
-/// Time bases: a scale is a Magnitude, so 1 080 000 / 27 000 000 is the same scale as 1/25.
+/// Time bases: a compile-time scale is a Magnitude, a stream's is a RunScale; either way 1 080 000 / 27 000 000 is
+/// the same scale as 1/25, and a base read at run time converts exactly or by a named rounding.
 fn time_bases() {
     assert_eq!(Tick27M::SCALE, <Rational<1, 25>>::SCALE);
     assert_eq!(
@@ -247,16 +230,33 @@ fn time_bases() {
     );
     let tick = Fixed::<Second, Tick60k, u32>::new(1);
     println!("tc = {tick}");
-    assert_eq!(known_base(1001, 60_000), Some(KnownBase::Ntsc));
-    assert_eq!(known_base(2002, 120_000), Some(KnownBase::Ntsc));
-    assert_eq!(known_base(1_080_000, 27_000_000), Some(KnownBase::Pal));
-    assert_eq!(known_base(1, 90_000), Some(KnownBase::Mpeg));
+    // the same bases read from streams
+    let ntsc = stream_base(1001, 60_000).unwrap();
+    assert_eq!(stream_base(2002, 120_000), Some(ntsc));
+    assert_eq!(stream_base(1_080_000, 27_000_000), stream_base(1, 25));
+    assert_eq!(RunScale::of::<Tick60k>(), Some(ntsc));
+    assert_eq!(stream_base(1, 0), None);
+    // an MP4 timescale no firmware lists in advance: 512 ticks of 1/15360 s are 3000 of 90 kHz
+    let mp4 = stream_base(1, 15_360).unwrap();
+    let pts = Ticks::<u64>::new(512, mp4);
+    assert_eq!(pts.to_fixed::<Tick90k, u64>().map(Fixed::get), Some(3000));
+    // a field of the NTSC stream is 1501.5 ticks of 90 kHz: no exact value, the rounding is named
+    let field = Ticks::<u64>::new(1, ntsc);
+    assert_eq!(field.to_fixed::<Tick90k, u64>(), None);
     assert_eq!(
-        known_base(1, 15_360),
-        None,
-        "an MP4 timescale this firmware wasn't built for"
+        field
+            .to_fixed_rounded::<Tick90k, u64>(Rounding::NearestEven)
+            .map(Fixed::get),
+        Some(1502)
     );
-    assert_eq!(known_base(1, 0), None);
+    // ticks of two streams compare by their value: two fields of 1001/60000 s are 3003 ticks of 90 kHz
+    let rtp = stream_base(1, 90_000).unwrap();
+    assert_eq!(Ticks::<u64>::new(2, ntsc), Ticks::new(3003, rtp));
+    println!(
+        "{} = {}",
+        Ticks::<u64>::new(2, ntsc),
+        Ticks::<u64>::new(3003, rtp)
+    );
 }
 
 /// Between clocks: a frame is exactly 3003 ticks of 90 kHz, an H.264 tick (a field) is 1501.5 and has to round.

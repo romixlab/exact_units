@@ -43,6 +43,7 @@ nav = [
             { "Advanced" = [
                     "maths/rounding.md",
                     "maths/overflow.md",
+                    "maths/run_time_scales.md",
                     "maths/quantities.md",
                     "maths/doses.md",
                     "maths/systems.md",

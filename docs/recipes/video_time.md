@@ -10,7 +10,7 @@ The sources are ITU-T H.264 (V16, 06/2026), ITU-T H.265 (V11, 01/2026), the AV1 
 
 | Step | Exact | Named rounding | Not in the crate yet |
 |---|---|---|---|
-| A stream's tick, num_units_in_tick ÷ time_scale | yes, as a scale marker | | a base known only at run time |
+| A stream's tick, num_units_in_tick ÷ time_scale | yes, as a scale marker or a `RunScale` | | |
 | A frame at 30000/1001 [[Hz]] in 90 [[kHz]] ticks | 3003 | | |
 | An H.264 tick (a field) in 90 [[kHz]] ticks | | 1501.5 | |
 | 48 [[kHz]] samples per frame | every 5 frames, 8008 | each frame | |
@@ -29,7 +29,26 @@ assert_eq!(<Rational<1_080_000, 27_000_000>>::SCALE, <Rational<1, 25>>::SCALE);
 
 A frame is not the same number of ticks in both standards. In H.264 an ordinary frame lasts two ticks: DeltaTfiDivisor is 2 for a frame (Table E-6), which is why 30000/1001 frames/s needs a tick of 1001/60000 [[s]]. In H.265 a frame lasts one elemental interval: DeltaToDivisor is 1 for a frame (Table E.7), and the 25 [[Hz]] example has a tick of 0.04 [[s]], one per picture. So the frame period is named per standard (`Rational<1001, 30000>` for H.264's example), never derived from "the tick".
 
-A stream states its base at run time, and the crate's scales are fixed at compile time. Where the bases are known when the firmware is built, match the stream's pair against them without dividing: n/d is a/b exactly when n·b = a·d. Any other pair is refused. The example's `known_base` does this.
+A stream states its base at run time. A `RunScale` holds it exactly, and `Ticks<T>` is a count at it ([Run-time scales](../maths/run_time_scales.md)). 2002/120000 is the same base as 1001/60000, and an MP4 timescale of 15360 that no firmware lists in advance converts like any other:
+
+```rust
+use exact_units::{Fixed, Rounding, RunScale, Ticks, prefix::Rational};
+
+let ntsc = RunScale::ratio(1001, 60_000).unwrap();
+assert_eq!(RunScale::ratio(2002, 120_000), Some(ntsc));
+// 512 ticks of 1/15360 s are 3000 ticks of 90 kHz
+let mp4 = RunScale::ratio(1, 15_360).unwrap();
+assert_eq!(Ticks::<u64>::new(512, mp4).to_fixed::<Rational<1, 90_000>, u64>(), Some(Fixed::new(3000)));
+// a field of the NTSC stream has no exact value at 90 kHz
+let field = Ticks::<u64>::new(1, ntsc);
+assert_eq!(field.to_fixed::<Rational<1, 90_000>, u64>(), None);
+let rounded = field.to_fixed_rounded::<Rational<1, 90_000>, u64>(Rounding::NearestEven);
+assert_eq!(rounded, Some(Fixed::new(1502)));
+// a zero is no base
+assert_eq!(RunScale::ratio(1, 0), None);
+```
+
+Where every base is known when the firmware is built, a `Fixed` per base costs nothing at run time. Match the stream's pair against them without dividing: n/d is a/b exactly when n·b = a·d, and any other pair is refused. A run-time base costs about 4 KiB of flash on a Cortex-M4F for any number of bases.
 
 ## Between two clocks: exact, or a named rounding
 
@@ -111,7 +130,6 @@ The crate has no codec for such labels yet. The example writes one with integers
 
 ## What the crate doesn't do yet
 
-- **A time base known only at run time has no type.** `Fixed`'s scale is fixed at compile time, `Exact` is host-sized, and `PrefixRatio` holds powers of ten, not 1001. A firmware demuxer can match a closed set of bases, as above, but can't hold an MP4 track's timescale it wasn't built for.
 - **`from_raw` doesn't reduce a modulo point.** `PtsTime::from_raw(1 << 33)` is not equal to `PtsTime::from_raw(0)`, although their difference is 0.
 - **No label codec.** A time code (hh:mm:ss;ff with drop-frame counting) and its exact drift against a time point are written by hand.
-- **No unwrapper for modulo points in this crate.** The typed one is `ww_si`'s, for device time.
+- **No unwrapper for modulo points in this crate.** The typed one is `ww_si`'s, for device time. A counter at a run-time rate (RTP at the rate the session states) has a stateless step, `unwrap_near`, on a `Linear` point known modulo 2³² ([Run-time scales](../maths/run_time_scales.md#points-on-a-run-time-clock)).
