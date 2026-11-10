@@ -469,10 +469,18 @@ counted units, and the kinds that keep look-alike quantities apart.
   P2401#10nov-1911b.
 - 📋 **UNIT-13 Quantities of s⁻¹ beyond Hz and Bq** — decay constant, reaction rate, count rate, and the fluence
   rate (m⁻²·s⁻¹), with the named steps physics gives (λ·N is an activity). P2401#10nov-1911c.
-- 📋 **UNIT-14 Nuclear units** — barn, curie, rad, rem, röntgen, the dalton (after NUM-32) and years named apart
-  (Julian 365.25 d; NUBASE2020's 365.2422 d, `conventional`), an opt-in group. The book's
-  [nuclear physics recipes](docs/recipes/nuclear.md) declare the barn, the curie and NUBASE's year with `unit!` meanwhile.
-  P2401#10nov-1911d.
+- 📋 **UNIT-14 Nuclear units** — barn, curie, rad ("rd": "rad" is the radian's), rem (a dose equivalent, as the
+  bare sievert), röntgen (with `Exposure` a kind for C/kg, apart from a specific charge) and years named apart (Julian
+  365.25 d; Gregorian 365.2425 d; NUBASE2020's 365.2422 d, `conventional`), an opt-in group `nuclear`. The dalton
+  waits for NUM-32 (P2401#10nov-1516b). The book's [nuclear physics recipes](docs/recipes/nuclear.md) declare the
+  barn, the curie and NUBASE's year with `unit!` meanwhile. P2401#10nov-1911d.
+- 💡 **UNIT-15 ICRU 95's operational quantities** — ICRU Report 95 (2020) redefines the ambient and personal dose
+  (H*, Hp, D′lens, D′local skin) from conversion coefficients to E, not from Q at a depth: quantities of their own
+  beside ICRU 51's H*(10) and Hp(10) of UNIT-12. Needs the report in the library. P2401#10nov-1516c.
+- 💡 **UNIT-16 A quantity's declared rate** — Gy / s is `Derived` today, and `Derived` reaches every quantity of its
+  dimension by `as_quantity`, so a dose rate can be named the wrong kind. A quantity could declare its rate (absorbed
+  dose → absorbed dose rate), so Q / time and rate · time keep the pair: a narrow, declared exception to "a product
+  is never recognised as a named quantity". P2401#10nov-1516d.
 
 ## Points and origins (`PT`)
 
