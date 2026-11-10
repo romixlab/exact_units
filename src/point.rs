@@ -32,6 +32,7 @@ pub use offset::Offset;
 
 mod offset;
 pub mod origins;
+mod scaled;
 #[cfg(all(test, feature = "std"))]
 mod tests;
 

@@ -10,7 +10,7 @@
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
 
-use super::reference::round_div;
+use super::reference::{modulo, round_div};
 #[cfg(not(kani))]
 use super::reference::{range, round_div_big};
 use exact_units::num::Int;
@@ -246,6 +246,47 @@ pub(crate) fn rescales_small(x: i16, a: (u8, u8, i8), b: (u8, u8, i8), r: Roundi
     assert_eq!(exact.map(i128::from), (p % d == 0).then_some(q));
 }
 
+/// A counter at a run-time step that wraps at its storage, on `u16`: `wrapping_add` lands on `(a + v) mod 2¹⁶`,
+/// `wrapping_diff` is the short way round (against [modulo]), and `unwrap_near` gives the full count nearest the
+/// reference whose low 16 bits are the counter's, `None` exactly where that is below 0 or past `u64`.
+pub(crate) fn wraps_u16(a: u16, v: u16, reference: u64) {
+    use exact_units::origins::DeviceBoot;
+    type Counter = exact_units::Point<DeviceBoot, Scaled<Second, u16>>;
+    let s = RunScale::ratio(1, 48_000).unwrap_or(RunScale::ONE);
+    let other = RunScale::ratio(1, 90_000).unwrap_or(RunScale::ONE);
+    let m = 1i128 << 16;
+    let p = Counter::at(a, s);
+    let next = p.wrapping_add(Scaled::new(v, s));
+    assert_eq!(
+        next.map(|n| i128::from(n.steps())),
+        Some(modulo(i128::from(a) + i128::from(v), m, false))
+    );
+    assert_eq!(
+        p.wrapping_sub(Scaled::new(v, s))
+            .map(|n| i128::from(n.steps())),
+        Some(modulo(i128::from(a) - i128::from(v), m, false))
+    );
+    assert_eq!(p.wrapping_add(Scaled::new(v, other)), None);
+    if let Some(next) = next {
+        assert_eq!(
+            next.wrapping_diff(p).map(|d| i128::from(d.get())),
+            Some(modulo(i128::from(v), m, true))
+        );
+    }
+    let r = exact_units::Point::<DeviceBoot, Scaled<Second, u64>>::at(reference, s);
+    let want = i128::from(reference) + modulo(i128::from(a) - i128::from(reference), m, true);
+    let fits = (0..=i128::from(u64::MAX)).contains(&want);
+    assert_eq!(
+        p.unwrap_near(r).map(|f| i128::from(f.steps())),
+        fits.then_some(want),
+        "{a} near {reference}"
+    );
+    assert_eq!(
+        p.unwrap_near(exact_units::Point::at(reference, other)),
+        None
+    );
+}
+
 #[cfg(not(any(kani, fuzzing)))]
 mod tests {
     use super::super::reference::MODES;
@@ -342,6 +383,11 @@ mod tests {
         #[test]
         fn compare_i64(a in strategy::i64(), sa in scale(), b in strategy::i64(), sb in scale()) {
             compares(a, sa, b, sb);
+        }
+
+        #[test]
+        fn wrapping_counter(a in any::<u16>(), v in any::<u16>(), r in prop_oneof![any::<u64>(), 0..=70_000u64, (u64::MAX - 70_000)..=u64::MAX]) {
+            wraps_u16(a, v, r);
         }
 
         #[test]
@@ -459,6 +505,12 @@ mod tests {
 #[cfg(kani)]
 mod proofs {
     use super::super::reference::MODES;
+
+    /// Every u16 counter, move and reference: wrapping and unwrapping.
+    #[kani::proof]
+    fn wrapping_counter() {
+        super::wraps_u16(kani::any(), kani::any(), kani::any());
+    }
 
     /// Every i16 count, every pair of scales of 8-bit parts and exponents within ±8: the `u32` path of the kernel
     /// against the quotient in `i128`.
