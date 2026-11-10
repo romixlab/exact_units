@@ -49,7 +49,7 @@ use crate::niche::{self, RawValue};
 #[cfg(any(feature = "dimensionless", feature = "information"))]
 use crate::system::def_list;
 use crate::system::{DefList, for_each, slice_of};
-use crate::{Magnitude, MarkerId, Rounding};
+use crate::{MarkerId, Rounding};
 use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
@@ -87,6 +87,9 @@ use shrink_wrap::refused::{Refused, Rule};
 ///         id: MarkerId { crate_name: "doc", name: "Sfloat" },
 ///         shape: CodecShape::Table(exact_units::system::def_list(&[])), // IO-3 names SFLOAT's own shape
 ///         spare: exact_units::system::def_list(&[CodeSpan { low: 0x07FE, high: 0x0802 }]),
+///         codes: CodeSpan::all::<u16>(),
+///         nominal: None,
+///         curve: None,
 ///     };
 ///
 ///     fn formula(raw: u16) -> (i16, i8) {
@@ -183,15 +186,25 @@ pub struct CodecDef<'i> {
     /// The codes that mean no value: free for a [Niched](niche::Niched) to claim, refused by
     /// [Coded::try_from_raw] and [Codec::decode]. Empty for a codec whose every code is a value ([MuLaw]).
     pub spare: &'i [CodeSpan],
+    /// Every code the `Raw` holds, spare or not: `0..=255` for a `u8`. [encode](Self::encode) never gives a code
+    /// outside it and [decode](Self::decode) refuses one; checked against `Raw` at compile time.
+    pub codes: CodeSpan,
+    /// The codes of the nominal range, where a codec has one: video's black to white (16..=235 for 8-bit narrow
+    /// Y′). Codes outside it are still values (a signal's undershoot and overshoot); a client clips or warns there.
+    pub nominal: Option<CodeSpan>,
+    /// The transfer curve above the code, where the value the code gives is a signal for one: PQ over a 10-bit
+    /// quantizer. `None` for a code whose value is the meaning itself.
+    pub curve: Option<CurveDef<'i>>,
 }
 
 impl CodecDef<'_> {
-    /// `raw` decoded by this definition alone, as [Codec::decode] does: `None` for a [spare](Self::spare) code,
+    /// `raw` decoded by this definition alone, as [Codec::decode] does: `None` for a [spare](Self::spare) code or
+    /// one outside [codes](Self::codes),
     /// else what [CodecShape::decode] gives, the same algorithm the typed path runs. `None` too for a shape with no
     /// algorithm here yet.
     #[must_use]
     pub fn decode(&self, raw: i128) -> Option<i128> {
-        if self.is_spare(raw) {
+        if !self.codes.contains(raw) || self.is_spare(raw) {
             return None;
         }
         self.shape.decode(raw)
@@ -201,12 +214,15 @@ impl CodecDef<'_> {
     ///
     /// # Errors
     ///
-    /// `None` for a shape with no algorithm here yet, or where `value` is beyond every code's range.
+    /// `None` for a shape with no algorithm here yet, or where `value` is beyond every code's range: a code past
+    /// [codes](Self::codes) (256 for an 8-bit `Raw`) is none.
     #[must_use]
     pub fn encode(&self, value: i128, rounding: Rounding) -> Option<i128> {
         self.shape
-            .encode_where(value, rounding, |raw| !self.is_spare(raw))
-            .filter(|&raw| !self.is_spare(raw))
+            .encode_where(value, rounding, |raw| {
+                self.codes.contains(raw) && !self.is_spare(raw)
+            })
+            .filter(|&raw| self.codes.contains(raw) && !self.is_spare(raw))
     }
 
     /// Whether `raw` is one of the [spare](Self::spare) codes. `true` too where a span read from the wire doesn't
@@ -245,6 +261,16 @@ impl CodeSpan {
         }
     }
 
+    /// Every code of the storage `T`: `0..=255` for a `u8`, what [CodecDef::codes] is for a codec whose `Raw` is
+    /// `T`.
+    #[must_use]
+    pub const fn all<T: Storage>() -> Self {
+        CodeSpan {
+            low: T::MIN_INT,
+            high: T::MAX_INT,
+        }
+    }
+
     /// Whether `raw` is in `low..=high`.
     #[must_use]
     pub const fn contains(self, raw: i128) -> bool {
@@ -252,13 +278,24 @@ impl CodeSpan {
     }
 }
 
-/// The spare codes of a `Codec`'s [DEF](Codec::DEF), checked: each span ascending and within `t_min..=t_max`, a
-/// compile error where it isn't (this is only evaluated in a `const`).
+/// The spare codes of a `Codec`'s [DEF](Codec::DEF), with the whole definition checked: [codes](CodecDef::codes)
+/// exactly `t_min..=t_max`, each spare span ascending and within it, the [nominal](CodecDef::nominal) span ascending
+/// and within it; a compile error where it isn't (this is only evaluated in a `const`).
 #[expect(
     clippy::panic,
     reason = "const fn evaluated only in a const item: the panic is a compile error naming the broken definition"
 )]
 const fn checked_spare(def: &CodecDef<'static>, t_min: i128, t_max: i128) -> &'static [CodeSpan] {
+    assert!(
+        def.codes.low == t_min && def.codes.high == t_max,
+        "a Codec's DEF.codes must be every code of its Raw"
+    );
+    if let Some(n) = def.nominal {
+        assert!(
+            n.low <= n.high && n.low >= t_min && n.high <= t_max,
+            "a Codec's nominal span is upside down or doesn't fit its Raw"
+        );
+    }
     let Some(spare) = slice_of(&def.spare) else {
         panic!("a Codec's DEF.spare is const data, a slice");
     };
@@ -316,22 +353,6 @@ pub enum CodecShape<'i> {
     MuLaw,
     /// ITU-T G.711 A-law: as μ-law's segments, the even ones linear. No [Codec] in this crate yet (LVL-4).
     ALaw,
-    /// A gamma curve, `v' = v^gamma`: sRGB's shape away from its linear segment near zero. No [Codec] in this
-    /// crate yet (LVL-4); `gamma` is exact, never an `f64` standing in for it.
-    Power {
-        /// The exponent.
-        gamma: Magnitude,
-    },
-    /// A gamma curve with a linear segment near zero (sRGB, L*): [Power](CodecShape::Power) plus the segment's own
-    /// slope and breakpoint, not yet named here. No [Codec] in this crate yet (LVL-4).
-    PiecewisePower,
-    /// An exponential curve, `base^(v + offset)` (BLE illuminance's log scale). No [Codec] in this crate yet (LVL-4).
-    Exp {
-        /// The base.
-        base: Magnitude,
-        /// Added before raising to `base`.
-        offset: Magnitude,
-    },
     /// The linear value of every code, by raw code from 0: entry `i` is what code `i` means, a code past the end
     /// means no value. Decoding looks the code up; encoding takes the code of the value, or the one a named
     /// [Rounding] picks among the codes that aren't spare (the lowest code where two mean the same value). The
@@ -351,8 +372,7 @@ pub enum CodecShape<'i> {
 impl CodecShape<'_> {
     /// `raw` decoded by this shape, as its [Codec] would, but from the shape alone: a dynamic client's path, the
     /// same algorithm as the typed one, never a separate implementation of it. `None` for a shape with no
-    /// algorithm here yet ([ALaw](Self::ALaw), [Power](Self::Power), [PiecewisePower](Self::PiecewisePower),
-    /// [Exp](Self::Exp)), and for a [Table](Self::Table) code past its end (or an entry read from the wire that
+    /// algorithm here yet ([ALaw](Self::ALaw)), and for a [Table](Self::Table) code past its end (or an entry read from the wire that
     /// doesn't decode); never `None` for [MuLaw](Self::MuLaw), whose decode is total.
     #[must_use]
     pub fn decode(&self, raw: i128) -> Option<i128> {
@@ -373,8 +393,9 @@ impl CodecShape<'_> {
                 hit.filter(|_| whole)
             }
             CodecShape::Offset { zero } => raw.checked_sub(*zero),
-            // every other shape today (ALaw, Power, PiecewisePower, Exp), and (feature shrink_wrap) a
-            // shape wire bytes named that this version doesn't know
+            CodecShape::ALaw => None,
+            // a shape wire bytes named that this version doesn't know
+            #[cfg(feature = "shrink_wrap")]
             _ => None,
         }
     }
@@ -405,6 +426,8 @@ impl CodecShape<'_> {
             }
             CodecShape::Table(table) => table_encode(table, value, rounding, allowed),
             CodecShape::Offset { zero } => value.checked_add(*zero),
+            CodecShape::ALaw => None,
+            #[cfg(feature = "shrink_wrap")]
             _ => None,
         }
     }
@@ -911,6 +934,9 @@ impl Codec for MuLaw {
         },
         shape: CodecShape::MuLaw,
         spare: def_list(&[]),
+        codes: CodeSpan::all::<u8>(),
+        nominal: None,
+        curve: None,
     };
 
     #[inline]
@@ -936,6 +962,9 @@ impl Codec for MuLawSingleZero {
         },
         shape: CodecShape::MuLaw,
         spare: def_list(&[CodeSpan::one(0x7F)]),
+        codes: CodeSpan::all::<u8>(),
+        nominal: None,
+        curve: None,
     };
 
     #[inline]
@@ -1040,6 +1069,9 @@ impl Codec for CanFdDlc {
         },
         shape: CodecShape::Table(def_list(&CAN_FD_DLC_TABLE)),
         spare: def_list(&[CodeSpan { low: 16, high: 255 }]),
+        codes: CodeSpan::all::<u8>(),
+        nominal: None,
+        curve: None,
     };
 
     /// The length of the low 4 bits of `raw`, as a controller reads the field: a spare code (16 and above) means
@@ -1063,28 +1095,11 @@ impl Codec for CanFdDlc {
     }
 }
 
-/// How a [Curve] computes: never a float standing in where an exact or tabled relationship holds (AGENTS.md
-/// "Every lossy step is named").
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum CurveKind {
-    /// A closed-form relationship, exact in both directions (mpg to L/100 km, an exact reciprocal).
-    Exact,
-    /// A table of named points, not a formula (AWG wire gauge, the Beaufort scale).
-    Tabled,
-    /// A floating-point approximation (Richter magnitude from amplitude): named so a client can always tell this
-    /// curve apart from an [Exact](CurveKind::Exact) or [Tabled](CurveKind::Tabled) one.
-    Float,
-}
+mod curve;
 
-/// A named, non-linear conversion between two quantities: AWG, mpg ↔ L/100 km, Beaufort, Richter, shoe sizes
-/// (LVL-4), marked by [CurveKind] so a client never has to guess which it is. Declared here, beside [Codec], as
-/// the foundation; LVL-4 gives it a conversion (`convert` or similar, not fixed yet) and implements the first
-/// curves. [Pq](video::Pq), the PQ transfer curve of HDR video, is the first, [CurveKind::Float].
-pub trait Curve: Copy + 'static {
-    /// Whether this curve is exact, tabled or a float approximation.
-    const KIND: CurveKind;
-}
+#[cfg(all(feature = "std", feature = "shrink_wrap"))]
+pub use curve::CurveDefOwned;
+pub use curve::{Curve, CurveDef, CurveForm, CurveKind, ExpBase, Referred, Segment};
 
 #[cfg(test)]
 mod tests;

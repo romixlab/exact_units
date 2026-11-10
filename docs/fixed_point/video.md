@@ -118,7 +118,7 @@ with m₁ = 2610/16384, m₂ = 2523/4096 × 128, c₁ = 3424/4096, c₂ = 2413/4
 
 What is exact:
 
-- **The constants.** Each is an exact rational, `Pq::M1` to `Pq::C3` as `Magnitude`s. All five are dyadic, so an `f64` holds each exactly too.
+- **The constants.** Each is an exact rational, `Pq::M1` to `Pq::C3` as `Fraction`s, and `Pq::DEF` is the curve as data, one `CurveForm::RationalPower` segment. All five are dyadic, so an `f64` holds each exactly too.
 - **White.** c₁ = c₃ − c₂ + 1 exactly (checked at compile time), so E′ = 1 is exactly 10 000 cd/m², and 10 000 cd/m² exactly E′ = 1.
 - **Black, one way.** E′ = 0 is 0 cd/m². The other way, 0 cd/m² is E′ = c₁^m₂, about 7.3·10⁻⁷: the EOTF's `max(.., 0)` takes every E′ up to that to black, a flat stretch of the standard's own shape. On 10 bits it is under a thousandth of a code, so code 64 is black both ways.
 - **The code.** A 10-bit PQ code is `Narrow10`'s (or a full-range quantizer's), exact.
@@ -166,7 +166,7 @@ Video found where `Codec` and `CodecShape` stop:
 - `Codec::formula` must give an exact `Linear`. A curve with an irrational output (PQ, HLG's log half, sRGB's power) can't be a `Codec`; it is a float edge beside one.
 - `Codec::encode` rounds to the nearest code in the `Linear`'s domain. Video quantizes in E′, not in linear light, which is why the quantizer and the curve are separate here: the quantizer's `Linear` is E′.
 - A `CodecShape` is one shape. "10-bit narrow range of PQ" is two, and the data path can't say so yet.
-- `CodecShape::Power` takes its exponent as a `Magnitude`, a scale; `PiecewisePower` has no parameters yet (sRGB needs six); nothing describes PQ's or HLG's shape.
+- Closed: a curve is data of its own, `CurveDef`, its segments' `CurveForm`s (`Affine`, `Power`, `Exp`, `RationalPower`) with exact `Fraction` parameters, exponents included; `CodecShape::Power`, `PiecewisePower` and `Exp` are gone.
 - `CurveKind` is one kind per curve. PQ is exact at two codes, HLG on its lower half, sRGB on its toe.
-- `CodecDef` doesn't know the width of the `Raw`: the data path's `Offset` encode of a value past the `Linear`'s bound gives a code past the storage unless a spare span covers it.
+- Closed: `CodecDef::codes` is every code of the `Raw`, so the data path's `Offset` encode never gives a code past the storage; `CodecDef::nominal` names the nominal range.
 - A pixel is three codes, and 4:2:2 shares its chroma between two pixels; a `Codec` has one `Raw`.

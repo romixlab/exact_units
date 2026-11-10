@@ -202,15 +202,16 @@ mod tests {
 /// shape this crate names, parameters included (`Power`'s `gamma`, `Exp`'s `base` and `offset`, `Table`'s slice).
 #[cfg(all(not(kani), feature = "std", feature = "shrink_wrap"))]
 mod wire {
-    use exact_units::Magnitude;
+    use exact_units::Fraction;
     use exact_units::codec::{
-        CodeSpan, Codec, CodecDef, CodecShape, Coded, MuLaw, MuLawSingleZero,
+        CodeSpan, Codec, CodecDef, CodecShape, Coded, CurveDef, CurveForm, ExpBase, MuLaw,
+        MuLawSingleZero, Referred, Segment,
     };
     use exact_units::niche::{Niched, Null};
     use shrink_wrap::prelude::*;
     use shrink_wrap::refused::{Refused, RefusedNum, Rule};
 
-    const BUF: usize = 1024;
+    const BUF: usize = 4096;
 
     #[expect(clippy::expect_used, reason = "a property fails by panicking")]
     fn round_trips(original: &CodecDef<'_>) {
@@ -285,6 +286,78 @@ mod wire {
         }
     }
 
+    /// One segment of every [CurveForm], parameters with a sign, a fraction and a large `u128` among them.
+    fn every_form() -> [Segment; 5] {
+        let f = Fraction::new;
+        [
+            Segment {
+                from: Fraction::ZERO,
+                form: CurveForm::Affine {
+                    gain: f(25, 323),
+                    offset: Fraction::ZERO,
+                },
+            },
+            Segment {
+                from: f(1, 25),
+                form: CurveForm::Power {
+                    gain: Fraction::ONE,
+                    shift: f(11, 200),
+                    exponent: f(12, 5),
+                    offset: f(-1, 3),
+                },
+            },
+            Segment {
+                from: f(1, 2),
+                form: CurveForm::Exp {
+                    gain: f(17_883_277, 300_000_000),
+                    base: ExpBase::E,
+                    scale: f(100_000_000, 17_883_277),
+                    shift: f(1, 2),
+                    offset: f(28_466_892, 1_200_000_000),
+                },
+            },
+            Segment {
+                from: f(3, 4),
+                form: CurveForm::Exp {
+                    gain: Fraction::ONE,
+                    base: ExpBase::Exactly(f(11, 10)),
+                    scale: Fraction::ONE,
+                    shift: Fraction::ONE,
+                    offset: Fraction::ZERO,
+                },
+            },
+            Segment {
+                from: f(7, 8),
+                form: CurveForm::RationalPower {
+                    m1: f(2610, 16384),
+                    m2: f(2523, 32),
+                    c1: f(3424, 4096),
+                    c2: f(2413, 128),
+                    c3: Fraction::new(i128::MAX, u128::MAX),
+                },
+            },
+        ]
+    }
+
+    /// A curve over `segments`.
+    fn curve(segments: &[Segment]) -> CurveDef<'_> {
+        CurveDef {
+            id: exact_units::MarkerId {
+                crate_name: "props",
+                name: "Curve",
+            },
+            referred: Referred::Display,
+            unit: exact_units::MarkerId {
+                crate_name: "exact_units",
+                name: "Nit",
+            },
+            scale: Fraction::int(10_000),
+            low: Fraction::ZERO,
+            high: Fraction::ONE,
+            segments: RefVec::Slice { slice: segments },
+        }
+    }
+
     #[test]
     fn every_shape_round_trips() {
         let id = exact_units::MarkerId {
@@ -292,17 +365,11 @@ mod wire {
             name: "Test",
         };
         let table = [0i128, 1, -8031, 8031];
+        let segments = every_form();
         for shape in [
             CodecShape::MuLaw,
             CodecShape::ALaw,
-            CodecShape::Power {
-                gamma: Magnitude::ONE,
-            },
-            CodecShape::PiecewisePower,
-            CodecShape::Exp {
-                base: Magnitude::pow10(1),
-                offset: Magnitude::ONE,
-            },
+            CodecShape::Offset { zero: -16 },
             CodecShape::Table(RefVec::Slice { slice: &table }),
         ] {
             for spare in [
@@ -316,11 +383,22 @@ mod wire {
                     CodeSpan::one(-1),
                 ],
             ] {
-                round_trips(&CodecDef {
-                    id,
-                    shape,
-                    spare: RefVec::Slice { slice: spare },
-                });
+                for (nominal, curve) in [
+                    (None, None),
+                    (
+                        Some(CodeSpan { low: 16, high: 235 }),
+                        Some(curve(&segments)),
+                    ),
+                ] {
+                    round_trips(&CodecDef {
+                        id,
+                        shape,
+                        spare: RefVec::Slice { slice: spare },
+                        codes: CodeSpan::all::<u16>(),
+                        nominal,
+                        curve,
+                    });
+                }
             }
         }
     }

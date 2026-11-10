@@ -31,11 +31,14 @@
 //! assert_eq!(Coded::<NarrowChroma8>::try_new(NarrowChroma8::ZERO, Rounding::NearestEven).map(Coded::raw), Ok(128));
 //! ```
 
-use super::{CodeSpan, Codec, CodecDef, CodecShape, Curve, CurveKind};
+#[cfg(feature = "photometric")]
+use super::Curve;
+use super::{CodeSpan, Codec, CodecDef, CodecShape, CurveDef, CurveForm, Referred, Segment};
 use crate::fixed::{Fixed, Range, prefix::Rational};
 use crate::system::def_list;
 use crate::units::Ratio;
-use crate::{Magnitude, MarkerId, Rounding};
+use crate::{Fraction, MarkerId, Rounding};
+use core::cmp::Ordering;
 
 /// E′ of a Y′, R′, G′ or B′ component coded on 8 bits, narrow range: `D − 16` in steps of 1/219, so 0 is black and
 /// 219 nominal white. Bounded to the video data, codes 1..=254: −15..=238.
@@ -93,6 +96,9 @@ impl Codec for Narrow8 {
         },
         shape: CodecShape::Offset { zero: 16 },
         spare: def_list(&[CodeSpan::one(0), CodeSpan::one(255)]),
+        codes: CodeSpan::all::<u8>(),
+        nominal: Some(CodeSpan { low: 16, high: 235 }),
+        curve: None,
     };
 
     #[inline]
@@ -134,6 +140,9 @@ impl Codec for NarrowChroma8 {
         },
         shape: CodecShape::Offset { zero: 128 },
         spare: def_list(&[CodeSpan::one(0), CodeSpan::one(255)]),
+        codes: CodeSpan::all::<u8>(),
+        nominal: Some(CodeSpan { low: 16, high: 240 }),
+        curve: None,
     };
 
     #[inline]
@@ -179,6 +188,9 @@ impl Codec for Narrow10 {
                 high: 65535,
             },
         ]),
+        codes: CodeSpan::all::<u16>(),
+        nominal: Some(CodeSpan { low: 64, high: 940 }),
+        curve: None,
     };
 
     #[inline]
@@ -226,6 +238,9 @@ impl Codec for NarrowChroma10 {
                 high: 65535,
             },
         ]),
+        codes: CodeSpan::all::<u16>(),
+        nominal: Some(CodeSpan { low: 64, high: 960 }),
+        curve: None,
     };
 
     #[inline]
@@ -260,43 +275,72 @@ impl Codec for NarrowChroma10 {
 /// those two means an irrational luminance: no exact `Linear` exists, and PQ is no [Codec]. Its decode and encode
 /// are a float edge that says so in its name ([eotf_f64](Self::eotf_f64), [to_nits_f64](Self::to_nits_f64),
 /// [from_nits_f64](Self::from_nits_f64)), with feature `libm` (core has no `pow`), and [Curve::KIND] is
-/// [CurveKind::Float].
+/// [CurveKind::Float](super::CurveKind::Float).
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Pq;
 
-/// [Pq]'s constants over 4096, the standard's own denominator, for the compile-time check of `c₁ = c₃ − c₂ + 1`:
-/// [Magnitude] multiplies and divides exactly, but has no sum.
-const PQ_C1_4096: i64 = 3424;
-
-/// c₂ over 4096.
-const PQ_C2_4096: i64 = 2413 * 32;
-
-/// c₃ over 4096.
-const PQ_C3_4096: i64 = 2392 * 32;
-
-const _: () = assert!(
-    PQ_C1_4096 == PQ_C3_4096 - PQ_C2_4096 + 4096,
-    "PQ's c1 = c3 - c2 + 1: E' = 1 is exactly 10 000 cd/m²"
-);
+// c₁ = c₃ − c₂ + 1, so E′ = 1 is exactly 10 000 cd/m²: checked on the exact constants, at compile time.
+const _: () = {
+    let (Some(d), Some(sum)) = (
+        Pq::C3.checked_sub(Pq::C2),
+        Fraction::ONE.checked_add(Fraction::ZERO),
+    ) else {
+        panic!("PQ's constants subtract");
+    };
+    let Some(rhs) = d.checked_add(sum) else {
+        panic!("PQ's constants add");
+    };
+    assert!(
+        matches!(Pq::C1.compare(rhs), Ordering::Equal),
+        "PQ's c1 = c3 - c2 + 1: E' = 1 is exactly 10 000 cd/m²"
+    );
+};
 
 impl Pq {
     /// m₁ = 2610/16384 = 0.1593017578125 (BT.2100-3 Table 4).
-    pub const M1: Magnitude = Magnitude::ratio(2610, 16384);
+    pub const M1: Fraction = Fraction::new(2610, 16384);
 
     /// m₂ = 2523/4096 × 128 = 78.84375.
-    pub const M2: Magnitude = Magnitude::ratio(2523, 4096).mul(Magnitude::ratio(128, 1));
+    pub const M2: Fraction = Fraction::new(2523 * 128, 4096);
 
     /// c₁ = 3424/4096 = 0.8359375 = c₃ − c₂ + 1.
-    pub const C1: Magnitude = Magnitude::ratio(3424, 4096);
+    pub const C1: Fraction = Fraction::new(3424, 4096);
 
     /// c₂ = 2413/4096 × 32 = 18.8515625.
-    pub const C2: Magnitude = Magnitude::ratio(2413, 4096).mul(Magnitude::ratio(32, 1));
+    pub const C2: Fraction = Fraction::new(2413 * 32, 4096);
 
     /// c₃ = 2392/4096 × 32 = 18.6875.
-    pub const C3: Magnitude = Magnitude::ratio(2392, 4096).mul(Magnitude::ratio(32, 1));
+    pub const C3: Fraction = Fraction::new(2392 * 32, 4096);
 
     /// The luminance of E′ = 1, 10 000 cd/m², exactly.
     pub const PEAK_NITS: u16 = 10_000;
+
+    /// PQ as data: BT.2100-3 Table 4's EOTF, one [RationalPower](CurveForm::RationalPower) segment over E′ in
+    /// 0..=1, display light in cd/m² with `y = 1` at 10 000.
+    pub const DEF: CurveDef<'static> = CurveDef {
+        id: MarkerId {
+            crate_name: "exact_units",
+            name: "Pq",
+        },
+        referred: Referred::Display,
+        unit: MarkerId {
+            crate_name: "exact_units",
+            name: "Nit",
+        },
+        scale: Fraction::int(10_000),
+        low: Fraction::ZERO,
+        high: Fraction::ONE,
+        segments: def_list(&[Segment {
+            from: Fraction::ZERO,
+            form: CurveForm::RationalPower {
+                m1: Self::M1,
+                m2: Self::M2,
+                c1: Self::C1,
+                c2: Self::C2,
+                c3: Self::C3,
+            },
+        }]),
+    };
 }
 
 /// [Pq::M1] in `f64`, exactly (2610/16384 is dyadic).
@@ -408,7 +452,10 @@ impl Pq {
     }
 }
 
-/// PQ is a float curve: exact at E′ = 0 and 1 alone.
+/// PQ is a float curve: exact at E′ = 0 and 1 alone ([CurveKind::Float](super::CurveKind::Float)).
+#[cfg(feature = "photometric")]
 impl Curve for Pq {
-    const KIND: CurveKind = CurveKind::Float;
+    type Light = crate::units::Nit;
+
+    const DEF: CurveDef<'static> = Pq::DEF;
 }

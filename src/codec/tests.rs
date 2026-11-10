@@ -118,6 +118,9 @@ fn a_table_decodes_by_code_and_encodes_around_spare_codes() {
         },
         shape: CodecShape::Table(def_list(&TABLE)),
         spare: def_list(&SPARE),
+        codes: CodeSpan::all::<u8>(),
+        nominal: None,
+        curve: None,
     };
     assert_eq!(def.decode(0), Some(50));
     assert_eq!(def.decode(3), Some(30));
@@ -136,4 +139,34 @@ fn a_table_decodes_by_code_and_encodes_around_spare_codes() {
     assert_eq!(def.encode(60, Rounding::Ceil), None);
     // without the spare codes, the shape alone takes code 4
     assert_eq!(def.shape.encode(20, Rounding::Floor), Some(4));
+}
+
+/// The data path never gives a code past the `Raw`: `Offset`'s `value + zero` for 8-bit narrow Y′ stops at 255,
+/// and a code past it decodes to no value (gap 17 of the codec design).
+#[cfg(feature = "dimensionless")]
+#[test]
+fn an_offset_code_stays_within_the_raw() {
+    use super::video::Narrow8;
+    use super::{CodeSpan, Codec};
+    use crate::Rounding;
+
+    let def = Narrow8::DEF;
+    assert_eq!(def.codes, CodeSpan { low: 0, high: 255 });
+    assert_eq!(def.encode(238, Rounding::NearestEven), Some(254));
+    assert_eq!(def.encode(239, Rounding::NearestEven), None); // 255 is spare
+    assert_eq!(def.encode(240, Rounding::NearestEven), None); // 256 is no u8
+    assert_eq!(def.decode(256), None);
+    assert_eq!(def.decode(-1), None);
+    assert_eq!(def.nominal, Some(CodeSpan { low: 16, high: 235 }));
+}
+
+/// PQ's data names its one form, and its kind follows from it: not exact on every value.
+#[cfg(feature = "photometric")]
+#[test]
+fn pq_is_a_float_curve_by_its_form() {
+    use super::video::Pq;
+    use super::{Curve, CurveKind};
+
+    assert_eq!(Pq::KIND, CurveKind::Float);
+    assert_eq!(<Pq as Curve>::DEF.kind(), CurveKind::Float);
 }

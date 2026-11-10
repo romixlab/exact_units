@@ -459,7 +459,32 @@ fraction! {
     /// assert_eq!(Fraction::int(1).checked_div(Fraction::ZERO), None);
     /// assert_eq!(Fraction::new(1, 3).to_string(), "0.(3)");
     /// ```
+    ///
+    /// On the wire (feature `shrink_wrap`): the sign and both `u128`s, a curve's parameters
+    /// ([CurveForm](crate::codec::CurveForm)) are the case; a read refuses a zero denominator, terms that aren't
+    /// lowest and a negative zero, so every `Fraction` read is one `new` could make.
+    #[cfg_attr(
+        feature = "shrink_wrap",
+        derive_shrink_wrap(borrowed, owned(feature = "std"), final_structure, validate = Self::validate)
+    )]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     Fraction, u128
+}
+
+#[cfg(feature = "shrink_wrap")]
+use shrink_wrap::prelude::*;
+
+#[cfg(feature = "shrink_wrap")]
+impl Fraction {
+    /// Run on every `Fraction` read from the wire: the parts must be in lowest terms, as [from_parts](Self::from_parts)
+    /// leaves them.
+    fn validate(&self) -> Result<(), shrink_wrap::Error> {
+        if Self::from_parts(self.neg, self.num, self.den) == Some(*self) {
+            Ok(())
+        } else {
+            Err(shrink_wrap::Error::SubtypeOutOfRange)
+        }
+    }
 }
 
 fraction! {
@@ -752,4 +777,34 @@ fn magnitude_f64(num: u128, den: u128) -> f64 {
     }
     let step = f64::from(1u32 << e.unsigned_abs());
     if e >= 0 { x * step } else { x / step }
+}
+
+/// A `Fraction` crosses the wire as itself, and a read refuses parts that `new` couldn't make.
+#[cfg(all(test, feature = "shrink_wrap"))]
+mod wire {
+    use super::Fraction;
+    use shrink_wrap::prelude::*;
+
+    #[test]
+    fn round_trips_and_refuses_non_lowest_terms() {
+        for f in [
+            Fraction::ZERO,
+            Fraction::new(-3, 4),
+            Fraction::new(i128::MAX, u128::MAX),
+        ] {
+            let mut buf = [0_u8; 64];
+            let bytes = f.to_ww_bytes(&mut buf).unwrap().to_vec();
+            assert_eq!(Fraction::from_ww_bytes(&bytes), Ok(f));
+        }
+        for (neg, num, den) in [(false, 2, 4), (false, 1, 0), (true, 0, 1), (false, 0, 2)] {
+            let bad = Fraction { neg, num, den };
+            let mut buf = [0_u8; 64];
+            let bytes = bad.to_ww_bytes(&mut buf).unwrap().to_vec();
+            assert_eq!(
+                Fraction::from_ww_bytes(&bytes),
+                Err(shrink_wrap::Error::SubtypeOutOfRange),
+                "{neg} {num}/{den}"
+            );
+        }
+    }
 }

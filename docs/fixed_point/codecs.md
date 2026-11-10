@@ -91,9 +91,10 @@ assert_eq!(Coded::<MuLawSingleZero>::try_from_raw(0xFF).map(|c| c.get().get()), 
 
 `Codec::DEF` is a `CodecDef`: a `MarkerId`, a `CodecShape` (the algorithm named as data, the way `UnitDef` is a
 unit's definition as data) and `spare`, the spare codes as spans of codes (`CodeSpan { low, high }`). It is the one
-place a codec writes its spare codes: `decode`, `Coded` and a `Niched` read them from there. `CodecShape::MuLaw` has no parameters (the standard pins the formula); the crate also
-declares the shapes later codecs will need — `ALaw`, `Power { gamma }`, `PiecewisePower` and `Exp { base, offset }`
-— with no `Codec` behind any of them yet. `Table` has one: [the CAN FD DLC](#a-table-the-can-fd-dlc). `Offset { zero }`, a code that is the `Linear`'s raw value plus `zero`, has video's narrow-range quantizers: [Video codes and transfer curves](video.md).
+place a codec writes its spare codes: `decode`, `Coded` and a `Niched` read them from there. `CodecShape::MuLaw` has no parameters (the standard pins the formula); `ALaw` is declared, with no `Codec`
+behind it yet. `codes` is every code the `Raw` holds (`CodeSpan::all::<u8>()`), `nominal` the nominal range where a
+codec has one, and `curve` the transfer curve above the code (a `CurveDef`, see [Video codes and transfer
+curves](video.md)), `None` where the code's value is the meaning itself. `Table` has one: [the CAN FD DLC](#a-table-the-can-fd-dlc). `Offset { zero }`, a code that is the `Linear`'s raw value plus `zero`, has video's narrow-range quantizers: [Video codes and transfer curves](video.md).
 
 ```rust
 use exact_units::codec::{Codec, CodecShape, MuLaw};
@@ -121,9 +122,9 @@ assert_eq!(MuLaw::DEF.decode(0x7F), Some(0));
 assert_eq!(MuLawSingleZero::DEF.decode(0x7F), None);
 ```
 
-With `shrink_wrap` on, `CodecDef` and `CodecShape` are on the wire too, every shape included (`Power`'s `gamma`,
-`Exp`'s `base` and `offset`, `Table`'s slice, each exact data, never a float standing in for a parameter), and the
-spare codes with them. A `Coded` read from the wire refuses a spare code, as `try_from_raw` does.
+With `shrink_wrap` on, `CodecDef` and `CodecShape` are on the wire too, every shape included (`Table`'s slice, `Offset`'s
+zero), and the spare codes, the code range and a curve's segments with them, every parameter an exact `Fraction`,
+never a float standing in for one. A `Coded` read from the wire refuses a spare code, as `try_from_raw` does.
 
 ## A table: the CAN FD DLC
 
