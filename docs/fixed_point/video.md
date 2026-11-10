@@ -351,12 +351,12 @@ Not in the crate yet; what each would be exact in:
 
 ## Limits of the codec design
 
-Video found where `Codec` and `CodecShape` stop:
+Video found where `Codec` and `CodecShape` stopped; a codec design round (LVL-9) closed most of them:
 
-- `Codec::formula` must give an exact `Linear`. A curve with an irrational output (PQ, HLG's log half, sRGB's power) can't be a `Codec`; it is a float edge beside one.
-- `Codec::encode` rounds to the nearest code in the `Linear`'s domain. Video quantizes in E′, not in linear light, which is why the quantizer and the curve are separate here: the quantizer's `Linear` is E′.
-- A `CodecShape` is one shape. "10-bit narrow range of PQ" is two, and the data path can't say so yet.
+- `Codec::formula` must give an exact `Linear`. A curve with an irrational output (PQ, HLG's log half, sRGB's power) can't be a `Codec`; `Transfer<Q, C>` is the layer beside one ([Transfer curves](codecs.md#transfer-curves-curve-and-curvedef-exact-per-value)).
+- Closed: encoding's "nearest" names its domain, `Domain::Signal` (what the quantizer's own `Rounding` does, the standards' way) or `Domain::Light` (nearest the decoded light); the two differ only for the `Nearest*` roundings, never for `Floor`, `Ceil` or `Truncate` ([Domain::Signal or Domain::Light](codecs.md#encoding-light-domainsignal-or-domainlight)).
+- Closed: a code and the curve above it are one `Codec`, `Transfer<Q, C>`, so "10-bit narrow range of PQ" is data: `CodecDef::curve` names the curve over the quantizer, and a schema reads it, not two shapes with no way to say they compose.
 - Closed: a curve is data of its own, `CurveDef`, its segments' `CurveForm`s (`Affine`, `Power`, `Exp`, `RationalPower`) with exact `Fraction` parameters, exponents included; `CodecShape::Power`, `PiecewisePower` and `Exp` are gone.
-- `CurveKind` is one kind per curve. PQ is exact at two codes, HLG on its lower half, sRGB on its toe.
+- Closed: `CurveKind` stays one kind per curve, a summary (`Exact` or `Float`); `CurveDef::decode_exact` is the per-value truth it summarizes — PQ exact at two codes, HLG on its lower half, sRGB on its toe, every other value `None`, never a near value standing in for it.
 - Closed: `CodecDef::codes` is every code of the `Raw`, so the data path's `Offset` encode never gives a code past the storage; `CodecDef::nominal` names the nominal range.
 - A pixel is three codes, and 4:2:2 shares its chroma between two pixels; a `Codec` has one `Raw`.

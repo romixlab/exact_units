@@ -220,10 +220,158 @@ each its meaning, so `Niched<Coded<Sfloat>, SfloatSpecial>` reads a NaN as `Read
 its bits would spell. The `Codec` trait's own documentation carries this as a working doctest, with a placeholder
 `Linear`; IO-3 gives SFLOAT its exact value type and its own `CodecShape`.
 
-## `Curve`, declared for LVL-4
+## Transfer curves: `Curve` and `CurveDef`, exact per value
 
-Non-linear conversions that aren't a code on the wire but a *named relationship between two quantities* (AWG,
-mpg ↔ L/100 km, Beaufort, Richter, shoe sizes) get their own trait, `Curve`, marked by `CurveKind`: `Exact` (mpg
-↔ L/100 km, a reciprocal), `Tabled` (AWG, Beaufort: named points, not a formula) or `Float` (Richter: the one kind
-that isn't exact, named so a client never has to guess). `Curve` is declared here, beside `Codec`, with no
-conversion method yet: LVL-4 gives it one. The first curve implementing it is PQ, `CurveKind::Float` ([Video codes and transfer curves](video.md#pq)).
+A transfer curve (PQ, HLG, sRGB's power) turns a codec's exact `Linear` into light, and for almost every value that
+light is irrational. `Codec::decode` must give an exact `Linear` or refuse (rule 2), so a curve like this can't live
+inside one: it is its own trait, `Curve`, declared beside `Codec`.
+
+```rust
+use exact_units::codec::{Curve, CurveKind};
+use exact_units::codec::video::Pq;
+use exact_units::Fraction;
+
+assert_eq!(Pq::KIND, CurveKind::Float); // not every value is exact...
+assert_eq!(Pq::DEF.decode_exact(Fraction::ZERO), Some(Fraction::ZERO));
+assert_eq!(Pq::DEF.decode_exact(Fraction::ONE), Some(Fraction::int(10_000)));
+assert_eq!(Pq::DEF.decode_exact(Fraction::new(1, 2)), None); // ...but two of them are
+```
+
+`Curve::DEF` is a `CurveDef`: which function of its standard this is (`Referred::Scene`, an inverse OETF, or
+`Referred::Display`, an EOTF — the two differ, BT.709's inverse OETF is not BT.1886's EOTF), the light's unit and
+scale (`Nit` and 10 000 for PQ, so a form's `y = 1` is 10 000 cd/m²), the signal's domain (`low..=high`) and the
+pieces (`segments`, ascending by `Segment::from`). `CurveKind` is a curve-wide summary (`Exact` where every segment's
+form is exact on every rational, else `Float`, computed from the forms by a `const fn`); exactness is really a
+per-value question, and `CurveDef::decode_exact` is the one true answer to it: `Some` exactly where the light is a
+rational that fits a `Fraction`, `None` everywhere else, never a near value standing in for the true one.
+
+A `Segment`'s `CurveForm` is written in the decode direction, signal to light, every parameter an exact `Fraction`
+(an exponent too, never a `Magnitude`: π or ln 2 mean nothing as an exponent):
+
+- `Affine { gain, offset }`: `y = gain·x + offset`, exact on every rational (a toe like sRGB's or BT.709's).
+- `Power { gain, shift, exponent, offset }`: `y = gain·max(x + shift, 0)^exponent + offset`, exact where `x + shift`
+  is a rational's `q`-th power, the exponent being `p/q`.
+- `Exp { gain, base, scale, shift, offset }`: `y = gain·base^(scale·(x − shift)) + offset`, exact for Euler's `e`
+  only where the exponent is 0, for a rational base where the power is rational.
+- `RationalPower { m1, m2, c1, c2, c3 }`: PQ's own shape, `y = (max(x^(1/m2) − c1, 0)/(c2 − c3·x^(1/m2)))^(1/m1)`,
+  exact where the two nested roots are rational — for PQ that is `x = 0` and `x = 1` alone.
+
+The data path is the same algorithm from the data alone: `CurveDef::decode_exact`, `encode_exact`, and (feature
+`libm`) `decode_f64`, `encode_f64`, over a `Quantizer { zero, step, low, high }` — the code layer under the curve,
+not a type.
+
+## `Transfer<Q, C>`: the quantizer and the curve as one `Codec`
+
+A video code is two layers, the quantizer and the curve above it, and `Transfer<Q, C>` is both as one `Codec`: `Q`
+must be a `CodecShape::Offset` codec whose `Linear` has a rational step (`SignalStep`), and `C` is the `Curve` over
+it. `Coded<Transfer<Q, C>>` holds the same bytes as `Coded<Q>` — `of` and `code` convert between them for free, the
+curve being a meaning added in the type, not a different wire value — and its `DEF` is `Q::DEF` with
+`curve: Some(C::DEF)` set, so a schema reads "10-bit narrow range of PQ" as data, closing a gap the plain `Codec`
+design had (one shape alone could not say "quantizer and curve").
+
+```rust
+use exact_units::codec::{Coded, Transfer};
+use exact_units::codec::video::{Narrow10, Pq};
+use exact_units::Fraction;
+
+type Code = Coded<Transfer<Narrow10, Pq>>;
+
+// code 940 is nominal white: its light is exact, 10 000 cd/m²
+let white = Code::of(Coded::<Narrow10>::try_from_raw(940).unwrap());
+assert_eq!(white.light_exact().map(|l| l.get()), Some(Fraction::int(10_000)));
+
+// most codes mean an irrational light: no exact value, the float edge by its name
+let mid = Code::of(Coded::<Narrow10>::try_from_raw(502).unwrap());
+assert_eq!(mid.light_exact(), None);
+assert!(mid.light_f64().is_some());
+```
+
+## Encoding light: `Domain::Signal` or `Domain::Light`
+
+Encoding a light to a code needs "nearest" to mean something, and video's standards and a perceptual nearest don't
+agree: they quantize the *signal* (`Domain::Signal`, what the quantizer's own `Rounding` does), not the decoded
+*light* (`Domain::Light`). The two differ only for the `Nearest*` roundings — `Floor`, `Ceil` and `Truncate` pick the
+same code in both, every curve here being monotonic — so a caller names the domain beside the `Rounding`, as it
+names the `Rounding` itself.
+
+```rust
+use exact_units::codec::{Coded, Domain, Transfer};
+use exact_units::codec::video::{Narrow10, Pq};
+use exact_units::{Fixed, Rounding, prefix::One, units::Nit};
+
+type Code = Coded<Transfer<Narrow10, Pq>>;
+
+// a light strictly between codes 866 and 867: past the signal-domain tie (so Signal rounds up)
+// but short of the midpoint of the two codes' decoded lights (so Light rounds down)
+let light = Fixed::<Nit, One, f64>::try_new(4535.88).unwrap();
+assert_eq!(Code::from_light_f64(light, Rounding::NearestEven, Domain::Signal).map(|c| c.raw()), Ok(867));
+assert_eq!(Code::from_light_f64(light, Rounding::NearestEven, Domain::Light).map(|c| c.raw()), Ok(866));
+```
+
+## Exact where it can be, a certified float edge where it can't
+
+`from_light_exact` (`CurveDef::encode_exact` on the data path) decides a code by comparing the light with exact
+decodes only, so it is the true code even where the signal itself is irrational — and `EncodeError::NotExact` where
+a decode it needs isn't exact, never a near guess:
+
+```rust
+use exact_units::codec::{Coded, Domain, EncodeError, Transfer};
+use exact_units::codec::video::{Narrow10, Pq};
+use exact_units::{Exact, Rounding};
+
+type Code = Coded<Transfer<Narrow10, Pq>>;
+
+// 10 000 cd/m² is exact (E′ = 1): the true code, decided by comparison alone
+let peak = Exact::int(10_000);
+assert_eq!(Code::from_light_exact(peak, Rounding::NearestAway, Domain::Signal).map(|c| c.raw()), Ok(940));
+
+// 5 000 cd/m² isn't: the decodes an exact search would need to compare against aren't rational
+let mid = Exact::int(5_000);
+assert_eq!(
+    Code::from_light_exact(mid, Rounding::NearestAway, Domain::Signal),
+    Err(EncodeError::NotExact)
+);
+```
+
+Where the exact path can't decide, `light_f64`/`from_light_f64` (feature `libm`) are the float edge, named so — but
+a certified one, not a convenience: the light is taken as exact, and the code is the true one for it, computed in
+`f64` with the curve's own error bound (`F64_MARGIN`, 2⁻³⁰ of a code: well above every curve's real `pow`/`exp`
+error here, and tested against the exact path wherever both answer).
+
+```rust
+use exact_units::codec::{Coded, Domain, Transfer};
+use exact_units::codec::video::{Narrow10, Pq};
+use exact_units::{Fixed, Rounding, prefix::One, units::Nit};
+
+type Code = Coded<Transfer<Narrow10, Pq>>;
+
+let mid_f64 = Fixed::<Nit, One, f64>::try_new(5_000.0).unwrap();
+assert_eq!(Code::from_light_f64(mid_f64, Rounding::NearestAway, Domain::Signal).map(|c| c.raw()), Ok(876));
+```
+
+Within that margin of a tie or a code boundary, `from_light_f64` refuses rather than guess:
+`EncodeError::NearTie { below, above }` names both candidates, for a caller who picks one by name. PQ is flat near
+black (every E′ up to c₁^m₂ decodes to 0 cd/m²), so the two codes right above black share almost the same light,
+and a light exactly between them is such a tie:
+
+```rust
+use exact_units::codec::{Coded, Domain, EncodeError, Transfer};
+use exact_units::codec::video::{Narrow10, Pq};
+use exact_units::{Fixed, Rounding, prefix::One, units::Nit};
+
+type Code = Coded<Transfer<Narrow10, Pq>>;
+
+let below = Code::of(Coded::<Narrow10>::try_from_raw(64).unwrap()).light_f64().unwrap().get();
+let above = Code::of(Coded::<Narrow10>::try_from_raw(65).unwrap()).light_f64().unwrap().get();
+let tie = Fixed::<Nit, One, f64>::try_new(f64::midpoint(below, above)).unwrap();
+
+assert_eq!(
+    Code::from_light_f64(tie, Rounding::NearestEven, Domain::Light),
+    Err(EncodeError::NearTie { below: 64, above: 65 })
+);
+```
+
+`from_light_f64_off_by_one_near_ties` always gives a code instead — the candidate the `f64` position itself points
+to, which may be the wrong side of a tie it couldn't certify — and its longer name says exactly what it gives up.
+`Curve`'s first implementor is PQ; LVL-4's named non-linear conversions (AWG, mpg ↔ L/100 km, Beaufort) reuse the
+same `CurveForm`s, a table standing in for `Tabled` ones.

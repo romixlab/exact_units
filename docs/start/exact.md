@@ -97,6 +97,19 @@ let _ = Fixed::<Volt, Milli, i16>::new(4_900).is_in(q!(4.9005 V ..= 5.1 V)); // 
 # #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
 ```
 
+The same rule holds past `Fixed` itself: a transfer curve (PQ, HLG, sRGB's power) gives the light a code means, or
+refuses, never a float standing in for the light. `CurveDef::decode_exact` is `Some` exactly where the true value
+is a rational that fits a `Fraction`, `None` everywhere else — most of a non-linear curve, by its own nature
+([Transfer curves](../fixed_point/codecs.md#transfer-curves-curve-and-curvedef-exact-per-value)):
+
+```rust
+use exact_units::codec::video::Pq;
+use exact_units::Fraction;
+
+assert_eq!(Pq::DEF.decode_exact(Fraction::ONE), Some(Fraction::int(10_000))); // E' = 1 is exactly 10 000 cd/m²
+assert_eq!(Pq::DEF.decode_exact(Fraction::new(1, 2)), None); // most signals mean an irrational light: refused
+```
+
 ## 3. Every lossy step is named
 
 Losing part of a value is often what you want. Then the code says how. `Rounding` has no default, so a rounding call always names its mode:
@@ -127,6 +140,27 @@ use exact_units::{Bam16, Q15, units::Ratio};
 assert_eq!((Q15::<Ratio>::of(30000) + Q15::of(10000)).get(), i16::MAX);
 // a binary angle wraps: ¾ turn + ½ turn is ¼ turn
 assert_eq!((Bam16::of(49152) + Bam16::of(32768)).get(), 16384);
+```
+
+Encoding a transfer curve's light back to a code is the same promise from the other side. Where an exact comparison
+can't decide (the light is irrational, as PQ's is for almost every code), the certified float edge decides in
+`f64` instead — but it, too, names where it can't: within a stated margin of a tie, it refuses rather than guess
+which code wins, naming both ([The certified float edge](../fixed_point/codecs.md#exact-where-it-can-be-a-certified-float-edge-where-it-cant)):
+
+```rust
+use exact_units::codec::{Coded, Domain, EncodeError, Transfer};
+use exact_units::codec::video::{Narrow10, Pq};
+use exact_units::{Fixed, Rounding, prefix::One, units::Nit};
+
+type Code = Coded<Transfer<Narrow10, Pq>>;
+
+let below = Code::of(Coded::<Narrow10>::try_from_raw(64).unwrap()).light_f64().unwrap().get();
+let above = Code::of(Coded::<Narrow10>::try_from_raw(65).unwrap()).light_f64().unwrap().get();
+let tie = Fixed::<Nit, One, f64>::try_new(f64::midpoint(below, above)).unwrap();
+assert_eq!(
+    Code::from_light_f64(tie, Rounding::NearestEven, Domain::Light),
+    Err(EncodeError::NearTie { below: 64, above: 65 })
+);
 ```
 
 ## 4. Measured constants stay symbols
