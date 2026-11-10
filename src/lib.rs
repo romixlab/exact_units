@@ -70,6 +70,7 @@ mod exact;
 mod fixed;
 #[cfg(feature = "counting")]
 mod index;
+mod interval;
 #[cfg(feature = "leap_seconds")]
 pub mod leap;
 #[cfg(feature = "levels")]

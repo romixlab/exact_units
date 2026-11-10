@@ -80,7 +80,7 @@ use super::Decimal;
 use super::quantity::{AtMost, Below, Cut, cut_scale};
 use super::range::{About, Folded, LiteralRange};
 use crate::conv_error::Symbol;
-use crate::decibel::exact::Interval;
+use crate::interval::Interval;
 use crate::{Bounds, Contains, Fixed, FixedScale, LevelForm, Magnitude, NanFree, Unit};
 
 /// A level of a gain as a type, `NUM · 10^EXP` of the level `L` ([Db] or [Np]): what `q!(-3 dB)` gives, compared

@@ -443,7 +443,7 @@ pub(crate) const fn gain<U: Unit, P: FixedScale>(db: Decibels, form: LevelForm) 
     }
     Value {
         neg: false,
-        abs: Abs::Irrational(exact::Interval::level(n, d, num, den)),
+        abs: Abs::Irrational(crate::interval::Interval::level(n, d, num, den)),
     }
 }
 
@@ -457,7 +457,7 @@ pub(crate) const fn gain_np<U: Unit, P: FixedScale>(np: Nepers, form: LevelForm)
     }
     Value {
         neg: false,
-        abs: Abs::Irrational(exact::Interval::neper(k, r, d, num, den)),
+        abs: Abs::Irrational(crate::interval::Interval::neper(k, r, d, num, den)),
     }
 }
 

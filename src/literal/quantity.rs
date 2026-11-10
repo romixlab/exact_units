@@ -148,7 +148,7 @@ use core::cmp::Ordering;
 use core::marker::PhantomData;
 
 use super::{Decimal, LiteralIn, scale_in};
-use crate::decibel::exact::Interval;
+use crate::interval::Interval;
 use crate::prefix::One;
 use crate::{Bounds, Exact, Fixed, FixedScale, Fraction, Magnitude, NanFree, Unit};
 

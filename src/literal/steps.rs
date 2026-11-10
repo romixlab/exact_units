@@ -8,7 +8,8 @@
 //! where a rounding would land on the last stored value (`fixed!(10.4)` into `Range<0, 10>`).
 
 use super::big::{Big, BigDecimal};
-use crate::decibel::exact::{Around, Interval};
+use crate::decibel::exact::Around;
+use crate::interval::Interval;
 use crate::{Magnitude, Rounding};
 
 /// `|x|` in stored values: a fraction `p / q` of integers, or an interval around an irrational value (a literal in

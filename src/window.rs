@@ -4,7 +4,7 @@
 
 use crate::{Bounds, Contains, Fixed, Storage};
 #[cfg(feature = "dimensionless")]
-use crate::{Exact, Fraction, OffTarget, Repr, Tolerance, decibel::exact::mul_wide, units::Ratio};
+use crate::{Exact, Fraction, OffTarget, Repr, Tolerance, interval::mul_wide, units::Ratio};
 use core::fmt;
 
 /// Which stored values stand for an end that is no stored value: there is no default, the caller names one.

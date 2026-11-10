@@ -47,7 +47,7 @@
 
 use crate::complex::Complex;
 #[cfg(feature = "q")]
-use crate::decibel::exact::Interval;
+use crate::interval::Interval;
 use crate::{Bounds, Fixed, FixedScale, Magnitude, Rounding, Unit, Unlimited};
 use big::BigDecimal;
 use core::marker::PhantomData;
