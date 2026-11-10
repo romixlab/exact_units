@@ -27,6 +27,7 @@
 //! assert_eq!(size_of::<Load>(), 1);
 //! ```
 
+use crate::codec::CodeSpan;
 use crate::fixed::{Bounds, Fixed, OutOfBounds, Repr, Storage};
 use crate::point::{Origin, Point};
 use core::fmt;
@@ -249,6 +250,10 @@ pub trait RawValue: Copy + sealed::Sealed {
     /// them, `None` for a float storage.
     const RANGE: Option<(i128, i128)>;
 
+    /// The codes inside [RANGE](Self::RANGE) that are no value: a [Coded](crate::codec::Coded)'s spare codes, where
+    /// a niche code may sit. Empty for a [Fixed] or a [Point], whose whole range is values.
+    const HOLES: &'static [CodeSpan] = &[];
+
     /// The number as stored.
     fn raw(self) -> Self::Raw;
 
@@ -341,6 +346,7 @@ impl<O: Origin<Unit = U>, U, P, T: Storage, B: Bounds<T>> RawValue for Point<O, 
 /// overlap: what [Niched] proves before its first use.
 const fn check_codes(
     range: Option<(i128, i128)>,
+    holes: &[CodeSpan],
     t_min: i128,
     t_max: i128,
     codes: &[(i128, i128)],
@@ -362,8 +368,9 @@ const fn check_codes(
             "a niche code doesn't fit the storage"
         );
         assert!(
-            *hi < min || *lo > max,
-            "a niche code is inside the bounds: give the value a Range that leaves the codes out"
+            *hi < min || *lo > max || in_hole(holes, *lo, *hi),
+            "a niche code is inside the bounds: give the value a Range that leaves the codes out, or a codec \
+             whose spare codes hold them"
         );
         let mut later = tail;
         while let [(lo2, hi2), tail2 @ ..] = later {
@@ -372,6 +379,18 @@ const fn check_codes(
         }
         rest = tail;
     }
+}
+
+/// Whether `lo..=hi` lies wholly inside one of `holes`.
+const fn in_hole(holes: &[CodeSpan], lo: i128, hi: i128) -> bool {
+    let mut rest = holes;
+    while let [h, tail @ ..] = rest {
+        if h.low <= lo && hi <= h.high {
+            return true;
+        }
+        rest = tail;
+    }
+    false
 }
 
 /// What a [Niched] holds: a value, or the meaning of a niche code.
@@ -450,7 +469,7 @@ pub struct Niched<V: RawValue<Raw = T>, N: Niches<T>, T: Storage = <V as RawValu
 
 impl<T: Storage, V: RawValue<Raw = T>, N: Niches<T>> Niched<V, N, T> {
     /// The proof that the codes fit the storage and stay out of the bounds, a compile error where it fails.
-    const CHECKED: () = check_codes(V::RANGE, T::MIN_INT, T::MAX_INT, N::CODES);
+    const CHECKED: () = check_codes(V::RANGE, V::HOLES, T::MIN_INT, T::MAX_INT, N::CODES);
 
     #[inline(always)]
     fn from_raw(raw: T) -> Self {
@@ -882,6 +901,8 @@ impl<V: RawValue, R: Rails> RawValue for Clipped<V, R> {
     type Raw = V::Raw;
 
     const RANGE: Option<(i128, i128)> = V::RANGE;
+
+    const HOLES: &'static [CodeSpan] = V::HOLES;
 
     #[inline(always)]
     fn raw(self) -> V::Raw {

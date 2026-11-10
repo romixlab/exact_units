@@ -10,13 +10,16 @@ T>`, where `C` is a [Codec](../maths/niches.md) and `V` is the linear value its 
 
 ## `Codec` and `Coded`
 
-A `Codec` names its code (`Raw`, what is in memory and on the wire), its meaning (`Linear`, a `Fixed`), and two
-steps: `decode`, which never refuses (every code means something), and `encode`, which rounds to the nearest code
-by a named `Rounding` and refuses only a value beyond every code's range.
+A `Codec` names its code (`Raw`, what is in memory and on the wire), its meaning (`Linear`), the codes that mean
+no value (its *spare* codes, in `DEF.spare`), and two steps: `decode`, which refuses exactly the spare codes, and
+`encode`, which rounds to the nearest code by a named `Rounding`, never gives a spare code, and refuses only a
+value beyond every code's range. A codec writes `formula`, what a code's bits give; `decode` is `formula` with the
+spare codes refused, so a NaN code never passes for the number its bits would spell.
 
 `Coded<C, V, T>` holds the bytes of `C::Raw` and nothing else, `size_of` is `T`'s, exactly as `Niched` holds the
-bytes of a value's storage. `V` (`C::Linear`) and `T` (`C::Raw`) are spelled out so a `Coded` reads without
-following the trait.
+bytes of a value's storage, and never a spare code: `try_from_raw` refuses one with a `SpareCode` that holds it,
+and `from_raw`, which can't refuse, compiles only for a codec without spare codes. `V` (`C::Linear`) and `T`
+(`C::Raw`) are spelled out so a `Coded` reads without following the trait.
 
 ## G.711 μ-law, the worked example
 
@@ -43,8 +46,8 @@ assert_eq!(
 );
 ```
 
-Decoding is total and onto: every byte means a value. It is not one-to-one. The standard has a redundant negative
-zero: `0x7F` and `0xFF` both decode to 0.
+`MuLaw` has no spare code: decoding is total and onto, every byte means a value. It is not one-to-one. The
+standard has a negative zero: `0x7F` and `0xFF` both decode to 0.
 
 ```rust
 use exact_units::codec::{Coded, MuLaw};
@@ -53,18 +56,42 @@ assert_eq!(Coded::<MuLaw>::from_raw(0x7F).get().get(), 0);
 assert_eq!(Coded::<MuLaw>::from_raw(0xFF).get().get(), 0);
 ```
 
-So the round trip byte → value → byte holds for every byte but `0x7F`, which comes back as `0xFF` — the same
-value's other code, and the one no encoder produces. `tests/props/codec.rs` walks all 256 bytes against an
-independent reference, and every possible `i16` target's `encode` against a brute-force search of the nearest of
-the 256 codes, which is how a real bug in the first version of `encode` here was found: rounding past a segment's
-top step (its 16th, which doesn't exist) needs comparing the two neighbouring codes' true distance, not a blind
-carry into the next segment, because adjacent segments don't meet (segment 0's 16 steps of 2 reach 30, segment
-1's 16 steps of 4 start at 33 — both the standard's own shape, not a bug).
+`0x7F` is a real code, not a stray one. G.711's Table 2b gives the character `0111 1111` to every negative input
+between decision values 0 and −1, so an analogue codec sends it for a slightly negative silence, and ITU-T G.191's
+reference encoder (`ulaw_compress`, which takes the one's complement of a negative sample) sends it for the 16-bit
+inputs −1 to −4. A decoder that took `0x7F` for anything but 0 would misread those streams.
+
+This crate's `encode` gives 0 as `0xFF` alone, by every rounding: a negative value that rounds to 0 is still the
+one zero. So the round trip byte → value → byte holds for every byte but `0x7F`, which comes back as `0xFF`, the
+same value's other code. `tests/props/codec.rs` walks all 256 bytes against an independent reference, and every
+possible `i16` target's `encode` against a brute-force search of the nearest of the 256 codes, which is how a real
+bug in the first version of `encode` here was found: rounding past a segment's top step (its 16th, which doesn't
+exist) needs comparing the two neighbouring codes' true distance, not a blind carry into the next segment, because
+adjacent segments don't meet (segment 0's 16 steps of 2 reach 30, segment 1's 16 steps of 4 start at 33, both
+the standard's own shape, not a bug).
+
+### One zero, by choice: `MuLawSingleZero`
+
+A stream whose encoder never sends `0x7F` can use it for something else: "no sample", a gap in a jitter buffer.
+That is a convention, so it has its own name: `MuLawSingleZero` decodes and encodes as `MuLaw` does, with `0x7F`
+spare. Sun's widely copied `g711.c` is such an encoder (its `linear2ulaw` gives every negative sample a magnitude
+of at least 1), and so is this crate's own. A G.711 stream from G.191's encoder or an analogue codec is not: read it
+with `MuLaw`.
+
+```rust
+use exact_units::codec::{Codec, Coded, MuLawSingleZero};
+
+assert_eq!(MuLawSingleZero::decode(0x7F), None);
+let e = Coded::<MuLawSingleZero>::try_from_raw(0x7F).unwrap_err();
+assert_eq!(e.to_string(), "127 is a spare code of MuLawSingleZero, no value");
+assert_eq!(Coded::<MuLawSingleZero>::try_from_raw(0xFF).map(|c| c.get().get()), Ok(0));
+```
 
 ## As data, for a client without the trait
 
-`Codec::DEF` is a `CodecDef`: a `MarkerId` and a `CodecShape`, the algorithm named as data, the way `UnitDef` is a
-unit's definition as data. `CodecShape::MuLaw` has no parameters (the standard pins the formula); the crate also
+`Codec::DEF` is a `CodecDef`: a `MarkerId`, a `CodecShape` (the algorithm named as data, the way `UnitDef` is a
+unit's definition as data) and `spare`, the spare codes as spans of codes (`CodeSpan { low, high }`). It is the one
+place a codec writes its spare codes: `decode`, `Coded` and a `Niched` read them from there. `CodecShape::MuLaw` has no parameters (the standard pins the formula); the crate also
 declares the shapes later codecs will need — `ALaw`, `Power { gamma }`, `PiecewisePower`, `Exp { base, offset }`
 and `Table` — with no `Codec` behind any of them yet.
 
@@ -72,11 +99,13 @@ and `Table` — with no `Codec` behind any of them yet.
 use exact_units::codec::{Codec, CodecShape, MuLaw};
 
 assert_eq!(MuLaw::DEF.shape, CodecShape::MuLaw);
+assert!(!MuLaw::DEF.is_spare(0x7F));
 ```
 
 `CodecDef` (and `CodecShape`) also run the algorithm themselves, from the data alone: `decode` and `encode` take
-and give plain `i128`, no `Codec`, no generated type. `tests/props/codec.rs` checks this agrees with `MuLaw`'s own
-typed path for every byte and every `i16`, so a client that only has the schema (WireWeaver's eventual
+and give plain `i128`, no `Codec`, no generated type, and `CodecDef`'s refuse the spare codes as the typed path
+does. `tests/props/codec.rs` checks this agrees with the typed path of `MuLaw` and `MuLawSingleZero` for every
+byte, and every `i16` by every rounding, so a client that only has the schema (WireWeaver's eventual
 `MarkerDef::Codec`) computes the same bits as one compiled against this crate.
 
 ```rust
@@ -86,30 +115,59 @@ use exact_units::codec::Codec;
 
 assert_eq!(MuLaw::DEF.decode(0x80), Some(8031));
 assert_eq!(MuLaw::DEF.encode(8031, Rounding::NearestEven), Some(0x80));
+
+use exact_units::codec::MuLawSingleZero;
+assert_eq!(MuLaw::DEF.decode(0x7F), Some(0));
+assert_eq!(MuLawSingleZero::DEF.decode(0x7F), None);
 ```
 
 With `shrink_wrap` on, `CodecDef` and `CodecShape` are on the wire too, every shape included (`Power`'s `gamma`,
-`Exp`'s `base` and `offset`, `Table`'s slice, each exact data, never a float standing in for a parameter).
+`Exp`'s `base` and `offset`, `Table`'s slice, each exact data, never a float standing in for a parameter), and the
+spare codes with them. A `Coded` read from the wire refuses a spare code, as `try_from_raw` does.
 
-## Composing with `Niched`, not yet for real
+## Composing with `Niched`
 
-`Coded` implements `RawValue`, the trait `Fixed` and `Point` implement too, so `Niched<Coded<C, V, T>, N>` is a
-type that builds, read and written the same way a `Niched<Fixed<..>, N>` is. But every `Codec` in this crate is
-total — `decode` never refuses a code — so `Coded`'s whole raw range is already in bounds, and no code is left
-for a niche to claim. Trying anyway is a compile error, caught the same way a niche inside a `Fixed`'s bounds is:
+`Coded` implements `RawValue`, the trait `Fixed` and `Point` implement too, so `Niched<Coded<C, V, T>, N>` is
+read and written the same way a `Niched<Fixed<..>, N>` is. A niche code must be no value: outside a `Fixed`'s
+bounds, or one of a codec's spare codes. `MuLawSingleZero`'s `0x7F` is the worked case, an `Option` of a μ-law
+sample in one byte:
+
+```rust
+use exact_units::codec::{Coded, MuLawSingleZero};
+use exact_units::niche::{Niched, Null};
+
+type Sample = Coded<MuLawSingleZero>;
+type MaybeSample = Niched<Sample, Null<0x7F>>;
+
+assert_eq!(MaybeSample::try_from_raw(0x7F).map(MaybeSample::value), Ok(None));
+let loudest = MaybeSample::try_from_raw(0x80).map(|s| s.value().map(|c| c.get().get()));
+assert_eq!(loudest, Ok(Some(8031)));
+assert_eq!(MaybeSample::from(None::<Sample>).raw(), 0x7F);
+assert_eq!(size_of::<MaybeSample>(), 1);
+```
+
+Rust's own `Option<Coded<MuLawSingleZero>>` is two bytes: stable Rust can't be told that a byte has a free value in
+the middle of its range. The `Niched` one is the one-byte form.
+
+On `MuLaw`, every byte is a value, `0x7F` too, so the same niche is a compile error, caught the same way a niche
+inside a `Fixed`'s bounds is:
 
 ```rust,compile_fail
 use exact_units::codec::{Coded, MuLaw};
 use exact_units::niche::{Niched, Null};
 
-// every byte of MuLaw's Raw (u8) already decodes: 0xFF has nowhere left to mean "not available"
-let _ = Niched::<Coded<MuLaw>, Null<0xFF>>::try_from_raw(3);
+// 0x7F is G.711's negative zero, a value: nothing is left for a niche
+let _ = Niched::<Coded<MuLaw>, Null<0x7F>>::try_from_raw(3);
 ```
 
-This is exactly the shape IEEE 11073 SFLOAT needs (a NaN, ±∞ or "not at this resolution" code outside the linear
-formula), and exactly why it has no `Codec` here yet: it needs `decode` to leave such codes to a niche instead of
-deciding every one of them, a real design question for whoever implements it next (LVL-4 or IO-3), not settled
-by this foundation.
+### The same mechanism for SFLOAT
+
+IEEE 11073-20601's SFLOAT (IO-3) is a 16-bit decimal float: a 4-bit exponent and a 12-bit mantissa. Five codes
+around `0x0800` are no number: +∞ (`0x07FE`), NaN (`0x07FF`), "not at this resolution" (`0x0800`), a reserved one
+(`0x0801`) and −∞ (`0x0802`). Its `DEF.spare` names them as one span, `0x07FE..=0x0802`, and a `niches!` enum gives
+each its meaning, so `Niched<Coded<Sfloat>, SfloatSpecial>` reads a NaN as `Reading::Niche(Nan)`, never as the 2047
+its bits would spell. The `Codec` trait's own documentation carries this as a working doctest, with a placeholder
+`Linear`; IO-3 gives SFLOAT its exact value type and its own `CodecShape`.
 
 ## `Curve`, declared for LVL-4
 

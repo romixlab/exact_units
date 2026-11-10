@@ -13,8 +13,8 @@ fn ff_and_7f_both_decode_to_zero() {
     assert_eq!(Coded::<MuLaw>::from_raw(0x7F).get().get(), 0);
 }
 
-/// Every byte but `0x7F` (the standard's redundant negative zero, which no encoder produces) round-trips to
-/// itself; `0x7F` round-trips to `0xFF`, the same value's other code.
+/// Every byte but `0x7F` (G.711's negative zero, a value real streams carry, which this crate's encoder never
+/// gives) round-trips to itself; `0x7F` round-trips to `0xFF`, the same value's other code.
 #[test]
 fn every_byte_round_trips_but_the_negative_zero() {
     for raw in 0..=u8::MAX {
@@ -76,5 +76,26 @@ fn dynamic_encode_matches_the_typed_path() {
             Coded::<MuLaw>::try_new(linear, Rounding::NearestEven).map(|c| i128::from(c.raw()));
         let dynamic = MuLaw::DEF.encode(i128::from(value), Rounding::NearestEven);
         assert_eq!(dynamic, typed.ok(), "{value}");
+    }
+}
+
+/// [MuLawSingleZero]'s [RawValue] holes are its spare code alone, which a niche may claim; [MuLaw] has none.
+#[test]
+fn raw_value_holes_are_the_spare_codes() {
+    use super::{CodeSpan, MuLawSingleZero};
+    assert_eq!(<Coded<MuLaw> as RawValue>::HOLES, &[]);
+    assert_eq!(
+        <Coded<MuLawSingleZero> as RawValue>::HOLES,
+        &[CodeSpan::one(0x7F)]
+    );
+}
+
+/// [RawValue::try_from_raw] of a codec with a spare code refuses exactly it.
+#[test]
+fn raw_value_try_from_raw_refuses_the_spare_code() {
+    use super::MuLawSingleZero;
+    for raw in 0..=u8::MAX {
+        let v = <Coded<MuLawSingleZero> as RawValue>::try_from_raw(raw);
+        assert_eq!(v.is_err(), raw == 0x7F, "{raw:#04x}");
     }
 }

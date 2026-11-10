@@ -2,14 +2,18 @@
 //! (telephony), a gamma-encoded pixel, a log-encoded illuminance (BLE). `Fixed`'s scale is always linear and stays
 //! that way; a non-linear encoding is a wrapper instead, with the bytes of the raw code.
 //!
-//! - [Codec]: `type Raw` (the code, a [Storage]), `type Linear` (the value it means, a [Fixed]), [DEF](Codec::DEF)
-//!   (the algorithm as data, a [CodecDef]), [decode](Codec::decode) (total: every code means something) and
-//!   [encode](Codec::encode) (by a named [Rounding], refused only when the value is beyond every code's range).
-//! - [CodecDef] names the [CodecShape]: what a client without the trait runs to decode the same bytes, as
-//!   [UnitDef](crate::UnitDef) is a unit's definition as data. [MuLaw] backs [CodecShape::MuLaw]; the other shapes
-//!   are the plan for later codecs (LVL-4's named conversions, IO-3's SFLOAT) and have none yet, a gap this module's
-//!   docs don't hide.
-//! - [Coded]`<C, V>` holds the bytes of `C::Raw`: [get](Coded::get) decodes, [try_new](Coded::try_new) encodes.
+//! - [Codec]: `type Raw` (the code, a [Storage]), `type Linear` (the value it means), [DEF](Codec::DEF) (the
+//!   algorithm and the spare codes as data, a [CodecDef]), [decode](Codec::decode) (`None` exactly for a spare
+//!   code, a code that means no value) and [encode](Codec::encode) (by a named [Rounding], refused only when the
+//!   value is beyond every code's range, never a spare code).
+//! - [CodecDef] names the [CodecShape] and the [spare](CodecDef::spare) codes: what a client without the trait
+//!   runs to decode the same bytes, as [UnitDef](crate::UnitDef) is a unit's definition as data. [MuLaw] and
+//!   [MuLawSingleZero] back [CodecShape::MuLaw]; the other shapes are the plan for later codecs (LVL-4's named
+//!   conversions, IO-3's SFLOAT) and have none yet, a gap this module's docs don't hide.
+//! - [Coded]`<C, V>` holds the bytes of `C::Raw`, never a spare code: [get](Coded::get) decodes,
+//!   [try_new](Coded::try_new) encodes, [try_from_raw](Coded::try_from_raw) refuses a spare code ([SpareCode]).
+//!   Its spare codes are where a [Niched](niche::Niched) puts its own: `Niched<Coded<MuLawSingleZero>,
+//!   Null<0x7F>>` is an `Option` of a μ-law sample in one byte.
 //!
 //! ```
 //! # #[cfg(feature = "dimensionless")] {
@@ -20,7 +24,7 @@
 //! let loudest = Coded::<MuLaw>::from_raw(0x80);
 //! assert_eq!(loudest.get().get(), 8031);
 //!
-//! // and encodes back to the same byte, as every code does but the redundant negative zero, 0x7F
+//! // and encodes back to the same byte, as every code does but G.711's negative zero, 0x7F (back as 0xFF)
 //! assert_eq!(
 //!     Coded::<MuLaw>::try_new(loudest.get(), Rounding::NearestEven),
 //!     Ok(loudest)
@@ -34,8 +38,11 @@ use crate::MarkerIdOwned;
 use crate::fixed::Fixed;
 #[cfg(feature = "dimensionless")]
 use crate::fixed::prefix::Pow2;
-use crate::fixed::{OutOfBounds, Storage};
+use crate::fixed::{OutOfBounds, Repr, Storage};
 use crate::niche::{self, RawValue};
+#[cfg(feature = "dimensionless")]
+use crate::system::def_list;
+use crate::system::{for_each, slice_of};
 use crate::{Magnitude, MarkerId, Rounding};
 use core::fmt;
 use core::hash::{Hash, Hasher};
@@ -43,10 +50,74 @@ use core::marker::PhantomData;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
 
-/// A non-linear encoding: `Raw` (the code on the wire) and `Linear` (the [Fixed] it means), total one way
-/// ([decode](Self::decode) never refuses: every code of `Raw` means something) and refused the other
-/// ([encode](Self::encode) gives `None` only for a `Linear` beyond every code's range; within it, the nearest
-/// code by the given [Rounding]). [DEF](Self::DEF) is the same algorithm as data, for a client without this trait.
+/// A non-linear encoding: `Raw` (the code on the wire) and `Linear` (the value it means). [decode](Self::decode)
+/// refuses exactly the [spare](CodecDef::spare) codes [DEF](Self::DEF) names (none for a codec whose every code is
+/// a value, [MuLaw]); [encode](Self::encode) gives `None` only for a `Linear` beyond every code's range, and
+/// within it the nearest code by the given [Rounding], never a spare one. `DEF` is the same algorithm as data, for
+/// a client without this trait, and the one place the spare codes are written: the typed path and the data path
+/// read the same list.
+///
+/// A spare code is what a [Niched](niche::Niched) claims for a meaning: `Niched<Coded<C>, N>` takes `N`'s codes
+/// from `C`'s spare ones. IEEE 11073-20601's SFLOAT (IO-3) is the case this is shaped for: its five codes around
+/// `0x0800` (+∞, NaN, NRes, a reserved one, −∞) are no number, so its `DEF` names them spare and a [niches!](crate::niches!)
+/// enum gives each its meaning. `Linear` here is a placeholder pair of mantissa and decimal exponent; IO-3 gives
+/// SFLOAT its own exact type and [CodecShape]:
+///
+/// ```
+/// use exact_units::codec::{Codec, CodecDef, CodecShape, CodeSpan, Coded};
+/// use exact_units::niche::{Niched, Reading};
+/// use exact_units::{MarkerId, Rounding, niches};
+///
+/// #[derive(Copy, Clone)]
+/// struct Sfloat;
+///
+/// impl Codec for Sfloat {
+///     type Raw = u16;
+///     type Linear = (i16, i8); // mantissa · 10^exponent
+///
+///     const DEF: CodecDef<'static> = CodecDef {
+///         id: MarkerId { crate_name: "doc", name: "Sfloat" },
+///         shape: CodecShape::Table(exact_units::system::def_list(&[])), // IO-3 names SFLOAT's own shape
+///         spare: exact_units::system::def_list(&[CodeSpan { low: 0x07FE, high: 0x0802 }]),
+///     };
+///
+///     fn formula(raw: u16) -> (i16, i8) {
+///         let exponent = (raw.cast_signed() >> 12) as i8; // the top 4 bits, sign-extended
+///         let mantissa = ((raw << 4).cast_signed()) >> 4; // the low 12 bits, sign-extended
+///         (mantissa, exponent)
+///     }
+///
+///     fn encode(_: (i16, i8), _: Rounding) -> Option<u16> {
+///         None // IO-3
+///     }
+/// }
+///
+/// niches! {
+///     /// SFLOAT's special codes.
+///     pub enum SfloatSpecial: u16 {
+///         /// +∞.
+///         PlusInfinity = 0x07FE,
+///         /// Not a number.
+///         Nan = 0x07FF,
+///         /// Not at this resolution.
+///         NRes = 0x0800,
+///         /// Reserved for a future use.
+///         Reserved = 0x0801,
+///         /// −∞.
+///         MinusInfinity = 0x0802,
+///     }
+/// }
+///
+/// type Reading11073 = Niched<Coded<Sfloat>, SfloatSpecial>;
+///
+/// // 0x07FF would be 2047 by the formula, but it is NaN: decode refuses it, the niche names it
+/// assert_eq!(Sfloat::decode(0x07FF), None);
+/// assert_eq!(Reading11073::try_from_raw(0x07FF).map(Reading11073::get), Ok(Reading::Niche(SfloatSpecial::Nan)));
+/// // 0xF07D is 125 · 10⁻¹
+/// let r = Reading11073::try_from_raw(0xF07D).map(|r| r.get().value().map(Coded::get));
+/// assert_eq!(r, Ok(Some((125, -1))));
+/// assert_eq!(size_of::<Reading11073>(), 2);
+/// ```
 pub trait Codec: Copy + 'static {
     /// The code: what is in memory and on the wire.
     type Raw: Storage;
@@ -54,13 +125,25 @@ pub trait Codec: Copy + 'static {
     /// The value a code means.
     type Linear;
 
-    /// Who this codec is and how it computes, for introspection and a dynamic client.
+    /// Who this codec is, how it computes and which codes are spare, for introspection and a dynamic client.
     const DEF: CodecDef<'static>;
 
-    /// The value `raw` means. Total: every code of `Raw` decodes.
-    fn decode(raw: Self::Raw) -> Self::Linear;
+    /// What the codec's formula gives `raw`, spare or not: for a spare code a number that means nothing (SFLOAT's
+    /// NaN code reads as 2047), so call [decode](Self::decode) unless the code is known not to be spare.
+    /// [Coded::get] calls this, as a `Coded` never holds a spare code.
+    fn formula(raw: Self::Raw) -> Self::Linear;
 
-    /// `value` by the nearest code, ties broken by `rounding`.
+    /// The value `raw` means, `None` for a [spare](CodecDef::spare) code.
+    #[inline]
+    fn decode(raw: Self::Raw) -> Option<Self::Linear> {
+        if in_spans(Coded::<Self>::SPARE, raw) {
+            None
+        } else {
+            Some(Self::formula(raw))
+        }
+    }
+
+    /// `value` by the nearest code, ties broken by `rounding`: never a [spare](CodecDef::spare) code.
     ///
     /// # Errors
     ///
@@ -89,24 +172,109 @@ pub struct CodecDef<'i> {
     pub id: MarkerId<'i>,
     /// What it computes.
     pub shape: CodecShape<'i>,
+    /// The codes that mean no value: free for a [Niched](niche::Niched) to claim, refused by
+    /// [Coded::try_from_raw] and [Codec::decode]. Empty for a codec whose every code is a value ([MuLaw]).
+    pub spare: &'i [CodeSpan],
 }
 
 impl CodecDef<'_> {
-    /// `raw` decoded by this shape alone, as [CodecShape::decode] does: no type, no `Codec` impl, the same
-    /// algorithm `Codec::decode` runs. `None` for a shape with no algorithm here yet.
+    /// `raw` decoded by this definition alone, as [Codec::decode] does: `None` for a [spare](Self::spare) code,
+    /// else what [CodecShape::decode] gives, the same algorithm the typed path runs. `None` too for a shape with no
+    /// algorithm here yet.
     #[must_use]
     pub fn decode(&self, raw: i128) -> Option<i128> {
+        if self.is_spare(raw) {
+            return None;
+        }
         self.shape.decode(raw)
     }
 
-    /// `value` encoded by this shape alone, as [CodecShape::encode] does.
+    /// `value` encoded by this definition alone, as [Codec::encode] does: [CodecShape::encode], never a spare code.
     ///
     /// # Errors
     ///
     /// `None` for a shape with no algorithm here yet, or where `value` is beyond every code's range.
     #[must_use]
     pub fn encode(&self, value: i128, rounding: Rounding) -> Option<i128> {
-        self.shape.encode(value, rounding)
+        self.shape
+            .encode(value, rounding)
+            .filter(|&raw| !self.is_spare(raw))
+    }
+
+    /// Whether `raw` is one of the [spare](Self::spare) codes. `true` too where a span read from the wire doesn't
+    /// decode: a code this definition can't vouch for is no value.
+    #[must_use]
+    pub fn is_spare(&self, raw: i128) -> bool {
+        let mut hit = false;
+        let whole = for_each(&self.spare, |s: CodeSpan| hit |= s.contains(raw));
+        hit || !whole
+    }
+}
+
+/// An inclusive range of codes, `low..=high`, as integers: a single code is `low == high`. [CodecDef::spare] lists
+/// them.
+#[cfg_attr(
+    feature = "shrink_wrap",
+    derive_shrink_wrap(borrowed, owned(feature = "std"), final_structure)
+)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct CodeSpan {
+    /// The lowest code.
+    pub low: i128,
+    /// The highest code.
+    pub high: i128,
+}
+
+impl CodeSpan {
+    /// The one code `code`.
+    #[must_use]
+    pub const fn one(code: i128) -> Self {
+        CodeSpan {
+            low: code,
+            high: code,
+        }
+    }
+
+    /// Whether `raw` is in `low..=high`.
+    #[must_use]
+    pub const fn contains(self, raw: i128) -> bool {
+        self.low <= raw && raw <= self.high
+    }
+}
+
+/// The spare codes of a `Codec`'s [DEF](Codec::DEF), checked: each span ascending and within `t_min..=t_max`, a
+/// compile error where it isn't (this is only evaluated in a `const`).
+#[expect(
+    clippy::panic,
+    reason = "const fn evaluated only in a const item: the panic is a compile error naming the broken definition"
+)]
+const fn checked_spare(def: &CodecDef<'static>, t_min: i128, t_max: i128) -> &'static [CodeSpan] {
+    let Some(spare) = slice_of(&def.spare) else {
+        panic!("a Codec's DEF.spare is const data, a slice");
+    };
+    let mut rest = spare;
+    while let [s, tail @ ..] = rest {
+        assert!(
+            s.low <= s.high,
+            "a spare span's low code is above its high code"
+        );
+        assert!(
+            s.low >= t_min && s.high <= t_max,
+            "a spare code doesn't fit the codec's Raw"
+        );
+        rest = tail;
+    }
+    spare
+}
+
+/// Whether `raw` is in one of `spare`'s spans.
+#[inline(always)]
+fn in_spans<T: Storage>(spare: &[CodeSpan], raw: T) -> bool {
+    match raw.to_repr() {
+        Repr::Int(x) => spare.iter().any(|s| s.contains(x)),
+        Repr::Float(_) => false,
     }
 }
 
@@ -191,15 +359,17 @@ impl CodecShape<'_> {
 }
 
 /// A value given by a [Codec]'s code instead of a linear step: the bytes of `C::Raw`, nothing more (`size_of` is
-/// `C::Raw`'s). [get](Self::get) decodes, which never refuses; [try_new](Self::try_new) encodes, which refuses only
-/// a `Linear` beyond every code's range.
+/// `C::Raw`'s), and never a [spare](CodecDef::spare) code. [get](Self::get) decodes, which never refuses;
+/// [try_new](Self::try_new) encodes, which refuses only a `Linear` beyond every code's range;
+/// [try_from_raw](Self::try_from_raw) refuses a spare code, and [from_raw](Self::from_raw), which can't refuse,
+/// compiles only for a codec without one.
 ///
 /// `V` is `C::Linear` and `T` is `C::Raw`, both spelled out (as [Niched](crate::niche::Niched)'s `V` and `T` are) so
 /// a `Coded` reads the value it holds and the bytes it is without following the trait: a G.711 μ-law byte is
 /// `Coded<MuLaw, Fixed<Ratio, Pow2<-13>, i16>>`.
 #[cfg_attr(
     feature = "shrink_wrap",
-    derive_shrink_wrap(borrowed, owned(feature = "std"), transparent)
+    derive_shrink_wrap(borrowed, owned(feature = "std"), transparent, validate = Self::validate)
 )]
 #[repr(transparent)]
 pub struct Coded<
@@ -207,7 +377,7 @@ pub struct Coded<
     V = <C as Codec>::Linear,
     T: Storage = <C as Codec>::Raw,
 > {
-    /// The code, as stored and sent.
+    /// The code, as stored and sent: never a spare one.
     raw: T,
     /// The codec, in the type only.
     _codec: PhantomData<C>,
@@ -216,9 +386,52 @@ pub struct Coded<
 }
 
 impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> Coded<C, V, T> {
-    /// `raw` as read from a register or a bus. Never refuses: every code of `C::Raw` decodes.
+    /// `C::DEF`'s spare codes, checked against the storage: a compile error where a span is upside down or doesn't
+    /// fit `T`.
+    pub const SPARE: &'static [CodeSpan] = checked_spare(&C::DEF, T::MIN_INT, T::MAX_INT);
+
+    /// `raw` as read from a register or a bus, for a codec whose every code is a value ([MuLaw]): a compile error
+    /// for one with [spare](CodecDef::spare) codes, where [try_from_raw](Self::try_from_raw) is the way in.
+    ///
+    /// ```compile_fail
+    /// # #[cfg(feature = "dimensionless")] {
+    /// use exact_units::codec::{Coded, MuLawSingleZero};
+    ///
+    /// // 0x7F is spare here: from_raw can't refuse it, so it doesn't build
+    /// let _ = Coded::<MuLawSingleZero>::from_raw(0x80);
+    /// # }
+    /// ```
     #[inline(always)]
     pub const fn from_raw(raw: T) -> Self {
+        const {
+            assert!(
+                Self::SPARE.is_empty(),
+                "this codec has spare codes: Coded::try_from_raw refuses them, from_raw can't"
+            );
+        }
+        Self::from_code(raw)
+    }
+
+    /// `raw` as read from a register or a bus, if it isn't a [spare](CodecDef::spare) code.
+    ///
+    /// # Errors
+    ///
+    /// [SpareCode], holding `raw`, for a spare code.
+    #[inline(always)]
+    pub fn try_from_raw(raw: T) -> Result<Self, SpareCode<C, V, T>> {
+        if in_spans(Self::SPARE, raw) {
+            Err(SpareCode {
+                raw,
+                _codec: PhantomData,
+            })
+        } else {
+            Ok(Self::from_code(raw))
+        }
+    }
+
+    /// `raw`, known not to be a spare code.
+    #[inline(always)]
+    const fn from_code(raw: T) -> Self {
         Coded {
             raw,
             _codec: PhantomData,
@@ -234,7 +447,7 @@ impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> Coded<C, V, T> {
     #[inline(always)]
     pub fn try_new(value: V, rounding: Rounding) -> Result<Self, OutOfBounds> {
         C::encode(value, rounding)
-            .map(Self::from_raw)
+            .map(Self::from_code)
             .ok_or(OutOfBounds)
     }
 
@@ -247,7 +460,104 @@ impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> Coded<C, V, T> {
     /// The value the code decodes to.
     #[inline(always)]
     pub fn get(self) -> V {
-        C::decode(self.raw)
+        // not a spare code: every constructor refused one
+        C::formula(self.raw)
+    }
+
+    /// Run on every value read from the wire: a spare code is [shrink_wrap::Error::SubtypeOutOfRange].
+    #[cfg(feature = "shrink_wrap")]
+    #[inline(always)]
+    fn validate(&self) -> Result<(), shrink_wrap::Error> {
+        if in_spans(Self::SPARE, self.raw) {
+            Err(shrink_wrap::Error::SubtypeOutOfRange)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// A code [Coded::try_from_raw] refused: one of the codec's [spare](CodecDef::spare) codes, which mean no value. It
+/// holds the code, as [OutOfRange](crate::OutOfRange) holds a value; the codec is its type's, so it is as large as
+/// `T`. `Display` names both, and `?` turns it into [OutOfBounds].
+///
+/// ```
+/// # #[cfg(feature = "dimensionless")] {
+/// use exact_units::codec::{Coded, MuLawSingleZero};
+///
+/// let e = Coded::<MuLawSingleZero>::try_from_raw(0x7F).unwrap_err();
+/// assert_eq!(e.raw(), 0x7F);
+/// assert_eq!(e.to_string(), "127 is a spare code of MuLawSingleZero, no value");
+/// # }
+/// ```
+pub struct SpareCode<
+    C: Codec<Linear = V, Raw = T>,
+    V = <C as Codec>::Linear,
+    T: Storage = <C as Codec>::Raw,
+> {
+    /// The code refused.
+    raw: T,
+    /// The codec and its value, in the type only.
+    _codec: PhantomData<(C, V)>,
+}
+
+impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> SpareCode<C, V, T> {
+    /// The code refused.
+    #[inline(always)]
+    pub fn raw(&self) -> T {
+        self.raw
+    }
+}
+
+impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> Clone for SpareCode<C, V, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> Copy for SpareCode<C, V, T> {}
+
+/// The same code refused: the type says the rest.
+impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> PartialEq for SpareCode<C, V, T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.raw == other.raw
+    }
+}
+
+impl<C: Codec<Linear = V, Raw = T>, V, T: Storage + Eq> Eq for SpareCode<C, V, T> {}
+
+impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> fmt::Debug for SpareCode<C, V, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
+impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> fmt::Display for SpareCode<C, V, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.raw.to_repr() {
+            Repr::Int(x) => write!(f, "{x}")?,
+            Repr::Float(x) => write!(f, "{x}")?,
+        }
+        write!(f, " is a spare code of {}, no value", C::DEF.id.name)
+    }
+}
+
+impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> core::error::Error for SpareCode<C, V, T> {}
+
+#[cfg(feature = "defmt")]
+impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> defmt::Format for SpareCode<C, V, T> {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        match self.raw.to_repr() {
+            Repr::Int(x) => defmt::write!(f, "{=i128}", x),
+            Repr::Float(x) => defmt::write!(f, "{=f64}", x),
+        }
+        defmt::write!(f, " is a spare code of {=str}, no value", C::DEF.id.name);
+    }
+}
+
+impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> From<SpareCode<C, V, T>> for OutOfBounds {
+    #[inline(always)]
+    fn from(_: SpareCode<C, V, T>) -> Self {
+        OutOfBounds
     }
 }
 
@@ -284,30 +594,47 @@ impl<C: Codec<Linear = V, Raw = T>, V: fmt::Debug, T: Storage> fmt::Debug for Co
 
 impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> niche::sealed::Sealed for Coded<C, V, T> {}
 
-/// `Coded` composes with [Niched](niche::Niched), as [Fixed] and [Point](crate::Point) do: `Niched<Coded<C, V, T>,
-/// N>` is a type for any `N`, built and read the same way. But every code of `C::Raw` decodes ([Codec::decode] is
-/// total), so `Coded`'s whole raw range is in bounds and no code is free for a niche to claim: with every `Codec`
-/// in this crate total, `N::CODES` has nowhere to go, and a real niche set is a compile error, caught where a
-/// `Niched` method first checks the codes against the bounds (`niche`'s "a niche code is inside the bounds").
+/// `Coded` composes with [Niched](niche::Niched), as [Fixed] and [Point](crate::Point) do: the codec's
+/// [spare](CodecDef::spare) codes are the holes in `Coded`'s range ([RawValue::HOLES]) where a niche code may sit,
+/// and every other code of `C::Raw` is a value. So `Niched<Coded<C, V, T>, N>` builds where each of `N`'s codes is
+/// a spare code of `C`, and is a compile error where one is a value. [MuLawSingleZero] leaves `0x7F` spare, so
+/// `Niched<Coded<MuLawSingleZero>, Null<0x7F>>` is an `Option` of a μ-law sample in one byte:
+///
+/// ```
+/// # #[cfg(feature = "dimensionless")] {
+/// use exact_units::codec::{Coded, MuLawSingleZero};
+/// use exact_units::niche::{Niched, Null};
+///
+/// type Sample = Coded<MuLawSingleZero>;
+/// type MaybeSample = Niched<Sample, Null<0x7F>>;
+///
+/// let silence = MaybeSample::try_from_raw(0x7F).map(MaybeSample::value);
+/// assert_eq!(silence, Ok(None));
+/// let loudest = MaybeSample::try_from_raw(0x80).map(|s| s.value().map(|c| c.get().get()));
+/// assert_eq!(loudest, Ok(Some(8031)));
+/// assert_eq!(MaybeSample::from(None::<Sample>).raw(), 0x7F);
+/// assert_eq!(size_of::<MaybeSample>(), 1);
+/// # }
+/// ```
+///
+/// [MuLaw] is G.711 as written, where `0x7F` is a value (the code of a negative input between 0 and −1): no code is
+/// spare, and a niche on it doesn't build.
 ///
 /// ```compile_fail
 /// # #[cfg(feature = "dimensionless")] {
 /// use exact_units::codec::{Coded, MuLaw};
 /// use exact_units::niche::{Niched, Null};
 ///
-/// // every byte of MuLaw::Raw (u8) already decodes: 0xFF has nowhere left to mean "not available"
-/// let _ = Niched::<Coded<MuLaw>, Null<0xFF>>::try_from_raw(3);
+/// // 0x7F is G.711's negative zero, a value: nothing is left for a niche
+/// let _ = Niched::<Coded<MuLaw>, Null<0x7F>>::try_from_raw(3);
 /// # }
 /// ```
-///
-/// The SFLOAT shape this crate names (`CodecShape::Table`) is exactly the future case `Niched<Coded<..>, N>` is
-/// for, a NaN or ±∞ code outside the codec's formula; it needs `Codec::decode` to leave such codes to a niche
-/// instead of deciding every one of them, which is a real, open design question for whoever implements it (LVL-4
-/// or IO-3), not decided here.
 impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> RawValue for Coded<C, V, T> {
     type Raw = T;
 
     const RANGE: Option<(i128, i128)> = niche::int_range::<T, crate::fixed::Unbounded>();
+
+    const HOLES: &'static [CodeSpan] = Self::SPARE;
 
     #[inline(always)]
     fn raw(self) -> T {
@@ -316,19 +643,27 @@ impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> RawValue for Coded<C, V, T> {
 
     #[inline(always)]
     fn try_from_raw(raw: T) -> Result<Self, OutOfBounds> {
-        Ok(Self::from_raw(raw))
+        Ok(Self::try_from_raw(raw)?)
     }
 
     #[inline(always)]
     fn from_raw_unchecked(raw: T, _: niche::sealed::Token) -> Self {
-        Self::from_raw(raw)
+        Self::from_code(raw)
     }
 }
 
-/// ITU-T G.711 μ-law: 8 segments of 16 steps each, the step doubling every segment (2, 4, 8, .., 256), encoded in
-/// one byte. [decode](Codec::decode) is onto but not one-to-one (`0xFF` and `0x7F` both mean 0, the standard's
-/// "double zero"), and two adjacent segments leave a gap a few steps wide at the boundary (segment 0's 16 steps of
-/// 2 reach 30, segment 1's 16 steps of 4 start at 33): both are the standard's own shape, not a bug here.
+/// ITU-T G.711 μ-law as the standard writes it: 8 segments of 16 steps each, the step doubling every segment (2, 4,
+/// 8, .., 256), encoded in one byte. [decode](Codec::decode) is total and onto but not one-to-one: `0xFF` and `0x7F`
+/// both mean 0, the standard's "double zero" (G.711, Tables 2a and 2b: `0x7F` is the character of every negative
+/// input between decision values 0 and −1). And two adjacent segments leave a gap a few steps wide at the boundary
+/// (segment 0's 16 steps of 2 reach 30, segment 1's 16 steps of 4 start at 33): both are the standard's own shape,
+/// not a bug here.
+///
+/// `0x7F` is a value here, not a spare code: real streams carry it. ITU-T G.191's reference encoder
+/// (`ulaw_compress`, one's complement on negative samples) gives it for the 16-bit inputs −1..=−4, and an
+/// analogue codec for any slightly negative silence. A stream whose encoder never sends it, and that wants `0x7F`
+/// for a niche, says so with [MuLawSingleZero]. [encode](Codec::encode) here never gives `0x7F` either: zero is
+/// always `0xFF`.
 ///
 /// [Linear](Codec::Linear) is `Fixed<Ratio, Pow2<-13>, i16>`, the 14-bit linear sample (13 magnitude bits and a
 /// sign, the standard's native domain): the widely used 16-bit variant (BIAS 0x84, as telephony software converts
@@ -336,6 +671,19 @@ impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> RawValue for Coded<C, V, T> {
 #[cfg(feature = "dimensionless")]
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct MuLaw;
+
+/// G.711 μ-law with one zero, `0xFF`: the negative zero `0x7F` is [spare](CodecDef::spare), free for a niche
+/// (`Niched<Coded<MuLawSingleZero>, Null<0x7F>>`, an `Option` in one byte). Every other code decodes and encodes as
+/// [MuLaw]'s, by the same [CodecShape::MuLaw].
+///
+/// A convention, so an opt-in (AGENTS.md's rule 5): right only for a stream whose encoder never sends `0x7F`, such
+/// as Sun's widely copied `g711.c` (`linear2ulaw` folds every negative sample to a magnitude of at least 1) and this
+/// crate's own [encode](Codec::encode). A G.711 stream from G.191's reference encoder or from an analogue codec does
+/// carry `0x7F` as a value: read with this codec, such a sample is refused ([SpareCode]) or, in a `Niched`, taken
+/// for the niche. Read those with [MuLaw].
+#[cfg(feature = "dimensionless")]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct MuLawSingleZero;
 
 /// The bias a μ-law byte's magnitude is computed against, in the 14-bit domain: `(2·15 + 33) << 7 - 33 = 8031` is
 /// the largest magnitude a byte decodes to ([CLIP]). Plain integer arithmetic, so unlike [MuLaw] itself this and
@@ -382,7 +730,8 @@ const fn mu_law_decode(byte: u8) -> i16 {
 }
 
 /// `value` (a signed 14-bit magnitude) encoded as a μ-law byte, rounded to the nearest code by `r`: the inverse of
-/// [mu_law_decode], clipped first to [CLIP]. Always some byte: encoding never refuses in this codec.
+/// [mu_law_decode], clipped first to [CLIP]. Always some byte, never the negative zero `0x7F` (a value that rounds
+/// to 0 is `0xFF`): encoding never refuses in this codec.
 #[expect(
     clippy::as_conversions,
     reason = "const fn: From isn't const on stable; each narrowing cast is proven in its own `expect` below"
@@ -460,7 +809,9 @@ const fn mu_law_encode(value: i16, r: Rounding) -> u8 {
         reason = "m is 0..=15, fitting 4 bits and never negative"
     )]
     let mantissa_bits = m as u8;
-    !(sign_bit | exponent_bits | mantissa_bits)
+    let byte = !(sign_bit | exponent_bits | mantissa_bits);
+    // a negative value that rounds to 0 is still 0: the one zero, 0xFF, never the negative zero 0x7F
+    if byte == 0x7F { 0xFF } else { byte }
 }
 
 #[cfg(feature = "dimensionless")]
@@ -474,10 +825,36 @@ impl Codec for MuLaw {
             name: "MuLaw",
         },
         shape: CodecShape::MuLaw,
+        spare: def_list(&[]),
     };
 
     #[inline]
-    fn decode(raw: u8) -> Self::Linear {
+    fn formula(raw: u8) -> Self::Linear {
+        Fixed::new(mu_law_decode(raw))
+    }
+
+    #[inline]
+    fn encode(value: Self::Linear, rounding: Rounding) -> Option<u8> {
+        Some(mu_law_encode(value.get(), rounding))
+    }
+}
+
+#[cfg(feature = "dimensionless")]
+impl Codec for MuLawSingleZero {
+    type Raw = u8;
+    type Linear = Fixed<crate::units::Ratio, Pow2<-13>, i16>;
+
+    const DEF: CodecDef<'static> = CodecDef {
+        id: MarkerId {
+            crate_name: "exact_units",
+            name: "MuLawSingleZero",
+        },
+        shape: CodecShape::MuLaw,
+        spare: def_list(&[CodeSpan::one(0x7F)]),
+    };
+
+    #[inline]
+    fn formula(raw: u8) -> Self::Linear {
         Fixed::new(mu_law_decode(raw))
     }
 

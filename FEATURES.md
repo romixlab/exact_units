@@ -527,8 +527,8 @@ non-linear named scales.
   LVL-3's remaining pieces land.
 - ✅ **LVL-6 Codecs: non-linear encodings beside `Fixed`** · `foundations` (P2401#3nov-0047d) — `codec::Coded<C, V,
   T>` with the bytes of `C::Raw`, like `Niched`: `V` is `C::Linear`, `T` is `C::Raw`, both spelled out so a `Coded`
-  reads without following the trait. `Codec` (`type Raw: Storage`, `type Linear`, `const DEF: CodecDef`, total
-  `decode`, `encode(Linear, Rounding) -> Option<Raw>`); `CodecDef` names a `CodecShape` as data (`MuLaw`, `ALaw`,
+  reads without following the trait. `Codec` (`type Raw: Storage`, `type Linear`, `const DEF: CodecDef`,
+  `formula`, `decode` refusing spare codes, `encode(Linear, Rounding) -> Option<Raw>`); `CodecDef` names a `CodecShape` as data (`MuLaw`, `ALaw`,
   `Power { gamma }`, `PiecewisePower`, `Exp { base, offset }`, `Table`), as `UnitDef`/`OriginDef`/`QuantityDef` are
   data with a `MarkerId`. `MuLaw` is the worked codec: ITU-T G.711 μ-law's 8 segments of 16 steps, exact integer
   formulas (no float), `Linear` is `Fixed<Ratio, Pow2<-13>, i16>` (the standard's native 14-bit domain, not the
@@ -539,17 +539,24 @@ non-linear named scales.
   `CodecDef::decode`/`encode` run the same algorithm from the shape alone (no `Codec`, no type): a dynamic client's
   path, checked against the typed one for every byte and every `i16`. `Coded` implements `RawValue` (`niche`'s
   sealed token widened to `pub(crate)` so a sibling module can, still sealed to the rest of the world), so
-  `Niched<Coded<C, V, T>, N>` is a type that builds; but every `Codec` here is total (`decode` never refuses), so
-  `Coded`'s whole raw range is in bounds and no code is free for a real niche to claim — a real, open question
-  for whoever gives SFLOAT's NaN/±∞ codes to IO-3, not decided here, and a `compile_fail` doctest on `Coded`'s
-  `RawValue` impl shows exactly where it would have to give. `CodecDef`/`CodecShape` are on the wire (feature
+  `Niched<Coded<C, V, T>, N>` reads and writes as a `Niched<Fixed<..>, N>` does. Spare codes (P2401#9nov-1931):
+  `CodecDef::spare: &[CodeSpan]` is the one place a codec names the codes that mean no value; `Codec::decode`
+  (provided, over the required `formula`) is `None` exactly for them, `encode` never gives one, `Coded::try_from_raw`
+  and the wire read refuse one (`SpareCode`, holding the code as `OutOfRange` holds a value), `Coded::from_raw` is a
+  compile error for a codec with any, and `RawValue::HOLES` lets a niche code sit on a spare code. `MuLaw` keeps
+  `0x7F` as a value (G.711 Table 2b; G.191's `ulaw_compress` sends it for −1..=−4), so a niche on it is a
+  `compile_fail` doctest; `MuLawSingleZero` is the opt-in with `0x7F` spare, and `Niched<Coded<MuLawSingleZero>,
+  Null<0x7F>>` is a one-byte `Option`. μ-law `encode` gives 0 as `0xFF` by every rounding. SFLOAT's NaN/NRes/±∞
+  codes are one spare span plus a `niches!` enum, a doctest on `Codec` (IO-3 gives it its value type and shape). `CodecDef`/`CodecShape` are on the wire (feature
   `shrink_wrap`, `ww_repr = unib32`), tested round-tripping every shape, parameters included; WireWeaver's own
   `MarkerDef::Codec`, its walker, `ww_self`/`ww_si` and the conformance corpus stay a separate landing
   (P2401#9nov-1924, wire_weaver). `Curve` and `CurveKind` (exact, tabled or float) are declared, no impls: LVL-4
   gives the first curves and the conversion method. `ALaw`, `Power`, `PiecewisePower`, `Exp` and `Table` still
   have no `Codec` behind them (LVL-4, IO-3). Tests: `tests/props/codec.rs` (every byte against an independent
   i128 reference, every `i16` target's `encode` checked against a brute-force nearest-of-256 search and against
-  the dynamic path, the wire round trip, a Kani proof), `src/codec/tests.rs` (`RawValue`'s own contract). Book:
+  the dynamic path, every `i16` by every rounding never `0x7F`, `MuLawSingleZero` refusing exactly `0x7F`, the
+  one-byte `Option` for every byte, the wire round trip with spare codes and the wire read refusing one, Kani
+  proofs), `src/codec/tests.rs` (`RawValue`'s own contract, `HOLES`). Book:
   [Codecs](docs/fixed_point/codecs.md).
 - ✅ **LVL-7 Level ranges** — `gain.is_in(q!(-3 dB ..= 3 dB, Inside))`, `q!(20 dB +- 1 dB, Inside)`, `q!(0 dB ..= 20 dB)` against a linear gain whose kind has a level form (NUM-22 parses them into `LiteralRange` of two `LevelLiteral` types, refusing a part of a level), each end folded as NUM-18 folds one level, then by NUM-22's rules: a gain that is no stored value (every level but whole decades) needs `, Inside` or `, Outside`, no empty or always-true range, NaN in no range. Integer and float storages. Tests: `tests/props/q_range_level.rs` (against `reference::range_order` over `q_level::order_db` / `order_np` in big integers, every `u16` walked; floats through the single compares), `tests/compile_fail/q_range_at.rs`, `tests/q_asm.rs`. Docs: [A range of levels](docs/levels/decibels.md#a-range-of-levels). P2401#8nov-0605c.
 
