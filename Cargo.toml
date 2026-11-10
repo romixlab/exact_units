@@ -324,6 +324,11 @@ required-features = [
     "libm",
 ]
 
+[[example]]
+# H.264/H.265 time bases, RTP's wrapping 90 kHz clock, a 33-bit PTS, 48 kHz audio cadence, drop-frame time codes
+name = "16_video_time"
+required-features = ["time"]
+
 [profile.dev]
 split-debuginfo = "unpacked"
 
