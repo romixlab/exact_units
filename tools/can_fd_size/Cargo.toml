@@ -1,0 +1,34 @@
+# A CAN FD length and its DLC through exact_units' OneOf and CanFdDlc, beside the same written by hand: two firmware
+# images for a Cortex-M4F whose flash tests/can_fd_size.rs compares. Not part of the crate: a workspace of its own,
+# never published.
+[package]
+name = "can_fd_size"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "typed"
+test = false
+bench = false
+
+[[bin]]
+name = "hand"
+test = false
+bench = false
+
+[dependencies]
+exact_units = { path = "../..", default-features = false, features = ["information"] }
+
+# as a firmware's release build: small, whole-program
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+debug = false
+panic = "abort"
+
+[profile.dev]
+panic = "abort"

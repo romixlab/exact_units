@@ -41,6 +41,8 @@ use crate::fixed::Fixed;
 #[cfg(feature = "dimensionless")]
 use crate::fixed::prefix::Pow2;
 #[cfg(feature = "information")]
+use crate::fixed::set_position;
+#[cfg(feature = "information")]
 use crate::fixed::{OneOf, prefix::One};
 use crate::fixed::{OutOfBounds, Repr, Storage, ValueSet, nearest_entry};
 use crate::niche::{self, RawValue};
@@ -275,12 +277,19 @@ const fn checked_spare(def: &CodecDef<'static>, t_min: i128, t_max: i128) -> &'s
     spare
 }
 
-/// Whether `raw` is in one of `spare`'s spans.
+/// Whether `raw` is in one of `spare`'s spans. The first two spans are read one by one, not in a loop: a codec's
+/// spans are a constant, so each folds into a compare against a constant in `T` itself (`raw >= 16` for
+/// [CanFdDlc]), where a loop would walk them in `i128` from flash.
 #[inline(always)]
 fn in_spans<T: Storage>(spare: &[CodeSpan], raw: T) -> bool {
-    match raw.to_repr() {
-        Repr::Int(x) => spare.iter().any(|s| s.contains(x)),
-        Repr::Float(_) => false,
+    let Repr::Int(x) = raw.to_repr() else {
+        return false;
+    };
+    match spare {
+        [] => false,
+        [a] => a.contains(x),
+        [a, b] => a.contains(x) || b.contains(x),
+        [a, b, rest @ ..] => a.contains(x) || b.contains(x) || rest.iter().any(|s| s.contains(x)),
     }
 }
 
@@ -948,16 +957,19 @@ impl Codec for MuLawSingleZero {
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct CanFdLengths;
 
-impl ValueSet for CanFdLengths {
-    const VALUES: &'static [i64] = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
+impl ValueSet<u8> for CanFdLengths {
+    /// [CanFdDlc]'s table, the length of each code in its place: the set and the codec are one table of 16 bytes.
+    const VALUES: &'static [u8] = &CAN_FD_DLC;
 }
 
 /// The data length code (DLC) of a CAN FD frame: 4 bits that say how many data bytes follow, 0..=8 as themselves and
 /// 9..=15 as 12, 16, 20, 24, 32, 48 and 64 bytes. ISO 11898-1:2015 defines the coding; the table is checked against
 /// ST's RM0468 Rev 3 (STM32H72x/73x reference manual), §61.4.1, Table 503 "DLC coding in FDCAN", p. 2510, and Linux's
 /// `can_fd_dlc2len` (`drivers/net/can/dev/length.c`) has the same. The first [CodecShape::Table] codec: its [DEF](Codec::DEF)
-/// carries the table, and the typed path encodes through the same table and the same rounding as a client that
-/// has only the data.
+/// carries the table for a client that has only the data. The typed path works in `u8` on the one table of 16
+/// bytes that is also [CanFdLengths]: a code's length is its entry, a length's code is its position (a binary
+/// search), so a firmware pays what a table written by hand costs. `tests/props/can_fd.rs` checks both paths
+/// agree on every code and every length, by every rounding.
 ///
 /// - [Raw](Codec::Raw) is `u8`, the field as a controller's register or a byte of a frame holds it: codes
 ///   16..=255 are [spare](CodecDef::spare), no DLC, refused by [Coded::try_from_raw] and free for a niche.
@@ -995,7 +1007,8 @@ pub struct CanFdDlc;
 /// [CanFdDlc]'s table: the length of each code 0..=15, in bytes.
 const CAN_FD_DLC: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
 
-/// [CAN_FD_DLC] as a [CodecShape::Table]'s entries, widened in `const` code: one table, two types.
+/// [CAN_FD_DLC] as a [CodecShape::Table]'s entries, widened in `const` code, for the data form only: a firmware
+/// that never reads [Codec::DEF] links none of it.
 #[cfg_attr(
     not(feature = "information"),
     expect(dead_code, reason = "CanFdDlc needs `information`")
@@ -1041,9 +1054,11 @@ impl Codec for CanFdDlc {
         Fixed::new_unchecked(len)
     }
 
+    /// The position of the length in the table: every `Linear` is one of it, so no rounding is ever needed and
+    /// `rounding` changes nothing (as [CodecDef::encode] gives for a length of the set).
     #[inline]
-    fn encode(value: Self::Linear, rounding: Rounding) -> Option<u8> {
-        let code = Self::DEF.encode(i128::from(value.get()), rounding)?;
+    fn encode(value: Self::Linear, _rounding: Rounding) -> Option<u8> {
+        let code = set_position(&CAN_FD_DLC, value.get())?;
         u8::try_from(code).ok()
     }
 }

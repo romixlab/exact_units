@@ -49,7 +49,7 @@ pub trait Bounds<T: Storage>: Copy + Default + 'static {
 
     /// The values allowed where they are a set with gaps, ascending: `Some` only for [OneOf]. `MIN` and `MAX` are
     /// then its first and last value, and a value between them that isn't in the set is refused too.
-    const SET: Option<&'static [i64]> = None;
+    const SET: Option<&'static [T]> = None;
 
     /// `MIN <= x <= MAX`, one of [SET](Self::SET) where it is `Some`, and not NaN unless
     /// [ALLOWS_NAN](Self::ALLOWS_NAN).
@@ -72,9 +72,9 @@ pub trait Bounds<T: Storage>: Copy + Default + 'static {
         {
             return false;
         }
-        match (Self::SET, x.to_repr()) {
-            (Some(set), Repr::Int(i)) => in_set(set, i),
-            _ => true,
+        match Self::SET {
+            Some(set) => set_position(set, x).is_some(),
+            None => true,
         }
     }
 }
@@ -185,9 +185,9 @@ impl<U, P, T: Storage + defmt::Format, B: Bounds<T>> defmt::Format for OutOfRang
                 }
                 first = false;
                 if lo == hi {
-                    defmt::write!(f, "{=i64}", lo);
+                    defmt::write!(f, "{}", lo);
                 } else {
-                    defmt::write!(f, "{=i64}..={=i64}", lo, hi);
+                    defmt::write!(f, "{}..={}", lo, hi);
                 }
             });
             defmt::write!(f, "}} ({=str})", T::NAME);
@@ -403,7 +403,7 @@ impl<const MIN: u64, const MAX: u64> NanFree for RangeU64<MIN, MAX> {}
 
 impl<const MIN: i64, const MAX: i64, const EXP: i8> NanFree for RangeDec<MIN, MAX, EXP> {}
 
-impl<S: ValueSet> NanFree for OneOf<S> {}
+impl<S> NanFree for OneOf<S> {}
 
 /// A bounds marker without limits: [Unbounded], [Wrapping], [Saturating] or [MaybeNan]. The first three are the same values and
 /// convert into each other for free ([Fixed::with_overflow](super::Fixed::with_overflow)); they differ in what
@@ -433,9 +433,10 @@ pub struct RangeU64<const MIN: u64, const MAX: u64>;
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct RangeDec<const MIN: i64, const MAX: i64, const EXP: i8>;
 
-/// The values a [OneOf] allows, written once: an integer set with gaps between its values, ascending and without
-/// repeats (a compile error where it isn't, or where a value doesn't fit the storage). A marker of its own, as stable
-/// Rust takes no slice as a const parameter.
+/// The values a [OneOf] allows, written once in the storage `T` they are for: an integer set with gaps between its
+/// values, ascending and without repeats (a compile error where it isn't). A marker of its own, as stable Rust takes
+/// no slice as a const parameter. The values are of `T` itself, so a check, a rounding and the table in flash are
+/// `T`'s size: a set of `u8` lengths is 16 bytes and compares in bytes, as a table written by hand would.
 ///
 /// ```
 /// use exact_units::{Fixed, OneOf, ValueSet, prefix::One, units::Ratio};
@@ -444,8 +445,8 @@ pub struct RangeDec<const MIN: i64, const MAX: i64, const EXP: i8>;
 /// #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 /// struct BulkSizes;
 ///
-/// impl ValueSet for BulkSizes {
-///     const VALUES: &'static [i64] = &[8, 16, 32, 64];
+/// impl ValueSet<u8> for BulkSizes {
+///     const VALUES: &'static [u8] = &[8, 16, 32, 64];
 /// }
 ///
 /// type Packet = Fixed<Ratio, One, u8, OneOf<BulkSizes>>;
@@ -453,23 +454,60 @@ pub struct RangeDec<const MIN: i64, const MAX: i64, const EXP: i8>;
 /// let e = Packet::try_new(24).unwrap_err();
 /// assert_eq!(e.to_string(), "24 is out of {8, 16, 32, 64} (Ratio, u8)");
 /// ```
-pub trait ValueSet:
+///
+/// A set for a storage it doesn't list is no bound of it: `OneOf<BulkSizes>` over a `u16` doesn't build until
+/// `BulkSizes` is a `ValueSet<u16>` too.
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, OneOf, ValueSet, prefix::One, units::Ratio};
+///
+/// #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+/// struct BulkSizes;
+///
+/// impl ValueSet<u8> for BulkSizes {
+///     const VALUES: &'static [u8] = &[8, 16, 32, 64];
+/// }
+///
+/// let _ = Fixed::<Ratio, One, u16, OneOf<BulkSizes>>::try_new(32);
+/// ```
+pub trait ValueSet<T: Storage>:
     Copy + Default + core::fmt::Debug + PartialEq + Eq + core::hash::Hash + 'static
 {
     /// The values, ascending, each once.
-    const VALUES: &'static [i64];
+    const VALUES: &'static [T];
 }
 
-/// One of the values of a [ValueSet] `S`, for an integer storage up to `i64` (the storages of [Range]): a length
-/// that comes in fixed steps (CAN FD's 0..=8, 12, 16, 20, 24, 32, 48 and 64 bytes,
+/// One of the values of a [ValueSet] `S`, for an integer storage (those of [bounded](super::Fixed::bounded)): a
+/// length that comes in fixed steps (CAN FD's 0..=8, 12, 16, 20, 24, 32, 48 and 64 bytes,
 /// [CanFdLengths](crate::codec::CanFdLengths)), a clock divider, a packet size. [try_new](super::Fixed::try_new),
-/// [bounded](super::Fixed::bounded), a `fixed!` constant, serde and the wire refuse every other value, and [OutOfRange] lists the
-/// set: `13 B is out of {0..=8, 12, 16, 20, 24, 32, 48, 64} B (Byte, u8)`.
+/// [bounded](super::Fixed::bounded), a `fixed!` constant, serde and the wire refuse every other value, and
+/// [OutOfRange] lists the set: `13 B is out of {0..=8, 12, 16, 20, 24, 32, 48, 64} B (Byte, u8)`. The check, and
+/// [try_new_rounded](super::Fixed::try_new_rounded), compare in the storage itself: no wider integer on the way.
 ///
 /// [Bounds::MIN] and [Bounds::MAX] are the set's first and last value, so what proves from them alone (a conversion
 /// [into_rounded](super::Fixed::into_rounded) proves, a [Niched](crate::niche::Niched)'s room) sees the whole range
 /// between, never less. `saturating_*` is a compile error: a sum can stop at an end of a range, but a value in a gap
 /// has no end to stop at without a rounding. `checked_*` is the way, `None` for a sum in a gap.
+///
+/// [try_new_rounded](super::Fixed::try_new_rounded) names a [Rounding](super::Rounding) into the set:
+///
+/// ```
+/// use exact_units::{Fixed, OneOf, Rounding, ValueSet, prefix::One, units::Ratio};
+///
+/// #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+/// struct Steps;
+///
+/// impl ValueSet<u8> for Steps {
+///     const VALUES: &'static [u8] = &[1, 2, 4, 8];
+/// }
+///
+/// type Div = Fixed<Ratio, One, u8, OneOf<Steps>>;
+/// assert!(Div::try_new(5).is_err());
+/// assert_eq!(Div::try_new_rounded(5, Rounding::Ceil).map(Div::get), Some(8));
+/// assert_eq!(Div::try_new_rounded(5, Rounding::NearestEven).map(Div::get), Some(4));
+/// assert_eq!(Div::try_new_rounded(6, Rounding::NearestEven).map(Div::get), Some(4)); // 4 is at position 2
+/// assert_eq!(Div::try_new_rounded(9, Rounding::Ceil), None);
+/// ```
 ///
 /// ```compile_fail
 /// use exact_units::{Fixed, OneOf, ValueSet, prefix::One, units::Ratio};
@@ -477,8 +515,8 @@ pub trait ValueSet:
 /// #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 /// struct Steps;
 ///
-/// impl ValueSet for Steps {
-///     const VALUES: &'static [i64] = &[1, 2, 4, 8];
+/// impl ValueSet<u8> for Steps {
+///     const VALUES: &'static [u8] = &[1, 2, 4, 8];
 /// }
 ///
 /// type Div = Fixed<Ratio, One, u8, OneOf<Steps>>;
@@ -487,145 +525,92 @@ pub trait ValueSet:
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct OneOf<S>(PhantomData<S>);
 
-impl<U, P, T: Storage, S: ValueSet> super::Fixed<U, P, T, OneOf<S>>
-where
-    OneOf<S>: Bounds<T>,
-{
-    /// `value` where it is one of the set, else the set's value `r` rounds it to: [Ceil](super::Rounding::Ceil) the
-    /// next one up (a CAN FD payload of 13 bytes goes in a frame of 16), [Floor](super::Rounding::Floor) the next
-    /// one down, the nearest modes the closer one, a tie to the value at the even position of the set
-    /// ([NearestEven](super::Rounding::NearestEven)) or to the one farther from zero
-    /// ([NearestAway](super::Rounding::NearestAway)). [try_new](super::Fixed::try_new) is the exact way, which
-    /// refuses 13.
-    ///
-    /// # Errors
-    ///
-    /// `None` where no value of the set lies on the side `r` takes: above the last for `Ceil`, below the first for
-    /// `Floor`.
-    ///
-    /// ```
-    /// use exact_units::{Fixed, OneOf, Rounding, ValueSet, prefix::One, units::Ratio};
-    ///
-    /// #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
-    /// struct Steps;
-    ///
-    /// impl ValueSet for Steps {
-    ///     const VALUES: &'static [i64] = &[1, 2, 4, 8];
-    /// }
-    ///
-    /// type Div = Fixed<Ratio, One, u8, OneOf<Steps>>;
-    /// assert!(Div::try_new(5).is_err());
-    /// assert_eq!(Div::try_new_rounded(5, Rounding::Ceil).map(Div::get), Some(8));
-    /// assert_eq!(Div::try_new_rounded(5, Rounding::NearestEven).map(Div::get), Some(4));
-    /// assert_eq!(Div::try_new_rounded(6, Rounding::NearestEven).map(Div::get), Some(4)); // 4 is at position 2
-    /// assert_eq!(Div::try_new_rounded(9, Rounding::Ceil), None);
-    /// ```
-    #[must_use]
-    pub fn try_new_rounded(value: T, r: super::Rounding) -> Option<Self> {
-        let Repr::Int(x) = value.to_repr() else {
-            return None;
-        };
-        let set = <OneOf<S> as Bounds<T>>::SET?;
-        let entries = (0_i128..).zip(set.iter().map(|&v| i128::from(v)));
-        let code = super::nearest_entry(entries, x, r)?;
-        let at = set.get(usize::try_from(code).ok()?)?;
-        let v = T::from_int(i128::from(*at))?;
-        Some(Self::new_unchecked(v))
-    }
+/// The position of `x` in `set` (ascending), `None` where it isn't one of it: a binary search in `T` itself.
+#[inline]
+pub(crate) fn set_position<T: Storage>(set: &[T], x: T) -> Option<usize> {
+    let at = set.partition_point(|v| *v < x);
+    set.get(at).filter(|v| **v == x).map(|_| at)
 }
 
-/// `values` checked: not empty, ascending, no value twice. A compile error where it isn't (this is only evaluated in
-/// a `const`).
-#[expect(
-    clippy::panic,
-    reason = "const fn evaluated only in a const item: the panic is a compile error naming the broken set"
-)]
-const fn checked_set(values: &'static [i64]) -> &'static [i64] {
-    let &[mut last, ref rest @ ..] = values else {
-        panic!("a ValueSet's VALUES is empty: no value would be allowed");
-    };
-    let mut rest = rest;
-    while let [x, tail @ ..] = rest {
-        assert!(
-            *x > last,
-            "a ValueSet's VALUES must be ascending, each value once"
-        );
-        last = *x;
-        rest = tail;
+/// The value of `set` (ascending) `x` rounds to by `r`, with its position: `x` itself where it is one, else the next
+/// one below ([Floor](super::Rounding::Floor)), above ([Ceil](super::Rounding::Ceil)), toward zero
+/// ([Truncate](super::Rounding::Truncate)), or the nearer of the two, a tie to the even position
+/// ([NearestEven](super::Rounding::NearestEven)) or to the one farther from zero
+/// ([NearestAway](super::Rounding::NearestAway)). `dist` is the distance of two values of `T`, `zero` its zero:
+/// all in `T`. `None` where no value of the set lies on the side `r` takes.
+#[inline]
+pub(crate) fn round_in_set<T: Storage, D: Ord>(
+    set: &[T],
+    x: T,
+    r: super::Rounding,
+    zero: T,
+    dist: impl Fn(T, T) -> D,
+) -> Option<(usize, T)> {
+    use super::Rounding;
+    let at = set.partition_point(|v| *v < x);
+    let above = set.get(at).map(|&a| (at, a));
+    if above.is_some_and(|(_, a)| a == x) {
+        return above;
     }
-    values
-}
-
-/// The first and last of a checked set.
-#[expect(
-    clippy::panic,
-    reason = "const fn evaluated only in a const item: checked_set refused an empty set first"
-)]
-const fn set_ends(values: &'static [i64]) -> (i64, i64) {
-    match checked_set(values) {
-        [first, .., last] => (*first, *last),
-        [only] => (*only, *only),
-        [] => panic!("a ValueSet's VALUES is empty"),
-    }
-}
-
-/// Whether `x` is one of `set` (ascending): a binary search, in `const` code too.
-#[expect(
-    clippy::as_conversions,
-    reason = "const fn: From is not const on stable; an i64 widens into an i128 exactly"
-)]
-pub(crate) const fn in_set(set: &[i64], x: i128) -> bool {
-    let mut rest = set;
-    while let [_, ..] = rest {
-        let (low, high) = rest.split_at(rest.len() / 2);
-        let [mid, above @ ..] = high else {
-            return false;
-        };
-        let mid = *mid as i128;
-        if x == mid {
-            return true;
+    let below = at.checked_sub(1).and_then(|i| set.get(i).map(|&b| (i, b)));
+    match r {
+        Rounding::Floor => below,
+        Rounding::Ceil => above,
+        Rounding::Truncate => {
+            if x > zero {
+                below
+            } else if x < zero {
+                above
+            } else {
+                None
+            }
         }
-        rest = if x < mid { low } else { above };
+        Rounding::NearestEven | Rounding::NearestAway => match (below, above) {
+            (Some(b), Some(a)) => match dist(x, b.1).cmp(&dist(a.1, x)) {
+                core::cmp::Ordering::Less => Some(b),
+                core::cmp::Ordering::Greater => Some(a),
+                // a tie: b and a are next to each other, so one position is even; else b < x < a, and the one
+                // farther from zero is b exactly where x < 0
+                core::cmp::Ordering::Equal if r == Rounding::NearestEven => {
+                    Some(if b.0 & 1 == 0 { b } else { a })
+                }
+                core::cmp::Ordering::Equal => Some(if x < zero { b } else { a }),
+            },
+            (b, a) => b.or(a),
+        },
     }
-    false
 }
 
 /// `lo ..= hi` narrowed to the values of `set` within it: the first value at or above `lo`, the last at or below
 /// `hi`. `None` where none is between them. Without a set, `lo ..= hi` as it is.
 #[cfg(any(feature = "dimensionless", feature = "q"))]
-#[expect(
-    clippy::as_conversions,
-    reason = "const fn: From is not const on stable; an i64 widens into an i128 exactly"
-)]
-pub(crate) const fn set_inward(set: Option<&[i64]>, lo: i128, hi: i128) -> Option<(i128, i128)> {
-    let Some(mut rest) = set else {
+pub(crate) fn set_inward<T: Storage>(
+    set: Option<&[T]>,
+    lo: i128,
+    hi: i128,
+) -> Option<(i128, i128)> {
+    let Some(set) = set else {
         return if lo <= hi { Some((lo, hi)) } else { None };
     };
-    let mut first = None;
-    let mut last = None;
-    while let [x, tail @ ..] = rest {
-        let x = *x as i128;
-        if x >= lo && x <= hi {
-            if first.is_none() {
-                first = Some(x);
-            }
-            last = Some(x);
-        }
-        rest = tail;
-    }
-    match (first, last) {
-        (Some(a), Some(b)) => Some((a, b)),
+    let mut within = set.iter().filter_map(|v| match v.to_repr() {
+        Repr::Int(x) if x >= lo && x <= hi => Some(x),
         _ => None,
-    }
+    });
+    let first = within.next()?;
+    Some((first, within.last().unwrap_or(first)))
 }
 
 /// Calls `f` with each run of consecutive values of `set` as its ends: `0..=8, 12, 16` is `(0, 8)`, `(12, 12)`,
 /// `(16, 16)`.
-pub(crate) fn for_each_run(set: &[i64], mut f: impl FnMut(i64, i64)) {
-    let mut run: Option<(i64, i64)> = None;
+pub(crate) fn for_each_run<T: Storage>(set: &[T], mut f: impl FnMut(T, T)) {
+    let next = |a: T, b: T| match (a.to_repr(), b.to_repr()) {
+        (Repr::Int(a), Repr::Int(b)) => a.checked_add(1) == Some(b),
+        _ => false,
+    };
+    let mut run: Option<(T, T)> = None;
     for &x in set {
         run = match run {
-            Some((lo, hi)) if hi.checked_add(1) == Some(x) => Some((lo, x)),
+            Some((lo, hi)) if next(hi, x) => Some((lo, x)),
             Some((lo, hi)) => {
                 f(lo, hi);
                 Some((x, x))
@@ -696,40 +681,6 @@ macro_rules! range {
             };
 
             const INT_RANGE: Option<(i128, i128)> = Some((MIN as i128, MAX as i128));
-        }
-
-        #[expect(
-            clippy::allow_attributes,
-            reason = "the casts differ per storage: an #[expect] is unfulfilled where one is exact"
-        )]
-        #[expect(clippy::as_conversions, reason = "const items: From is not const on stable")]
-        impl<S: ValueSet> Bounds<$ty> for OneOf<S> {
-            #[allow(
-                clippy::cast_possible_truncation,
-                clippy::cast_sign_loss,
-                reason = "fits checked at compile time that the bound is in the storage's range"
-            )]
-            const MIN: Option<$ty> = {
-                let $x = fits(set_ends(S::VALUES).0 as i128, $min as i128, $max as i128);
-                Some($wrap)
-            };
-
-            #[allow(
-                clippy::cast_possible_truncation,
-                clippy::cast_sign_loss,
-                reason = "fits checked at compile time that the bound is in the storage's range"
-            )]
-            const MAX: Option<$ty> = {
-                let $x = fits(set_ends(S::VALUES).1 as i128, $min as i128, $max as i128);
-                Some($wrap)
-            };
-
-            const INT_RANGE: Option<(i128, i128)> = {
-                let (first, last) = set_ends(S::VALUES);
-                Some((first as i128, last as i128))
-            };
-
-            const SET: Option<&'static [i64]> = Some(checked_set(S::VALUES));
         }
     )*};
 }
@@ -997,8 +948,9 @@ impl<const MIN: i64, const MAX: i64, const EXP: i8> Bounds<f32> for RangeDec<MIN
     };
 }
 
-/// `bounded(value)`: a `const fn` constructor per integer storage, a compile error for a value outside `B` in `const`
-/// code (a panic at run time).
+/// Per integer storage: `bounded(value)`, a `const fn` constructor, a compile error for a value outside `B` in `const`
+/// code (a panic at run time); and [OneOf]'s bounds and [try_new_rounded](super::Fixed::try_new_rounded), which
+/// compare in the storage itself. `$get` is the storage's number as a primitive integer, for `const` code.
 macro_rules! bounded {
     ($($ty:ident $x:ident => $get:expr;)*) => {$(
         impl<U, P, B: Bounds<$ty>> super::Fixed<U, P, $ty, B> {
@@ -1020,13 +972,92 @@ macro_rules! bounded {
                 {
                     panic!("value above its bound");
                 }
-                #[expect(clippy::as_conversions, reason = "const fn: From is not const on stable; widens into i128")]
-                if let Some(set) = B::SET
-                    && !in_set(set, v as i128)
-                {
-                    panic!("value not one of its bound's set");
+                if let Some(mut rest) = B::SET {
+                    let mut found = false;
+                    while let [s, tail @ ..] = rest {
+                        let $x = *s;
+                        found |= $get == v;
+                        rest = tail;
+                    }
+                    if !found {
+                        panic!("value not one of its bound's set");
+                    }
                 }
                 Self::new_unchecked(value)
+            }
+        }
+
+        #[expect(clippy::as_conversions, reason = "const items: From is not const on stable; widens into i128")]
+        impl<S: ValueSet<$ty>> Bounds<$ty> for OneOf<S> {
+            const MIN: Option<$ty> = match Self::SET {
+                Some([first, ..]) => Some(*first),
+                _ => None,
+            };
+
+            const MAX: Option<$ty> = match Self::SET {
+                Some([.., last]) => Some(*last),
+                _ => None,
+            };
+
+            const INT_RANGE: Option<(i128, i128)> = match (Self::MIN, Self::MAX) {
+                (Some(first), Some(last)) => {
+                    let first = {
+                        let $x = first;
+                        $get as i128
+                    };
+                    let $x = last;
+                    Some((first, $get as i128))
+                }
+                _ => None,
+            };
+
+            // checked: not empty, ascending, no value twice; a const item, so a panic is a compile error naming the
+            // broken set
+            const SET: Option<&'static [$ty]> = {
+                let [first, ref rest @ ..] = *S::VALUES else {
+                    panic!("a ValueSet's VALUES is empty: no value would be allowed");
+                };
+                let mut last = {
+                    let $x = first;
+                    $get
+                };
+                let mut rest = rest;
+                while let [v, tail @ ..] = rest {
+                    let $x = *v;
+                    assert!($get > last, "a ValueSet's VALUES must be ascending, each value once");
+                    last = $get;
+                    rest = tail;
+                }
+                Some(S::VALUES)
+            };
+        }
+
+        impl<U, P, S: ValueSet<$ty>> super::Fixed<U, P, $ty, OneOf<S>> {
+            /// `value` where it is one of the set, else the set's value `r` rounds it to:
+            /// [Ceil](super::Rounding::Ceil) the next one up (a CAN FD payload of 13 bytes goes in a frame of 16),
+            /// [Floor](super::Rounding::Floor) the next one down, [Truncate](super::Rounding::Truncate) the next one
+            /// toward zero, the nearest modes the closer one, a tie to the value at the even position of the set
+            /// ([NearestEven](super::Rounding::NearestEven)) or to the one farther from zero
+            /// ([NearestAway](super::Rounding::NearestAway)). [try_new](super::Fixed::try_new) is the exact way,
+            /// which refuses 13. A binary search in the storage itself; [OneOf] shows it at work.
+            ///
+            /// # Errors
+            ///
+            /// `None` where no value of the set lies on the side `r` takes: above the last for `Ceil`, below the
+            /// first for `Floor`.
+            #[inline]
+            #[must_use]
+            pub fn try_new_rounded(value: $ty, r: super::Rounding) -> Option<Self> {
+                let set = <OneOf<S> as Bounds<$ty>>::SET?;
+                let dist = |a: $ty, b: $ty| {
+                    let a = {
+                        let $x = a;
+                        $get
+                    };
+                    let $x = b;
+                    a.abs_diff($get)
+                };
+                round_in_set(set, value, r, <$ty as Storage>::ZERO, dist).map(|(_, v)| Self::new_unchecked(v))
             }
         }
     )*};

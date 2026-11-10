@@ -137,44 +137,80 @@ pub(crate) fn dlc_encodes(x: u8, r: Rounding) {
         .map(|c| i128::from(c.raw()));
     assert_eq!(typed, want, "{x} by {r:?}");
     if let Ok(len) = Len::try_new(x) {
+        // the typed encode is a position in u8, the data path's a table walk in i128: the same code
         let exact = dlc_of(i128::from(x)).map(|d| i128::try_from(d).unwrap_or(i128::MAX));
+        let typed = CanFdDlc::encode(len, r).map(i128::from);
+        assert_eq!(typed, exact, "{x} by {r:?}");
         assert_eq!(
-            CanFdDlc::encode(len, r).map(i128::from),
-            exact,
+            typed,
+            CanFdDlc::DEF.encode(i128::from(x), r),
             "{x} by {r:?}"
         );
     }
 }
 
-/// A signed set of odd length, its ends at `i16`'s: the binary search of `OneOf` off the CAN case.
+/// A signed set, its ends at `i16`'s: the binary search of `OneOf` off the CAN case, and gaps wider than `i16`
+/// holds (−32768 to −300), so a rounding that took their difference in `i16` would overflow.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub(crate) struct Signed;
 
-impl ValueSet for Signed {
-    const VALUES: &'static [i64] = &[-32768, -300, -1, 0, 7, 8, 1000, 32767];
+impl ValueSet<i16> for Signed {
+    const VALUES: &'static [i16] = &[-32768, -300, -1, 0, 7, 8, 1000, 32767];
 }
 
-/// `x` is taken by a `OneOf<Signed>` exactly when the list holds it, and rounds into it as the reference does.
+/// The value of `set` `x` rounds to by `r`, by brute force in `i128`: the exact one, else the largest below or the
+/// smallest above as `r` says, the nearer of the two, a tie to the even position (`NearestEven`) or the value
+/// farther from zero (`NearestAway`; the one above where both are as far).
+fn set_rounded(set: &[i128], x: i128, r: Rounding) -> Option<i128> {
+    if set.contains(&x) {
+        return Some(x);
+    }
+    let below = set.iter().rposition(|&v| v < x);
+    let above = set.iter().position(|&v| v > x);
+    let at = |i: usize| set.get(i).copied().unwrap_or_default();
+    let pick = match r {
+        Rounding::Floor => below,
+        Rounding::Ceil => above,
+        Rounding::Truncate => match x.cmp(&0) {
+            core::cmp::Ordering::Greater => below,
+            core::cmp::Ordering::Less => above,
+            core::cmp::Ordering::Equal => None,
+        },
+        Rounding::NearestEven | Rounding::NearestAway => match (below, above) {
+            (Some(b), Some(a)) => {
+                let (db, da) = (x.abs_diff(at(b)), at(a).abs_diff(x));
+                Some(if db < da {
+                    b
+                } else if da < db {
+                    a
+                } else if r == Rounding::NearestEven {
+                    if b % 2 == 0 { b } else { a }
+                } else if at(b).unsigned_abs() > at(a).unsigned_abs() {
+                    b
+                } else {
+                    a
+                })
+            }
+            (b, a) => b.or(a),
+        },
+    };
+    pick.map(at)
+}
+
+/// `x` is taken by a `OneOf<Signed>` exactly when the list holds it, and rounds into it by every rounding as the
+/// reference does.
 pub(crate) fn signed_set_contains(x: i16) {
     type S = Fixed<exact_units::units::Ratio, One, i16, OneOf<Signed>>;
-    let listed = Signed::VALUES.contains(&i64::from(x));
+    let listed = Signed::VALUES.contains(&x);
     assert_eq!(S::try_new(x).is_ok(), listed, "{x}");
-    let below = Signed::VALUES
-        .iter()
-        .rev()
-        .find(|&&v| v <= i64::from(x))
-        .copied();
-    let above = Signed::VALUES.iter().find(|&&v| v >= i64::from(x)).copied();
-    assert_eq!(
-        S::try_new_rounded(x, Rounding::Floor).map(|v| i64::from(v.get())),
-        below,
-        "{x}"
-    );
-    assert_eq!(
-        S::try_new_rounded(x, Rounding::Ceil).map(|v| i64::from(v.get())),
-        above,
-        "{x}"
-    );
+    let set: Vec<i128> = Signed::VALUES.iter().map(|&v| i128::from(v)).collect();
+    for r in ROUNDINGS {
+        assert_eq!(
+            S::try_new_rounded(x, r).map(|v| i128::from(v.get())),
+            set_rounded(&set, i128::from(x), r),
+            "{x} by {r:?}"
+        );
+    }
 }
 
 #[cfg(not(any(kani, fuzzing)))]

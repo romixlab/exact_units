@@ -13,6 +13,8 @@ use shrink_wrap::prelude::*;
 pub(crate) use bounds::for_each_run;
 #[cfg(any(feature = "dimensionless", feature = "q"))]
 pub(crate) use bounds::set_inward;
+#[cfg(feature = "information")]
+pub(crate) use bounds::set_position;
 pub use bounds::{
     Bounds, Finite, MaybeNan, NanFree, OneOf, OutOfBounds, OutOfRange, Range, RangeDec, RangeU64,
     Saturating, Unbounded, Unlimited, ValueSet, Wrapping,
@@ -1805,11 +1807,13 @@ pub(crate) fn write_range<T: Storage, B: Bounds<T>>(f: &mut fmt::Formatter<'_>) 
             let sep = if first { "" } else { ", " };
             first = false;
             r = r.and_then(|()| {
-                if lo == hi {
-                    write!(f, "{sep}{lo}")
-                } else {
-                    write!(f, "{sep}{lo}..={hi}")
+                f.write_str(sep)?;
+                lo.fmt_number(f)?;
+                if lo != hi {
+                    f.write_str("..=")?;
+                    hi.fmt_number(f)?;
                 }
+                Ok(())
             });
         });
         r?;

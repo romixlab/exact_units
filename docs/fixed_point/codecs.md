@@ -168,6 +168,13 @@ entries need not be ascending, and where two codes mean one value, encoding take
 `tests/props/can_fd.rs` walks every byte as a DLC and every `u8` length by every rounding against the table written
 out from the standard, and checks that the typed path and the data path agree.
 
+The two paths share the table, not the code. The data path walks `CodecDef`'s entries in `i128`, as a client that
+knows only the data must. The typed path works in `u8` on one table of 16 bytes, which is `CanFdLengths` too: a
+code's length is its entry, a length's code is its position in the set, and a spare code is `raw >= 16`. A firmware
+that never reads `DEF` links none of the data form. On a Cortex-M4F the typed `try_new`, `try_new_rounded`, encode
+and decode take no more flash than the same written by hand on a `u8` and a table (`tests/can_fd_size.rs` builds
+both and compares).
+
 ## Composing with `Niched`
 
 `Coded` implements `RawValue`, the trait `Fixed` and `Point` implement too, so `Niched<Coded<C, V, T>, N>` is

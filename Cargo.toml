@@ -230,6 +230,11 @@ required-features = ["serde"]
 name = "q_asm"
 required-features = ["q", "std"]
 
+# OneOf<CanFdLengths> and Coded<CanFdDlc> against hand-written code, flash on thumbv7em: builds tools/can_fd_size
+[[test]]
+name = "can_fd_size"
+required-features = ["information", "std"]
+
 # examples/NN_*.rs: one story each, in reading order; the README's Examples section lists them
 [[example]]
 # the unit and scale in the type: µs and ms don't mix, a conversion is exact or refused, and no_std

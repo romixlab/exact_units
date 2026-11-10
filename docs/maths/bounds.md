@@ -67,8 +67,9 @@ let _ = Bad::try_new(1);
 ## A set of values
 
 Some numbers come in fixed steps rather than a range: a CAN FD frame carries 0 to 8 data bytes, then 12, 16, 20,
-24, 32, 48 or 64, and nothing between. `OneOf<S>` holds such a set. `S` is a marker that implements `ValueSet` and
-lists the values once, ascending; stable Rust takes no slice as a const parameter, so the list lives in the marker.
+24, 32, 48 or 64, and nothing between. `OneOf<S>` holds such a set. `S` is a marker that implements `ValueSet<T>` and
+lists the values once, ascending, in the storage `T` they are for; stable Rust takes no slice as a const parameter, so
+the list lives in the marker.
 
 ```rust
 use exact_units::{Fixed, OneOf, Rounding, ValueSet, prefix::One, units::Byte};
@@ -76,8 +77,8 @@ use exact_units::{Fixed, OneOf, Rounding, ValueSet, prefix::One, units::Byte};
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 struct FdLengths;
 
-impl ValueSet for FdLengths {
-    const VALUES: &'static [i64] = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
+impl ValueSet<u8> for FdLengths {
+    const VALUES: &'static [u8] = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
 }
 
 type Len = Fixed<Byte, One, u8, OneOf<FdLengths>>;
@@ -97,6 +98,7 @@ assert_eq!(Len::try_new_rounded(65, Rounding::Ceil), None);
 - `try_new_rounded` takes a value off the set to the next one up (`Ceil`), down (`Floor`) or the nearest. A tie between two goes to the value at the even position of the set (`NearestEven`), or to the one farther from zero (`NearestAway`). There is no default rounding.
 - `checked_add` and its kin are `None` for a result in a gap. `saturating_add` is a compile error: it stops at the ends of a range, and a gap has no end to stop at without a rounding.
 - A window around a set value ends on set values.
+- The set is a table of `T` in flash, 16 bytes for the CAN FD lengths in `u8`. `try_new` and `try_new_rounded` search it in `T` itself, no wider integer on the way: on a Cortex-M4F they take no more flash than the same written by hand on a `u8` and a table of 16 (`tests/can_fd_size.rs` builds both and compares).
 - The crate ships the CAN FD set as `codec::CanFdLengths`, and the 4-bit code that carries it as a codec: [Codecs](../fixed_point/codecs.md#a-table-the-can-fd-dlc).
 
 A constant off the set doesn't build:
@@ -116,8 +118,8 @@ use exact_units::{Fixed, OneOf, ValueSet, prefix::One, units::Ratio};
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 struct Unsorted;
 
-impl ValueSet for Unsorted {
-    const VALUES: &'static [i64] = &[8, 4];
+impl ValueSet<u8> for Unsorted {
+    const VALUES: &'static [u8] = &[8, 4];
 }
 
 let _ = Fixed::<Ratio, One, u8, OneOf<Unsorted>>::try_new(4);
