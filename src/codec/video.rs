@@ -516,6 +516,10 @@ const _: () = {
 };
 
 /// `Some`'s value in a `const`, else a compile error.
+#[expect(
+    clippy::panic,
+    reason = "called only in const items, where a panic is a compile error: HLG's constants fit a Fraction"
+)]
 const fn known(f: Option<Fraction>) -> Fraction {
     match f {
         Some(f) => f,

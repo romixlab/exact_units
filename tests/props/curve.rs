@@ -417,6 +417,7 @@ fn hlg_upper_half_by_the_f64_edge() {
 #[test]
 fn hlg_encodes_every_light_as_the_standard() {
     let c = Hlg::DEF;
+    let code = |k: i128| f64::from(i32::try_from(k).unwrap());
     for i in 0..=100_000_u32 {
         let e = 1.0 / 12.0 + f64::from(i) * (11.0 / 12.0) / 100_000.0;
         let e = e.min(1.0);
@@ -424,12 +425,12 @@ fn hlg_encodes_every_light_as_the_standard() {
         let want = pos.round();
         let got = c.encode_f64(&NARROW10, e, Rounding::NearestAway, Domain::Signal);
         if (pos - pos.floor() - 0.5).abs() >= 1e-6 {
-            assert_eq!(got.map(|k| k as f64), Ok(want), "E = {e}, position {pos}");
+            assert_eq!(got.map(code), Ok(want), "E = {e}, position {pos}");
         } else {
             match got {
-                Ok(k) => assert_eq!(k as f64, want, "E = {e}"),
+                Ok(k) => assert_eq!(code(k), want, "E = {e}"),
                 Err(EncodeError::NearTie { below, above }) => {
-                    assert_eq!((below as f64, above as f64), (pos.floor(), pos.ceil()));
+                    assert_eq!((code(below), code(above)), (pos.floor(), pos.ceil()));
                 }
                 Err(err) => panic!("E = {e}: {err:?}"),
             }

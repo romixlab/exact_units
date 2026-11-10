@@ -18,7 +18,8 @@ use crate::{Fraction, MarkerId, Unit};
 use shrink_wrap::prelude::*;
 
 /// A transfer curve between a signal and light, as a type: its [DEF](Self::DEF) is the algorithm as data, the one a
-/// client without the trait runs, and the typed path reads the same. [Pq](super::video::Pq) is the first.
+/// client without the trait runs, and the typed path reads the same. [Pq](super::video::Pq) and
+/// [Hlg](super::video::Hlg) are two.
 ///
 /// Exactness is per value, not per curve: [KIND](Self::KIND) only says whether every value is exact.
 pub trait Curve: Copy + 'static {

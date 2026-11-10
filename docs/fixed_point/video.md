@@ -203,11 +203,89 @@ What it costs, against the certified `f64` edge (`from_light_f64`):
 
 `tests/curve_size.rs` measures the flash. Most of either image is the exact path and `Fraction`'s 128-bit arithmetic, which both carry. The time goes to the roots: a PQ light takes a 2523rd and a 1305th root, each a bisection whose steps are powers of 128-bit numbers. The float-free edge is for a light given exactly once (a setting, a metadata field, a test vector), not for a stream of pixels.
 
+## HLG
+
+HLG, hybrid log-gamma, is the scene-referred curve of high-dynamic-range video (BT.2100-3 Table 5, first ARIB STD-B67). Its OETF takes a relative scene light E, 0 to 1, to the signal E′:
+
+- E′ = √(3E) for E up to 1/12;
+- E′ = a·ln(12E − b) + c above, with a = 0.17883277, b = 1 − 4a and c = 0.5 − a·ln(4a).
+
+`Hlg::DEF` is its inverse, signal to light, as every curve in the crate is written:
+
+- E = E′²/3 for E′ up to ½, a `CurveForm::Power`;
+- E = (exp((E′ − c)/a) + b)/12 above, a `CurveForm::Exp`.
+
+c is transcendental, and not a `Magnitude` either, whose symbols are π, ln 2 and ln 10. It needn't be one. Since exp(−c/a) = 4a·exp(−½/a), the upper half is (a/3)·e^((E′ − ½)/a) + b/12, and every parameter is an exact `Fraction`: a/3, 1/a, ½ and b/12. c is absorbed into the exponent's shift.
+
+What is exact:
+
+- **The lower half, both ways.** E′²/3 is rational at every rational E′. A 10-bit narrow-range code D from 64 to 502 (E′ = ½) decodes to (D − 64)²/(3·876²) exactly.
+- **Its encode too.** E′ = √(3E) is irrational for almost every light, so no exact E′ exists to round. The exact encode doesn't need one: it compares the light with the exact lights of codes and of half-codes, which are rational, and finds the code by every `Rounding` in both `Domain`s.
+- **The joint.** E′ = ½ is E = 1/12 by both halves: a/3 + b/12 = 1/12 because b = 1 − 4a. The crate checks it on `Hlg::DEF`'s forms at compile time.
+- **The constants.** `Hlg::A` and `Hlg::B` are the standard's decimals, exact.
+
+What isn't: the upper half, above E′ = ½. `exp` of a non-zero rational is irrational, so every code from 503 to 940 means an irrational light. `light_exact` and `decode_exact` answer `None` there, and `from_light_exact` answers `EncodeError::NotExact` for a light above 1/12. The float edge is the way, with the `libm` feature:
+
+- `Hlg::inverse_oetf_f64(e)` and `Hlg::oetf_f64(light)`, on 0..=1, `None` outside it.
+- `Coded<Transfer<Narrow10, Hlg>>`'s `light_f64` and `from_light_f64`, a 10-bit code and its light. The encode is certified: the true code for the `f64` light, or `NearTie` with both candidates.
+
+Without floats, `from_light_certified` encodes a light given exactly on the upper half too: it brackets the irrational lights of codes and ties in intervals, as for PQ above.
+
+`Hlg` implements `Curve` with `KIND = CurveKind::Float`, its light a `Ratio`.
+
+```rust
+use exact_units::codec::{Coded, Domain, EncodeError, Transfer};
+use exact_units::codec::video::{Hlg, Narrow10};
+use exact_units::units::Ratio;
+use exact_units::{Exact, Fraction, Rounding};
+
+type HlgCode = Coded<Transfer<Narrow10, Hlg>>;
+let code = |k| HlgCode::try_from_raw(k).unwrap();
+
+// code 502 is E' = 1/2, scene light 1/12, exactly
+assert_eq!(code(502).light_exact(), Some(Exact::<Ratio>::of(Fraction::new(1, 12))));
+// the upper half has no exact light
+assert_eq!(code(700).light_exact(), None);
+
+// 1/50 of the peak is E' = √0.06, irrational, yet its code is decided exactly
+let dim = Exact::<Ratio>::of(Fraction::new(1, 50));
+assert_eq!(HlgCode::from_light_exact(dim, Rounding::NearestAway, Domain::Signal).map(Coded::raw), Ok(279));
+// above 1/12 the exact encode says it can't
+let bright = Exact::<Ratio>::of(Fraction::new(1, 2));
+assert_eq!(HlgCode::from_light_exact(bright, Rounding::NearestAway, Domain::Signal).map(Coded::raw), Err(EncodeError::NotExact));
+```
+
+With a rounded to 8 decimals, the curve's ends don't quite meet 0..=1: E′ = 1 is E ≈ 1.000000027, and E = 1 is E′ ≈ 0.999999995. Both are well inside code 940.
+
+### BT.2100 and ARIB STD-B67
+
+The two standards write the same curve two ways. BT.2100-3 normalises E to 0..1 and writes b and c as formulas of a. ARIB STD-B67 1.0 (Table 2) normalises E to reference white, so its E is BT.2100's 12E and runs to 12, and it prints the constants as digits:
+
+- its lower half is E′ = r·√E with r = 0.5, which is √(3E) of BT.2100's E;
+- its b = 0.28466892 is 1 − 4a exactly;
+- its c = 0.55991073 is 0.5 − a·ln(4a) rounded to 8 decimals: the formula gives 0.559910729…, just under it.
+
+The crate follows BT.2100's formulas. `tests/props/curve.rs` checks that ARIB's digits are these formulas, and that ARIB's OETF, with its rounded c, is within 5·10⁻⁹ of the crate's for every E from 0 to 12 in steps of 0.01.
+
+### What the tests check
+
+`tests/props/curve.rs`:
+
+- every code 64..=502, its exact light against (D − 64)²/(3·876²), and back to the code by every rounding in both domains;
+- every tie between them, in the signal and in the light, against a scan of every code;
+- the joint at E′ = ½, from both forms;
+- every code 503..=940 by the `f64` edge, against the standard's formula in std's `f64`, back to its code;
+- 100 001 lights from 1/12 to 1 against the standard's OETF in std's `f64`, the code certain where the reference's code position is at least 10⁻⁶ from a tie;
+- the `f64` edge on the lower half against the exact encode, at random lights and a few ulps from every tie.
+
+### Not here: the OOTF
+
+HLG's light is relative scene light. A display turns it into display light by the OOTF, a system gamma that depends on the display's peak luminance and that mixes the three components through their luminance. That is no curve of one component, so it isn't a `Curve`. It isn't in the crate yet.
+
 ## Other curves and the colour matrices
 
 These aren't in the crate yet; what each would be exact in:
 
-- **HLG** (BT.2100-3 Table 5, first ARIB STD-B67). The lower half is E′ = √(3E), so its inverse E = E′²/3 is exact: a 10-bit narrow-range code up to 502 decodes to (D − 64)²/(3·876²) exactly. The upper half is a·ln(12E − b) + c with a = 0.17883277, b = 1 − 4a and c = 0.5 − a·ln(4a). c is transcendental, and not a `Magnitude`, whose symbols are π, ln 2 and ln 10.
 - **sRGB** (IEC 61966-2-1). 12.92·L below a break and 1.055·L^(1/2.4) − 0.055 above it, all exact decimals. The standard prints two breakpoints, 0.0031308 for encoding and 0.04045 for decoding, and they aren't quite the same point: the two segments don't meet exactly at either. The linear toe is exact (8-bit codes 0 to 10 decode to k/(255·12.92)), the power segment isn't.
 - **R′G′B′ to Y′C′BC′R.** Exact. Y′ = K_R·R′ + K_G·G′ + K_B·B′ with K_G = 1 − K_R − K_B, C′B = (B′ − Y′)/(2(1 − K_B)) and C′R = (R′ − Y′)/(2(1 − K_R)). K_R and K_B are exact decimals (BT.709: 0.2126 and 0.0722; BT.601: 0.299 and 0.114; BT.2020: 0.2627 and 0.0593), so every coefficient is rational, and the digital form is an exact rational matrix followed by a named rounding.
 
