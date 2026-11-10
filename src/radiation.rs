@@ -11,11 +11,13 @@
 //!   radiations is a sum of the step's results.
 //! - **Dose equivalent** H = Q·D (CIPM 2002, Recommendation 2), what operational quantities such as H*(10) are made
 //!   of: [Fixed::dose_equivalent] with a quality factor Q, from the ICRU's Q(L) ([Icrp60::q_of_let]) or measured.
-//! - **Effective dose** E = Σ w_T·H_T, the tissue-weighted sum of equivalent doses (ICRP Publication 103, Table 3).
+//! - **Effective dose** E = Σ w_T·H_T, the tissue-weighted sum of equivalent doses (ICRP Publication 103, Table 3):
+//!   [Icrp103::effective_dose] of one [Icrp103Tissues], an equivalent dose per tissue, so none is left out.
 //!
 //! Every step is exact or `None`: an integer w_R that overflows the storage, a rational factor whose product isn't a
 //! whole number of the storage's step. The `_rounded` steps name the [Rounding]. A rate weights the same way, an
-//! absorbed dose rate into an equivalent dose rate.
+//! absorbed dose rate into an equivalent dose rate. A dose rate becomes its own kind of dose over a time by
+//! [Fixed::dose_over], a dose its rate by [Fixed::rate_over]: Ḣ*(10) gives H*(10) and no other.
 //!
 //! ```
 //! use exact_units::{Fixed, prefix::Micro, radiation::Icrp103, units::{EquivalentDose, Gray}};
@@ -47,12 +49,17 @@
 
 use crate::exact::Exact;
 use crate::quantities::{
-    AbsorbedDose, AbsorbedDoseRate, DoseEquivalent, DoseEquivalentRate, EquivalentDose,
-    EquivalentDoseRate,
+    AbsorbedDose, AbsorbedDoseRate, AmbientDoseEquivalent10, AmbientDoseEquivalentRate10,
+    DoseEquivalent, DoseEquivalentRate, EffectiveDose, EffectiveDoseRate, EquivalentDose,
+    EquivalentDoseRate, Kerma, KermaRate, PersonalDoseEquivalent0_07, PersonalDoseEquivalent10,
+    PersonalDoseEquivalentRate0_07, PersonalDoseEquivalentRate10,
 };
 use crate::quantity::steps::same_factor;
-use crate::units::{ElectronVolt, KiloElectronVoltPerMicrometer};
-use crate::{Bounds, Fixed, FixedScale, Magnitude, NanFree, QuantityExpr, Rounding, Storage, Unit};
+use crate::units::{ElectronVolt, KiloElectronVoltPerMicrometer, Second};
+use crate::{
+    Bounds, Fixed, FixedScale, Fraction, Magnitude, NanFree, QuantityExpr, Repr, Rounding, Storage,
+    Unit,
+};
 
 /// A weighting factor from a named, versioned source, exact: a radiation weighting factor w_R, a quality factor Q, or
 /// the user's own with its source said.
@@ -457,8 +464,8 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
                 clippy::cast_precision_loss,
                 reason = "the named float edge: an integer dose read as the nearest f64"
             )]
-            crate::Repr::Int(i) => i as f64,
-            crate::Repr::Float(f) => f,
+            Repr::Int(i) => i as f64,
+            Repr::Float(f) => f,
         };
         Fixed::try_new(x * w_r.w).ok()
     }
@@ -508,5 +515,465 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     fn weighted<U2: Unit>(self, w: Weight, r: Option<Rounding>) -> Option<Fixed<U2, P, T, B>> {
         let x: T = crate::fixed::scale_by(self.get(), w.num, w.den, r)?;
         Fixed::try_new(x).ok()
+    }
+}
+
+/// One value per tissue of ICRP Publication 103's Table 3 (the French edition's Tableau 4.2, again as Tableau B.2), in
+/// its order: the equivalent doses H_T of a Reference Person for [Icrp103::effective_dose], or the tissue weighting
+/// factors w_T themselves, [Icrp103::TISSUES]. A field per tissue, so an effective dose leaves none out.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Icrp103Tissues<X> {
+    /// Red bone marrow, w_T 0.12.
+    pub red_bone_marrow: X,
+    /// Colon, w_T 0.12.
+    pub colon: X,
+    /// Lung, w_T 0.12.
+    pub lung: X,
+    /// Stomach, w_T 0.12.
+    pub stomach: X,
+    /// Breast, w_T 0.12.
+    pub breast: X,
+    /// The remainder tissues, w_T 0.12: the arithmetic mean of the equivalent doses of the 13 remainder tissues of
+    /// each sex (Eq. 4.6, ¶128), the adrenals, the extrathoracic region, the gall bladder, heart, kidneys, lymphatic
+    /// nodes, muscle, oral mucosa, pancreas, prostate (male), small intestine, spleen, thymus and uterus/cervix
+    /// (female). ICRP 60's splitting rule for the remainder is gone, so the effective dose is a plain sum.
+    pub remainder: X,
+    /// Gonads, w_T 0.08.
+    pub gonads: X,
+    /// Bladder, w_T 0.04.
+    pub bladder: X,
+    /// Oesophagus, w_T 0.04.
+    pub oesophagus: X,
+    /// Liver, w_T 0.04.
+    pub liver: X,
+    /// Thyroid, w_T 0.04.
+    pub thyroid: X,
+    /// Bone surface, w_T 0.01.
+    pub bone_surface: X,
+    /// Brain, w_T 0.01.
+    pub brain: X,
+    /// Salivary glands, w_T 0.01.
+    pub salivary_glands: X,
+    /// Skin, w_T 0.01.
+    pub skin: X,
+}
+
+impl<X: Copy> Icrp103Tissues<X> {
+    /// The values in the table's order.
+    const fn values(&self) -> [X; 15] {
+        [
+            self.red_bone_marrow,
+            self.colon,
+            self.lung,
+            self.stomach,
+            self.breast,
+            self.remainder,
+            self.gonads,
+            self.bladder,
+            self.oesophagus,
+            self.liver,
+            self.thyroid,
+            self.bone_surface,
+            self.brain,
+            self.salivary_glands,
+            self.skin,
+        ]
+    }
+}
+
+/// A tissue weighting factor of ICRP 103's Table 3, in hundredths.
+const fn w_t(hundredths: u64, of: &'static str) -> Weight {
+    match Weight::new(hundredths, 100, of, Icrp103::SOURCE, Icrp103::YEAR) {
+        Some(w) => w,
+        None => Weight::whole(0, of, Icrp103::SOURCE, Icrp103::YEAR),
+    }
+}
+
+/// [Icrp103::TISSUES] in hundredths, the common denominator of Table 3; a compile error unless they sum to 1.
+const TISSUE_HUNDREDTHS: [i128; 15] = {
+    let w = Icrp103::TISSUES.values();
+    let mut k = [0i128; 15];
+    let mut sum = 0;
+    let mut i = 0;
+    #[expect(
+        clippy::indexing_slicing,
+        clippy::as_conversions,
+        reason = "const code over two arrays of 15; each w_T is a whole number of hundredths, at most 12"
+    )]
+    while i < 15 {
+        let (num, den) = w[i].ratio();
+        assert!(
+            100 % den == 0,
+            "a w_T of Table 3 is a whole number of hundredths"
+        );
+        k[i] = (num * (100 / den)) as i128;
+        sum += k[i];
+        i += 1;
+    }
+    assert!(sum == 100, "the w_T of Table 3 sum to 1");
+    k
+};
+
+impl Icrp103 {
+    /// The tissue weighting factors w_T of Table 3 (Tableau 4.2 and B.2 of the French edition), mean values over both
+    /// sexes and all ages, for the effective dose.
+    pub const TISSUES: Icrp103Tissues<Weight> = Icrp103Tissues {
+        red_bone_marrow: w_t(12, "red bone marrow"),
+        colon: w_t(12, "colon"),
+        lung: w_t(12, "lung"),
+        stomach: w_t(12, "stomach"),
+        breast: w_t(12, "breast"),
+        remainder: w_t(12, "remainder tissues"),
+        gonads: w_t(8, "gonads"),
+        bladder: w_t(4, "bladder"),
+        oesophagus: w_t(4, "oesophagus"),
+        liver: w_t(4, "liver"),
+        thyroid: w_t(4, "thyroid"),
+        bone_surface: w_t(1, "bone surface"),
+        brain: w_t(1, "brain"),
+        salivary_glands: w_t(1, "salivary glands"),
+        skin: w_t(1, "skin"),
+    };
+
+    /// The effective dose E = Σ w_T·H_T of these equivalent doses of a Reference Person, H_T sex-averaged, w_T of
+    /// Table 3 ([TISSUES](Self::TISSUES)); of equivalent dose rates, the effective dose rate. `U2` is a unit of
+    /// [EffectiveDose] (of [EffectiveDoseRate]) with `U`'s factor, `units::EffectiveDose` for `units::EquivalentDose`.
+    /// Exact or `None`: where the sum isn't a whole number of the storage's step (w_T are hundredths), past `T` or
+    /// outside `B`; [effective_dose_rounded](Self::effective_dose_rounded) rounds once. A float storage too is exact
+    /// or `None`. [effective_dose_by_sex](Self::effective_dose_by_sex) takes the two Reference Persons apart.
+    ///
+    /// ```
+    /// use exact_units::{Fixed, prefix::Micro, radiation::{Icrp103, Icrp103Tissues}, units::{EffectiveDose, EquivalentDose}};
+    ///
+    /// let mut h = Icrp103Tissues::<Fixed<EquivalentDose, Micro, u32>>::default();
+    /// h.thyroid = Fixed::new(50_000); // 50 mSv to the thyroid alone
+    /// h.lung = Fixed::new(1000);
+    /// let e: Fixed<EffectiveDose, Micro, u32> = Icrp103::effective_dose(&h).unwrap();
+    /// assert_eq!(e.get(), 2120); // 0.04 · 50 000 + 0.12 · 1000
+    /// ```
+    ///
+    /// An equivalent dose of one organ is no effective dose, and an absorbed dose takes its w_R first:
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Fixed, prefix::Micro, radiation::{Icrp103, Icrp103Tissues}, units::{EffectiveDose, Gray}};
+    /// let d = Icrp103Tissues::<Fixed<Gray, Micro, u32>>::default();
+    /// let _: Option<Fixed<EffectiveDose, Micro, u32>> = Icrp103::effective_dose(&d);
+    /// ```
+    #[must_use]
+    pub fn effective_dose<U2: Unit, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>>(
+        h: &Icrp103Tissues<Fixed<U, P, T, B>>,
+    ) -> Option<Fixed<U2, P, T, B>> {
+        const { check_effective::<U, U2>() };
+        effective(&[h], None)
+    }
+
+    /// [effective_dose](Self::effective_dose) rounded once by `r` where the sum isn't a whole number of the storage's
+    /// step; `None` past `T` or outside `B`.
+    #[must_use]
+    pub fn effective_dose_rounded<U2: Unit, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>>(
+        h: &Icrp103Tissues<Fixed<U, P, T, B>>,
+        r: Rounding,
+    ) -> Option<Fixed<U2, P, T, B>> {
+        const { check_effective::<U, U2>() };
+        effective(&[h], Some(r))
+    }
+
+    /// The effective dose of Eq. 4.5, E = Σ w_T·(H_T^M + H_T^F)/2, from the equivalent doses of the Reference Male
+    /// and the Reference Female (the remainder of each the mean of its 13 tissues, Eq. 4.6): exact or `None`, as
+    /// [effective_dose](Self::effective_dose), with nothing rounded in between.
+    ///
+    /// ```
+    /// use exact_units::{Fixed, prefix::Micro, radiation::{Icrp103, Icrp103Tissues}, units::{EffectiveDose, EquivalentDose}};
+    ///
+    /// let (mut male, mut female) = <(Icrp103Tissues<Fixed<EquivalentDose, Micro, u32>>, Icrp103Tissues<_>)>::default();
+    /// male.gonads = Fixed::new(100);
+    /// female.gonads = Fixed::new(300);
+    /// let e: Fixed<EffectiveDose, Micro, u32> = Icrp103::effective_dose_by_sex(&male, &female).unwrap();
+    /// assert_eq!(e.get(), 16); // 0.08 · (100 + 300) / 2
+    /// ```
+    #[must_use]
+    pub fn effective_dose_by_sex<U2: Unit, U: Unit, P: FixedScale, T: Storage, B: Bounds<T>>(
+        male: &Icrp103Tissues<Fixed<U, P, T, B>>,
+        female: &Icrp103Tissues<Fixed<U, P, T, B>>,
+    ) -> Option<Fixed<U2, P, T, B>> {
+        const { check_effective::<U, U2>() };
+        effective(&[male, female], None)
+    }
+
+    /// [effective_dose_by_sex](Self::effective_dose_by_sex) rounded once by `r`; `None` past `T` or outside `B`.
+    #[must_use]
+    pub fn effective_dose_by_sex_rounded<
+        U2: Unit,
+        U: Unit,
+        P: FixedScale,
+        T: Storage,
+        B: Bounds<T>,
+    >(
+        male: &Icrp103Tissues<Fixed<U, P, T, B>>,
+        female: &Icrp103Tissues<Fixed<U, P, T, B>>,
+        r: Rounding,
+    ) -> Option<Fixed<U2, P, T, B>> {
+        const { check_effective::<U, U2>() };
+        effective(&[male, female], Some(r))
+    }
+}
+
+/// What an effective dose takes and gives: equivalent doses (or their rates) into an effective dose (or its rate),
+/// one factor.
+const fn check_effective<U: Unit, U2: Unit>() {
+    let dose = U::QUANTITY.converts_typed(QuantityExpr::of::<EquivalentDose>());
+    let rate = U::QUANTITY.converts_typed(QuantityExpr::of::<EquivalentDoseRate>());
+    assert!(
+        dose || rate,
+        "an effective dose takes equivalent doses (Of<EquivalentDose, Sievert>) or their rates: an absorbed dose takes its w_R first, equivalent_dose"
+    );
+    assert!(
+        (dose && U2::QUANTITY.same_typed(QuantityExpr::of::<EffectiveDose>()))
+            || (rate && U2::QUANTITY.same_typed(QuantityExpr::of::<EffectiveDoseRate>())),
+        "effective_dose gives an effective dose (Of<EffectiveDose, Sievert>) or its rate"
+    );
+    assert!(
+        same_factor::<U, U2>(),
+        "an effective dose keeps the unit's factor (mSv to mSv): convert the result after"
+    );
+}
+
+/// Σ w_T·H_T over the Reference Persons `hs`, divided by their number, as a whole number of steps of `P`: exact for
+/// `r` `None`, else rounded once.
+fn effective<U: Unit, U2: Unit, P: FixedScale, T: Storage, B: Bounds<T>>(
+    hs: &[&Icrp103Tissues<Fixed<U, P, T, B>>],
+    r: Option<Rounding>,
+) -> Option<Fixed<U2, P, T, B>> {
+    let mut sum = Fraction::ZERO;
+    for h in hs {
+        for (h, k) in h.values().into_iter().zip(TISSUE_HUNDREDTHS) {
+            let h = match h.get().to_repr() {
+                Repr::Int(i) => Fraction::int(i),
+                Repr::Float(x) => Fraction::from_f64(x)?,
+            };
+            sum = sum.checked_add(h.checked_mul_int(k)?)?;
+        }
+    }
+    let n = i128::try_from(hs.len()).ok()?;
+    let e = sum.checked_div_int(n.checked_mul(100)?)?;
+    Fixed::try_new(crate::fixed::from_fraction(e, r)?).ok()
+}
+
+/// Each dose rate and its dose, for [Fixed::dose_over] and [Fixed::rate_over].
+const RATE_DOSE: [(QuantityExpr<'static>, QuantityExpr<'static>); 8] = [
+    (
+        QuantityExpr::of::<AbsorbedDoseRate>(),
+        QuantityExpr::of::<AbsorbedDose>(),
+    ),
+    (QuantityExpr::of::<KermaRate>(), QuantityExpr::of::<Kerma>()),
+    (
+        QuantityExpr::of::<DoseEquivalentRate>(),
+        QuantityExpr::of::<DoseEquivalent>(),
+    ),
+    (
+        QuantityExpr::of::<AmbientDoseEquivalentRate10>(),
+        QuantityExpr::of::<AmbientDoseEquivalent10>(),
+    ),
+    (
+        QuantityExpr::of::<PersonalDoseEquivalentRate10>(),
+        QuantityExpr::of::<PersonalDoseEquivalent10>(),
+    ),
+    (
+        QuantityExpr::of::<PersonalDoseEquivalentRate0_07>(),
+        QuantityExpr::of::<PersonalDoseEquivalent0_07>(),
+    ),
+    (
+        QuantityExpr::of::<EquivalentDoseRate>(),
+        QuantityExpr::of::<EquivalentDose>(),
+    ),
+    (
+        QuantityExpr::of::<EffectiveDoseRate>(),
+        QuantityExpr::of::<EffectiveDose>(),
+    ),
+];
+
+/// Whether `UR` measures a dose rate and `UD` its own dose, and `UT` is a time; the factor from the stored numbers of
+/// `self` (`US` at `PS`) and the time (`UT` at `PT`) to the result's (`UO` at `PO`), the time divided by for `per`.
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code (evaluated in const blocks), as documented"
+)]
+const fn rate_dose_factor<
+    UR: Unit,
+    UD: Unit,
+    US: Unit,
+    PS: FixedScale,
+    UT: Unit,
+    PT: FixedScale,
+    UO: Unit,
+    PO: FixedScale,
+>(
+    per: bool,
+) -> Fraction {
+    assert!(
+        UT::DIM.same_typed(Second::DIM),
+        "a dose rate's step takes a time"
+    );
+    let mut paired = false;
+    let mut i = 0;
+    #[expect(
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects,
+        reason = "const code over the 8 pairs, i < 8"
+    )]
+    while i < RATE_DOSE.len() {
+        let (r, d) = RATE_DOSE[i];
+        paired = paired || (UR::QUANTITY.same_typed(r) && UD::QUANTITY.same_typed(d));
+        i += 1;
+    }
+    assert!(
+        paired,
+        "dose_over and rate_over keep the kind: a dose rate (Gy/s, Of<AmbientDoseEquivalentRate10, SievertPerHour>) and its own dose (Gy, Of<AmbientDoseEquivalent10, Sievert>)"
+    );
+    let (Some(s), Some(t), Some(o)) = (
+        US::EXPR.magnitude(),
+        UT::EXPR.magnitude(),
+        UO::EXPR.magnitude(),
+    ) else {
+        panic!("a dose rate's step needs units whose factor is a magnitude")
+    };
+    let s = s.mul(PS::SCALE);
+    let t = t.mul(PT::SCALE);
+    let k = if per { s.div(t) } else { s.mul(t) }.div(o.mul(PO::SCALE));
+    match Fraction::from_magnitude(&k) {
+        Some(k) => k,
+        None => panic!("the factor of a dose rate's step is not a fraction of u128s (π, a root)"),
+    }
+}
+
+/// The stored number of `x` as a [Fraction], `None` for a float that is NaN or infinite.
+fn stored<U, P, T: Storage, B: Bounds<T>>(x: Fixed<U, P, T, B>) -> Option<Fraction> {
+    match x.get().to_repr() {
+        Repr::Int(i) => Some(Fraction::int(i)),
+        Repr::Float(x) => Fraction::from_f64(x),
+    }
+}
+
+impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
+    /// The dose of this dose rate over the time `t`, of the rate's own kind: an absorbed dose rate gives an absorbed
+    /// dose, Ḣ*(10) gives H*(10), and no other. `U2` has the dose's quantity, in any unit, scale and storage
+    /// (`Of<AmbientDoseEquivalent10, Sievert>` from `Of<AmbientDoseEquivalentRate10, SievertPerHour>`). Exact or
+    /// `None`: where the dose isn't a whole number of `P2` (or no float of `T2`), past `T2` or outside `B2`;
+    /// [dose_over_rounded](Self::dose_over_rounded) rounds once. A product `rate * t` is a plain one, which
+    /// `as_quantity` names any kind; this step keeps the pair.
+    ///
+    /// ```
+    /// use exact_units::{Fixed, prefix::{Micro, Nano, One}, quantities::{AmbientDoseEquivalent10, AmbientDoseEquivalentRate10}};
+    /// use exact_units::units::{Minute, Of, Sievert, SievertPerHour};
+    ///
+    /// let rate = Fixed::<Of<AmbientDoseEquivalentRate10, SievertPerHour>, Micro, u32>::new(3); // 3 µSv/h
+    /// let t = Fixed::<Minute, One, u32>::new(20);
+    /// let h: Fixed<Of<AmbientDoseEquivalent10, Sievert>, Nano, u32> = rate.dose_over(t).unwrap();
+    /// assert_eq!(h.get(), 1000); // 1 µSv in 20 minutes
+    /// ```
+    ///
+    /// The dose of an ambient dose equivalent rate is no personal dose equivalent:
+    ///
+    /// ```compile_fail
+    /// use exact_units::{Fixed, prefix::{Micro, One}, quantities::{AmbientDoseEquivalentRate10, PersonalDoseEquivalent10}};
+    /// use exact_units::units::{Of, Second, Sievert, SievertPerHour};
+    /// let rate = Fixed::<Of<AmbientDoseEquivalentRate10, SievertPerHour>, Micro, u32>::new(3);
+    /// let _: Option<Fixed<Of<PersonalDoseEquivalent10, Sievert>, Micro, u32>> = rate.dose_over(Fixed::<Second, One, u32>::new(1));
+    /// ```
+    #[must_use]
+    pub fn dose_over<
+        U2: Unit,
+        P2: FixedScale,
+        T2: Storage,
+        B2: Bounds<T2>,
+        UT: Unit,
+        PT: FixedScale,
+        TT: Storage,
+        BT: Bounds<TT>,
+    >(
+        self,
+        t: Fixed<UT, PT, TT, BT>,
+    ) -> Option<Fixed<U2, P2, T2, B2>> {
+        let k = const { rate_dose_factor::<U, U2, U, P, UT, PT, U2, P2>(false) };
+        let x = stored(self)?.checked_mul(stored(t)?)?.checked_mul(k)?;
+        Fixed::try_new(crate::fixed::from_fraction(x, None)?).ok()
+    }
+
+    /// [dose_over](Self::dose_over) rounded once by `r` where the dose isn't a whole number of `P2`; `None` past `T2`
+    /// or outside `B2`.
+    #[must_use]
+    pub fn dose_over_rounded<
+        U2: Unit,
+        P2: FixedScale,
+        T2: Storage,
+        B2: Bounds<T2>,
+        UT: Unit,
+        PT: FixedScale,
+        TT: Storage,
+        BT: Bounds<TT>,
+    >(
+        self,
+        t: Fixed<UT, PT, TT, BT>,
+        r: Rounding,
+    ) -> Option<Fixed<U2, P2, T2, B2>> {
+        let k = const { rate_dose_factor::<U, U2, U, P, UT, PT, U2, P2>(false) };
+        let x = stored(self)?.checked_mul(stored(t)?)?.checked_mul(k)?;
+        Fixed::try_new(crate::fixed::from_fraction(x, Some(r))?).ok()
+    }
+
+    /// The mean rate of this dose over the time `t`, of the dose's own kind: H*(10) gives Ḣ*(10), an absorbed dose an
+    /// absorbed dose rate. `U2` has the rate's quantity, in any unit, scale and storage. Exact or `None`: where the
+    /// rate isn't a whole number of `P2`, for a zero time, past `T2` or outside `B2`;
+    /// [rate_over_rounded](Self::rate_over_rounded) rounds once.
+    ///
+    /// ```
+    /// use exact_units::{Fixed, prefix::{Micro, Nano, One}, quantities::{AmbientDoseEquivalent10, AmbientDoseEquivalentRate10}};
+    /// use exact_units::units::{Minute, Of, Sievert, SievertPerHour};
+    ///
+    /// let h = Fixed::<Of<AmbientDoseEquivalent10, Sievert>, Nano, u32>::new(1000); // 1 µSv
+    /// let t = Fixed::<Minute, One, u32>::new(20);
+    /// let rate: Fixed<Of<AmbientDoseEquivalentRate10, SievertPerHour>, Micro, u32> = h.rate_over(t).unwrap();
+    /// assert_eq!(rate.get(), 3); // 3 µSv/h
+    /// ```
+    #[must_use]
+    pub fn rate_over<
+        U2: Unit,
+        P2: FixedScale,
+        T2: Storage,
+        B2: Bounds<T2>,
+        UT: Unit,
+        PT: FixedScale,
+        TT: Storage,
+        BT: Bounds<TT>,
+    >(
+        self,
+        t: Fixed<UT, PT, TT, BT>,
+    ) -> Option<Fixed<U2, P2, T2, B2>> {
+        let k = const { rate_dose_factor::<U2, U, U, P, UT, PT, U2, P2>(true) };
+        let x = stored(self)?.checked_div(stored(t)?)?.checked_mul(k)?;
+        Fixed::try_new(crate::fixed::from_fraction(x, None)?).ok()
+    }
+
+    /// [rate_over](Self::rate_over) rounded once by `r` where the rate isn't a whole number of `P2`; `None` for a zero
+    /// time, past `T2` or outside `B2`.
+    #[must_use]
+    pub fn rate_over_rounded<
+        U2: Unit,
+        P2: FixedScale,
+        T2: Storage,
+        B2: Bounds<T2>,
+        UT: Unit,
+        PT: FixedScale,
+        TT: Storage,
+        BT: Bounds<TT>,
+    >(
+        self,
+        t: Fixed<UT, PT, TT, BT>,
+        r: Rounding,
+    ) -> Option<Fixed<U2, P2, T2, B2>> {
+        let k = const { rate_dose_factor::<U2, U, U, P, UT, PT, U2, P2>(true) };
+        let x = stored(self)?.checked_div(stored(t)?)?.checked_mul(k)?;
+        Fixed::try_new(crate::fixed::from_fraction(x, Some(r))?).ok()
     }
 }

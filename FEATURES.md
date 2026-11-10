@@ -448,8 +448,7 @@ counted units, and the kinds that keep look-alike quantities apart.
   `non_canonical_dims`), `tests/two_crates.rs` (a crate's `Pixel` takes `Radian`'s path), `tests/units.rs` (torque is
   not energy until stripped), `tests/props/dim.rs` (the const walk against plain sums and `DimOwned`, the wire),
   `tests/props/wire.rs` (`dims`: only a canonical `DimWire` decodes).
-- 🚧 **UNIT-12 Dose quantities and a named weighting** — the quantities and the weighting step are built;
-  effective dose from w_T and the rate ⇄ dose steps are next. Quantities, m²·s⁻², all kinds: `AbsorbedDose` with
+- ✅ **UNIT-12 Dose quantities and a named weighting** — Quantities, m²·s⁻², all kinds: `AbsorbedDose` with
   `Kerma` under it (the SI gives both the gray); `DoseEquivalent`, the SI's H = Q·D (CIPM 2002 Rec. 2) and bare
   `Sievert`'s, with the operational `AmbientDoseEquivalent10` H*(10), `PersonalDoseEquivalent10` Hp(10),
   `PersonalDoseEquivalent0_07` Hp(0.07) (ICRU 51 through ICRP 103 Table B.5) and ICRP's `EquivalentDose` H_T and
@@ -458,11 +457,16 @@ counted units, and the kinds that keep look-alike quantities apart.
   did). `LinearEnergyTransfer` (keV/µm) is a kind, not a force. The step: `exact_units::radiation`, `Weight` from a
   named set, `Icrp103` (Table 2; neutrons Eq. 4.3 as a float edge) and `Icrp60` (Table B.3, neutron bands exact;
   Q(L) exact where it is a fraction), `Fixed::equivalent_dose(w_R)` and `dose_equivalent(Q)` of a dose or its rate,
-  exact or `None`, `_rounded`, `equivalent_dose_f64`; `convert`'s error for Gy to Sv says to weight. Not built: the
+  exact or `None`, `_rounded`, `equivalent_dose_f64`; `convert`'s error for Gy to Sv says to weight. Effective dose:
+  `Icrp103::TISSUES` (Table 3's w_T), `Icrp103Tissues` (a field per tissue), `Icrp103::effective_dose` and
+  `effective_dose_by_sex` (Eq. 4.5), exact or `None`, `_rounded`, of doses or rates. A rate and its dose:
+  `Fixed::dose_over(t)` and `rate_over(t)` keep the pair (Ḣ*(10) to H*(10) and back), exact or `None`, `_rounded`.
+  Not built: the
   edition in the type (decided: named at the call), ICRU 95's operational quantities, H′(0.07, Ω), H′(3, Ω), Hp(3),
   ICRP 26 and US NRC quantities (the user's to declare). Plan: P2401 `design/radiation-quantities-plan.md`. Tests:
   `tests/quantities.rs`, `tests/units.rs` (`dose_rates_are_kinds`), `tests/props/radiation.rs` (every i16 by six
-  weights and every rounding, Q(L) walked to 1100 keV/µm, neutron band edges, a Kani proof), `conv_error`'s
+  weights and every rounding, Q(L) walked to 1100 keV/µm, neutron band edges, `effective_each_tissue`,
+  `effective_i64` and `rate_steps_walk` against `i128`, Kani proofs), `conv_error`'s
   `gray_to_sievert_hints_a_weighting`, `compile_fail` doctests. Book: [Doses and weighting](docs/maths/doses.md).
   P2401#10nov-1911b.
 - 📋 **UNIT-13 Quantities of s⁻¹ beyond Hz and Bq** — decay constant, reaction rate, count rate, and the fluence

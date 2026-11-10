@@ -1693,6 +1693,29 @@ pub(crate) fn scale_by<T: Storage>(x: T, num: u64, den: u64, r: Option<Rounding>
     exact_float::convert(x.to_repr(), f, r, Overflow::Checked)
 }
 
+/// `x` in `T`: exactly, else `None`, for `r` `None`; else rounded once by `r`, `None` past `T`. The result of a
+/// named step worked out as a [Fraction](crate::Fraction) ([radiation](crate::radiation)'s effective dose and
+/// rate steps).
+#[cfg(feature = "radiation")]
+pub(crate) fn from_fraction<T: Storage>(x: crate::Fraction, r: Option<Rounding>) -> Option<T> {
+    if !T::IS_FLOAT {
+        return match r {
+            None if !x.is_integer() => None,
+            None => T::from_int(x.round(Rounding::Truncate)?),
+            Some(r) => T::from_int(x.round(r)?),
+        };
+    }
+    // a float exactly or rounded once: the parts in u128, `None` for a fraction whose parts have no u128 form
+    let n = i128::try_from(x.numer()?).ok()?;
+    let n = if x.is_negative() { n.checked_neg()? } else { n };
+    let f = exact_float::Factor {
+        num: 1,
+        den: x.denom()?,
+        shift: 0,
+    };
+    exact_float::convert(Repr::Int(n), f, r, Overflow::Checked)
+}
+
 /// `x · scale` in `T`, if it is exact: `None` when not whole for an integer `T` or not a float of a float `T`, out of
 /// range, or with a power of π (no value but 0 has an exact one, and that is refused too).
 fn rescale<T: Storage>(x: Repr, scale: Magnitude) -> Option<T> {

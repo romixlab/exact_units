@@ -91,9 +91,73 @@ assert_eq!(ambient.get(), 6900);
 
 A Q from a measured spectrum is a `Weight` of the caller's, `Weight::new(num, den, of, source, year)`, with its source said.
 
+## Effective dose: E = Σ w_T·H_T
+
+The effective dose weights the equivalent doses of the organs and tissues of a Reference Person by the tissue weighting factors w_T of ICRP 103's Table 3 (the French edition's Tableau 4.2, again as Tableau B.2). `Icrp103::TISSUES` carries them, and `Icrp103Tissues` holds one value per tissue, so no tissue can be left out of the sum:
+
+| Tissue | w_T |
+|---|---|
+| Red bone marrow, colon, lung, stomach, breast, remainder tissues | 0.12 each |
+| Gonads | 0.08 |
+| Bladder, oesophagus, liver, thyroid | 0.04 each |
+| Bone surface, brain, salivary glands, skin | 0.01 each |
+
+```rust
+use exact_units::{Fixed, prefix::Micro, radiation::{Icrp103, Icrp103Tissues}};
+use exact_units::units::{EffectiveDose, EquivalentDose};
+
+let mut h = Icrp103Tissues::<Fixed<EquivalentDose, Micro, u32>>::default();
+h.thyroid = Fixed::new(50_000); // 50 mSv to the thyroid
+h.lung = Fixed::new(1000);
+let e: Fixed<EffectiveDose, Micro, u32> = Icrp103::effective_dose(&h).unwrap();
+assert_eq!(e.to_string(), "2120 µSv");
+```
+
+`effective_dose` takes the sex-averaged H_T. `effective_dose_by_sex(&male, &female)` is Eq. 4.5 itself, E = Σ w_T·(H_T^M + H_T^F)/2, with nothing rounded between the two. The remainder field is the arithmetic mean of the 13 remainder tissues of each sex (Eq. 4.6), as ICRP's dose coefficient tables give it; ICRP 60's splitting rule for the remainder is gone, so E is a plain sum.
+
+The w_T are hundredths, so a sum is often no whole number of the storage's step. The step is exact or `None`, as the weightings are, and `effective_dose_rounded` rounds once, at the end. A float storage is exact or `None` too: 0.04 · 0.5 mSv is no `f64`. Equivalent dose rates give an effective dose rate the same way. An absorbed dose is refused: it takes its w_R first.
+
+```rust,compile_fail
+use exact_units::{Fixed, prefix::Micro, radiation::{Icrp103, Icrp103Tissues}, units::{EffectiveDose, Gray}};
+
+let d = Icrp103Tissues::<Fixed<Gray, Micro, u32>>::default();
+let _: Option<Fixed<EffectiveDose, Micro, u32>> = Icrp103::effective_dose(&d);
+```
+
+## A rate and its dose
+
+A dose rate times a time is a plain product, `Derived`, and `as_quantity` could name it any quantity of that dimension. The named steps keep the pair: `rate.dose_over(t)` gives the dose of the rate's own kind, and `dose.rate_over(t)` the mean rate of the dose's kind. Ḣ*(10) over a time is an H*(10), never an Hp(10) or an effective dose. The pairs are each dose rate of the tree above with its dose: `AbsorbedDoseRate` and `AbsorbedDose`, `KermaRate` and `Kerma`, and so on for the dose equivalent, the three operational quantities, the equivalent dose and the effective dose.
+
+```rust
+use exact_units::{Fixed, prefix::{Micro, Nano, One}};
+use exact_units::quantities::{AmbientDoseEquivalent10, AmbientDoseEquivalentRate10};
+use exact_units::units::{Minute, Of, Sievert, SievertPerHour};
+
+// a survey meter reads 3 µSv/h; 20 minutes there
+let rate = Fixed::<Of<AmbientDoseEquivalentRate10, SievertPerHour>, Micro, u32>::new(3);
+let t = Fixed::<Minute, One, u32>::new(20);
+let h: Fixed<Of<AmbientDoseEquivalent10, Sievert>, Nano, u32> = rate.dose_over(t).unwrap();
+assert_eq!(h.to_string(), "1000 nSv");
+// and back
+let back: Fixed<Of<AmbientDoseEquivalentRate10, SievertPerHour>, Micro, u32> = h.rate_over(t).unwrap();
+assert_eq!(back, rate);
+```
+
+The result's unit, scale and storage are the caller's, usually given by the binding; the factor between the units (Sv/h times minutes into Sv) is worked out at compile time. The step is exact or `None` (a result that isn't a whole number of its step, a zero time, a value past the storage); `dose_over_rounded` and `rate_over_rounded` round once.
+
+```rust,compile_fail
+use exact_units::{Fixed, prefix::{Micro, One}};
+use exact_units::quantities::{AmbientDoseEquivalentRate10, PersonalDoseEquivalent10};
+use exact_units::units::{Of, Second, Sievert, SievertPerHour};
+
+// an area monitor's rate gives no personal dose equivalent
+let rate = Fixed::<Of<AmbientDoseEquivalentRate10, SievertPerHour>, Micro, u32>::new(3);
+let _: Option<Fixed<Of<PersonalDoseEquivalent10, Sievert>, Micro, u32>> = rate.dose_over(Fixed::<Second, One, u32>::new(1));
+```
+
 ## What the crate doesn't do
 
-- **No effective dose from tissue doses yet.** E = Σ w_T·H_T over ICRP 103's Table 3 is the next piece (UNIT-12).
-- **No step from a rate to its dose.** A rate times a time is a plain product; `as_quantity` names it, and nothing stops naming it the wrong kind.
+- **Rate arithmetic keeps no kind.** `rate * t` and `dose / t` are plain products; only `dose_over` and `rate_over` keep the pair. A quantity that declares its rate, so the operators keep it too, is an idea (UNIT-16).
+- **The remainder's mean is the caller's.** Eq. 4.6's mean of 13 tissues per sex goes into the `remainder` field as a value; there is no step from the 13 tissues.
 - **ICRU Report 95's operational quantities** (2020: H*, Hp from conversion coefficients to E, no depth) are not here, nor H′(0.07, Ω), H′(3, Ω) and Hp(3) of ICRU 51.
 - **Older and national quantities** are the user's to declare: ICRP 26's effective dose equivalent, and the US NRC's TEDE, deep-dose and shallow-dose equivalents (10 CFR 20), which use ICRP 26/30 weights.
