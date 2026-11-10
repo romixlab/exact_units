@@ -292,6 +292,18 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
 - ✅ **NUM-29 `assert_in!`, a constant checked against `q!`** — `assert_in!(X, q!(9.542425... dB))` checks a constant in a `const { }` block, `X` back where it is in the range (so it builds a `const` too), else a compile error naming it: for a prefix of digits the value's own decimal and the prefix of the same places it has, ready to paste (`it is 9.542 V, its first 2 decimals are q!(9.54... V)`); for any other range the value and the stored values the range holds after its fit. The macro calls a hidden `const fn assert_in_const` on `Fixed` (each storage), `Exact` and `Point`, which reads the folded ends from the hidden trait `literal::range::Folded<V>` (associated consts, as a `const fn` can't call a trait method); `Contains` reads the same consts, one fold for both. `q!` emits fit code 3 for a prefix (`Inside` for the fold), so a prefix is told from the same range written out. Named in the literal's unit (`q!` takes an SI prefix into the number: `4950.0... mV` is named in V with 4 places), a point in its own frame. Not done: a level range shows the gains, not the value's digits in dB (a logarithm at compile time). Tests: `tests/compile_fail/q_assert_in.rs` (integer, float, `Exact`, point, level, a negative prefix), `tests/props/q_range.rs` (`assert_in_prefix_walks_i16`, `assert_in_prefix_walks_every_third`, against `reference::range::cut_decimal`), `compile_fail` doctests on `assert_in!`. Docs: [Checked at compile time](docs/start/literals.md#checked-at-compile-time). P2401#8nov-0724.
 
 - ✅ **NUM-31 A set of values as a bound, and the CAN FD DLC** — `OneOf<S>`, a bound whose values are a set with gaps, listed once by a `ValueSet` marker (`const VALUES: &'static [i64]`, ascending, checked at compile time; stable Rust takes no slice as a const parameter). For the integer storages of `Range`. `Bounds` gains `SET: Option<&'static [i64]>`, so `contains`, and with it `try_new`, `to_bounds`, serde and the wire read, refuse a value in a gap; the `const fn bounded` and `fixed!` too, at compile time. `OutOfRange` lists the set, a run as its ends: `13 B is out of {0..=8, 12, 16, 20, 24, 32, 48, 64} B (Byte, u8)`. The wire names a gap value `Rule::NoValue` and one past the ends `Rule::Range`. `try_new_rounded(value, Rounding)` rounds into the set by a named rounding, a tie to the even position or away from zero; `checked_*` is `None` in a gap, `saturating_*` a compile error, a `Fixed::window` and a `q!` tolerance window end on set values. `MIN`/`MAX`/`INT_RANGE` are the set's ends, so proofs from them and a `Niched`'s room see the whole range between. `codec::CanFdLengths` is CAN FD's set (0..=8, 12, 16, 20, 24, 32, 48, 64 bytes), and `codec::CanFdDlc` the first `CodecShape::Table` codec (feature `information`): `u8` codes 0..=15 (16..=255 spare) to `Fixed<Byte, One, u8, OneOf<CanFdLengths>>`, DLC 9 is 12 bytes exactly, encoding exact. `CodecShape::Table` decodes and encodes from the data alone, rounding among the codes that aren't spare. Source: ST RM0468 Rev 3 (STM32H72x/73x reference manual), §61.4.1, Table 503 "DLC coding in FDCAN", p. 2510, which implements ISO 11898-1:2015; Linux's `can_fd_dlc2len` agrees. Tests: `tests/props/can_fd.rs` (every byte as a DLC by both paths, every `u8` length by every rounding against the table written out in the test, every `i16` against a signed set, the wire, serde, windows, a Kani proof of the decode), `src/codec/tests.rs` (an unordered table with a spare code), doctests and `compile_fail` blocks on `OneOf`. Docs: [A set of values](docs/maths/bounds.md#a-set-of-values), [A table: the CAN FD DLC](docs/fixed_point/codecs.md#a-table-the-can-fd-dlc). Follow-ups: a `Rule` of its own that lists the set on the wire, `OneOf` in WireWeaver's model and walker, embedded_bedrock's `fd_len` on these types (filed in P2401). P2401#10nov-1005.
+- 📋 **NUM-32 Measured masses from a named set** — m_u (the dalton), M_u, m_e and m_p from `Codata2018` /
+  `Codata2022`, as μ₀ and G are: today `Constants` gives μ₀ and G only and `Magnitude` has no dalton symbol, so a mass
+  in u (AME2020) reaches an energy only through m_u·c² digits the user writes (`examples/15_nuclear.rs` carries them
+  in a local trait). ²³⁸U's rest energy moves 309 eV between the two editions; AME2020 used CODATA 2018's. Design
+  call: a symbol for m_u, set-only values, or both, and how a data table names its edition. P2401#10nov-1910.
+- 📋 **NUM-33 `Exact` beyond `u128`** — a power-of-ten (and two) exponent in `Fraction`, or wider limbs: 8.68·10⁻³⁰
+  kg with c² below it, and N_A times a molar mass with CODATA's M_u, give `None` today. P2401#10nov-1910b.
+- 📋 **NUM-34 Quantity steps on `Exact`** — `as_quantity`, `up` and `to_system` as `Fixed` has them: λ·N to Bq and
+  eV to `systems::Natural` go through a `Fixed` today. P2401#10nov-1911.
+- 💡 **NUM-35 A run-time exact value with symbols** — a fraction times powers of π, ln 2 and ln 10 at run time, so
+  A = ln 2 · N/T½ stays exact until a named edge (and 2⁻ᵏ after k half-lives is exact). P2401#10nov-1911e.
+
 ## Units and markers (`UNIT`)
 
 The unit markers themselves: SI derived units, Imperial and US customary, calendar units, more
@@ -437,6 +449,16 @@ counted units, and the kinds that keep look-alike quantities apart.
   `non_canonical_dims`), `tests/two_crates.rs` (a crate's `Pixel` takes `Radian`'s path), `tests/units.rs` (torque is
   not energy until stripped), `tests/props/dim.rs` (the const walk against plain sums and `DimOwned`, the wire),
   `tests/props/wire.rs` (`dims`: only a canonical `DimWire` decodes).
+- 📋 **UNIT-12 Dose quantities and a named weighting** — Gy to Sv by a weighting factor from a named, versioned set
+  (ICRP 103 Table 2, ICRP 60; the ICRU's Q(L)), and quantities apart for the CIPM's dose equivalent H = Q·D, ICRP's
+  equivalent dose H_T and effective dose E, which share the sievert; today `DoseEquivalent` stands for all and
+  `units::Sievert`'s doc calls it "equivalent dose". P2401#10nov-1911b.
+- 📋 **UNIT-13 Quantities of s⁻¹ beyond Hz and Bq** — decay constant, reaction rate, count rate, and the fluence
+  rate (m⁻²·s⁻¹), with the named steps physics gives (λ·N is an activity). P2401#10nov-1911c.
+- 📋 **UNIT-14 Nuclear units** — barn, curie, rad, rem, röntgen, the dalton (after NUM-32) and years named apart
+  (Julian 365.25 d; NUBASE2020's 365.2422 d, `conventional`), an opt-in group. The book's
+  [nuclear physics recipes](docs/recipes/nuclear.md) declare the barn, the curie and NUBASE's year with `unit!` meanwhile.
+  P2401#10nov-1911d.
 
 ## Points and origins (`PT`)
 
@@ -676,6 +698,10 @@ the command line, databases, Arrow.
   as a ratio's scale, as `serde::with_unit` reads them; American spellings of long names (`meter`, `liter`) as
   aliases where they don't clash; a lookup index so a word isn't matched against every unit and prefix (the fuzz
   target runs about 100 inputs a second).
+- 💡 **IO-11 Values with a standard uncertainty** — as CODATA, AME2020 and NUBASE2020 print them (1600(7) y):
+  exact as printed, first-order propagation, the `(7)` form in text; only μ₀ and G carry one today (`Measured`,
+  `Resolved`). P2401#10nov-1911f.
+
 ## Dropped and superseded
 
 - **NUM-9 `Quantity` used at one fixed scale becomes `Fixed`** (was STD-57) — dropped (Roman, 27 Oct 2026): the per-use list of
