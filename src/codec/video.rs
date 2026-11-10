@@ -1,13 +1,15 @@
 //! Video codes: narrow-range quantization of a video signal (ITU-R BT.709, BT.2100) as exact [Codec]s, and
-//! the PQ transfer curve (BT.2100, first SMPTE ST 2084) as exact constants and a named float edge.
+//! the PQ and HLG transfer curves (BT.2100, first SMPTE ST 2084 and ARIB STD-B67) as exact data and a named float
+//! edge.
 //!
 //! A video component's digital code is two layers. The *quantizer* turns the non-linear signal E′ (0 is black, 1
 //! nominal white; −½..=½ for a colour difference) into a code: `D = INT[(219·E′ + 16)·2ⁿ⁻⁸]` for Y′, R′, G′, B′,
 //! `D = INT[(224·E′ + 128)·2ⁿ⁻⁸]` for C′B, C′R (ITU-R BT.709-6 Part 2 item 3.4; on 10 and 12 bits BT.2100-3 Table 9's narrow range).
 //! That is affine, so exact both ways: [Narrow8], [NarrowChroma8], [Narrow10] and [NarrowChroma10] are its codecs,
 //! [CodecShape::Offset] its shape, and their `Linear` is E′ itself, `Fixed<Ratio, Rational<1, 219>, ..>`. The
-//! *transfer curve* turns E′ into light: BT.709's or sRGB's power, PQ ([Pq]), HLG. Those are not exact (a PQ code
-//! means an irrational luminance for every code but two), so no curve here is a `Codec`.
+//! *transfer curve* turns E′ into light: BT.709's or sRGB's power, PQ ([Pq]), HLG ([Hlg]). Those are not exact (a
+//! PQ code means an irrational luminance for every code but two, an HLG code above E′ = ½ an irrational scene
+//! light), so no curve here is a `Codec`: each is a [Curve] over a quantizer, exact per value.
 //!
 //! Codes past nominal black and white are values, not errors: 1..=15 (footroom) and 236..=254 (headroom) carry a
 //! signal's undershoot and overshoot. Only 0 and 255 (10-bit: 0..=3 and 1020..=1023) are no value, the timing
@@ -31,9 +33,9 @@
 //! assert_eq!(Coded::<NarrowChroma8>::try_new(NarrowChroma8::ZERO, Rounding::NearestEven).map(Coded::raw), Ok(128));
 //! ```
 
-#[cfg(feature = "photometric")]
-use super::Curve;
-use super::{CodeSpan, Codec, CodecDef, CodecShape, CurveDef, CurveForm, Referred, Segment};
+use super::{
+    CodeSpan, Codec, CodecDef, CodecShape, Curve, CurveDef, CurveForm, ExpBase, Referred, Segment,
+};
 use crate::fixed::{Fixed, Range, prefix::Rational};
 use crate::system::def_list;
 use crate::units::Ratio;
@@ -435,4 +437,170 @@ impl Curve for Pq {
     type Light = crate::units::Nit;
 
     const DEF: CurveDef<'static> = Pq::DEF;
+}
+
+/// The HLG transfer curve, hybrid log-gamma, the scene-referred curve of high-dynamic-range video: ITU-R BT.2100-3
+/// Table 5 (first ARIB STD-B67). Its OETF takes a relative scene light E (0..=1) to the signal E′ (0..=1):
+///
+/// `E′ = √(3E)` for `E ≤ 1/12`, `E′ = a·ln(12E − b) + c` above, with `a = 0.17883277`, `b = 1 − 4a` and
+/// `c = 0.5 − a·ln(4a)`.
+///
+/// [DEF](Self::DEF) is its inverse, signal to scene light, as every curve here is written: `E = E′²/3` for
+/// `E′ ≤ ½`, `E = (exp((E′ − c)/a) + b)/12` above. `exp((E′ − c)/a)` is `4a·exp((E′ − ½)/a)`, so c, a
+/// transcendental number, is absorbed into the exponent's shift and every parameter is an exact [Fraction].
+///
+/// What is exact:
+///
+/// - **The lower half, both ways.** `E′²/3` is rational at every rational E′: a 10-bit narrow-range code up to
+///   502 (E′ = ½) decodes to `(D − 64)²/(3·876²)` exactly. The encode is exact too, though E′ = √(3E) is
+///   irrational for almost every E: [CurveDef::encode_exact] decides the code by comparing the light with the
+///   exact lights of codes and of half-codes, never by taking a root.
+/// - **The joint.** E′ = ½ is E = 1/12 by both halves, exactly (checked at compile time): `a/3 + b/12 = 1/12`
+///   because b = 1 − 4a.
+/// - **The constants.** [A](Self::A) and [B](Self::B) are the standard's decimals, exact.
+///
+/// What isn't: the upper half above E′ = ½. `exp` of a non-zero rational is irrational, so every code from 503 to
+/// 940 means an irrational light; [decode_exact](CurveDef::decode_exact) answers `None` there and the float edge,
+/// `_f64` (feature `libm`), is the way. [Curve::KIND] is [CurveKind::Float](super::CurveKind::Float). With a
+/// rounded to 8 decimals the ends don't quite meet: E′ = 1 is E ≈ 1.000000027, and E = 1 is E′ ≈ 0.999999995,
+/// both well inside code 940.
+///
+/// The light is relative scene light, [Ratio], 1 at the camera's peak: the OOTF that turns it into display light
+/// (a system gamma by the display's peak luminance, mixing the three components) is not a curve of one component
+/// and is not here.
+///
+/// ```
+/// use exact_units::codec::{Coded, Domain, EncodeError, Transfer};
+/// use exact_units::codec::video::{Hlg, Narrow10};
+/// use exact_units::units::Ratio;
+/// use exact_units::{Exact, Fraction, Rounding};
+///
+/// type HlgCode = Coded<Transfer<Narrow10, Hlg>>;
+/// let code = |k| HlgCode::try_from_raw(k).unwrap();
+/// // code 502 is E' = 1/2, scene light 1/12, exactly
+/// assert_eq!(code(502).light_exact(), Some(Exact::<Ratio>::of(Fraction::new(1, 12))));
+/// // code 300 is E' = 236/876: (236/876)^2/3, exactly
+/// assert_eq!(code(300).light_exact(), Some(Exact::<Ratio>::of(Fraction::new(236 * 236, 3 * 876 * 876))));
+/// // the upper half is no rational
+/// assert_eq!(code(700).light_exact(), None);
+/// // a scene light of 1/50 is code 279 (E' = sqrt(0.06) = 0.2449.., 876 E' + 64 = 278.58..), decided exactly
+/// let light = Exact::<Ratio>::of(Fraction::new(1, 50));
+/// assert_eq!(HlgCode::from_light_exact(light, Rounding::NearestAway, Domain::Signal).map(Coded::raw), Ok(279));
+/// // above 1/12 the exact encode can't decide, and says so
+/// let bright = Exact::<Ratio>::of(Fraction::new(1, 2));
+/// assert_eq!(HlgCode::from_light_exact(bright, Rounding::NearestAway, Domain::Signal).map(Coded::raw), Err(EncodeError::NotExact));
+/// ```
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Hlg;
+
+// a/3 + b/12 = 1/12: the upper half meets the lower one at E′ = ½ exactly, as b = 1 − 4a. Checked on the forms
+// of `Hlg::DEF`, at compile time: the upper one's e⁰ term plus its offset, the lower one's ½²/3.
+const _: () = {
+    let CurveForm::Exp { gain, offset, .. } = HLG_UPPER else {
+        panic!("HLG's upper half is an Exp form");
+    };
+    let CurveForm::Power { gain: g, .. } = HLG_LOWER else {
+        panic!("HLG's lower half is a Power form");
+    };
+    let (Some(upper), Some(lower)) = (gain.checked_add(offset), g.checked_div_int(4)) else {
+        panic!("HLG's constants add");
+    };
+    assert!(
+        matches!(upper.compare(lower), Ordering::Equal),
+        "HLG's halves meet at E' = 1/2"
+    );
+    assert!(
+        matches!(upper.compare(Fraction::new(1, 12)), Ordering::Equal),
+        "E' = 1/2 is E = 1/12"
+    );
+};
+
+/// `Some`'s value in a `const`, else a compile error.
+const fn known(f: Option<Fraction>) -> Fraction {
+    match f {
+        Some(f) => f,
+        None => panic!("an HLG constant overflows"),
+    }
+}
+
+impl Hlg {
+    /// a = 0.17883277 (BT.2100-3 Table 5).
+    pub const A: Fraction = Fraction::new(17_883_277, 100_000_000);
+
+    /// b = 1 − 4a = 0.28466892, exactly: BT.2100-3 writes the formula, ARIB STD-B67 the decimal, and they agree.
+    pub const B: Fraction = known(Fraction::ONE.checked_sub(known(Hlg::A.checked_mul_int(4))));
+
+    /// HLG as data: BT.2100-3 Table 5's inverse OETF, a [Power](CurveForm::Power) segment `E′²/3` from E′ = 0 and
+    /// an [Exp](CurveForm::Exp) segment `(4a·e^((E′ − ½)/a) + b)/12` from ½, scene light relative to 1.
+    pub const DEF: CurveDef<'static> = CurveDef {
+        id: MarkerId {
+            crate_name: "exact_units",
+            name: "Hlg",
+        },
+        referred: Referred::Scene,
+        unit: MarkerId {
+            crate_name: "exact_units",
+            name: "Ratio",
+        },
+        scale: Fraction::ONE,
+        low: Fraction::ZERO,
+        high: Fraction::ONE,
+        segments: def_list(&[
+            Segment {
+                from: Fraction::ZERO,
+                form: HLG_LOWER,
+            },
+            Segment {
+                from: Fraction::new(1, 2),
+                form: HLG_UPPER,
+            },
+        ]),
+    };
+}
+
+/// [Hlg]'s lower half, `E = E′²/3`.
+const HLG_LOWER: CurveForm = CurveForm::Power {
+    gain: Fraction::new(1, 3),
+    scale: Fraction::ONE,
+    shift: Fraction::ZERO,
+    exponent: Fraction::int(2),
+    offset: Fraction::ZERO,
+};
+
+/// [Hlg]'s upper half, `E = (exp((E′ − c)/a) + b)/12 = (a/3)·e^((E′ − ½)/a) + b/12`, c absorbed: `−c/a = −½/a +
+/// ln(4a)`, and `e^ln(4a)` is the factor 4a.
+const HLG_UPPER: CurveForm = CurveForm::Exp {
+    gain: known(Hlg::A.checked_div_int(3)),
+    base: ExpBase::E,
+    scale: known(Hlg::A.checked_recip()),
+    shift: Fraction::new(1, 2),
+    offset: known(Hlg::B.checked_div_int(12)),
+};
+
+#[cfg(feature = "libm")]
+impl Hlg {
+    /// The inverse OETF in `f64`: E′ (0..=1) to the scene light E, `None` for an E′ outside 0..=1 or NaN. A float
+    /// edge, named so: up to E′ = ½ the value is [decode_exact](CurveDef::decode_exact)'s rounded, above it `exp`
+    /// rounds. [CurveDef::decode_f64] of [Hlg::DEF], the data path's algorithm.
+    #[must_use]
+    pub fn inverse_oetf_f64(e: f64) -> Option<f64> {
+        Hlg::DEF.decode_f64(e)
+    }
+
+    /// The OETF in `f64`: the scene light E (0..=1) to E′, `None` for an E outside 0..=1 or NaN. A float edge:
+    /// `sqrt` up to 1/12, `ln` above, each rounded. [CurveDef::inverse_f64] of [Hlg::DEF].
+    #[must_use]
+    pub fn oetf_f64(light: f64) -> Option<f64> {
+        if !(0.0..=1.0).contains(&light) {
+            return None;
+        }
+        Hlg::DEF.inverse_f64(light)
+    }
+}
+
+/// HLG is a float curve: exact on its lower half alone ([CurveKind::Float](super::CurveKind::Float)).
+impl Curve for Hlg {
+    type Light = Ratio;
+
+    const DEF: CurveDef<'static> = Hlg::DEF;
 }

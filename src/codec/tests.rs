@@ -170,3 +170,13 @@ fn pq_is_a_float_curve_by_its_form() {
     assert_eq!(Pq::KIND, CurveKind::Float);
     assert_eq!(<Pq as Curve>::DEF.kind(), CurveKind::Float);
 }
+
+/// HLG's data names its two forms, an exact power and an `Exp`: not exact on every value.
+#[test]
+fn hlg_is_a_float_curve_by_its_forms() {
+    use super::video::Hlg;
+    use super::{Curve, CurveKind};
+
+    assert_eq!(Hlg::KIND, CurveKind::Float);
+    assert_eq!(<Hlg as Curve>::DEF.kind(), CurveKind::Float);
+}

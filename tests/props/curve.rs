@@ -1,6 +1,6 @@
 //! Transfer curves (LVL-9): a form's exact decode against big-rational powers, the exact encode against a scan of
 //! every code, the certified `f64` edge against the exact one, the float-free certified encode against both, PQ and
-//! an HLG-shaped curve through the typed path.
+//! HLG through the data and the typed path.
 #![cfg(not(any(kani, fuzzing)))]
 #![expect(
     clippy::arithmetic_side_effects,
@@ -9,7 +9,7 @@
 #![expect(clippy::unwrap_used, reason = "a property fails by panicking")]
 
 use crate::reference::curve::{encode_by_scan, pow};
-use exact_units::codec::video::Pq;
+use exact_units::codec::video::{Hlg, Pq};
 use exact_units::codec::{
     CurveDef, CurveForm, Domain, EncodeError, ExpBase, Quantizer, Referred, Segment,
 };
@@ -79,23 +79,6 @@ const SQUARE: [Segment; 1] = [Segment {
     },
 }];
 
-/// An HLG-shaped curve, BT.2100-3 Table 5's inverse OETF with a = 0.17883277: `E′²/3` up to ½, then `(4a·e^((E′ − ½)/a) + b)/12` with
-/// b = 1 − 4a, c absorbed into the exponent's shift. Exact up to ½ and at ½, not above.
-const HLG: [Segment; 2] = [
-    SQUARE[0],
-    Segment {
-        from: Fraction::new(1, 2),
-        form: CurveForm::Exp {
-            gain: Fraction::new(17_883_277, 300_000_000),
-            base: ExpBase::E,
-            scale: Fraction::new(100_000_000, 17_883_277),
-            shift: Fraction::new(1, 2),
-            // b/12 = (1 − 4a)/12
-            offset: Fraction::new(100_000_000 - 4 * 17_883_277, 1_200_000_000),
-        },
-    },
-];
-
 /// The power `x^(p/q)` of every `x = a/b` with `a` in 0..=40 and `b` in 1..=40, for exponents with roots and
 /// without: `decode_exact` answers exactly where the big-rational reference has an exact value that fits.
 #[test]
@@ -162,7 +145,7 @@ fn pq_and_exp_are_exact_where_they_can_be() {
             _ => assert_eq!(light, None, "code {k}"),
         }
     }
-    let hlg = curve(&HLG);
+    let hlg = Hlg::DEF;
     assert_eq!(
         hlg.decode_exact(Fraction::new(1, 2)),
         Some(Fraction::new(1, 12))
@@ -259,63 +242,262 @@ fn the_domains_differ_somewhere() {
     assert!(differs);
 }
 
-/// On the HLG-shaped curve, a light up to 1/12 (E′ = ½) encodes exactly, as the square curve's scan says, though
-/// E′ = √(3E) is irrational for almost all of them; above 1/12 the exact encode says it can't.
+/// HLG's lower half, every 10-bit code 64..=502 (E′ = 0..=½): its light is `(D − 64)²/(3·876²)` exactly, and
+/// comes back to the code by every rounding in both domains. Every half-code's light (a tie in the signal) and
+/// every midpoint of two codes' lights (a tie in the light) encodes as a scan of the codes says, though E′ = √(3E)
+/// is irrational for almost all of them. Above 1/12 the exact encode says it can't.
 #[test]
-fn hlg_encodes_exactly_on_its_lower_half() {
-    let c = curve(&HLG);
-    let square = curve(&SQUARE);
-    let (q, at, ties) = lights(&square, &NARROW10);
-    // codes 64..=502 are the lower half (E′ = 438/876 = ½ at 502)
-    let lower = 502 - q.low;
-    let lower = usize::try_from(lower).unwrap();
-    let (at, ties) = (&at[..=lower], &ties[..lower]);
-    let q_lower = Quantizer { high: 502, ..q };
-    for t in ties {
-        let y = small(t).unwrap();
+fn hlg_is_exact_on_its_lower_half() {
+    let c = Hlg::DEF;
+    let half = 502;
+    let at: Vec<BigRational> = (64..=half)
+        .map(|k| {
+            let d = k - 64;
+            BigRational::new(BigInt::from(d * d), BigInt::from(3 * 876 * 876))
+        })
+        .collect();
+    let ties: Vec<BigRational> = (64..half)
+        .map(|k| {
+            let twice = 2 * (k - 64) + 1;
+            BigRational::new(BigInt::from(twice * twice), BigInt::from(4 * 3 * 876 * 876))
+        })
+        .collect();
+    let two = BigRational::from_integer(BigInt::from(2));
+    for (i, k) in (64..=half).enumerate() {
+        let y = small(&at[i]).unwrap();
+        assert_eq!(
+            c.decode_exact(NARROW10.signal(k).unwrap()),
+            Some(y),
+            "code {k}"
+        );
         for r in ROUNDINGS {
             for d in [Domain::Signal, Domain::Light] {
-                let want = encode_by_scan(
-                    at,
-                    ties,
-                    q_lower.low,
-                    q_lower.zero,
-                    &big(y),
-                    r,
-                    d == Domain::Light,
-                );
                 assert_eq!(
-                    c.encode_exact(&NARROW10, y, r, d).ok(),
-                    want,
-                    "{y:?} by {r:?} in {d:?}"
+                    c.encode_exact(&NARROW10, y, r, d),
+                    Ok(k),
+                    "code {k} by {r:?} in {d:?}"
                 );
             }
         }
+        let Some(next) = at.get(i + 1) else { continue };
+        for t in [ties[i].clone(), (&at[i] + next) / &two] {
+            let y = small(&t).unwrap();
+            for r in ROUNDINGS {
+                for d in [Domain::Signal, Domain::Light] {
+                    let want = encode_by_scan(&at, &ties, 64, 64, &t, r, d == Domain::Light);
+                    assert_eq!(
+                        c.encode_exact(&NARROW10, y, r, d).ok(),
+                        want,
+                        "{y:?} by {r:?} in {d:?}"
+                    );
+                }
+            }
+        }
+    }
+    // the footroom is outside HLG's domain: no light, and no light below black
+    assert_eq!(c.decode_exact(NARROW10.signal(63).unwrap()), None);
+    // just above 1/12, between codes 502 and 503: 503's light is irrational, so no exact answer
+    let above = Fraction::new(1, 12)
+        .checked_add(Fraction::new(1, 1_000_000))
+        .unwrap();
+    for d in [Domain::Signal, Domain::Light] {
+        assert_eq!(
+            c.encode_exact(&NARROW10, above, Rounding::Floor, d),
+            Err(EncodeError::NotExact)
+        );
+        assert_eq!(
+            c.encode_exact(&NARROW10, Fraction::new(1, 2), Rounding::NearestAway, d),
+            Err(EncodeError::NotExact)
+        );
+    }
+}
+
+/// HLG's halves meet at E′ = ½ exactly: both forms give 1/12 there, so the curve is continuous, and in `f64` both
+/// sides of the joint are within an ulp or two of 1/12.
+#[test]
+fn hlg_is_continuous_at_one_half() {
+    let c = Hlg::DEF;
+    let half = Fraction::new(1, 2);
+    let lower = c.segment_at(Fraction::new(1, 4)).unwrap().form;
+    let upper = c.segment_at(half).unwrap().form;
+    assert_ne!(lower, upper);
+    assert_eq!(lower.decode_exact(half), Some(Fraction::new(1, 12)));
+    assert_eq!(upper.decode_exact(half), Some(Fraction::new(1, 12)));
+    assert_eq!(c.decode_exact(half), Some(Fraction::new(1, 12)));
+    for form in [lower, upper] {
+        let y = form.decode_f64(0.5).unwrap();
+        assert!((y - 1.0 / 12.0).abs() < 1e-16, "{y}");
+    }
+    let below = c.decode_f64(0.5_f64.next_down()).unwrap();
+    let above = c.decode_f64(0.5_f64.next_up()).unwrap();
+    assert!(below < above && above - below < 1e-15, "{below} {above}");
+}
+
+/// HLG's OETF as BT.2100-3 Table 5 writes it, in `f64` with std's `ln` and `sqrt` (the crate's runs libm's `log` on
+/// the `Exp` form's inverse), c as the formula: E′ for a scene light E in 0..=1.
+fn hlg_oetf_reference(e: f64) -> f64 {
+    let a = 0.178_832_77_f64;
+    let b = 1.0 - 4.0 * a;
+    let c = 0.5 - a * (4.0 * a).ln();
+    if e <= 1.0 / 12.0 {
+        (3.0 * e).sqrt()
+    } else {
+        a * (12.0 * e - b).ln() + c
+    }
+}
+
+/// HLG's inverse OETF as BT.2100-3 Table 5 writes it, in `f64` with std's `exp`: E for E′.
+fn hlg_inverse_oetf_reference(e: f64) -> f64 {
+    let a = 0.178_832_77_f64;
+    let b = 1.0 - 4.0 * a;
+    let c = 0.5 - a * (4.0 * a).ln();
+    if e <= 0.5 {
+        e * e / 3.0
+    } else {
+        (((e - c) / a).exp() + b) / 12.0
+    }
+}
+
+/// HLG's upper half, every 10-bit code 503..=940, through the certified `f64` edge: the light matches the
+/// standard's formula in std's `f64`, rises strictly, and comes back to its code by the nearest roundings in both
+/// domains (a code's own light is far from every tie); a directed rounding gives the code, the one beside it, or
+/// both where `f64` can't tell. The exact path says it can't.
+#[test]
+fn hlg_upper_half_by_the_f64_edge() {
+    let c = Hlg::DEF;
+    let mut last = c.decode_f64(0.5).unwrap();
+    for k in 503..=940 {
+        let e = NARROW10.signal(k).unwrap();
+        assert_eq!(c.decode_exact(e), None, "code {k}");
+        let y = c.decode_f64(e.to_f64()).unwrap();
+        let want = hlg_inverse_oetf_reference(e.to_f64());
+        assert!(
+            (y - want).abs() <= 4.0 * f64::EPSILON * want,
+            "code {k}: {y} against {want}"
+        );
+        assert!(y > last, "code {k}");
+        last = y;
+        for r in ROUNDINGS {
+            for d in [Domain::Signal, Domain::Light] {
+                let got = c.encode_f64(&NARROW10, y, r, d);
+                // the f64 light is a rounding of the code's own: a directed rounding may go a code down or up from
+                // it, and where f64 can't tell, the edge names both
+                let (below, above) = match r {
+                    Rounding::Floor | Rounding::Truncate => (k - 1, k),
+                    Rounding::Ceil => (k, (k + 1).min(940)),
+                    _ => (k, k),
+                };
+                match got {
+                    Ok(got) => assert!(
+                        (below..=above).contains(&got),
+                        "code {k} by {r:?} in {d:?}: {got}"
+                    ),
+                    Err(EncodeError::NearTie { below: b, above: a }) => {
+                        assert_eq!((b, a), (below, above), "code {k} by {r:?} in {d:?}");
+                    }
+                    Err(e) => panic!("code {k} by {r:?} in {d:?}: {e:?}"),
+                }
+            }
+        }
+        assert_eq!(
+            c.encode_exact(
+                &NARROW10,
+                Fraction::from_f64(y).unwrap(),
+                Rounding::NearestAway,
+                Domain::Signal
+            ),
+            Err(EncodeError::NotExact)
+        );
+    }
+}
+
+/// Scene lights from 1/12 to 1 in steps of 1/100 000 encode by the certified edge, in the signal domain, to the code
+/// the standard's OETF in std's `f64` rounds to: where the reference's code position is at least 10⁻⁶ from a
+/// tie, far beyond either side's few ulps, the edge gives that code; nearer, it gives that code or both candidates.
+#[test]
+fn hlg_encodes_every_light_as_the_standard() {
+    let c = Hlg::DEF;
+    for i in 0..=100_000_u32 {
+        let e = 1.0 / 12.0 + f64::from(i) * (11.0 / 12.0) / 100_000.0;
+        let e = e.min(1.0);
+        let pos = 876.0 * hlg_oetf_reference(e) + 64.0;
+        let want = pos.round();
+        let got = c.encode_f64(&NARROW10, e, Rounding::NearestAway, Domain::Signal);
+        if (pos - pos.floor() - 0.5).abs() >= 1e-6 {
+            assert_eq!(got.map(|k| k as f64), Ok(want), "E = {e}, position {pos}");
+        } else {
+            match got {
+                Ok(k) => assert_eq!(k as f64, want, "E = {e}"),
+                Err(EncodeError::NearTie { below, above }) => {
+                    assert_eq!((below as f64, above as f64), (pos.floor(), pos.ceil()));
+                }
+                Err(err) => panic!("E = {e}: {err:?}"),
+            }
+        }
+        let x = Hlg::oetf_f64(e).unwrap();
+        assert!((x - hlg_oetf_reference(e)).abs() < 1e-15, "E = {e}");
+    }
+}
+
+/// The ends of HLG's float edge: 0 both ways; E′ = 1 is E ≈ 1.000000027, a rounded 8-decimal a; E = 1 is E′ ≈
+/// 0.999999995, both inside code 940; outside 0..=1 is refused.
+#[test]
+fn hlg_ends() {
+    assert_eq!(Hlg::inverse_oetf_f64(0.0), Some(0.0));
+    assert_eq!(Hlg::oetf_f64(0.0), Some(0.0));
+    let top = Hlg::inverse_oetf_f64(1.0).unwrap();
+    assert!(top > 1.000_000_026 && top < 1.000_000_028, "{top}");
+    let white = Hlg::oetf_f64(1.0).unwrap();
+    assert!(white > 0.999_999_994 && white < 0.999_999_996, "{white}");
+    for bad in [-1e-300, 1.0 + f64::EPSILON, f64::NAN, f64::INFINITY] {
+        assert_eq!(Hlg::inverse_oetf_f64(bad), None);
+        assert_eq!(Hlg::oetf_f64(bad), None);
     }
     assert_eq!(
-        c.encode_exact(
-            &NARROW10,
-            Fraction::new(1, 12),
-            Rounding::NearestEven,
-            Domain::Signal
-        ),
-        Ok(502)
+        Hlg::DEF.encode_f64(&NARROW10, 1.0, Rounding::NearestAway, Domain::Signal),
+        Ok(940)
     );
     assert_eq!(
-        c.encode_exact(
-            &NARROW10,
-            Fraction::new(1, 2),
-            Rounding::NearestEven,
-            Domain::Signal
-        ),
-        Err(EncodeError::NotExact)
+        Hlg::DEF.encode_f64(&NARROW10, 1.000_001, Rounding::NearestAway, Domain::Signal),
+        Err(EncodeError::OutOfRange)
     );
+}
+
+/// BT.2100-3 writes b and c as formulas of a; ARIB STD-B67 1.0 Table 2 prints them as digits, b = 0.28466892 and c
+/// = 0.55991073, with E normalised to reference white (its E is BT.2100's 12E, running to 12) and r = 0.5. Its b is
+/// 1 − 4a exactly, its c is 0.5 − a·ln(4a) to 8 decimals, and its OETF is BT.2100's of E/12.
+#[test]
+fn hlg_matches_arib_std_b67() {
+    assert_eq!(Hlg::A, Fraction::new(17_883_277, 100_000_000));
+    assert_eq!(Hlg::B, Fraction::new(28_466_892, 100_000_000));
+    let a = Hlg::A.to_f64();
+    let c = 0.5 - a * (4.0 * a).ln();
+    assert_eq!(format!("{c:.8}"), "0.55991073");
+    let (b_arib, c_arib, r) = (0.284_668_92, 0.559_910_73, 0.5_f64);
+    for i in 0..=1200 {
+        let e_arib = f64::from(i) / 100.0;
+        let arib = if e_arib <= 1.0 {
+            r * e_arib.sqrt()
+        } else {
+            a * (e_arib - b_arib).ln() + c_arib
+        };
+        let ours = Hlg::oetf_f64(e_arib / 12.0).unwrap();
+        // ARIB's c is c rounded to 8 decimals: under 5·10⁻⁹ apart
+        assert!(
+            (arib - ours).abs() < 5e-9,
+            "E = {e_arib}: {arib} against {ours}"
+        );
+    }
 }
 
 /// The certified `f64` edge on the square curve never contradicts the exact encode of the same light (the `f64`'s
 /// own value): where it answers, it is the exact answer; where it can't, both candidates bracket it.
 fn f64_agrees_with_exact(y: f64) {
-    let c = curve(&SQUARE);
+    f64_agrees_on(&curve(&SQUARE), y);
+}
+
+/// [f64_agrees_with_exact] on the curve `c`, for a light where its exact encode answers.
+fn f64_agrees_on(c: &CurveDef<'_>, y: f64) {
     let exact = Fraction::from_f64(y).unwrap();
     for r in ROUNDINGS {
         for d in [Domain::Signal, Domain::Light] {
@@ -354,6 +536,22 @@ proptest! {
             y = if nudge > 0 { y.next_up() } else { y.next_down() };
         }
         f64_agrees_with_exact(y);
+    }
+
+    #[test]
+    fn hlg_f64_edge_never_contradicts_the_exact_one(y in 0.0..=1.0_f64 / 12.0) {
+        f64_agrees_on(&Hlg::DEF, y);
+    }
+
+    #[test]
+    fn hlg_f64_edge_at_ties(k in 64..502_i128, nudge in -4_i32..=4) {
+        // the f64 nearest a half-code's light on HLG's lower half, nudged by a few ulps
+        let half = Fraction::new(2 * (k - 64) + 1, 2 * 876);
+        let mut y = Hlg::DEF.decode_exact(half).unwrap().to_f64();
+        for _ in 0..nudge.unsigned_abs() {
+            y = if nudge > 0 { y.next_up() } else { y.next_down() };
+        }
+        f64_agrees_on(&Hlg::DEF, y);
     }
 }
 
@@ -446,7 +644,7 @@ fn codes_and_halves() -> impl Iterator<Item = Fraction> {
 #[test]
 fn the_interval_holds_the_exact_value() {
     let mut seen = 0;
-    for c in [curve(&SQUARE), curve(&HLG), Pq::DEF] {
+    for c in [curve(&SQUARE), Hlg::DEF, Pq::DEF] {
         for x in codes_and_halves() {
             let Some(want) = c.decode_exact(x) else {
                 continue;
@@ -470,7 +668,7 @@ fn the_interval_holds_the_exact_value() {
 /// are adjacent floats at most, the true value pinned to one `f64` gap.
 #[test]
 fn the_interval_holds_the_f64_value() {
-    for c in [Pq::DEF, curve(&HLG), curve(&BT709_POWER)] {
+    for c in [Pq::DEF, Hlg::DEF, curve(&BT709_POWER)] {
         for x in codes_and_halves() {
             if c.decode_exact(x).is_some() {
                 continue;
@@ -552,13 +750,13 @@ proptest! {
     #[test]
     fn the_certified_encode_is_the_exact_one(a in 0..=1000_i128, b in 1..=3000_u128) {
         certified_agrees_with_exact(&curve(&SQUARE), Fraction::new(a, b));
-        certified_agrees_with_exact(&curve(&HLG), Fraction::new(a, b));
+        certified_agrees_with_exact(&Hlg::DEF, Fraction::new(a, b));
     }
 
     #[test]
     fn the_certified_encode_never_contradicts_the_f64_one(y in 0.0..=10_000.0_f64) {
         certified_agrees_with_f64(&Pq::DEF, y);
-        certified_agrees_with_f64(&curve(&HLG), y / 10_000.0);
+        certified_agrees_with_f64(&Hlg::DEF, y / 10_000.0);
         certified_agrees_with_f64(&curve(&BT709_POWER), y / 10_000.0);
     }
 
@@ -566,7 +764,7 @@ proptest! {
     fn the_certified_encode_decides_the_f64_ties(k in 64..940_i128, nudge in -4_i32..=4) {
         // the f64 nearest a half-code's light, nudged by a few ulps: where the f64 edge names two codes
         let e = (f64::from(i32::try_from(k - 64).unwrap()) + 0.5) / 876.0;
-        for c in [Pq::DEF, curve(&HLG), curve(&BT709_POWER)] {
+        for c in [Pq::DEF, Hlg::DEF, curve(&BT709_POWER)] {
             let mut y = c.decode_f64(e).unwrap();
             for _ in 0..nudge.unsigned_abs() {
                 y = if nudge > 0 { y.next_up() } else { y.next_down() };
@@ -692,4 +890,52 @@ fn a_power_with_a_divisor_in_its_base() {
     assert_eq!(form.decode_exact(v), Some(Fraction::new(1, 1 << 20)));
     let y = form.decode_f64(0.5).unwrap();
     assert!((form.inverse_f64(y).unwrap() - 0.5).abs() < 1e-15);
+}
+
+/// HLG through the typed path, `Coded<Transfer<Narrow10, Hlg>>`: the same answers as the data, by the code's type.
+mod hlg_typed {
+    use exact_units::codec::video::{Hlg, Narrow10};
+    use exact_units::codec::{Coded, Domain, EncodeError, Transfer};
+    use exact_units::units::Ratio;
+    use exact_units::{Exact, Fraction, Rounding};
+
+    type HlgCode = Coded<Transfer<Narrow10, Hlg>>;
+
+    /// Every code of the lower half decodes exactly and encodes back by both domains; the upper half has no exact
+    /// light and its float light comes back to the code; footroom and headroom are outside HLG's domain.
+    #[test]
+    fn every_code() {
+        for k in 4..=1019_u16 {
+            let code = HlgCode::try_from_raw(k).unwrap();
+            let light = code.light_exact();
+            match k {
+                64..=502 => {
+                    let d = i128::from(k) - 64;
+                    let want = Exact::<Ratio>::of(Fraction::new(d * d, 3 * 876 * 876));
+                    assert_eq!(light, Some(want), "code {k}");
+                    for domain in [Domain::Signal, Domain::Light] {
+                        let back = HlgCode::from_light_exact(want, Rounding::NearestAway, domain);
+                        assert_eq!(back.map(Coded::raw), Ok(k));
+                    }
+                }
+                _ => assert_eq!(light, None, "code {k}"),
+            }
+            let float = code.light_f64();
+            if (64..=940).contains(&k) {
+                let y = float.unwrap();
+                for domain in [Domain::Signal, Domain::Light] {
+                    let back = HlgCode::from_light_f64(y, Rounding::NearestEven, domain);
+                    assert_eq!(back.map(Coded::raw), Ok(k), "code {k}");
+                }
+            } else {
+                assert_eq!(float, None, "code {k}");
+            }
+        }
+        let bright = Exact::<Ratio>::of(Fraction::new(1, 2));
+        assert_eq!(
+            HlgCode::from_light_exact(bright, Rounding::NearestAway, Domain::Signal)
+                .map(Coded::raw),
+            Err(EncodeError::NotExact)
+        );
+    }
 }
