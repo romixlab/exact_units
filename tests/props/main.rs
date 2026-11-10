@@ -28,6 +28,8 @@ mod exposure;
 #[cfg(not(any(kani, fuzzing)))]
 mod float_conv;
 mod format;
+#[cfg(feature = "dimensionless")]
+mod image_codecs;
 #[cfg(feature = "leap_seconds")]
 mod leap;
 #[cfg(feature = "levels")]

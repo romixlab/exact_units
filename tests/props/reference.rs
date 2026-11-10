@@ -1273,3 +1273,98 @@ pub(crate) fn round_div_big(
     };
     if up { f + 1 } else { f }
 }
+
+
+/// The integer arithmetic of image and video codecs, written out as the standards print it: floors by `div_euclid`,
+/// the roundings of T.871 and H.273 from their definitions, the lifting steps of T.800 and H.273 in `i128`.
+pub(crate) mod imaging {
+    /// `⌊p / d⌋`, `d > 0`.
+    pub(crate) fn floor(p: i128, d: i128) -> i128 {
+        p.div_euclid(d)
+    }
+
+    /// JFIF's Round(x) = ⌊x + 0.5⌋ (ITU-T T.871 clause 7) of `x = p / d`, `d > 0`: ⌊(2p + d) / 2d⌋. AV1's
+    /// Round2(x, n) = (x + 2ⁿ⁻¹) >> n is the same for `d = 2ⁿ`.
+    pub(crate) fn round_half_up(p: i128, d: i128) -> i128 {
+        (2 * p + d).div_euclid(2 * d)
+    }
+
+    /// H.273's Round(x) = Sign(x)·Floor(Abs(x) + 0.5) (eq. 8) of `x = p / d`, `d > 0`.
+    pub(crate) fn round_h273(p: i128, d: i128) -> i128 {
+        p.signum() * round_half_up(p.abs(), d)
+    }
+
+    /// T.800's periodic symmetric extension PSE₀(i, 0, n) (eq. F-4), `n >= 2`.
+    pub(crate) fn pse(i: i128, n: i128) -> usize {
+        let m = (i).rem_euclid(2 * (n - 1));
+        usize::try_from(m.min(2 * (n - 1) - m)).unwrap_or(0)
+    }
+
+    /// `x` at `i` of a signal of length `n` extended both ways (eq. F-3).
+    fn ext(x: &[i128], i: i128) -> i128 {
+        let n = i128::try_from(x.len()).unwrap_or(0);
+        x.get(pse(i, n)).copied().unwrap_or(0)
+    }
+
+    /// T.800's forward 5/3 lifting (F.4.8.1, eq. F-9 with the inverse's ⌊·/2⌋, and F-10), `i0 = 0`, `x.len() >= 2`:
+    /// `half` is the divisor of F-9, 2 for the transform F-5 and F-6 invert, 4 as the 2002 edition prints it.
+    pub(crate) fn fdwt53(x: &[i128], half: i128) -> Vec<i128> {
+        let odd = |k: i128| ext(x, k) - floor(ext(x, k - 1) + ext(x, k + 1), half);
+        (0..i128::try_from(x.len()).unwrap_or(0))
+            .map(|k| {
+                if k % 2 == 1 {
+                    odd(k)
+                } else {
+                    ext(x, k) + floor(odd(k - 1) + odd(k + 1) + 2, 4)
+                }
+            })
+            .collect()
+    }
+
+    /// T.800's inverse 5/3 lifting (F.3.8.1, eq. F-5 and F-6), `i0 = 0`, `y.len() >= 2`.
+    pub(crate) fn idwt53(y: &[i128]) -> Vec<i128> {
+        let even = |k: i128| ext(y, k) - floor(ext(y, k - 1) + ext(y, k + 1) + 2, 4);
+        (0..i128::try_from(y.len()).unwrap_or(0))
+            .map(|k| {
+                if k % 2 == 1 {
+                    ext(y, k) + floor(even(k - 1) + even(k + 1), 2)
+                } else {
+                    even(k)
+                }
+            })
+            .collect()
+    }
+
+    /// T.800's forward RCT (G.2.1, eq. G-3 to G-5).
+    pub(crate) fn rct(i: [i128; 3]) -> [i128; 3] {
+        let [i0, i1, i2] = i;
+        [floor(i0 + 2 * i1 + i2, 4), i2 - i1, i0 - i1]
+    }
+
+    /// T.800's inverse RCT (G.2.2, eq. G-6 to G-8).
+    pub(crate) fn rct_inverse(y: [i128; 3]) -> [i128; 3] {
+        let [y0, y1, y2] = y;
+        let i1 = y0 - floor(y2 + y1, 4);
+        [y2 + i1, i1, y1 + i1]
+    }
+
+    /// H.273's YCgCo-R (eq. 58 to 61) of `[R, G, B]`, chroma at `bits` (BitDepthC): `[Y, Cg, Co]`.
+    pub(crate) fn ycgco_r(rgb: [i128; 3], bits: u32) -> [i128; 3] {
+        let [r, g, b] = rgb;
+        let mid = 1_i128 << (bits - 1);
+        let co = r - b + mid;
+        let t = b + floor(co - mid, 2);
+        let cg = g - t + mid;
+        [t + floor(cg - mid, 2), cg, co]
+    }
+
+    /// H.273's inverse YCgCo-R (eq. 62 to 65) without the Clip3, which a round trip never needs: `[R, G, B]`.
+    pub(crate) fn ycgco_r_inverse(ycc: [i128; 3], bits: u32) -> [i128; 3] {
+        let [y, cg, co] = ycc;
+        let mid = 1_i128 << (bits - 1);
+        let t = y - floor(cg - mid, 2);
+        let g = t + cg - mid;
+        let b = t - floor(co - mid, 2);
+        [b + co - mid, g, b]
+    }
+}
