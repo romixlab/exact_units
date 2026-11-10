@@ -125,6 +125,7 @@ nav = [
             "recipes/sensors.md",
             "recipes/timing.md",
             "recipes/nuclear.md",
+            "recipes/video_time.md",
             "recipes/examples.md",
         ]
     },

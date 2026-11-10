@@ -81,6 +81,8 @@ pages! {
         feature = "time"
     ))]
     Nuclear = "recipes/nuclear.md";
+    #[cfg(feature = "time")]
+    VideoTime = "recipes/video_time.md";
     Magnitude = "nomicon/magnitude.md";
     Constants = "nomicon/constants.md";
 }
