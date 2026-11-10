@@ -1096,6 +1096,7 @@ impl Codec for CanFdDlc {
 }
 
 mod curve;
+pub mod matrix;
 mod transfer;
 
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]

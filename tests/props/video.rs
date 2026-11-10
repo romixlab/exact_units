@@ -15,8 +15,10 @@
 
 use exact_units::Rounding;
 use exact_units::codec::video::{
-    Narrow8, Narrow10, NarrowChroma8, NarrowChroma10, NarrowChromaSignal8, NarrowChromaSignal10,
-    NarrowSignal8, NarrowSignal10,
+    Full10, Full12, FullChroma10, FullChroma12, FullChromaSignal10, FullChromaSignal12,
+    FullSignal10, FullSignal12, Narrow8, Narrow10, Narrow12, NarrowChroma8, NarrowChroma10,
+    NarrowChroma12, NarrowChromaSignal8, NarrowChromaSignal10, NarrowChromaSignal12, NarrowSignal8,
+    NarrowSignal10, NarrowSignal12,
 };
 use exact_units::codec::{Codec, Coded};
 use exact_units::niche::{Niched, Reading};
@@ -65,6 +67,18 @@ const CHROMA10: Quantizer = Quantizer {
     factor: 224,
     offset8: 128,
     bits: 10,
+};
+
+const LUMA12: Quantizer = Quantizer {
+    factor: 219,
+    offset8: 16,
+    bits: 12,
+};
+
+const CHROMA12: Quantizer = Quantizer {
+    factor: 224,
+    offset8: 128,
+    bits: 12,
 };
 
 impl Quantizer {
@@ -143,6 +157,99 @@ fn every_code_decodes_and_encodes_back() {
     walk_codes::<NarrowChroma8, _, _>(CHROMA8);
     walk_codes::<Narrow10, _, _>(LUMA10);
     walk_codes::<NarrowChroma10, _, _>(CHROMA10);
+    walk_codes::<Narrow12, _, _>(LUMA12);
+    walk_codes::<NarrowChroma12, _, _>(CHROMA12);
+}
+
+/// One full-range quantizer's shape (BT.2100-3 Table 9): the factor (2ⁿ − 1, the same for luma and chroma) and the
+/// 8-bit-equivalent offset (0 for luma, 128 for chroma, so `offset8·depth` is 0 or 2ⁿ⁻¹). No reserved codes: every
+/// code 0..=factor is video data.
+#[derive(Copy, Clone)]
+struct FullQuantizer {
+    factor: i128,
+    offset8: i128,
+    bits: u32,
+}
+
+impl FullQuantizer {
+    /// 2ⁿ⁻⁸.
+    fn depth(self) -> i128 {
+        1 << (self.bits - 8)
+    }
+
+    /// The code of E′ = 0.
+    fn zero(self) -> i128 {
+        self.offset8 * self.depth()
+    }
+}
+
+const FULL_LUMA10: FullQuantizer = FullQuantizer {
+    factor: 1023,
+    offset8: 0,
+    bits: 10,
+};
+
+const FULL_CHROMA10: FullQuantizer = FullQuantizer {
+    factor: 1023,
+    offset8: 128,
+    bits: 10,
+};
+
+const FULL_LUMA12: FullQuantizer = FullQuantizer {
+    factor: 4095,
+    offset8: 0,
+    bits: 12,
+};
+
+const FULL_CHROMA12: FullQuantizer = FullQuantizer {
+    factor: 4095,
+    offset8: 128,
+    bits: 12,
+};
+
+/// One full-range codec's walk: every `u16`, both paths, against `q`.
+fn walk_full_codes<C: Codec<Linear = Fixed<Ratio, P, i16, B>>, P, B: Bounds<i16>>(q: FullQuantizer)
+where
+    C::Raw: TryFrom<i128> + Into<i128>,
+{
+    for raw in 0..=65535_i128 {
+        let Ok(code) = C::Raw::try_from(raw) else {
+            panic!("{raw} fits the raw storage")
+        };
+        let typed = C::decode(code).map(|v| i128::from(v.get()));
+        let data = C::DEF.decode(raw);
+        let want = (0..=q.factor).contains(&raw).then(|| raw - q.zero());
+        assert_eq!(typed, want, "{} decodes code {raw}", C::DEF.id.name);
+        assert_eq!(data, want, "{}'s DEF decodes code {raw}", C::DEF.id.name);
+        assert_eq!(Coded::<C>::try_from_raw(code).is_ok(), want.is_some());
+        if let Some(v) = C::decode(code) {
+            for r in ROUNDINGS {
+                let back = C::encode(v, r).map(Into::into);
+                assert_eq!(
+                    back,
+                    Some(raw),
+                    "{} encodes code {raw}'s value by {r:?}",
+                    C::DEF.id.name
+                );
+                let data = C::DEF.encode(i128::from(v.get()), r);
+                assert_eq!(
+                    data,
+                    Some(raw),
+                    "{}'s DEF encodes code {raw}'s value by {r:?}",
+                    C::DEF.id.name
+                );
+            }
+        }
+    }
+}
+
+/// Every code of the four full-range quantizers, both paths: every code 0..=2ⁿ−1 is a value, nothing reserved.
+#[test]
+fn every_full_range_code_decodes_and_encodes_back() {
+    walk_full_codes::<Full10, _, _>(FULL_LUMA10);
+    walk_full_codes::<FullChroma10, _, _>(FULL_CHROMA10);
+    walk_full_codes::<Full12, _, _>(FULL_LUMA12);
+    walk_full_codes::<FullChroma12, _, _>(FULL_CHROMA12);
 }
 
 /// E′ = `x`/4096 quantized by the crate (`to_rounded` to the codec's step by `r`, then `encode`) against the
@@ -185,6 +292,7 @@ fn quantizing_e_prime_is_the_standards_int() {
         for x in -820..=5325 {
             quantize_matches_int::<Narrow8, Rational<1, 219>, _>(LUMA8, x, r);
             quantize_matches_int::<Narrow10, Rational<1, 876>, _>(LUMA10, x, r);
+            quantize_matches_int::<Narrow12, Rational<1, 3504>, _>(LUMA12, x, r);
             // chroma's E' is -0.5..=0.5: the same walk shifted down
             ties += u32::from(quantize_matches_int::<NarrowChroma8, Rational<1, 224>, _>(
                 CHROMA8,
@@ -193,6 +301,11 @@ fn quantizing_e_prime_is_the_standards_int() {
             ));
             ties += u32::from(quantize_matches_int::<NarrowChroma10, Rational<1, 896>, _>(
                 CHROMA10,
+                x - 2560,
+                r,
+            ));
+            ties += u32::from(quantize_matches_int::<NarrowChroma12, Rational<1, 3584>, _>(
+                CHROMA12,
                 x - 2560,
                 r,
             ));
@@ -255,6 +368,53 @@ fn named_levels() {
             chroma10(NarrowChroma10::NOMINAL_MAX)
         ),
         (Some(64), Some(512), Some(960))
+    );
+    let code12 = |v: NarrowSignal12| Narrow12::encode(v, Rounding::NearestEven);
+    assert_eq!(
+        (code12(Narrow12::BLACK), code12(Narrow12::WHITE)),
+        (Some(256), Some(3760))
+    );
+    let chroma12 = |v: NarrowChromaSignal12| NarrowChroma12::encode(v, Rounding::NearestEven);
+    assert_eq!(
+        (
+            chroma12(NarrowChroma12::NOMINAL_MIN),
+            chroma12(NarrowChroma12::ZERO),
+            chroma12(NarrowChroma12::NOMINAL_MAX)
+        ),
+        (Some(256), Some(2048), Some(3840))
+    );
+}
+
+/// The full-range codecs' named levels are the standard's codes (BT.2100-3 Table 9).
+#[test]
+fn named_levels_full_range() {
+    let full10 = |v: FullSignal10| Full10::encode(v, Rounding::NearestEven);
+    assert_eq!(
+        (full10(Full10::BLACK), full10(Full10::WHITE)),
+        (Some(0), Some(1023))
+    );
+    let chroma_full10 = |v: FullChromaSignal10| FullChroma10::encode(v, Rounding::NearestEven);
+    assert_eq!(
+        (
+            chroma_full10(FullChroma10::NOMINAL_MIN),
+            chroma_full10(FullChroma10::ZERO),
+            chroma_full10(FullChroma10::NOMINAL_MAX)
+        ),
+        (Some(1), Some(512), Some(1023))
+    );
+    let full12 = |v: FullSignal12| Full12::encode(v, Rounding::NearestEven);
+    assert_eq!(
+        (full12(Full12::BLACK), full12(Full12::WHITE)),
+        (Some(0), Some(4095))
+    );
+    let chroma_full12 = |v: FullChromaSignal12| FullChroma12::encode(v, Rounding::NearestEven);
+    assert_eq!(
+        (
+            chroma_full12(FullChroma12::NOMINAL_MIN),
+            chroma_full12(FullChroma12::ZERO),
+            chroma_full12(FullChroma12::NOMINAL_MAX)
+        ),
+        (Some(1), Some(2048), Some(4095))
     );
 }
 
@@ -393,6 +553,53 @@ mod pq {
             assert_eq!(got, Ok(want), "{n} cd/m²");
         }
         assert!(closest > 1e-9, "a whole cd/m² is within {closest} of a tie");
+    }
+}
+
+#[cfg(all(feature = "libm", feature = "photometric"))]
+mod bt709 {
+    use exact_units::codec::video::{Bt709, Narrow10};
+    use exact_units::codec::{Coded, Curve, CurveKind, Domain, Referred, Transfer};
+    use exact_units::{Fixed, Rounding};
+
+    type Code = Coded<Transfer<Narrow10, Bt709>>;
+
+    /// A code `c` of the 10-bit narrow-range quantizer.
+    fn code(c: u16) -> Code {
+        Code::of(Coded::<Narrow10>::try_from_raw(c).unwrap_or_else(|_| panic!("{c} is video data")))
+    }
+
+    /// An inverse OETF, scene light, not exact on every value: most V′ aren't a rational's 9th power.
+    #[test]
+    fn kind_and_referred() {
+        assert_eq!(Bt709::KIND, CurveKind::Float);
+        assert_eq!(Bt709::DEF.referred, Referred::Scene);
+    }
+
+    /// V′ = 0 and 1 are E = 0 and 1 exactly, both the exact and the `f64` edge.
+    #[test]
+    fn ends_are_exact() {
+        assert_eq!(code(64).light_exact().map(|e| e.get().to_f64()), Some(0.0));
+        assert_eq!(code(940).light_exact().map(|e| e.get().to_f64()), Some(1.0));
+        assert_eq!(code(64).light_f64().map(Fixed::get), Some(0.0));
+        assert_eq!(code(940).light_f64().map(Fixed::get), Some(1.0));
+    }
+
+    /// Every 10-bit narrow-range code: the `f64` edge's light comes back to the same code by both the signal and
+    /// the light domain, for a rounding each (the two domains agree away from a tie, and `NearestAway` is the
+    /// rounding that matches BT.2100-3 Table 9's own `Round`).
+    #[test]
+    fn f64_round_trips_every_code() {
+        for raw in 64..=940_u16 {
+            let c = code(raw);
+            let Some(light) = c.light_f64() else {
+                panic!("code {raw} is in the curve's domain")
+            };
+            for domain in [Domain::Signal, Domain::Light] {
+                let back = Code::from_light_f64(light, Rounding::NearestAway, domain);
+                assert_eq!(back.map(Coded::raw), Ok(raw), "code {raw} in {domain:?}");
+            }
+        }
     }
 }
 

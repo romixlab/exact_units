@@ -12,10 +12,17 @@
 //! light), so no curve here is a `Codec`: each is a [Curve] over a quantizer, exact per value.
 //!
 //! Codes past nominal black and white are values, not errors: 1..=15 (footroom) and 236..=254 (headroom) carry a
-//! signal's undershoot and overshoot. Only 0 and 255 (10-bit: 0..=3 and 1020..=1023) are no value, the timing
-//! references of the serial interfaces (BT.709-6 Part 2 item 4.7): they are the codecs' [spare](CodecDef::spare)
-//! codes, free for a [Niched](crate::niche::Niched). So each `Linear` is bounded to the codes that are video data,
-//! and the nominal range is named beside it ([Narrow8::BLACK], [Narrow8::WHITE]).
+//! signal's undershoot and overshoot. Only 0 and 255 (10-bit: 0..=3 and 1020..=1023; 12-bit: 0..=15 and
+//! 4080..=4095) are no value, the timing references of the serial interfaces (BT.709-6 Part 2 item 4.7): they are
+//! the codecs' [spare](CodecDef::spare) codes, free for a [Niched](crate::niche::Niched). So each `Linear` is
+//! bounded to the codes that are video data, and the nominal range is named beside it ([Narrow8::BLACK],
+//! [Narrow8::WHITE]). [Narrow12] and [NarrowChroma12] are the same, 12 bits wide.
+//!
+//! "Full range" (BT.2100-3 Table 9, 10 and 12 bits only) reserves nothing: `D = Round[(2ⁿ − 1)·E′]` for Y′, R′, G′,
+//! B′, `D = Round[(2ⁿ − 1)·E′ + 2ⁿ⁻¹]` for C′B, C′R, every code 0..=2ⁿ−1 a value. [Full10], [FullChroma10],
+//! [Full12] and [FullChroma12] are its codecs; as it is affine too, `encode` is exact whatever [Rounding] it is
+//! given, though the standard's own `Round` (odd-width chroma span, −0.5 lands one code off centre) is what a
+//! real E′ should be rounded to first ([FullChroma10::NOMINAL_MIN]).
 //!
 //! ```
 //! use exact_units::codec::Coded;
@@ -57,6 +64,30 @@ pub type NarrowSignal10 = Fixed<Ratio, Rational<1, 876>, i16, Range<-60, 955>>;
 /// E′ of a C′B or C′R component coded on 10 bits, narrow range: `D − 512` in steps of 1/896, so ±448 is the nominal
 /// extreme (E′ = ±½). Bounded to the video data, codes 4..=1019: −508..=507.
 pub type NarrowChromaSignal10 = Fixed<Ratio, Rational<1, 896>, i16, Range<-508, 507>>;
+
+/// E′ of a Y′, R′, G′ or B′ component coded on 12 bits, narrow range: `D − 256` in steps of 1/3504, so 0 is black
+/// and 3504 nominal white (BT.2100-3 Table 9). Bounded to the video data, codes 16..=4079: −240..=3823.
+pub type NarrowSignal12 = Fixed<Ratio, Rational<1, 3504>, i16, Range<-240, 3823>>;
+
+/// E′ of a C′B or C′R component coded on 12 bits, narrow range: `D − 2048` in steps of 1/3584, so ±1792 is the
+/// nominal extreme (E′ = ±½). Bounded to the video data, codes 16..=4079: −2032..=2031.
+pub type NarrowChromaSignal12 = Fixed<Ratio, Rational<1, 3584>, i16, Range<-2032, 2031>>;
+
+/// E′ of a Y′, R′, G′ or B′ component coded on 10 bits, full range: `D` itself in steps of 1/1023, no offset
+/// (BT.2100-3 Table 9: `D = Round[(2ⁿ − 1)·E′]`). Every code is a value, 0..=1023: 0..=1023.
+pub type FullSignal10 = Fixed<Ratio, Rational<1, 1023>, i16, Range<0, 1023>>;
+
+/// E′ of a C′B or C′R component coded on 10 bits, full range: `D − 512` in steps of 1/1023 (`D = Round[(2ⁿ −
+/// 1)·E′ + 2ⁿ⁻¹]`). Every code is a value, 0..=1023: −512..=511.
+pub type FullChromaSignal10 = Fixed<Ratio, Rational<1, 1023>, i16, Range<-512, 511>>;
+
+/// E′ of a Y′, R′, G′ or B′ component coded on 12 bits, full range: `D` itself in steps of 1/4095. Every code is a
+/// value, 0..=4095: 0..=4095.
+pub type FullSignal12 = Fixed<Ratio, Rational<1, 4095>, i16, Range<0, 4095>>;
+
+/// E′ of a C′B or C′R component coded on 12 bits, full range: `D − 2048` in steps of 1/4095. Every code is a value,
+/// 0..=4095: −2048..=2047.
+pub type FullChromaSignal12 = Fixed<Ratio, Rational<1, 4095>, i16, Range<-2048, 2047>>;
 
 /// `raw − zero`, for a [CodecShape::Offset] codec's [formula](Codec::formula): exact for every code that is video
 /// data. A spare code (a timing reference) means nothing and its difference may fall outside the `Linear`'s bound
@@ -254,6 +285,292 @@ impl Codec for NarrowChroma10 {
     #[inline]
     fn encode(value: NarrowChromaSignal10, _: Rounding) -> Option<u16> {
         u16::try_from(i32::from(value.get()).checked_add(512)?).ok()
+    }
+}
+
+/// The narrow-range quantizer of a Y′, R′, G′ or B′ component on 12 bits, `D = (219·E′ + 16)·16 = 3504·E′ + 256`
+/// (BT.2100-3 Table 9): codes 16..=4079 are video data, [NarrowSignal12]; 0..=15, 4080..=4095 and every `u16` above
+/// 4095 are [spare](CodecDef::spare). Exact both ways, as [Narrow8].
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Narrow12;
+
+impl Narrow12 {
+    /// Nominal black, code 256: E′ = 0.
+    pub const BLACK: NarrowSignal12 = NarrowSignal12::bounded(0);
+
+    /// Nominal white, code 3760: E′ = 1.
+    pub const WHITE: NarrowSignal12 = NarrowSignal12::bounded(3504);
+}
+
+impl Codec for Narrow12 {
+    type Raw = u16;
+    type Linear = NarrowSignal12;
+
+    const DEF: CodecDef<'static> = CodecDef {
+        id: MarkerId {
+            crate_name: "exact_units",
+            name: "Narrow12",
+        },
+        shape: CodecShape::Offset { zero: 256 },
+        spare: def_list(&[
+            CodeSpan { low: 0, high: 15 },
+            CodeSpan {
+                low: 4080,
+                high: 65535,
+            },
+        ]),
+        codes: CodeSpan::all::<u16>(),
+        nominal: Some(CodeSpan {
+            low: 256,
+            high: 3760,
+        }),
+        curve: None,
+    };
+
+    #[inline]
+    fn formula(raw: u16) -> NarrowSignal12 {
+        Fixed::new_unchecked(offset_formula(i32::from(raw), 256, -240, 3823))
+    }
+
+    #[inline]
+    fn encode(value: NarrowSignal12, _: Rounding) -> Option<u16> {
+        u16::try_from(i32::from(value.get()).checked_add(256)?).ok()
+    }
+}
+
+/// The narrow-range quantizer of a C′B or C′R component on 12 bits, `D = (224·E′ + 128)·16 = 3584·E′ + 2048`
+/// (BT.2100-3 Table 9): codes 16..=4079 are video data, [NarrowChromaSignal12], 256 and 3840 the nominal extremes;
+/// 0..=15, 4080..=4095 and every `u16` above 4095 are [spare](CodecDef::spare).
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct NarrowChroma12;
+
+impl NarrowChroma12 {
+    /// No colour difference, code 2048: E′ = 0.
+    pub const ZERO: NarrowChromaSignal12 = NarrowChromaSignal12::bounded(0);
+
+    /// The nominal lowest, code 256: E′ = −½.
+    pub const NOMINAL_MIN: NarrowChromaSignal12 = NarrowChromaSignal12::bounded(-1792);
+
+    /// The nominal highest, code 3840: E′ = ½.
+    pub const NOMINAL_MAX: NarrowChromaSignal12 = NarrowChromaSignal12::bounded(1792);
+}
+
+impl Codec for NarrowChroma12 {
+    type Raw = u16;
+    type Linear = NarrowChromaSignal12;
+
+    const DEF: CodecDef<'static> = CodecDef {
+        id: MarkerId {
+            crate_name: "exact_units",
+            name: "NarrowChroma12",
+        },
+        shape: CodecShape::Offset { zero: 2048 },
+        spare: def_list(&[
+            CodeSpan { low: 0, high: 15 },
+            CodeSpan {
+                low: 4080,
+                high: 65535,
+            },
+        ]),
+        codes: CodeSpan::all::<u16>(),
+        nominal: Some(CodeSpan {
+            low: 256,
+            high: 3840,
+        }),
+        curve: None,
+    };
+
+    #[inline]
+    fn formula(raw: u16) -> NarrowChromaSignal12 {
+        Fixed::new_unchecked(offset_formula(i32::from(raw), 2048, -2032, 2031))
+    }
+
+    #[inline]
+    fn encode(value: NarrowChromaSignal12, _: Rounding) -> Option<u16> {
+        u16::try_from(i32::from(value.get()).checked_add(2048)?).ok()
+    }
+}
+
+/// The full-range quantizer of a Y′, R′, G′ or B′ component on 10 bits, `D = (2¹⁰ − 1)·E′ = 1023·E′` (BT.2100-3
+/// Table 9): no reserved codes, every code 0..=1023 is video data, [FullSignal10]. "Full range" in some software;
+/// not [Narrow10], which reserves the timing references. Exact both ways, as [Narrow8].
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Full10;
+
+impl Full10 {
+    /// Black, code 0: E′ = 0.
+    pub const BLACK: FullSignal10 = FullSignal10::bounded(0);
+
+    /// Nominal peak, code 1023: E′ = 1.
+    pub const WHITE: FullSignal10 = FullSignal10::bounded(1023);
+}
+
+impl Codec for Full10 {
+    type Raw = u16;
+    type Linear = FullSignal10;
+
+    const DEF: CodecDef<'static> = CodecDef {
+        id: MarkerId {
+            crate_name: "exact_units",
+            name: "Full10",
+        },
+        shape: CodecShape::Offset { zero: 0 },
+        spare: def_list(&[CodeSpan {
+            low: 1024,
+            high: 65535,
+        }]),
+        codes: CodeSpan::all::<u16>(),
+        nominal: Some(CodeSpan { low: 0, high: 1023 }),
+        curve: None,
+    };
+
+    #[inline]
+    fn formula(raw: u16) -> FullSignal10 {
+        Fixed::new_unchecked(offset_formula(i32::from(raw), 0, 0, 1023))
+    }
+
+    #[inline]
+    fn encode(value: FullSignal10, _: Rounding) -> Option<u16> {
+        u16::try_from(i32::from(value.get())).ok()
+    }
+}
+
+/// The full-range quantizer of a C′B or C′R component on 10 bits, `D = 1023·E′ + 512` (BT.2100-3 Table 9): no
+/// reserved codes, every code 0..=1023 is video data, [FullChromaSignal10]; the nominal extremes are 1 (E′ = −½,
+/// BT.2100-3's Round of −511.5) and 1023 (E′ = ½).
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct FullChroma10;
+
+impl FullChroma10 {
+    /// No colour difference, code 512: E′ = 0.
+    pub const ZERO: FullChromaSignal10 = FullChromaSignal10::bounded(0);
+
+    /// The nominal lowest, code 1: E′ = −511/1023, the nearest code to −½ (BT.2100-3's Round of −511.5 is 1, its
+    /// half-away-from-zero tie).
+    pub const NOMINAL_MIN: FullChromaSignal10 = FullChromaSignal10::bounded(-511);
+
+    /// The nominal highest, code 1023: E′ = 511/1023, the nearest code to ½.
+    pub const NOMINAL_MAX: FullChromaSignal10 = FullChromaSignal10::bounded(511);
+}
+
+impl Codec for FullChroma10 {
+    type Raw = u16;
+    type Linear = FullChromaSignal10;
+
+    const DEF: CodecDef<'static> = CodecDef {
+        id: MarkerId {
+            crate_name: "exact_units",
+            name: "FullChroma10",
+        },
+        shape: CodecShape::Offset { zero: 512 },
+        spare: def_list(&[CodeSpan {
+            low: 1024,
+            high: 65535,
+        }]),
+        codes: CodeSpan::all::<u16>(),
+        nominal: Some(CodeSpan { low: 1, high: 1023 }),
+        curve: None,
+    };
+
+    #[inline]
+    fn formula(raw: u16) -> FullChromaSignal10 {
+        Fixed::new_unchecked(offset_formula(i32::from(raw), 512, -512, 511))
+    }
+
+    #[inline]
+    fn encode(value: FullChromaSignal10, _: Rounding) -> Option<u16> {
+        u16::try_from(i32::from(value.get()).checked_add(512)?).ok()
+    }
+}
+
+/// The full-range quantizer of a Y′, R′, G′ or B′ component on 12 bits, `D = (2¹² − 1)·E′ = 4095·E′` (BT.2100-3
+/// Table 9): no reserved codes, every code 0..=4095 is video data, [FullSignal12]. Exact both ways, as [Narrow8].
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Full12;
+
+impl Full12 {
+    /// Black, code 0: E′ = 0.
+    pub const BLACK: FullSignal12 = FullSignal12::bounded(0);
+
+    /// Nominal peak, code 4095: E′ = 1.
+    pub const WHITE: FullSignal12 = FullSignal12::bounded(4095);
+}
+
+impl Codec for Full12 {
+    type Raw = u16;
+    type Linear = FullSignal12;
+
+    const DEF: CodecDef<'static> = CodecDef {
+        id: MarkerId {
+            crate_name: "exact_units",
+            name: "Full12",
+        },
+        shape: CodecShape::Offset { zero: 0 },
+        spare: def_list(&[CodeSpan {
+            low: 4096,
+            high: 65535,
+        }]),
+        codes: CodeSpan::all::<u16>(),
+        nominal: Some(CodeSpan { low: 0, high: 4095 }),
+        curve: None,
+    };
+
+    #[inline]
+    fn formula(raw: u16) -> FullSignal12 {
+        Fixed::new_unchecked(offset_formula(i32::from(raw), 0, 0, 4095))
+    }
+
+    #[inline]
+    fn encode(value: FullSignal12, _: Rounding) -> Option<u16> {
+        u16::try_from(i32::from(value.get())).ok()
+    }
+}
+
+/// The full-range quantizer of a C′B or C′R component on 12 bits, `D = 4095·E′ + 2048` (BT.2100-3 Table 9): no
+/// reserved codes, every code 0..=4095 is video data, [FullChromaSignal12]; the nominal extremes are 1 (the
+/// nearest code to E′ = −½) and 4095 (E′ = 2047/4095, the nearest to ½).
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct FullChroma12;
+
+impl FullChroma12 {
+    /// No colour difference, code 2048: E′ = 0.
+    pub const ZERO: FullChromaSignal12 = FullChromaSignal12::bounded(0);
+
+    /// The nominal lowest, code 1: the nearest code to E′ = −½ (BT.2100-3's Round of −2047.5 is 1, its
+    /// half-away-from-zero tie).
+    pub const NOMINAL_MIN: FullChromaSignal12 = FullChromaSignal12::bounded(-2047);
+
+    /// The nominal highest, code 4095: the nearest code to E′ = ½.
+    pub const NOMINAL_MAX: FullChromaSignal12 = FullChromaSignal12::bounded(2047);
+}
+
+impl Codec for FullChroma12 {
+    type Raw = u16;
+    type Linear = FullChromaSignal12;
+
+    const DEF: CodecDef<'static> = CodecDef {
+        id: MarkerId {
+            crate_name: "exact_units",
+            name: "FullChroma12",
+        },
+        shape: CodecShape::Offset { zero: 2048 },
+        spare: def_list(&[CodeSpan {
+            low: 4096,
+            high: 65535,
+        }]),
+        codes: CodeSpan::all::<u16>(),
+        nominal: Some(CodeSpan { low: 1, high: 4095 }),
+        curve: None,
+    };
+
+    #[inline]
+    fn formula(raw: u16) -> FullChromaSignal12 {
+        Fixed::new_unchecked(offset_formula(i32::from(raw), 2048, -2048, 2047))
+    }
+
+    #[inline]
+    fn encode(value: FullChromaSignal12, _: Rounding) -> Option<u16> {
+        u16::try_from(i32::from(value.get()).checked_add(2048)?).ok()
     }
 }
 
@@ -607,4 +924,86 @@ impl Curve for Hlg {
     type Light = Ratio;
 
     const DEF: CurveDef<'static> = Hlg::DEF;
+}
+
+/// BT.709's inverse OETF (ITU-R BT.709-6 Part 2 item 1.2): the scene light a camera's signal V′ means, `E =
+/// V′/4.5` below V′ = 0.081, `E = ((V′ + 0.099)/1.099)^(20/9)` at and above it. 0.081 is the decode direction's own
+/// breakpoint (decision 3: "one breakpoint per segment, the decode's"); the commonly quoted light-side one, E =
+/// 0.018, doesn't correspond exactly (`1.099·0.018^0.45 − 0.099 ≈ 0.081248`, a sixth decimal past 0.081), the
+/// standard's own rounding of two independently printed numbers, as sRGB's two breakpoints disagree too.
+///
+/// The power segment is [RationalPower](CurveForm::RationalPower) (PQ's form) with `m₂ = 1` and `c₃ = 0`, which
+/// reduces exactly to `((x − c₁)/c₂)^(1/m₁)`: a quotient of two exact `Fraction`s (always exact, however large the
+/// numbers), raised to a rational power by the root rule. [CurveForm::Power] cannot express this curve: its
+/// `gain` would have to be `1.099^(−20/9)`, irrational, and a `Fraction` cannot hold that. [Light](Curve::Light)
+/// is [Ratio](crate::units::Ratio): a scene light is relative, no physical unit ([Referred::Scene]).
+///
+/// Exact at both ends (the doctest below): V′ = 0 gives E = 0 (the toe); V′ = 1 gives E = 1, since `((1 +
+/// 0.099)/1.099)^(20/9) = 1^(20/9) = 1`. [CurveKind::Float] like every curve with a non-integer power: almost no
+/// other V′ is a rational's 9th power.
+///
+/// ```
+/// # #[cfg(feature = "photometric")] {
+/// use exact_units::codec::{Coded, Transfer, video::{Bt709, Narrow8}};
+/// use exact_units::Fraction;
+///
+/// type Code = Coded<Transfer<Narrow8, Bt709>>;
+///
+/// // code 16 is black, V' = 0: E = 0, exactly
+/// let black = Code::of(Coded::<Narrow8>::try_from_raw(16).unwrap());
+/// assert_eq!(black.light_exact().map(|e| e.get()), Some(Fraction::ZERO));
+/// // code 235 is nominal white, V' = 1: E = 1, exactly
+/// let white = Code::of(Coded::<Narrow8>::try_from_raw(235).unwrap());
+/// assert_eq!(white.light_exact().map(|e| e.get()), Some(Fraction::ONE));
+/// # }
+/// ```
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Bt709;
+
+impl Bt709 {
+    /// The toe's breakpoint, V′ = 0.081 = 4.5·0.018, the decode direction's own.
+    pub const BREAK: Fraction = Fraction::new(81, 1000);
+
+    /// BT.709's inverse OETF as data: the toe ([Affine](CurveForm::Affine)) below [BREAK](Self::BREAK), the power
+    /// ([RationalPower](CurveForm::RationalPower)) at and above it.
+    pub const DEF: CurveDef<'static> = CurveDef {
+        id: MarkerId {
+            crate_name: "exact_units",
+            name: "Bt709",
+        },
+        referred: Referred::Scene,
+        unit: MarkerId {
+            crate_name: "exact_units",
+            name: "Ratio",
+        },
+        scale: Fraction::ONE,
+        low: Fraction::ZERO,
+        high: Fraction::ONE,
+        segments: def_list(&[
+            Segment {
+                from: Fraction::ZERO,
+                form: CurveForm::Affine {
+                    gain: Fraction::new(2, 9),
+                    offset: Fraction::ZERO,
+                },
+            },
+            Segment {
+                from: Bt709::BREAK,
+                form: CurveForm::RationalPower {
+                    m1: Fraction::new(9, 20),
+                    m2: Fraction::ONE,
+                    c1: Fraction::new(-99, 1000),
+                    c2: Fraction::new(1099, 1000),
+                    c3: Fraction::ZERO,
+                },
+            },
+        ]),
+    };
+}
+
+#[cfg(feature = "photometric")]
+impl Curve for Bt709 {
+    type Light = Ratio;
+
+    const DEF: CurveDef<'static> = Bt709::DEF;
 }

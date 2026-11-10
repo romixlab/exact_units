@@ -6,8 +6,10 @@ level: advanced
 
 A digital video component is two steps away from the light it stands for. A *transfer curve* turns linear light into a non-linear signal E′, between 0 (black) and 1 (nominal white), or −½ and ½ for a colour difference. A *quantizer* then turns E′ into an integer code. The quantizer is exact in both directions. Most transfer curves are not, and the crate keeps the two apart so that each says what it is.
 
-- `codec::video::Narrow8`, `NarrowChroma8`, `Narrow10` and `NarrowChroma10` are the narrow-range quantizers of ITU-R BT.709 and BT.2100, as [codecs](codecs.md) whose `Linear` is E′.
+- `codec::video::Narrow8`, `NarrowChroma8`, `Narrow10`, `NarrowChroma10`, `Narrow12` and `NarrowChroma12` are the narrow-range quantizers of ITU-R BT.709 and BT.2100, as [codecs](codecs.md) whose `Linear` is E′; `Full10`, `FullChroma10`, `Full12` and `FullChroma12` are the full-range ones.
 - `codec::video::Pq` is the PQ curve of BT.2100 (first published as SMPTE ST 2084): exact constants, and the curve itself as a float edge that says so in its name.
+- `codec::video::Bt709` is BT.709's inverse OETF, the scene light a signal means: exact at E′ = 0 and 1, a float edge everywhere else.
+- `codec::matrix::Bt601`, `Bt709Matrix` and `Bt2020` are the Y′C′BC′R colour matrices, exact rationals from K_R and K_B alone.
 
 ## Narrow range
 
@@ -28,6 +30,8 @@ So each codec holds the codes as they are and E′ as an exact `Fixed`:
 | `NarrowChroma8` | `u8` | `Fixed<Ratio, Rational<1, 224>, i16, Range<-127, 126>>` | 1..=254 | 0, 255 |
 | `Narrow10` | `u16` | `Fixed<Ratio, Rational<1, 876>, i16, Range<-60, 955>>` | 4..=1019 | 0..=3, 1020..=65535 |
 | `NarrowChroma10` | `u16` | `Fixed<Ratio, Rational<1, 896>, i16, Range<-508, 507>>` | 4..=1019 | 0..=3, 1020..=65535 |
+| `Narrow12` | `u16` | `Fixed<Ratio, Rational<1, 3504>, i16, Range<-240, 3823>>` | 16..=4079 | 0..=15, 4080..=65535 |
+| `NarrowChroma12` | `u16` | `Fixed<Ratio, Rational<1, 3584>, i16, Range<-2032, 2031>>` | 16..=4079 | 0..=15, 4080..=65535 |
 
 The `Linear`'s bound is the video data, not the nominal range: a value in the headroom is a value. The nominal levels are named beside it (`Narrow8::BLACK`, `Narrow8::WHITE`, `NarrowChroma8::NOMINAL_MIN`, `ZERO`, `NOMINAL_MAX`, and the same on 10 bits).
 
@@ -121,7 +125,30 @@ assert_eq!(Sample::try_from_raw(255).map(Sample::get), Ok(Reading::Niche(TimingR
 assert_eq!(size_of::<Sample>(), 1);
 ```
 
-Full range (BT.2100-3 Table 9, on 10 and 12 bits only: `D = Round((2ⁿ − 1)·E′)`, chroma `+ 2ⁿ⁻¹`) is another convention with another scale, 1/1023 or 1/4095, and no reserved codes: its video data is 0 to 1023, and chroma's −½ is code 1. It would be a codec of its own: the crate picks neither for you.
+## Full range
+
+Full range (BT.2100-3 Table 9, on 10 and 12 bits only) reserves nothing: `D = Round[(2ⁿ − 1)·E′]` for Y′, R′, G′, B′; `D = Round[(2ⁿ − 1)·E′ + 2ⁿ⁻¹]` for C′B, C′R. "Full range" in some software. Every code 0 to 2ⁿ−1 is video data; there is no footroom, headroom or timing reference. `Full10`, `FullChroma10`, `Full12` and `FullChroma12` are the codecs, affine like the narrow ones, so `encode` is exact whatever `Rounding` it is given:
+
+| Codec | Raw | Linear (E′) | Video data |
+|---|---|---|---|
+| `Full10` | `u16` | `Fixed<Ratio, Rational<1, 1023>, i16, Range<0, 1023>>` | 0..=1023 |
+| `FullChroma10` | `u16` | `Fixed<Ratio, Rational<1, 1023>, i16, Range<-512, 511>>` | 0..=1023 |
+| `Full12` | `u16` | `Fixed<Ratio, Rational<1, 4095>, i16, Range<0, 4095>>` | 0..=4095 |
+| `FullChroma12` | `u16` | `Fixed<Ratio, Rational<1, 4095>, i16, Range<-2048, 2047>>` | 0..=4095 |
+
+The chroma span is odd-width (1024 or 4096 codes around a half-span that is a whole number plus ½), so the nominal extremes aren't quite symmetric: BT.2100-3's Round of −511.5 (10-bit chroma at E′ = −½) is 1, not 0, its half-away-from-zero tie (`FullChroma10::NOMINAL_MIN`, E′ = −511/1023). Code 0 is still a value, a sliver below nominal −½.
+
+```rust
+use exact_units::codec::Coded;
+use exact_units::codec::video::{Full10, FullChroma10};
+
+// code 0 is black, code 1023 nominal white, exactly
+let white = Coded::<Full10>::try_from_raw(1023).unwrap();
+assert_eq!(white.get(), Full10::WHITE);
+
+// chroma's zero is code 512, every code a value: no timing reference here
+assert_eq!(Coded::<FullChroma10>::try_from_raw(0).map(|c| c.get().get()), Ok(-512));
+```
 
 ## PQ
 
@@ -282,12 +309,45 @@ The crate follows BT.2100's formulas. `tests/props/curve.rs` checks that ARIB's 
 
 HLG's light is relative scene light. A display turns it into display light by the OOTF, a system gamma that depends on the display's peak luminance and that mixes the three components through their luminance. That is no curve of one component, so it isn't a `Curve`. It isn't in the crate yet.
 
-## Other curves and the colour matrices
+## BT.709's inverse OETF
 
-These aren't in the crate yet; what each would be exact in:
+ITU-R BT.709-6 Part 2 item 1.2 defines the OETF, the scene light E a camera turns into the signal V′: `V′ = 4.5E` below E = 0.018, `V′ = 1.099·E^0.45 − 0.099` at and above it. `Bt709` is its inverse, written as the crate's curves are, signal to light: `E = V′/4.5` below V′ = 0.081, `E = ((V′ + 0.099)/1.099)^(20/9)` at and above it. 0.081 is the decode direction's own breakpoint; the commonly quoted light-side one, 0.018, doesn't correspond to it exactly (`1.099·0.018^0.45 − 0.099 ≈ 0.081248`, a sixth decimal past 0.081), the standard's own rounding of two independently printed numbers — the same gap sRGB's two breakpoints have.
 
-- **sRGB** (IEC 61966-2-1). 12.92·L below a break and 1.055·L^(1/2.4) − 0.055 above it, all exact decimals. The standard prints two breakpoints, 0.0031308 for encoding and 0.04045 for decoding, and they aren't quite the same point: the two segments don't meet exactly at either. The linear toe is exact (8-bit codes 0 to 10 decode to k/(255·12.92)), the power segment isn't.
-- **R′G′B′ to Y′C′BC′R.** Exact. Y′ = K_R·R′ + K_G·G′ + K_B·B′ with K_G = 1 − K_R − K_B, C′B = (B′ − Y′)/(2(1 − K_B)) and C′R = (R′ − Y′)/(2(1 − K_R)). K_R and K_B are exact decimals (BT.709: 0.2126 and 0.0722; BT.601: 0.299 and 0.114; BT.2020: 0.2627 and 0.0593), so every coefficient is rational, and the digital form is an exact rational matrix followed by a named rounding.
+The power segment is `CurveForm::RationalPower` (PQ's form) with m₂ = 1 and c₃ = 0, which reduces to `((x − c₁)/c₂)^(1/m₁)`: a quotient of two exact `Fraction`s (always exact), raised to a rational power by the root rule. `CurveForm::Power` cannot express this curve on its own: its `gain` would have to be 1.099^(−20/9), irrational, and a `Fraction` cannot hold that.
+
+Exact at both ends: V′ = 0 gives E = 0; V′ = 1 gives E = 1, since `((1 + 0.099)/1.099)^(20/9) = 1`. Everywhere else V′ is almost never a rational's 9th power, so `Bt709::KIND` is `CurveKind::Float`, like PQ.
+
+```rust
+use exact_units::codec::{Coded, Transfer, video::{Bt709, Narrow8}};
+
+type Code = Coded<Transfer<Narrow8, Bt709>>;
+
+// code 235 is nominal white, V' = 1: E = 1, exactly
+use exact_units::Fraction;
+let white = Code::of(Coded::<Narrow8>::try_from_raw(235).unwrap());
+assert_eq!(white.light_exact().map(|e| e.get()), Some(Fraction::ONE));
+```
+
+`Bt709`'s `Light` is `Ratio`: a scene light is relative, no physical unit (`Referred::Scene`), unlike PQ's `Nit` (`Referred::Display`, an EOTF).
+
+## The Y′C′BC′R matrices
+
+ITU-R BT.601, BT.709 and BT.2020 share one shape for turning R′G′B′ into Y′C′BC′R, only K_R and K_B differing: `Y′ = K_R·R′ + K_G·G′ + K_B·B′` with K_G = 1 − K_R − K_B, `C′B = (B′ − Y′)/(2(1 − K_B))`, `C′R = (R′ − Y′)/(2(1 − K_R))`, and the inverse `R′ = Y′ + 2(1 − K_R)·C′R`, `B′ = Y′ + 2(1 − K_B)·C′B`, `G′ = (Y′ − K_R·R′ − K_B·B′)/K_G`. K_R and K_B are exact decimals (BT.709: 0.2126 and 0.0722; BT.601: 0.299 and 0.114; BT.2020: 0.2627 and 0.0593), so `codec::matrix::MatrixDef` stores only those two and derives the rest: every step of `encode` and `decode` is exact `Fraction` arithmetic, no rounding needed, since R′G′B′ and Y′C′BC′R are both unquantized. A client that wants a quantized code rounds separately, by a named `Rounding`, into whichever quantizer it targets; the matrix is not a `Codec` layer, since it mixes three components (a quantizer and a `Curve` each act on one signal alone).
+
+```rust
+use exact_units::codec::matrix::Bt709Matrix;
+use exact_units::Fraction;
+
+// white (R'=G'=B'=1) is Y'=1, C'B=C'R=0, exactly
+let [y, cb, cr] = Bt709Matrix::DEF.encode(Fraction::ONE, Fraction::ONE, Fraction::ONE).unwrap();
+assert_eq!((y, cb, cr), (Fraction::ONE, Fraction::ZERO, Fraction::ZERO));
+```
+
+## Other curves
+
+Not in the crate yet; what each would be exact in:
+
+- **sRGB** (IEC 61966-2-1). 12.92·L below a break and 1.055·L^(1/2.4) − 0.055 above it, all exact decimals, the same shape as BT.709's: `CurveForm::Power` with the divisor inside, `scale = 1000/1055`, `shift = 55/1055`. The standard prints two breakpoints, 0.0031308 for encoding and 0.04045 for decoding, and they aren't quite the same point either. Waiting on IEC 61966-2-1 in the library before landing, so the breakpoint-gap test (no 8-, 10-, 12- or 16-bit code differs between them) can cite it.
 
 ## Limits of the codec design
 
