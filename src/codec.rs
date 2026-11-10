@@ -1096,10 +1096,17 @@ impl Codec for CanFdDlc {
 }
 
 mod curve;
+mod transfer;
 
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use curve::CurveDefOwned;
-pub use curve::{Curve, CurveDef, CurveForm, CurveKind, ExpBase, Referred, Segment};
+#[cfg(feature = "libm")]
+pub use curve::F64_MARGIN;
+pub use curve::{
+    Curve, CurveDef, CurveForm, CurveKind, Domain, EncodeError, ExpBase, Quantizer, Referred,
+    Segment,
+};
+pub use transfer::{SignalStep, Transfer};
 
 #[cfg(test)]
 mod tests;

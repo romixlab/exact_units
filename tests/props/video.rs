@@ -265,7 +265,7 @@ fn timing_references_are_niches() {
 #[cfg(all(feature = "libm", feature = "photometric"))]
 mod pq {
     use exact_units::codec::video::{Narrow10, Pq};
-    use exact_units::codec::{Coded, Curve, CurveKind};
+    use exact_units::codec::{Coded, Curve, CurveKind, EncodeError};
     use exact_units::prefix::One;
     use exact_units::units::Nit;
     use exact_units::{Fixed, Rounding};
@@ -326,9 +326,12 @@ mod pq {
         assert_eq!(Pq::to_nits_f64(code(941)), None);
         assert_eq!(
             Pq::from_nits_f64(nits(10_000.5), Rounding::NearestAway),
-            None
+            Err(EncodeError::OutOfRange)
         );
-        assert_eq!(Pq::from_nits_f64(nits(-0.5), Rounding::NearestAway), None);
+        assert_eq!(
+            Pq::from_nits_f64(nits(-0.5), Rounding::NearestAway),
+            Err(EncodeError::OutOfRange)
+        );
     }
 
     /// The 877 codes from black to white: luminance rising strictly, and each code back from its own luminance by
@@ -341,7 +344,7 @@ mod pq {
             assert!(n.get() > last, "code {c}: {} after {last}", n.get());
             last = n.get();
             for r in [Rounding::NearestEven, Rounding::NearestAway] {
-                assert_eq!(Pq::from_nits_f64(n, r), Some(code(c)), "code {c} by {r:?}");
+                assert_eq!(Pq::from_nits_f64(n, r), Ok(code(c)), "code {c} by {r:?}");
             }
         }
     }
@@ -362,7 +365,7 @@ mod pq {
             )]
             let want = ((x + 0.5).floor() as u16) + 64;
             let got = Pq::from_nits_f64(nits(f64::from(n)), Rounding::NearestAway).map(Coded::raw);
-            assert_eq!(got, Some(want), "{n} cd/m²");
+            assert_eq!(got, Ok(want), "{n} cd/m²");
         }
         assert!(closest > 1e-9, "a whole cd/m² is within {closest} of a tie");
     }

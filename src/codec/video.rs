@@ -332,72 +332,52 @@ impl Pq {
         high: Fraction::ONE,
         segments: def_list(&[Segment {
             from: Fraction::ZERO,
-            form: CurveForm::RationalPower {
-                m1: Self::M1,
-                m2: Self::M2,
-                c1: Self::C1,
-                c2: Self::C2,
-                c3: Self::C3,
-            },
+            form: PQ_FORM,
         }]),
     };
 }
 
-/// [Pq::M1] in `f64`, exactly (2610/16384 is dyadic).
-#[cfg(feature = "libm")]
-const PQ_M1: f64 = 2610.0 / 16384.0;
-
-/// [Pq::M2] in `f64`, exactly.
-#[cfg(feature = "libm")]
-const PQ_M2: f64 = 2523.0 / 4096.0 * 128.0;
-
-/// [Pq::C1] in `f64`, exactly.
-#[cfg(feature = "libm")]
-const PQ_C1: f64 = 3424.0 / 4096.0;
-
-/// [Pq::C2] in `f64`, exactly.
-#[cfg(feature = "libm")]
-const PQ_C2: f64 = 2413.0 / 4096.0 * 32.0;
-
-/// [Pq::C3] in `f64`, exactly.
-#[cfg(feature = "libm")]
-const PQ_C3: f64 = 2392.0 / 4096.0 * 32.0;
+/// [Pq]'s one form, BT.2100-3 Table 4's EOTF as data: the typed float edge and the data path run this same form.
+const PQ_FORM: CurveForm = CurveForm::RationalPower {
+    m1: Pq::M1,
+    m2: Pq::M2,
+    c1: Pq::C1,
+    c2: Pq::C2,
+    c3: Pq::C3,
+};
 
 #[cfg(feature = "libm")]
 impl Pq {
     /// The EOTF in `f64`: E′ (0..=1) to Y (0..=1, a fraction of 10 000 cd/m²), `None` for an E′ outside 0..=1 or
     /// NaN. A float edge, named so: the exponents 1/m₁ = 8192/1305 and 1/m₂ = 32/2523 aren't dyadic, so they are
-    /// rounded to `f64` before `pow` rounds again. E′ = 0 and E′ = 1 give 0 and 1 exactly.
+    /// rounded to `f64` before `pow` rounds again. E′ = 0 and E′ = 1 give 0 and 1 exactly. [CurveForm::decode_f64]
+    /// of [Pq::DEF]'s form, the data path's algorithm.
     #[must_use]
     pub fn eotf_f64(e: f64) -> Option<f64> {
         if !(0.0..=1.0).contains(&e) {
             return None;
         }
-        let p = libm::pow(e, 1.0 / PQ_M2);
-        let num = (p - PQ_C1).max(0.0);
-        let den = PQ_C2 - PQ_C3 * p;
-        Some(libm::pow(num / den, 1.0 / PQ_M1))
+        PQ_FORM.decode_f64(e)
     }
 
     /// The inverse EOTF in `f64`: Y (0..=1) to E′ (0..=1), `None` for a Y outside 0..=1 or NaN. A float edge: the
     /// constants are exact in `f64` here, each `pow` rounds. Y = 1 gives 1 exactly; Y = 0 gives `c₁^m₂` ≈ 7.3·10⁻⁷,
-    /// not 0, the top of the stretch of E′ the EOTF takes to black.
+    /// not 0, the top of the stretch of E′ the EOTF takes to black. [CurveForm::inverse_f64] of [Pq::DEF]'s form.
     #[must_use]
     pub fn inverse_eotf_f64(y: f64) -> Option<f64> {
         if !(0.0..=1.0).contains(&y) {
             return None;
         }
-        let ym = libm::pow(y, PQ_M1);
-        Some(libm::pow((PQ_C1 + PQ_C2 * ym) / (1.0 + PQ_C3 * ym), PQ_M2))
+        PQ_FORM.inverse_f64(y)
     }
 }
 
 #[cfg(all(feature = "libm", feature = "photometric"))]
 impl Pq {
-    /// The display luminance of a 10-bit narrow-range PQ code, through [eotf_f64](Self::eotf_f64): `None` for a
-    /// code below black (64) or above nominal white (940), which PQ gives no luminance. Code 64 is 0 cd/m² and 940
-    /// is 10 000 cd/m², exactly; every other code's luminance is irrational, this is the nearest `f64` give or
-    /// take the rounding of `pow`.
+    /// The display luminance of a 10-bit narrow-range PQ code, through [Coded::light_f64](super::Coded::light_f64)
+    /// of a `Coded<Transfer<Narrow10, Pq>>`: `None` for a code below black (64) or above nominal white (940), which
+    /// PQ gives no luminance. Code 64 is 0 cd/m² and 940 is 10 000 cd/m², exactly; every other code's luminance is
+    /// irrational, this is the nearest `f64` give or take the rounding of `pow`.
     ///
     /// ```
     /// use exact_units::codec::{Coded, video::{Narrow10, Pq}};
@@ -413,42 +393,38 @@ impl Pq {
     pub fn to_nits_f64(
         code: super::Coded<Narrow10>,
     ) -> Option<Fixed<crate::units::Nit, crate::prefix::One, f64>> {
-        let k = code.get().get();
-        if !(0..=876).contains(&k) {
-            return None;
-        }
-        let y = Self::eotf_f64(f64::from(k) / 876.0)?;
-        Fixed::try_new(y * f64::from(Self::PEAK_NITS)).ok()
+        super::Coded::<super::Transfer<Narrow10, Pq>>::of(code).light_f64()
     }
 
-    /// The 10-bit narrow-range PQ code of a luminance, through [inverse_eotf_f64](Self::inverse_eotf_f64), the
-    /// quantizer's `876·E′` rounded by `rounding` (BT.2100-3 Table 9's Round is a half away from zero,
-    /// [Rounding::NearestAway]). `None` for a luminance below 0 or above 10 000 cd/m². A float edge: a
-    /// luminance within `pow`'s error of a tie between two codes may round to the other; every whole cd/m² from 0
-    /// to 10 000 is far enough from one (the tests walk them).
+    /// The 10-bit narrow-range PQ code of a luminance, certified: [Coded::from_light_f64](super::Coded::from_light_f64)
+    /// in the signal domain, the quantizer's `876·E′` rounded by `rounding` (BT.2100-3 Table 9's Round is a half
+    /// away from zero, [Rounding::NearestAway]). The luminance is taken as exact and the code is the true one for
+    /// it; where `f64` can't tell which side of a tie the code position is on, the answer is
+    /// [NearTie](super::EncodeError::NearTie) with both codes, never a guess. Every whole cd/m² from 0 to 10 000
+    /// is decided (the tests walk them).
     ///
     /// ```
     /// use exact_units::codec::video::Pq;
     /// use exact_units::{Fixed, Rounding, prefix::One, units::Nit};
     ///
     /// let peak = Fixed::<Nit, One, f64>::try_new(10_000.0).unwrap();
-    /// assert_eq!(Pq::from_nits_f64(peak, Rounding::NearestAway).map(|c| c.raw()), Some(940));
+    /// assert_eq!(Pq::from_nits_f64(peak, Rounding::NearestAway).map(|c| c.raw()), Ok(940));
     /// ```
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// [NearTie](super::EncodeError::NearTie) as above, [OutOfRange](super::EncodeError::OutOfRange) for a
+    /// luminance below 0 or above 10 000 cd/m².
     pub fn from_nits_f64(
         nits: Fixed<crate::units::Nit, crate::prefix::One, f64>,
         rounding: Rounding,
-    ) -> Option<super::Coded<Narrow10>> {
-        let e = Self::inverse_eotf_f64(nits.get() / f64::from(Self::PEAK_NITS))?;
-        let steps = crate::fixed::round_f64(e * 876.0, rounding);
-        #[expect(
-            clippy::as_conversions,
-            clippy::cast_possible_truncation,
-            reason = "float to integer: e is 0..=1, so steps is a whole number in 0..=876"
-        )]
-        let steps = steps as i16;
-        let signal = NarrowSignal10::try_new(steps).ok()?;
-        super::Coded::try_new(signal, rounding).ok()
+    ) -> Result<super::Coded<Narrow10>, super::EncodeError<u16>> {
+        super::Coded::<super::Transfer<Narrow10, Pq>>::from_light_f64(
+            nits,
+            rounding,
+            super::Domain::Signal,
+        )
+        .map(super::Coded::code)
     }
 }
 

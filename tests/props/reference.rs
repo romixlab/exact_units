@@ -855,3 +855,87 @@ pub(crate) mod systems {
         Some((out, f, held))
     }
 }
+
+/// Transfer curves (`tests/props/curve.rs`): exact powers and an encode by scanning every code, in big rationals.
+#[cfg(all(feature = "dimensionless", feature = "libm", not(any(kani, fuzzing))))]
+pub(crate) mod curve {
+    use super::round_div;
+    use exact_units::Rounding;
+    use num_bigint::{BigInt, BigUint, Sign};
+    use num_rational::BigRational;
+
+    /// `x^(p/q)`, `q > 0`, exactly: `None` where `x < 0`, `0` meets `p < 0`, or `x`'s numerator or denominator is
+    /// no `q`-th power. The root by `nth_root` and a check that it is exact.
+    pub(crate) fn pow(x: &BigRational, p: i64, q: u32) -> Option<BigRational> {
+        if x.numer().sign() == Sign::Minus {
+            return None;
+        }
+        if x.numer().sign() == Sign::NoSign {
+            return match p.signum() {
+                0 => Some(BigRational::from_integer(1.into())),
+                1 => Some(BigRational::from_integer(0.into())),
+                _ => None,
+            };
+        }
+        let root = |n: &BigInt| -> Option<BigInt> {
+            let n: BigUint = n.to_biguint()?;
+            let r = n.nth_root(q);
+            (r.pow(q) == n).then(|| BigInt::from(r))
+        };
+        let r = BigRational::new(root(x.numer())?, root(x.denom())?);
+        let e = u32::try_from(p.unsigned_abs()).ok()?;
+        let v = BigRational::new(r.numer().pow(e), r.denom().pow(e));
+        Some(if p < 0 { v.recip() } else { v })
+    }
+
+    /// Which code an encode gives, by its definition and nothing else: `lights[i]` is code `low + i`'s light,
+    /// `ties[i]` the light at the signal halfway between codes `low + i` and `low + i + 1` (`Signal` domain; the
+    /// `Light` domain takes the midpoint of the two lights). A tie goes by `r` on the steps from `zero`, as
+    /// `round_div` rounds. `None` outside the lights.
+    #[expect(
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects,
+        reason = "i comes from rposition over lights and i + 1 is read only below its length; codes are small"
+    )]
+    pub(crate) fn encode_by_scan(
+        lights: &[BigRational],
+        ties: &[BigRational],
+        low: i128,
+        zero: i128,
+        y: &BigRational,
+        r: Rounding,
+        light_domain: bool,
+    ) -> Option<i128> {
+        let (first, last) = (lights.first()?, lights.last()?);
+        if y < first || y > last {
+            return None;
+        }
+        // the highest code whose light is at most y, by a scan from the top
+        let i = lights.iter().rposition(|l| l <= y)?;
+        let k = low + i128::try_from(i).ok()?;
+        if &lights[i] == y || i + 1 == lights.len() {
+            return Some(k);
+        }
+        Some(match r {
+            Rounding::Floor => k,
+            Rounding::Ceil => k + 1,
+            Rounding::Truncate => k + i128::from(y.numer().sign() == Sign::Minus),
+            _ => {
+                let two = BigRational::from_integer(2.into());
+                let tie = if light_domain {
+                    (&lights[i] + &lights[i + 1]) / two
+                } else {
+                    ties[i].clone()
+                };
+                match y.cmp(&tie) {
+                    core::cmp::Ordering::Less => k,
+                    core::cmp::Ordering::Greater => k + 1,
+                    core::cmp::Ordering::Equal => {
+                        let steps = k - zero;
+                        zero + round_div(2 * steps + 1, 2, r)
+                    }
+                }
+            }
+        })
+    }
+}

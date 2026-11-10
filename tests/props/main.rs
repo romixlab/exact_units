@@ -15,6 +15,8 @@ mod arith;
 mod can_fd;
 #[cfg(feature = "dimensionless")]
 mod codec;
+#[cfg(all(feature = "dimensionless", feature = "libm"))]
+mod curve;
 #[cfg(feature = "levels")]
 mod damping;
 mod dim;
