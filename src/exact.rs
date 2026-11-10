@@ -411,9 +411,23 @@ impl<U: Unit> Exact<U> {
         InPrefix { x: self, prefix: p }
     }
 
-    /// The prefix `{}` writes this value with: the largest power of 1000 that leaves at least 1 before the point, on a
-    /// unit that takes a prefix and is a power of ten of SI (none on `m²`, `min`, `°`); on a ratio %, ppm or ppb,
-    /// the largest that leaves at least 0.1, none from 1 up.
+    /// The prefix `{}` writes this value with: the largest power of 1000 that leaves at least 1 before the point and
+    /// that the unit takes, by its names on a named unit (`eV` all, `km`, `min` and `°` none), on a compound one
+    /// where it is a power of ten of SI (none on `m²`); on a ratio %, ppm or ppb, the largest that leaves at least
+    /// 0.1, none from 1 up.
+    ///
+    /// ```
+    /// # #[cfg(all(feature = "radiation", feature = "mechanical"))] {
+    /// use exact_units::{Exact, Prefix, prefix::Kilo, units::{ElectronVolt, Kilometre}};
+    ///
+    /// // ⁵⁶Fe's binding energy: eV is 1.602176634·10⁻¹⁹ J, no power of ten of SI, and takes the SI prefixes
+    /// let b = Exact::<ElectronVolt>::new_in::<Kilo>(492_259_952_464, 1_000_000);
+    /// assert_eq!(b.auto_prefix(), Prefix::Mega);
+    /// assert_eq!(b.to_string(), "492.259952464 MeV");
+    /// // km is already scaled and takes none: no "kkm"
+    /// assert_eq!(Exact::<Kilometre>::int(5000).to_string(), "5000 km");
+    /// # }
+    /// ```
     #[must_use]
     pub fn auto_prefix(self) -> Prefix {
         let a = self.value.abs();
@@ -432,16 +446,27 @@ impl<U: Unit> Exact<U> {
                 Prefix::Nano
             };
         }
-        let decimal = U::EXPR.magnitude().is_some_and(|m| m.as_pow10().is_some());
-        if !decimal || !takes_bare_prefix(&U::EXPR) {
+        if !takes_bare_prefix(&U::EXPR) {
             return Prefix::Unit;
         }
-        (-10..=10i8)
-            .rev()
-            .filter_map(|k| k.checked_mul(3))
-            .find(|e| at_least(*e))
-            .and_then(Prefix::si_from_pow10)
-            .unwrap_or(Prefix::Quecto)
+        // a named unit takes the prefixes its names allow (eV all of them, though no power of ten of SI; km and min
+        // none); a compound one all of them where it is a power of ten of SI
+        let decimal = U::EXPR.magnitude().is_some_and(|m| m.as_pow10().is_some());
+        let takes = |p: Prefix| match U::EXPR.def() {
+            Some(d) => d.names.prefixes.allows(p),
+            None => decimal,
+        };
+        let mut smallest = Prefix::Unit;
+        for e in (-10..=10i8).rev().filter_map(|k| k.checked_mul(3)) {
+            let Some(p) = Prefix::si_from_pow10(e).filter(|p| takes(*p)) else {
+                continue;
+            };
+            if at_least(e) {
+                return p;
+            }
+            smallest = p;
+        }
+        smallest
     }
 }
 
