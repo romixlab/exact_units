@@ -57,7 +57,26 @@ const TREE: &[(&str, &[&str], &[&str])] = &[
     ("Activity", &[], &[]),
     ("SymbolRate", &[], &[]),
     ("AbsorbedDose", &[], &[]),
+    ("Kerma", &[], &[]),
     ("DoseEquivalent", &[], &[]),
+    ("AmbientDoseEquivalent10", &[], &["DoseEquivalent"]),
+    ("PersonalDoseEquivalent10", &[], &["DoseEquivalent"]),
+    ("PersonalDoseEquivalent0_07", &[], &["DoseEquivalent"]),
+    ("EquivalentDose", &[], &[]),
+    ("EffectiveDose", &[], &[]),
+    ("AbsorbedDoseRate", &[], &[]),
+    ("KermaRate", &[], &[]),
+    ("DoseEquivalentRate", &[], &[]),
+    ("AmbientDoseEquivalentRate10", &[], &["DoseEquivalentRate"]),
+    ("PersonalDoseEquivalentRate10", &[], &["DoseEquivalentRate"]),
+    (
+        "PersonalDoseEquivalentRate0_07",
+        &[],
+        &["DoseEquivalentRate"],
+    ),
+    ("EquivalentDoseRate", &[], &[]),
+    ("EffectiveDoseRate", &[], &[]),
+    ("LinearEnergyTransfer", &[], &[]),
     ("Resistance", &[], &[]),
     ("Conductance", &[], &[]),
     ("Power", &["D"], &[]),
@@ -88,7 +107,7 @@ const TREE: &[(&str, &[&str], &[&str])] = &[
 ];
 
 /// The quantities as `const` data, in [TREE]'s order.
-const DEFS: [&QuantityDef<'static>; 44] = [
+const DEFS: [&QuantityDef<'static>; 59] = [
     Length::DEF,
     Height::DEF,
     Width::DEF,
@@ -105,7 +124,22 @@ const DEFS: [&QuantityDef<'static>; 44] = [
     Activity::DEF,
     SymbolRate::DEF,
     AbsorbedDose::DEF,
+    quantities::Kerma::DEF,
     DoseEquivalent::DEF,
+    quantities::AmbientDoseEquivalent10::DEF,
+    quantities::PersonalDoseEquivalent10::DEF,
+    quantities::PersonalDoseEquivalent0_07::DEF,
+    quantities::EquivalentDose::DEF,
+    quantities::EffectiveDose::DEF,
+    quantities::AbsorbedDoseRate::DEF,
+    quantities::KermaRate::DEF,
+    quantities::DoseEquivalentRate::DEF,
+    quantities::AmbientDoseEquivalentRate10::DEF,
+    quantities::PersonalDoseEquivalentRate10::DEF,
+    quantities::PersonalDoseEquivalentRate0_07::DEF,
+    quantities::EquivalentDoseRate::DEF,
+    quantities::EffectiveDoseRate::DEF,
+    quantities::LinearEnergyTransfer::DEF,
     Resistance::DEF,
     Conductance::DEF,
     Power::DEF,
@@ -137,12 +171,14 @@ const DEFS: [&QuantityDef<'static>; 44] = [
 
 /// The expressions walked: each quantity, then the derived quantity of each of their dimensions and of a velocity,
 /// then ratios of length and of energy.
-const EXPRS: [QuantityExpr<'static>; 64] = {
-    let dims: [Dim<'static>; 17] = [
+const EXPRS: [QuantityExpr<'static>; 81] = {
+    let dims: [Dim<'static>; 19] = [
         Length::DEF.dim,
         Energy::DEF.dim,
         Frequency::DEF.dim,
         AbsorbedDose::DEF.dim,
+        quantities::AbsorbedDoseRate::DEF.dim,
+        quantities::LinearEnergyTransfer::DEF.dim,
         Resistance::DEF.dim,
         Conductance::DEF.dim,
         Power::DEF.dim,
@@ -158,7 +194,7 @@ const EXPRS: [QuantityExpr<'static>; 64] = {
         AbsorbedDose::DEF.dim,
         Resistance::DEF.dim,
     ];
-    let mut out = [QuantityExpr::RatioOf(Dim::ONE); 64];
+    let mut out = [QuantityExpr::RatioOf(Dim::ONE); 81];
     let mut i = 0;
     while i < DEFS.len() {
         out[i] = QuantityExpr::Spec(QuantityRef::Def(DEFS[i]));
@@ -588,4 +624,26 @@ fn wire_round_trip() {
             owned
         );
     }
+}
+
+/// A quantity's English name splits at the capitals and before a depth, `_` its decimal point.
+#[test]
+fn names() {
+    assert_eq!(PathLength::DEF.name().to_string(), "path length");
+    assert_eq!(
+        quantities::AmbientDoseEquivalent10::DEF.name().to_string(),
+        "ambient dose equivalent 10"
+    );
+    assert_eq!(
+        quantities::PersonalDoseEquivalent0_07::DEF
+            .name()
+            .to_string(),
+        "personal dose equivalent 0.07"
+    );
+    assert_eq!(
+        quantities::PersonalDoseEquivalentRate10::DEF
+            .name()
+            .to_string(),
+        "personal dose equivalent rate 10"
+    );
 }

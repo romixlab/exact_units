@@ -332,7 +332,7 @@ These `unit!` symbols are no `q!` symbol: a compound one is written with operato
 | W/sr | `RadiantIntensity` |
 | W/(m²·sr) | `Radiance` |
 | C/kg | `Exposure` |
-| Gy/s | `AbsorbedDoseRate` |
+| Gy/s | `GrayPerSecond` |
 | Sv/h | `SievertPerHour` |
 | ln 2 | `Ln2` |
 | ln 10 | `Ln10` |

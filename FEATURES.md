@@ -450,10 +450,17 @@ counted units, and the kinds that keep look-alike quantities apart.
   `non_canonical_dims`), `tests/two_crates.rs` (a crate's `Pixel` takes `Radian`'s path), `tests/units.rs` (torque is
   not energy until stripped), `tests/props/dim.rs` (the const walk against plain sums and `DimOwned`, the wire),
   `tests/props/wire.rs` (`dims`: only a canonical `DimWire` decodes).
-- 📋 **UNIT-12 Dose quantities and a named weighting** — Gy to Sv by a weighting factor from a named, versioned set
-  (ICRP 103 Table 2, ICRP 60; the ICRU's Q(L)), and quantities apart for the CIPM's dose equivalent H = Q·D, ICRP's
-  equivalent dose H_T and effective dose E, which share the sievert; today `DoseEquivalent` stands for all and
-  `units::Sievert`'s doc calls it "equivalent dose". P2401#10nov-1911b.
+- 🚧 **UNIT-12 Dose quantities and a named weighting** — the quantities are built, the weighting step is next.
+  m²·s⁻², each a kind: `AbsorbedDose` and `Kerma` share the gray (SI Brochure table 4); `DoseEquivalent`, the
+  SI's H = Q·D (CIPM 2002 Rec. 2) and bare `Sievert`'s, with the operational `AmbientDoseEquivalent10` H*(10),
+  `PersonalDoseEquivalent10` Hp(10), `PersonalDoseEquivalent0_07` Hp(0.07) as kinds under it (ICRU 51 through ICRP
+  103 Table B.5; H′(0.07, Ω), H′(3, Ω) and Hp(3) when needed); ICRP's `EquivalentDose` H_T and `EffectiveDose` E
+  (`units::EquivalentDose`, `units::EffectiveDose`). Each has a rate kind, so Gy/s (`GrayPerSecond`) and Sv/h
+  (`SievertPerHour`, a `DoseEquivalentRate`) no longer convert into each other (they did). `LinearEnergyTransfer`
+  is a kind, not a force. Next: Gy to Sv by a weighting from a named, versioned set (ICRP 103 Table 2, ICRP 60
+  Table B.3, the ICRU's Q(L)), effective dose from ICRP 103's w_T, rate ⇄ dose steps. Plan:
+  `design/radiation-quantities-plan.md` (P2401). Tests: `tests/quantities.rs`, `tests/units.rs`
+  (`dose_rates_are_kinds`), `compile_fail` doctests in `quantity`. P2401#10nov-1911b.
 - 📋 **UNIT-13 Quantities of s⁻¹ beyond Hz and Bq** — decay constant, reaction rate, count rate, and the fluence
   rate (m⁻²·s⁻¹), with the named steps physics gives (λ·N is an activity). P2401#10nov-1911c.
 - 📋 **UNIT-14 Nuclear units** — barn, curie, rad, rem, röntgen, the dalton (after NUM-32) and years named apart

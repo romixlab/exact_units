@@ -50,6 +50,29 @@
 //! let _ = Fixed::<Gray, Milli, u32>::new(20).convert::<Sievert, Milli, u32>();
 //! ```
 //!
+//! Nor does a dose rate: Gy/s and Sv/h are kinds apart, as their doses are.
+//!
+//! ```compile_fail
+//! use exact_units::{Fixed, prefix::Micro, units::{GrayPerSecond, SievertPerHour}};
+//! let _ = Fixed::<GrayPerSecond, Micro, u32>::new(1).convert::<SievertPerHour, Micro, u32>();
+//! ```
+//!
+//! The sievert measures three quantities: the SI's dose equivalent H = Q·D (a bare `Sievert`), ICRP's equivalent dose
+//! H_T and its effective dose E. None converts to another, and an area monitor's H*(10) is not a personal
+//! dosimeter's Hp(10):
+//!
+//! ```compile_fail
+//! use exact_units::{Fixed, prefix::Milli, units::{EffectiveDose, EquivalentDose}};
+//! let _ = Fixed::<EquivalentDose, Milli, u32>::new(20).convert::<EffectiveDose, Milli, u32>();
+//! ```
+//!
+//! ```compile_fail
+//! use exact_units::{Fixed, prefix::Micro, quantities::{AmbientDoseEquivalent10, PersonalDoseEquivalent10}};
+//! use exact_units::units::{Of, Sievert};
+//! let h = Fixed::<Of<AmbientDoseEquivalent10, Sievert>, Micro, u32>::new(20);
+//! let _ = h.convert::<Of<PersonalDoseEquivalent10, Sievert>, Micro, u32>();
+//! ```
+//!
 //! The rules follow ISO 80000-1's quantities and kinds as mp-units implements them, without its matching of
 //! recipes: a product is never recognised as a named quantity by itself.
 
@@ -123,7 +146,8 @@ pub struct QuantityDef<'i> {
 }
 
 impl<'i> QuantityDef<'i> {
-    /// The English name: the marker's name split at the capitals, lower case (`PathLength` is "path length").
+    /// The English name: the marker's name split at the capitals and before a number, lower case (`PathLength` is
+    /// "path length", `AmbientDoseEquivalent10` "ambient dose equivalent 10").
     #[must_use]
     pub const fn name(&self) -> QuantityName<'i> {
         QuantityName(self.id.name)
@@ -137,18 +161,24 @@ impl<'i> QuantityDef<'i> {
     }
 }
 
-/// A quantity's English name from its marker's name: `PathLength` written "path length".
+/// A quantity's English name from its marker's name: `PathLength` written "path length", a depth apart and `_` as
+/// its decimal point (`PersonalDoseEquivalent0_07` is "personal dose equivalent 0.07").
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct QuantityName<'i>(pub &'i str);
 
 impl fmt::Display for QuantityName<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut buf = [0u8; 4];
-        for (i, c) in self.0.chars().enumerate() {
-            if c.is_ascii_uppercase() && i > 0 {
+        let mut prev: Option<char> = None;
+        for c in self.0.chars() {
+            let after_letter = prev.is_some_and(|p| p.is_ascii_alphabetic());
+            if (c.is_ascii_uppercase() && prev.is_some()) || (c.is_ascii_digit() && after_letter) {
                 f.write_str(" ")?;
             }
+            // `_` between digits is a decimal point: `PersonalDoseEquivalent0_07` is "… 0.07"
+            let c = if c == '_' { '.' } else { c };
             f.write_str(c.to_ascii_lowercase().encode_utf8(&mut buf))?;
+            prev = Some(c);
         }
         Ok(())
     }

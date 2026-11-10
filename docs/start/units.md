@@ -21,7 +21,7 @@ The markers come in groups, one cargo feature each. A firmware turns on only the
 | `chemical` | `Mole`, `Katal`, `MolarConcentration` (mol/m³), `MolePerLitre`, `Molality`, `MolarMass`, `GramPerMole`, `MolarEnergy`, `MolarHeatCapacity` |
 | `photometric` | `Candela`, `Lumen`, `Lux`, `Nit` (cd/m²), `LuminousEfficacy` (lm/W) |
 | `radiometric` | `Irradiance` (W/m²), `RadiantIntensity` (W/sr), `Radiance` (W/(m²·sr)) |
-| `radiation` | `Becquerel`, `Gray`, `Sievert`, `ElectronVolt`, `Exposure` (C/kg), `AbsorbedDoseRate` (Gy/s), `SievertPerHour` |
+| `radiation` | `Becquerel`, `Gray`, `Sievert`, `ElectronVolt`, `Exposure` (C/kg), `GrayPerSecond` (Gy/s), `SievertPerHour` |
 | `dimensionless` | `Ratio`: duty, probability, scale |
 | `information` | `Bit`, `Nibble`, `Byte`, `Halfword`, `Word`, `Doubleword` |
 | `counting` | `Item`, `Sample`, `Frame`, `Packet`, `Line`, `Row`, `Record`, `Entry`, `Cycle`, `Block`, `Sector`, `Chunk`, `Char`, `Code` |

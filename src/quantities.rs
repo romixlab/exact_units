@@ -7,8 +7,12 @@
 //!   [Work], [Heat].
 //! - s⁻¹: [Frequency] (`Hertz`), and two kinds of their own, [Activity] (`Becquerel`) and [SymbolRate] (`Baud`):
 //!   Hz, Bq and Bd don't convert.
-//! - m²·s⁻²: [AbsorbedDose] (`Gray`) and [DoseEquivalent] (`Sievert`), kinds of their own, apart by a weighting
-//!   factor.
+//! - m²·s⁻², kinds of their own: [AbsorbedDose] (`Gray`) and [Kerma], which share the gray; [DoseEquivalent]
+//!   (`Sievert`, the CIPM's H = Q·D) with the operational [AmbientDoseEquivalent10] H*(10),
+//!   [PersonalDoseEquivalent10] Hp(10) and [PersonalDoseEquivalent0_07] Hp(0.07) as kinds under it, ICRP's [EquivalentDose] and [EffectiveDose], which share the sievert. A
+//!   weighting crosses from a gray to a sievert, never `convert`. Their rates, m²·s⁻³, are kinds apart too
+//!   ([AbsorbedDoseRate], [KermaRate], [DoseEquivalentRate], [EquivalentDoseRate], [EffectiveDoseRate]).
+//! - [LinearEnergyTransfer], keV/µm: not a force.
 //! - Electrical: [Resistance] (`Ohm`) and [Conductance] (`Siemens`), apart from V/A and A/V; [Power] with
 //!   [ApparentPower] (`VoltAmpere`) and [ReactivePower] (`Var`).
 //! - Electromagnetic, the SI side of Gaussian's rows ([systems](crate::systems)): [ElectricCurrent],
@@ -62,10 +66,56 @@ crate::quantity! {
     /// Symbol rate: symbols per second, [Baud](crate::units::Baud)'s; not a clock's frequency.
     pub struct SymbolRate = kind [s -1];
 
-    /// Absorbed dose, D (ISO 80000-10), [Gray](crate::units::Gray)'s.
+    /// Absorbed dose, D (ISO 80000-10): energy imparted per mass, [Gray](crate::units::Gray)'s.
     pub struct AbsorbedDose = kind [m 2, s -2];
-    /// Dose equivalent, H: an absorbed dose weighted by its radiation, [Sievert](crate::units::Sievert)'s.
+    /// Kerma, K (ISO 80000-10): kinetic energy released per mass, energy transferred to charged particles. The SI
+    /// gives it the gray as absorbed dose has (SI Brochure, 9th ed., table 4), but it is not an absorbed dose:
+    /// `Of<Kerma, Gray>`.
+    pub struct Kerma = kind [m 2, s -2];
+    /// Dose equivalent, H = Q·D at a point, Q the ICRU's quality factor of linear energy transfer (CIPM 2002,
+    /// Recommendation 2; SI Brochure, 9th ed., table 4): [Sievert](crate::units::Sievert)'s. Not ICRP's
+    /// [EquivalentDose] or [EffectiveDose], which share the sievert.
     pub struct DoseEquivalent = kind [m 2, s -2];
+    /// Ambient dose equivalent, H*(10) (ICRU Report 51; ICRP Publication 103, Table B.5): the dose equivalent at 10 mm
+    /// depth in the ICRU sphere in an expanded and aligned field, what an area monitor reads. A kind under
+    /// [DoseEquivalent]: `as_quantity` crosses, and it neither converts nor adds to Hp(10).
+    pub struct AmbientDoseEquivalent10: kind DoseEquivalent;
+    /// Personal dose equivalent, Hp(10) (ICRU Report 51; ICRP Publication 103, Table B.5): the dose equivalent in soft
+    /// tissue 10 mm below a point on the body, what a personal dosimeter reads for the effective dose.
+    pub struct PersonalDoseEquivalent10: kind DoseEquivalent;
+    /// Personal dose equivalent, Hp(0.07) (ICRU Report 51; ICRP Publication 103, Table B.5): at 0.07 mm depth, for the
+    /// dose to the skin, hands and feet.
+    pub struct PersonalDoseEquivalent0_07: kind DoseEquivalent;
+    /// Equivalent dose, H_T = Σ w_R·D_T,R (ICRP Publication 103, Eq. 4.2): the mean absorbed dose in a tissue or
+    /// organ, weighted by radiation weighting factors. Not a [DoseEquivalent], which is a point value weighted by
+    /// Q: `Of<EquivalentDose, Sievert>`.
+    pub struct EquivalentDose = kind [m 2, s -2];
+    /// Effective dose, E = Σ w_T·H_T (ICRP Publication 103, glossary): the tissue-weighted sum of equivalent doses
+    /// over the whole body of a Reference Person, a protection quantity: `Of<EffectiveDose, Sievert>`.
+    pub struct EffectiveDose = kind [m 2, s -2];
+
+    /// Absorbed dose rate, Ḋ: [GrayPerSecond](crate::units::GrayPerSecond)'s. Each dose has a rate of its own
+    /// kind, so Gy/s doesn't convert to Sv/h.
+    pub struct AbsorbedDoseRate = kind [m 2, s -3];
+    /// Kerma rate, K̇: an air kerma rate in `Of<KermaRate, GrayPerSecond>`.
+    pub struct KermaRate = kind [m 2, s -3];
+    /// Dose equivalent rate, Ḣ: [SievertPerHour](crate::units::SievertPerHour)'s.
+    pub struct DoseEquivalentRate = kind [m 2, s -3];
+    /// Ambient dose equivalent rate, Ḣ*(10): a survey meter's or a Geiger counter's µSv/h,
+    /// `Of<AmbientDoseEquivalentRate10, SievertPerHour>`.
+    pub struct AmbientDoseEquivalentRate10: kind DoseEquivalentRate;
+    /// Personal dose equivalent rate, Ḣp(10): an electronic personal dosimeter's rate.
+    pub struct PersonalDoseEquivalentRate10: kind DoseEquivalentRate;
+    /// Personal dose equivalent rate, Ḣp(0.07).
+    pub struct PersonalDoseEquivalentRate0_07: kind DoseEquivalentRate;
+    /// Equivalent dose rate, Ḣ_T.
+    pub struct EquivalentDoseRate = kind [m 2, s -3];
+    /// Effective dose rate, Ė.
+    pub struct EffectiveDoseRate = kind [m 2, s -3];
+
+    /// Linear energy transfer, L (ISO 80000-10): energy a charged particle loses per length of its track, in keV/µm.
+    /// A kind of its own, not a force, though both are J/m.
+    pub struct LinearEnergyTransfer = kind [kg 1, m 1, s -2];
 
     /// Resistance, R (ISO 80000-6): a component's V/A, not an amplifier's transimpedance.
     pub struct Resistance = kind [kg 1, m 2, s -3, a -2];

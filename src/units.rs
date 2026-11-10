@@ -528,12 +528,14 @@ crate::unit! {
     pub struct Becquerel = "Bq" (long "becquerel", ucum "Bq"), [s -1] quantity crate::quantities::Activity;
 
     /// Absorbed dose in grays, Gy (m²·s⁻², J/kg), an [AbsorbedDose](crate::quantities::AbsorbedDose): not a dose
-    /// equivalent in [Sievert], which weights it by the radiation.
+    /// in [Sievert], which weights it by the radiation, and not a kerma, which the SI also gives the gray
+    /// ([Kerma](crate::quantities::Kerma), `Of<Kerma, Gray>`).
     #[cfg(feature = "radiation")]
     pub struct Gray = "Gy" (long "gray", ucum "Gy"), [m 2, s -2] quantity crate::quantities::AbsorbedDose;
 
-    /// Equivalent dose in sieverts, Sv (m²·s⁻², J/kg), a [DoseEquivalent](crate::quantities::DoseEquivalent): not an
-    /// absorbed dose in [Gray].
+    /// Dose equivalent in sieverts, Sv (m²·s⁻², J/kg): the SI's [DoseEquivalent](crate::quantities::DoseEquivalent),
+    /// H = Q·D (CIPM 2002, Recommendation 2). ICRP's equivalent dose H_T and effective dose E share the sievert and
+    /// are [EquivalentDose] and [EffectiveDose]. Not an absorbed dose in [Gray].
     #[cfg(feature = "radiation")]
     pub struct Sievert = "Sv" (long "sievert", ucum "Sv"), [m 2, s -2] quantity crate::quantities::DoseEquivalent;
 
@@ -546,14 +548,16 @@ crate::unit! {
     #[cfg(feature = "radiation")]
     pub struct Exposure = "C/kg" (long "coulomb per kilogram" plural "coulombs per kilogram", ucum "C/kg"), [kg -1, s 1, a 1];
 
-    /// Absorbed dose rate in grays per second, Gy/s (m²·s⁻³, SI Brochure, 9th ed., table 6).
+    /// Absorbed dose rate in grays per second, Gy/s (m²·s⁻³, SI Brochure, 9th ed., table 6), an
+    /// [AbsorbedDoseRate](crate::quantities::AbsorbedDoseRate): not a dose equivalent rate in [SievertPerHour].
     #[cfg(feature = "radiation")]
-    pub struct AbsorbedDoseRate = "Gy/s" (long "gray per second" plural "grays per second", ucum "Gy/s"), [m 2, s -3];
+    pub struct GrayPerSecond = "Gy/s" (long "gray per second" plural "grays per second", ucum "Gy/s"), [m 2, s -3] quantity crate::quantities::AbsorbedDoseRate;
 
-    /// Equivalent dose rate in sieverts per hour, Sv/h (1/3600 Sv/s): a dosimeter's µSv/h is
-    /// `Fixed<SievertPerHour, Micro, T>`.
+    /// Dose equivalent rate in sieverts per hour, Sv/h (1/3600 Sv/s), a
+    /// [DoseEquivalentRate](crate::quantities::DoseEquivalentRate): a dosimeter's µSv/h is
+    /// `Fixed<SievertPerHour, Micro, T>`. Not an absorbed dose rate in [GrayPerSecond].
     #[cfg(feature = "radiation")]
-    pub struct SievertPerHour = "Sv/h" (long "sievert per hour" plural "sieverts per hour", ucum "Sv/h"), [m 2, s -3], Exact(1 / 3600);
+    pub struct SievertPerHour = "Sv/h" (long "sievert per hour" plural "sieverts per hour", ucum "Sv/h"), [m 2, s -3] quantity crate::quantities::DoseEquivalentRate, Exact(1 / 3600);
 
     // Dimensionless
 
@@ -865,6 +869,24 @@ pub type Phase<A> = Of<crate::quantities::PhaseAngle, A>;
 /// `as_quantity::<EnergyDensity>()`.
 #[cfg(feature = "mechanical")]
 pub type EnergyDensity = Of<crate::quantities::EnergyDensity, Per<Joule, Volume>>;
+
+/// Absorbed dose rate in grays per second, Gy/s: the unit [GrayPerSecond] by the name of its quantity.
+#[cfg(feature = "radiation")]
+pub type AbsorbedDoseRate = GrayPerSecond;
+
+/// ICRP's equivalent dose H_T in sieverts, Sv: an [EquivalentDose](crate::quantities::EquivalentDose), not the SI's
+/// dose equivalent H that a bare [Sievert] measures.
+#[cfg(feature = "radiation")]
+pub type EquivalentDose = Of<crate::quantities::EquivalentDose, Sievert>;
+
+/// ICRP's effective dose E in sieverts, Sv: an [EffectiveDose](crate::quantities::EffectiveDose), what dose limits
+/// are written in. Not the SI's dose equivalent H that a bare [Sievert] measures.
+#[cfg(feature = "radiation")]
+pub type EffectiveDose = Of<crate::quantities::EffectiveDose, Sievert>;
+
+/// Kerma in grays, Gy: a [Kerma](crate::quantities::Kerma), not the absorbed dose a bare [Gray] measures.
+#[cfg(feature = "radiation")]
+pub type Kerma = Of<crate::quantities::Kerma, Gray>;
 
 /// Entropy in joules per kelvin, J/K: an [Entropy](crate::quantities::Entropy), so not a [HeatCapacity], though both
 /// are J/K. One becomes the other only by a named step (`as_entropy`, `as_heat_capacity`).

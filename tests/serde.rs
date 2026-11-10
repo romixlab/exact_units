@@ -588,7 +588,7 @@ fn with_unit_round_trips_derived_symbols() {
         RadiantIntensity = "W/sr", "2 kW/sr";
         Radiance = "W/(m²·sr)", "2 kW/(m²·sr)";
         Exposure = "C/kg", "2 kC/kg";
-        AbsorbedDoseRate = "Gy/s", "2 kGy/s";
+        GrayPerSecond = "Gy/s", "2 kGy/s";
         SievertPerHour = "Sv/h", "2 kSv/h";
     }
 

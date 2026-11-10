@@ -219,10 +219,10 @@ fn time_units() {
 fn derived_units() {
     use exact_units::Dim;
     use units::{
-        AbsorbedDoseRate, Ampere, AngularAcceleration, AngularMomentum, AngularVelocity, Area,
-        Candela, ChargeDensity, Conductivity, Coulomb, CurrentDensity, Density, DynamicViscosity,
+        Ampere, AngularAcceleration, AngularMomentum, AngularVelocity, Area, Candela,
+        ChargeDensity, Conductivity, Coulomb, CurrentDensity, Density, DynamicViscosity,
         ElectricDisplacement, ElectricFieldStrength, EnergyDensity, Entropy, Exposure, Farad, Gram,
-        GramPerCubicCentimeter, GramPerMole, Gray, HeatCapacity, HeatFluxDensity,
+        GramPerCubicCentimeter, GramPerMole, Gray, GrayPerSecond, HeatCapacity, HeatFluxDensity,
         HeatTransferCoefficient, Henry, Irradiance, Joule, Kelvin, KinematicViscosity, Lumen,
         LuminousEfficacy, MagneticFieldStrength, MassFlow, Meter, Molality, MolarConcentration,
         MolarEnergy, MolarHeatCapacity, MolarMass, Mole, MolePerLitre, MomentOfInertia, Momentum,
@@ -292,7 +292,7 @@ fn derived_units() {
     }
     assert_eq!(dim::<Radiance>(), dim::<Per<RadiantIntensity, Area>>());
     assert_eq!(dim::<Exposure>(), dim::<Per<Coulomb, Gram>>());
-    assert_eq!(dim::<AbsorbedDoseRate>(), dim::<Per<Gray, Second>>());
+    assert_eq!(dim::<GrayPerSecond>(), dim::<Per<Gray, Second>>());
     assert_eq!(dim::<SievertPerHour>(), dim::<Per<Sievert, Second>>());
     // a moment of inertia is per rad², so it is no plain kg·m²; an angular momentum is no J·s
     assert!(!dim::<MomentOfInertia>().same(dim::<Times<Gram, Area>>()));
@@ -308,10 +308,9 @@ fn derived_quantities_and_conversions() {
     use exact_units::prefix::{Kilo, Micro, Milli, One};
     use exact_units::{Fixed, QuantityExpr, quantities};
     use units::{
-        AbsorbedDoseRate, Acceleration, Area, Candela, Density, EnergyDensity, Entropy,
-        GramPerCubicCentimeter, GramPerMole, HeatCapacity, HeatFluxDensity, Irradiance, Joule,
-        Kelvin, MolarConcentration, MolarMass, MolePerLitre, Nit, Resistivity, Second,
-        SievertPerHour, Speed, ThermalResistance, Volume, Watt,
+        Acceleration, Area, Candela, Density, EnergyDensity, Entropy, GramPerCubicCentimeter,
+        GramPerMole, HeatCapacity, HeatFluxDensity, Irradiance, Joule, Kelvin, MolarConcentration,
+        MolarMass, MolePerLitre, Nit, Resistivity, Second, Speed, ThermalResistance, Volume, Watt,
     };
 
     // quantities: derived but for the two that share a named marker's dimension
@@ -363,11 +362,6 @@ fn derived_quantities_and_conversions() {
     assert_eq!(
         Fixed::<GramPerMole, Milli, u32>::new(18015).convert::<MolarMass, Micro, u32>(),
         Some(Fixed::new(18015))
-    );
-    assert_eq!(
-        Fixed::<SievertPerHour, Micro, u64>::new(3_600_000)
-            .convert::<AbsorbedDoseRate, Micro, u64>(),
-        Some(Fixed::new(1000))
     );
     assert_eq!(
         Fixed::<Irradiance, One, u16>::new(1000).convert::<HeatFluxDensity, One, u16>(),
@@ -451,7 +445,7 @@ fn derived_names() {
         "RadiantIntensity",
         "Radiance",
         "Exposure",
-        "AbsorbedDoseRate",
+        "GrayPerSecond",
         "SievertPerHour",
     ] {
         assert!(units::by_name(name).is_some(), "{name}");
@@ -585,4 +579,34 @@ fn one_marker_per_name() {
         assert!(names.insert(def.id.name), "{} twice", def.id.name);
         assert_eq!(units::by_id(def.id), Some(*e));
     }
+}
+
+/// A dose rate is a kind, as its dose is: Sv/h converts neither to Gy/s nor to a plain Sv/s, and Gy/s not to Sv/h.
+#[cfg(feature = "radiation")]
+#[test]
+fn dose_rates_are_kinds() {
+    use exact_units::{QuantityExpr, quantities};
+    use units::{Second, SievertPerHour};
+
+    assert_eq!(
+        <SievertPerHour as Unit>::QUANTITY.const_converts(<units::GrayPerSecond as Unit>::QUANTITY),
+        Some(false)
+    );
+    assert_eq!(
+        <units::GrayPerSecond as Unit>::QUANTITY.const_converts(<SievertPerHour as Unit>::QUANTITY),
+        Some(false)
+    );
+    assert_eq!(
+        <SievertPerHour as Unit>::QUANTITY
+            .const_converts(<Per<units::Sievert, Second> as Unit>::QUANTITY),
+        Some(false)
+    );
+    assert_eq!(
+        <SievertPerHour as Unit>::QUANTITY,
+        QuantityExpr::of::<quantities::DoseEquivalentRate>()
+    );
+    assert_eq!(
+        <units::GrayPerSecond as Unit>::QUANTITY,
+        QuantityExpr::of::<quantities::AbsorbedDoseRate>()
+    );
 }
