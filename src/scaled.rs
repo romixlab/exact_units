@@ -831,30 +831,24 @@ mod proofs {
         Rounding::NearestCeil,
     ];
 
-    /// The kernel's `u32` path alone: every `u8` count of either sign at every scale of odd `u8` parts and an exponent
-    /// within ±8 answers, and its answer `q` is `±m · num · 2^k / den` rounded as the mode promises, checked by
-    /// multiplications in `i64` (`e = p − q·d` against the step `d`), and exact exactly where `e` is 0. The scale is
-    /// built field by field, so no gcd runs: the arithmetic doesn't need the form reduced. The limbs and the gcd are
+    /// The kernel's `u32` path at one scale: every `u8` count of either sign, an odd `u8` numerator and every mode
+    /// answers, and its answer `q` is `±m · num · 2^k / den` rounded as the mode promises, checked by multiplications in
+    /// `i64` (`e = p − q·d` against the step `d`), and exact exactly where `e` is 0. The scale is built field by field,
+    /// so no gcd runs: the arithmetic doesn't need the form reduced. The denominator and the exponent are fixed per
+    /// harness, as a symbolic 64-bit divisor keeps CBMC busy for hours; the limbs, the gcd and every other scale are
     /// covered by the properties of `tests/props/run_scale.rs`.
-    #[kani::proof]
-    fn scaled_u32() {
-        let (m, num, den, k, neg): (u8, u8, u8, i8, bool) = (
-            kani::any(),
-            kani::any(),
-            kani::any(),
-            kani::any(),
-            kani::any(),
-        );
+    fn check_u32(den: u32, k: i8) {
+        let (m, num, neg): (u8, u8, bool) = (kani::any(), kani::any(), kani::any());
         let i: usize = kani::any();
-        kani::assume(num % 2 == 1 && den % 2 == 1 && (-8..=8).contains(&k) && i < MODES.len());
+        kani::assume(num % 2 == 1 && i < MODES.len());
         let Some(&r) = MODES.get(i) else { return };
         let s = RunScale {
             num: num.into(),
-            den: den.into(),
+            den,
             pow2: k,
         };
         let Some((mag, exact)) = s.scaled_u32(m.into(), neg, r) else {
-            panic!("a u8 count at an 8-bit scale fits the u32 path");
+            panic!("a u8 count at an 8-bit numerator and a small exponent fits the u32 path");
         };
         let Some(q) = mag.settle::<i64>(neg, Overflow::Checked) else {
             panic!("the quotient fits i64");
@@ -888,5 +882,35 @@ mod proofs {
                 }
             }
         }
+    }
+
+    /// A step of 1: the path that skips the division.
+    #[kani::proof]
+    fn scaled_u32_whole() {
+        check_u32(1, 0);
+    }
+
+    /// An odd denominator alone, as NTSC's 1001.
+    #[kani::proof]
+    fn scaled_u32_odd() {
+        check_u32(1001, 0);
+    }
+
+    /// A power of two up, the denominator 1.
+    #[kani::proof]
+    fn scaled_u32_up() {
+        check_u32(1, 4);
+    }
+
+    /// A power of two down, so the step is even and ties happen.
+    #[kani::proof]
+    fn scaled_u32_down() {
+        check_u32(1, -4);
+    }
+
+    /// An odd denominator and a power of two down together: the step 3·2⁸.
+    #[kani::proof]
+    fn scaled_u32_mixed() {
+        check_u32(3, -8);
     }
 }
