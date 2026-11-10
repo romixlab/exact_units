@@ -11,9 +11,9 @@ The data are from the atomic mass evaluation AME2020 (Wang et al., Chinese Phys.
 | Step | Exact | Through a named set | Float edge |
 |---|---|---|---|
 | Binding energy, Q-value from mass excesses | yes | | |
-| A mass in u to an energy | | m_u·c² | |
+| A mass in u to an energy | | m_u | |
 | An energy in eV to a mass in kg | the factor e/c² | | the kilograms: no u128 fraction holds them |
-| Atoms in a gram | with M_u = 1 g/mol | M_u | |
+| Atoms in a gram | | m_u | the count: no u128 fraction holds it |
 | Activity A = ln 2 · N/T½ | N/T½ | | ln 2 |
 | Reaction rate σ·φ·N | yes | | |
 | Gy to Sv | ICRP 60's w_R | w_R named by its set (ICRP 103, ICRP 60) | ICRP 103 neutrons' w_R(E) |
@@ -50,24 +50,51 @@ A β⁻ decay's Q-value is the difference of the two atomic mass excesses: the e
 
 ## A mass in u is a ratio; its energy needs a named edition
 
-AME2020 also prints each atomic mass M in µu. That number is a ratio, M/m_u, because a mass spectrometer compares masses: in the crate it is an `Exact<Ratio>`. Turning it into an energy needs m_u·c², and m_u is measured. AME2020 used CODATA 2018's value, 931 494.102 42(28) keV (AME2020 I, Table A; CODATA 2018, Table XXXI). CODATA 2022 gives 931 494.103 72(29) keV (its Table XXXIII).
+AME2020 also prints each atomic mass M in µu. That number is a ratio, M/m_u, because a mass spectrometer compares masses: in the crate it is an `Exact<Ratio>`. Turning it into an energy needs m_u·c², and m_u, the dalton in kg, is measured. So it is a symbol of `Magnitude`, as μ₀ is: a unit can carry it in its scale (`m_u 1`), and a value in kg or eV comes only from a named [set of constants](../nomicon/constants.md), by `convert_with`. AME2020 used CODATA 2018's m_u (AME2020 I, Table A; CODATA 2018, Table XXXI: 1.660 539 066 60(50)·10⁻²⁷ kg). CODATA 2022 gives 1.660 539 068 92(52)·10⁻²⁷ kg (its Table XXXIII).
 
-The difference shows in a rest energy. ²³⁸U's M·c² moves by 309 eV between the two editions, two hundred times the 1.5 eV uncertainty AME2020 gives its mass:
+The crate has no dalton among its units yet, so it is declared here, its scale `m_u` alone. Without a set it has no value in grams, and that doesn't compile:
+
+```rust,compile_fail
+use exact_units::{Exact, units::Gram};
+
+exact_units::unit! {
+    struct Dalton = "Da" (long "dalton"), [kg 1], Exact(1 / 1, m_u 1);
+}
+
+let g = Exact::<Dalton>::int(1).convert::<Gram>();
+```
+
+With a set, m_u·c² is the set's m_u in kg times c², which the SI fixes, in eV. AME2020's Table A prints CODATA 2018's as 931 494.102 42 keV, rounded on its own; from the m_u CODATA prints in kg it is 2.9 meV less, inside the 0.28 eV uncertainty of both. The difference between editions shows in a rest energy. ²³⁸U's M·c² moves by 309 eV between the two, two hundred times the 1.5 eV uncertainty AME2020 gives its mass:
 
 ```rust
-use exact_units::{Exact, prefix::{Kilo, Micro}, units::{ElectronVolt, Ratio}};
+use exact_units::{Exact, prefix::{Kilo, Micro}, units::{ElectronVolt, Ratio, Speed}};
+use exact_units::constants::{Codata2018, Codata2022, Constants};
 
-// m_u·c² of CODATA 2018 and 2022, in keV
-let mu_c2_2018 = Exact::<ElectronVolt>::new_in::<Kilo>(93_149_410_242, 100_000);
-let mu_c2_2022 = Exact::<ElectronVolt>::new_in::<Kilo>(93_149_410_372, 100_000);
+exact_units::unit! {
+    /// The dalton, 1 Da = m_u: measured, so its scale keeps the symbol.
+    struct Dalton = "Da" (long "dalton"), [kg 1], Exact(1 / 1, m_u 1);
+}
+
+/// m_u·c² of the set `S`, in eV: its m_u in kg times the exact c².
+fn dalton_energy<S: Constants>() -> Exact<ElectronVolt> {
+    let c = Exact::<Speed>::int(299_792_458);
+    let mc2 = Exact::<Dalton>::int(1).checked_times(c).unwrap().checked_times(c).unwrap();
+    mc2.convert_with::<S, ElectronVolt>().unwrap()
+}
+
+// AME2020 Table A's m_u·c², 931 494.102 42 keV: 2.9 meV above the one from m_u in kg
+let table_a = Exact::<ElectronVolt>::new_in::<Kilo>(93_149_410_242, 100_000);
+let below = (table_a - dalton_energy::<Codata2018>()).unwrap();
+assert!(below > Exact::new(28, 10_000) && below < Exact::new(29, 10_000));
+
 // AME2020: M(²³⁸U) in µu
 let m = Exact::<Ratio>::new_in::<Micro>(238_050_786_936, 1000);
-
-let moved = (mu_c2_2022.scaled(m).unwrap() - mu_c2_2018.scaled(m).unwrap()).unwrap();
+let step = (dalton_energy::<Codata2022>() - dalton_energy::<Codata2018>()).unwrap();
+let moved = step.scaled(m).unwrap();
 assert!(moved > Exact::int(309) && moved < Exact::int(310));
 ```
 
-A mass table and its m_u·c² belong to one edition. The crate's own [sets of constants](../nomicon/constants.md) give μ₀ and G only, so for now the edition is the number you write, with its table named beside it. See [What the crate doesn't do yet](#what-the-crate-doesnt-do-yet).
+A mass table and its m_u belong to one edition: the generic `S` is where the code names it, and a table's own type can carry its edition as an associated `type Set: Constants`, so code that mixes two tables names both.
 
 ## E = mc² with c = 1
 
@@ -93,7 +120,7 @@ The exact way refuses rather than rounds: the joules of that Q over c², as a fr
 
 The activity of N atoms with half-life T½ is A = λ·N, with λ = ln 2/T½. Each piece has its own status:
 
-- N = m/(A_r·M_u)·N_A. N_A is exact by the SI. M_u, the molar mass constant, has been measured since 2019: 0.999 999 999 65(30) g/mol in CODATA 2018 and 1.000 000 001 05(31) g/mol in CODATA 2022, either side of the 1 g/mol it was before. With CODATA's M_u the fraction for N outgrows `u128` (a numerator near 10⁴²). With the old 1 g/mol it fits, 3.5·10⁻¹⁰ off, far inside the half-life's own 0.44 %.
+- N = m/(A_r·m_u). The molar mass constant M_u = N_A·m_u would put N_A in and take it out again: N_A is exact by the SI, and M_u is measured since 2019 with m_u, 0.999 999 999 65(30) g/mol in CODATA 2018 and 1.000 000 001 05(31) g/mol in CODATA 2022, either side of the 1 g/mol it was before (`constants::MOLAR_MASS_CONSTANT` is N_A·m_u, exactly). One atom of ²²⁶Ra in grams, 3.75·10⁻²² g to 21 digits, needs a denominator near 10⁴², past a `u128` fraction, so the count is a float edge, far below the half-life's own 0.44 %.
 - T½ of ²²⁶Ra is 1600(7) y (NUBASE2020, Table I), in NUBASE's year: 1 y = 365.2422 d (NUBASE2020, §2.3), the tropical year, not the Julian 365.25 d. The crate has no year, so the page declares this one, with `conventional` naming where its value comes from.
 - ln 2 is exact as a `Magnitude` symbol, but no run-time value carries a symbol, so A = ln 2 · N/T½ is a float edge.
 - Decays per second are an activity only by the named step `as_quantity::<Activity>()`. A plain s⁻¹ doesn't `convert` to Bq.
@@ -102,9 +129,12 @@ The activity of N atoms with half-life T½ is A = λ·N, with λ = ln 2/T½. Eac
 use core::f64::consts::LN_2;
 use exact_units::{Exact, Fixed, Rounding, prefix::{Kilo, Micro, One}};
 use exact_units::quantities::Activity;
-use exact_units::units::{Becquerel, Gram, GramPerMole, Mole, Per, Ratio, Second};
+use exact_units::constants::Codata2018;
+use exact_units::units::{Becquerel, Gram, Per, Ratio, Second};
 
 exact_units::unit! {
+    /// The dalton, 1 Da = m_u.
+    struct Dalton = "Da" (long "dalton"), [kg 1], Exact(1 / 1, m_u 1);
     /// NUBASE2020's year, 365.2422 d (§2.3).
     struct YearNubase = "y" (long "year (NUBASE2020)", prefixes only [Kilo, Mega, Giga]), [s 1],
         Exact(3155692608 / 100), conventional("NUBASE2020, section 2.3", 2021);
@@ -113,17 +143,15 @@ exact_units::unit! {
 }
 
 let a_r = Exact::<Ratio>::new_in::<Micro>(226_025_408_186, 1000); // AME2020: M(²²⁶Ra) in µu
-let molar = Exact::<GramPerMole>::int(1).scaled(a_r).unwrap(); // M_u = 1 g/mol, the pre-2019 convention
-let n_a = Exact::<Per<Ratio, Mole>>::new(602_214_076_000_000_000_000_000, 1);
-let moles = (Exact::<Gram>::int(1) / molar).unwrap().convert::<Mole>().unwrap();
-let atoms = (moles * n_a).unwrap().convert::<Ratio>().unwrap();
+let dalton = Exact::<Dalton>::int(1).convert_with::<Codata2018, Gram>().unwrap();
+assert!(dalton.scaled(a_r).is_none()); // one atom in grams: past a u128 fraction
+let atoms = 1.0 / (a_r.to_f64() * dalton.to_f64());
 
 let t_half = Exact::<YearNubase>::new_in::<Kilo>(16, 10).convert::<Second>().unwrap();
 assert_eq!(t_half, Exact::int(50_491_081_728));
 
-// N/T½ stays exact, an activity by the named step; × ln 2 is the float edge
-let per_t = (atoms / t_half).unwrap().as_quantity::<Activity>().convert::<Becquerel>().unwrap();
-let a = Fixed::<Becquerel, One, f64>::try_new(per_t.to_f64() * LN_2).unwrap();
+let per_s = Fixed::<Per<Ratio, Second>, One, f64>::try_new(atoms / t_half.to_f64() * LN_2).unwrap();
+let a: Fixed<Becquerel, One, f64> = per_s.as_quantity::<Activity>().convert().unwrap();
 let ci: Fixed<Curie, One, f64> = a.convert_rounded(Rounding::NearestEven).unwrap();
 // the curie was once "a gram of radium": with today's half-life a gram is 1.1 % short of it
 assert!(ci.get() > 0.988 && ci.get() < 0.989);
@@ -182,8 +210,7 @@ The coefficients are a fit, and every fit is a convention: which nuclides, which
 
 ## What the crate doesn't do yet
 
-- **m_u·c² and M_u have no set.** `constants::Constants` gives μ₀ and G only, and `Magnitude` has no symbol for the dalton, so a mass in u reaches an energy only through a number you write.
 - **No dalton, barn, curie or year among the units.** Each is declared above with `unit!`. The year needs a convention named (NUBASE's 365.2422 d, the Julian 365.25 d).
-- **`Exact` holds a `u128` fraction, without an exponent.** Atomic-scale values in SI units (10⁻³⁰ kg with c² below it), or N for a gram with CODATA's M_u, don't fit, and the arithmetic gives `None`.
+- **`Exact` holds a `u128` fraction, without an exponent.** Atomic-scale values in SI units (10⁻³⁰ kg with c² below it, one atom's mass in grams), don't fit, and the arithmetic gives `None`.
 - **No quantity for a reaction rate or a decay constant.** Both are s⁻¹, but neither is a frequency nor an activity.
 - **No exact cube root.** A^(1/3) is a float, and so is ln 2 times a run-time value.
