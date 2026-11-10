@@ -136,10 +136,8 @@ fn niched_and_coded_name_a_code_without_a_value() {
 /// The fields as plain numbers, to write what the typed struct refuses.
 #[derive_shrink_wrap(owned)]
 struct PlainSettings {
-    /// `Settings::channel`'s number.
-    channel: u8,
-    /// `Settings::delay`'s ms.
-    delay: u16,
+    /// `Settings::timeout`'s ms.
+    timeout: u16,
     /// `Settings::gain`'s float.
     gain: f32,
     /// `Settings::cell`'s position.
@@ -148,19 +146,16 @@ struct PlainSettings {
     temp: i8,
     /// `Settings::law`'s code.
     law: u8,
+    /// `Settings::channel`'s number.
+    channel: u8,
 }
 
-/// A delay of 0 ms is a delay, unlike a timeout.
-type Delay = Fixed<Second, Milli, u16, Range<0, 5000>>;
-
-/// Only the first field refuses 0: after a refused field the latched reads give 0, and a later field that refuses 0
-/// would replace the first refusal with its own (shrink_wrap's slot keeps the last one, wire_weaver's to fix).
+/// After a refused field the latched reads give 0, which the last field refuses too: the first refusal is the one
+/// named.
 #[derive_shrink_wrap(borrowed, owned, derive(Debug, PartialEq))]
 struct Settings {
-    /// 1..=8, never 0.
-    channel: Channel,
-    /// 0..=5000 ms.
-    delay: Delay,
+    /// 1..=5000 ms.
+    timeout: Timeout,
     /// -0.5..=2.5.
     gain: Gain,
     /// 0..=1000.
@@ -169,17 +164,19 @@ struct Settings {
     temp: Temp,
     /// A μ-law code, never 0x7F.
     law: Law,
+    /// 1..=8, never 0.
+    channel: Channel,
 }
 
 impl Default for PlainSettings {
     fn default() -> Self {
         PlainSettings {
-            channel: 1,
-            delay: 10,
+            timeout: 10,
             gain: 1.0,
             cell: 5,
             temp: 20,
             law: 0,
+            channel: 1,
         }
     }
 }
@@ -201,9 +198,12 @@ fn a_field_of_a_struct_names_its_refusal() {
     let ok =
         <Settings as DeserializeShrinkWrapOwned>::from_ww_bytes_explained(&settings_with(|_| {}))
             .expect("every field within its bounds");
-    assert_eq!(ok.delay.get(), 10);
+    assert_eq!(ok.timeout.get(), 10);
     let cases: [(Vec<u8>, &str); 7] = [
-        (settings_with(|s| s.delay = 6000), "6000 is out of 0..=5000"),
+        (
+            settings_with(|s| s.timeout = 6000),
+            "6000 is out of 1..=5000",
+        ),
         (settings_with(|s| s.gain = -1.0), "-1 is out of -0.5..=2.5"),
         (settings_with(|s| s.cell = 1001), "1001 is out of 0..=1000"),
         (
@@ -235,4 +235,43 @@ fn an_item_of_a_list_names_its_refusal() {
     let bytes = vec![1u16, 5000, 6001].to_ww_bytes_owned().expect("writes");
     let e = refused::<Vec<Timeout>>(&bytes);
     assert_eq!(e.to_string(), "6001 is out of 1..=5000");
+}
+
+/// A timeout of 6000 ms, then a number counting from 1.
+#[derive_shrink_wrap(owned)]
+struct PlainPair {
+    /// `Pair::timeout`'s ms.
+    timeout: u16,
+    /// `Pair::count`'s number.
+    count: u8,
+}
+
+/// Two fields that both refuse 0.
+#[derive_shrink_wrap(borrowed, owned, derive(Debug, PartialEq))]
+struct Pair {
+    /// 1..=5000 ms.
+    timeout: Timeout,
+    /// From 1.
+    count: Count,
+}
+
+/// The first refusal is named: the count, read as 0 after the timeout's refusal, refuses that 0 too, and doesn't
+/// replace it (shrink_wrap keeps the first, as it keeps the first error).
+#[test]
+fn the_first_refused_field_is_named() {
+    let bytes = PlainPair {
+        timeout: 6000,
+        count: 1,
+    }
+    .to_ww_bytes_owned()
+    .expect("writes");
+    let e = refused::<Pair>(&bytes);
+    assert_eq!(
+        e.refused,
+        Some(Refused::out_of(int(6000), int(1), int(5000)))
+    );
+    assert_eq!(e.to_string(), "6000 is out of 1..=5000");
+    let slot = Slot::new();
+    let e = <Pair as DeserializeShrinkWrap>::from_ww_bytes_explained(&bytes, &slot).unwrap_err();
+    assert_eq!(e.to_string(), "6000 is out of 1..=5000");
 }
