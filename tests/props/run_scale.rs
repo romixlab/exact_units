@@ -512,20 +512,23 @@ mod proofs {
         super::wraps_u16(kani::any(), kani::any(), kani::any());
     }
 
-    /// Every i16 count, every pair of scales of 8-bit parts and exponents within ±8: the `u32` path of the kernel
-    /// against the quotient in `i128`.
+    /// Scales of the proof: 1, a third, powers of two each way, 8-bit parts at the ends of their exponents.
+    const SCALES: [(u8, u8, i8); 6] = [
+        (1, 1, 0),
+        (1, 3, 0),
+        (7, 5, -2),
+        (255, 1, 8),
+        (1, 255, -8),
+        (9, 4, 1),
+    ];
+
+    /// Every i16 count and every mode at every pair of [SCALES]: the `u32` path of the kernel against the quotient
+    /// in `i128`. Symbolic parts make the gcd's loop too deep for CBMC; the walk and the proptest cover them.
     #[kani::proof]
-    #[kani::unwind(40)]
+    #[kani::unwind(20)]
     fn rescale_small() {
-        let (e1, e2): (i8, i8) = (kani::any(), kani::any());
-        kani::assume((-8..=8).contains(&e1) && (-8..=8).contains(&e2));
-        let i: usize = kani::any();
-        kani::assume(i < MODES.len());
-        super::rescales_small(
-            kani::any(),
-            (kani::any(), kani::any(), e1),
-            (kani::any(), kani::any(), e2),
-            MODES[i],
-        );
+        let (a, b, m): (usize, usize, usize) = (kani::any(), kani::any(), kani::any());
+        kani::assume(a < SCALES.len() && b < SCALES.len() && m < MODES.len());
+        super::rescales_small(kani::any(), SCALES[a], SCALES[b], MODES[m]);
     }
 }
