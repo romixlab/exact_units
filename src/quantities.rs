@@ -6,7 +6,10 @@
 //! - Energy (ISO 80000-4, -5): [Energy] → [MechanicalEnergy] → [KineticEnergy], [PotentialEnergy]; [Energy] →
 //!   [Work], [Heat].
 //! - s⁻¹: [Frequency] (`Hertz`), and two kinds of their own, [Activity] (`Becquerel`) and [SymbolRate] (`Baud`):
-//!   Hz, Bq and Bd don't convert.
+//!   Hz, Bq and Bd don't convert. Three more kinds of s⁻¹, none of them an activity: [DecayConstant] λ, [CountRate]
+//!   and [ReactionRate]; named steps lead from each to an activity.
+//! - Time (ISO 80000-3): [Time] → [MeanLife] τ, [HalfLife] T½.
+//! - [Fluence] Φ (m⁻²) and [FluenceRate] φ (m⁻²·s⁻¹), kinds of their own.
 //! - m²·s⁻²: [AbsorbedDose] (`Gray`) with [Kerma], which shares the gray, as a kind under it; [DoseEquivalent]
 //!   (`Sievert`, the CIPM's H = Q·D) with the operational [AmbientDoseEquivalent10] H*(10),
 //!   [PersonalDoseEquivalent10] Hp(10) and [PersonalDoseEquivalent0_07] Hp(0.07) and ICRP's [EquivalentDose] and
@@ -68,6 +71,27 @@ crate::quantity! {
     pub struct Activity = kind [s -1];
     /// Symbol rate: symbols per second, [Baud](crate::units::Baud)'s; not a clock's frequency.
     pub struct SymbolRate = kind [s -1];
+    /// Decay constant, λ: the probability per time that a nucleus decays, ln 2 over the half-life; not an activity
+    /// (λ·N is one, by the named step `times_nuclei`) and not a frequency.
+    pub struct DecayConstant = kind [s -1];
+    /// Count rate: a detector's counts per second; not an activity (A = R/ε, by the named step `over_efficiency`).
+    pub struct CountRate = kind [s -1];
+    /// Reaction rate: reactions per second in a target, σ·φ·N; not an activity (at saturation the product's activity
+    /// equals it, by the named step `saturation_activity`) and not a frequency.
+    pub struct ReactionRate = kind [s -1];
+
+    /// Time, t (ISO 80000-3): the open root of s.
+    pub struct Time = [s 1];
+    /// Mean life, τ = 1/λ: a time, not a half-life.
+    pub struct MeanLife: Time;
+    /// Half-life, T½ = ln 2/λ: a time, not a mean life.
+    pub struct HalfLife: Time;
+
+    /// Particle fluence, Φ: particles per cross-sectional area of a sphere, m⁻².
+    pub struct Fluence = kind [m -2];
+    /// Particle fluence rate, φ = dΦ/dt: m⁻²·s⁻¹, a beam's or a reactor's flux; times a cross section and a number of
+    /// target nuclei it is a reaction rate.
+    pub struct FluenceRate = kind [m -2, s -1];
 
     /// Absorbed dose, D (ISO 80000-10): energy imparted per mass, [Gray](crate::units::Gray)'s.
     pub struct AbsorbedDose = kind [m 2, s -2];

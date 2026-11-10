@@ -471,8 +471,19 @@ counted units, and the kinds that keep look-alike quantities apart.
   `effective_i64` and `rate_steps_walk` against `i128`, Kani proofs), `conv_error`'s
   `gray_to_sievert_hints_a_weighting`, `compile_fail` doctests. Book: [Doses and weighting](docs/maths/doses.md).
   P2401#10nov-1911b.
-- 📋 **UNIT-13 Quantities of s⁻¹ beyond Hz and Bq** — decay constant, reaction rate, count rate, and the fluence
-  rate (m⁻²·s⁻¹), with the named steps physics gives (λ·N is an activity). P2401#10nov-1911c.
+- ✅ **UNIT-13 Quantities of s⁻¹ beyond Hz and Bq** — `quantities::DecayConstant` λ, `CountRate` and
+  `ReactionRate`, kinds of s⁻¹ beside `Frequency`, `Activity` and `SymbolRate`, so none converts to Bq or Hz;
+  `Fluence` Φ (m⁻²) and `FluenceRate` φ (m⁻²·s⁻¹), kinds; `Time`, the open root of s, with `MeanLife` τ and
+  `HalfLife` T½ under it, times but not each other. Units (feature `radiation`): `PerSquareMeter`,
+  `PerSquareCentimeter`, `PerSquareMeterSecond`, `PerSquareCentimeterSecond`; aliases `units::DecayConstant`,
+  `CountRate`, `ReactionRate` (`Of<.., Per<Ratio, Second>>`). Named steps, as a dimension-one factor keeps the
+  other side's quantity (λ·N is still a decay constant): `times_nuclei` (A = λ·N, `Fixed` and `Exact`),
+  `saturation_activity` (A_sat = R), `over_efficiency` (A = R/ε, `Exact`, `None` for ε ≤ 0), `mean_life` and
+  `decay_constant` (τ = 1/λ, exact), `half_life_f64` and `decay_constant_f64` (ln 2, a float edge; an exact form over
+  NUM-35's `units::Ln2` is not written yet). The names follow the plan's reading of ISO 80000-10 and are
+  unchecked against the standard itself (not in the library): its item numbers, and whether its reaction rate is
+  per target or per volume, are still to check. Tests: `tests/rates.rs`, `tests/quantities.rs` (the new quantities
+  in every pair), compile_fail doctests in `src/quantity/rates.rs`. P2401#10nov-1911c.
 - ✅ **UNIT-14 Nuclear units** — an opt-in group `nuclear`, not in `quantities` or `std`, as `customary` is:
   `Dalton` (Da, 1 Da = m_u, NUM-32's symbol, no `quantity` line, so its dimension matches a gram's with no step,
   as `Gram`'s kg has none either, but a value in grams still needs `convert_with` and a named set: the scale keeps

@@ -150,7 +150,10 @@ fn has_power(e: &UnitExpr) -> Option<&'static str> {
 
 #[test]
 fn every_marker_with_a_power() {
-    let tested = every_marker!(Area KinematicViscosity SpecificVolume Volume VolumetricFlow);
+    let tested = every_marker!(
+        Area KinematicViscosity SpecificVolume Volume VolumetricFlow PerSquareMeter PerSquareCentimeter
+        PerSquareMeterSecond PerSquareCentimeterSecond
+    );
     for name in units::ALL.iter().filter_map(|e| has_power(e)) {
         assert!(tested.contains(&name), "{name} is not in the walk");
     }

@@ -36,7 +36,7 @@
     "DeviceBoot": {
       "description": "A device's boot, the zero of its monotonic clock, on DeviceMonotonic.",
       "long": "device boot",
-      "quantity": null,
+      "quantity": "time",
       "unit": "Second"
     },
     "Fahrenheit": {
@@ -54,19 +54,19 @@
     "GpsEpoch": {
       "description": "The GPS epoch, 1980-01-06 00:00:00 GPS time, which is 1980-01-06 00:00:19 TAI: GPS time counts every SI second and stays 19 s behind TAI, so it is an origin on TaiScale, 694 656 019 s after TaiEpoch1958 (8040 days and 19 s).",
       "long": "gps epoch",
-      "quantity": null,
+      "quantity": "time",
       "unit": "Second"
     },
     "NtpEpoch": {
       "description": "NTP's epoch, 1900-01-01 00:00:00 UTC, on PosixScale: 2 208 988 800 s before the UnixEpoch, exactly (NTP counts every day as 86400 s too, RFC 5905).",
       "long": "ntp epoch",
-      "quantity": null,
+      "quantity": "time",
       "unit": "Second"
     },
     "PtpEpoch": {
       "description": "PTP's epoch (IEEE 1588), 1970-01-01 00:00:00 TAI, on TaiScale: 378 691 200 s (4383 days) after TaiEpoch1958.",
       "long": "ptp epoch",
-      "quantity": null,
+      "quantity": "time",
       "unit": "Second"
     },
     "Rankine": {
@@ -78,13 +78,13 @@
     "TaiEpoch1958": {
       "description": "TAI's zero, 1958-01-01 00:00:00 TAI, on TaiScale.",
       "long": "tai epoch 1958",
-      "quantity": null,
+      "quantity": "time",
       "unit": "Second"
     },
     "UnixEpoch": {
       "description": "The Unix epoch, 1970-01-01 00:00:00 UTC, on PosixScale: a point from it is a moment in POSIX time, as CLOCK_REALTIME, time_t, journald's __REALTIME_TIMESTAMP and most log formats count it.",
       "long": "unix epoch",
-      "quantity": null,
+      "quantity": "time",
       "unit": "Second"
     },
     "Vacuum": {
@@ -2363,7 +2363,7 @@
       "dim": "s",
       "long": "day",
       "plural": "days",
-      "quantity": null,
+      "quantity": "time",
       "related": [
         "Second",
         "Minute",
@@ -3820,7 +3820,7 @@
       "dim": "s",
       "long": "year (Gregorian)",
       "plural": "years (Gregorian)",
-      "quantity": null,
+      "quantity": "time",
       "related": [
         "Second",
         "Minute",
@@ -4083,7 +4083,7 @@
       "dim": "s",
       "long": "hour",
       "plural": "hours",
-      "quantity": null,
+      "quantity": "time",
       "related": [
         "Second",
         "Minute",
@@ -4460,7 +4460,7 @@
       "dim": "s",
       "long": "year (Julian)",
       "plural": "years (Julian)",
-      "quantity": null,
+      "quantity": "time",
       "related": [
         "Second",
         "Minute",
@@ -5490,7 +5490,7 @@
       "dim": "s",
       "long": "minute",
       "plural": "minutes",
-      "quantity": null,
+      "quantity": "time",
       "related": [
         "Second",
         "Hour",
@@ -6187,6 +6187,54 @@
       ],
       "scale": "0.00155517384",
       "symbol": "dwt"
+    },
+    "PerSquareCentimeter": {
+      "description": "Particle fluence in particles per square centimeter, cm⁻² (10⁴ m⁻²), a Fluence.",
+      "dim": "m⁻²",
+      "long": "per square centimetre",
+      "plural": "per square centimetre",
+      "quantity": "fluence",
+      "related": [
+        "PerSquareMeter"
+      ],
+      "scale": "10000",
+      "symbol": "cm⁻²"
+    },
+    "PerSquareCentimeterSecond": {
+      "description": "Particle fluence rate in particles per square centimeter per second, cm⁻²·s⁻¹ (10⁴ m⁻²·s⁻¹), a FluenceRate: a reactor's neutron flux.",
+      "dim": "m⁻²·s⁻¹",
+      "long": "per square centimetre second",
+      "plural": "per square centimetre second",
+      "quantity": "fluence rate",
+      "related": [
+        "PerSquareMeterSecond"
+      ],
+      "scale": "10000",
+      "symbol": "cm⁻²·s⁻¹"
+    },
+    "PerSquareMeter": {
+      "description": "Particle fluence in particles per square meter, m⁻², a Fluence.",
+      "dim": "m⁻²",
+      "long": "per square metre",
+      "plural": "per square metre",
+      "quantity": "fluence",
+      "related": [
+        "PerSquareCentimeter"
+      ],
+      "scale": null,
+      "symbol": "m⁻²"
+    },
+    "PerSquareMeterSecond": {
+      "description": "Particle fluence rate in particles per square meter per second, m⁻²·s⁻¹, a FluenceRate.",
+      "dim": "m⁻²·s⁻¹",
+      "long": "per square metre second",
+      "plural": "per square metre second",
+      "quantity": "fluence rate",
+      "related": [
+        "PerSquareCentimeterSecond"
+      ],
+      "scale": null,
+      "symbol": "m⁻²·s⁻¹"
     },
     "Permeability": {
       "description": "Permeability in henries per meter, H/m (kg·m·s⁻²·A⁻², SI Brochure, 9th ed., table 6); also a cable's inductance per length.",
@@ -7365,7 +7413,7 @@
       "dim": "s",
       "long": "second",
       "plural": "seconds",
-      "quantity": null,
+      "quantity": "time",
       "related": [
         "Minute",
         "Hour",
@@ -8449,7 +8497,7 @@
       "dim": "s",
       "long": "year (NUBASE2020)",
       "plural": "years (NUBASE2020)",
-      "quantity": null,
+      "quantity": "time",
       "related": [
         "Second",
         "Minute",
@@ -8620,7 +8668,7 @@
       "dim": "s",
       "long": "week",
       "plural": "weeks",
-      "quantity": null,
+      "quantity": "time",
       "related": [
         "Second",
         "Minute",

@@ -359,6 +359,10 @@ These `unit!` symbols are no `q!` symbol: a compound one is written with operato
 | W/m² | `Irradiance` |
 | W/sr | `RadiantIntensity` |
 | W/(m²·sr) | `Radiance` |
+| m⁻² | `PerSquareMeter` |
+| cm⁻² | `PerSquareCentimeter` |
+| m⁻²·s⁻¹ | `PerSquareMeterSecond` |
+| cm⁻²·s⁻¹ | `PerSquareCentimeterSecond` |
 | keV/µm | `KiloElectronVoltPerMicrometer` |
 | C/kg | `CoulombPerKilogram` |
 | Gy/s | `GrayPerSecond` |

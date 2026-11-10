@@ -22,6 +22,9 @@ graph TD
   S["s⁻¹"] --> F["Frequency<br/>Hertz's quantity"]
   S --> A["Activity, a kind<br/>Becquerel's"]
   S --> SR["SymbolRate, a kind<br/>Baud's"]
+  S --> DC["DecayConstant, CountRate,<br/>ReactionRate: kinds"]
+  T["Time<br/>Second's quantity"] --> ML["MeanLife"]
+  T --> HL["HalfLife"]
 ```
 
 ## The rules

@@ -56,6 +56,14 @@ const TREE: &[(&str, &[&str], &[&str])] = &[
     ("Frequency", &["D"], &[]),
     ("Activity", &[], &[]),
     ("SymbolRate", &[], &[]),
+    ("DecayConstant", &[], &[]),
+    ("CountRate", &[], &[]),
+    ("ReactionRate", &[], &[]),
+    ("Time", &["D"], &[]),
+    ("MeanLife", &["Time", "D"], &["Time"]),
+    ("HalfLife", &["Time", "D"], &["Time"]),
+    ("Fluence", &[], &[]),
+    ("FluenceRate", &[], &[]),
     ("AbsorbedDose", &[], &[]),
     ("Kerma", &[], &["AbsorbedDose"]),
     ("DoseEquivalent", &[], &[]),
@@ -108,7 +116,7 @@ const TREE: &[(&str, &[&str], &[&str])] = &[
 ];
 
 /// The quantities as `const` data, in [TREE]'s order.
-const DEFS: [&QuantityDef<'static>; 60] = [
+const DEFS: [&QuantityDef<'static>; 68] = [
     Length::DEF,
     Height::DEF,
     Width::DEF,
@@ -124,6 +132,14 @@ const DEFS: [&QuantityDef<'static>; 60] = [
     Frequency::DEF,
     Activity::DEF,
     SymbolRate::DEF,
+    quantities::DecayConstant::DEF,
+    quantities::CountRate::DEF,
+    quantities::ReactionRate::DEF,
+    quantities::Time::DEF,
+    quantities::MeanLife::DEF,
+    quantities::HalfLife::DEF,
+    quantities::Fluence::DEF,
+    quantities::FluenceRate::DEF,
     AbsorbedDose::DEF,
     quantities::Kerma::DEF,
     DoseEquivalent::DEF,
@@ -173,8 +189,8 @@ const DEFS: [&QuantityDef<'static>; 60] = [
 
 /// The expressions walked: each quantity, then the derived quantity of each of their dimensions and of a velocity,
 /// then ratios of length and of energy.
-const EXPRS: [QuantityExpr<'static>; 82] = {
-    let dims: [Dim<'static>; 19] = [
+const EXPRS: [QuantityExpr<'static>; 93] = {
+    let dims: [Dim<'static>; 22] = [
         Length::DEF.dim,
         Energy::DEF.dim,
         Frequency::DEF.dim,
@@ -189,6 +205,9 @@ const EXPRS: [QuantityExpr<'static>; 82] = {
         Dim::ONE,
         PlaneAngle::DEF.dim,
         <Per<Meter, Second> as Unit>::DIM,
+        quantities::Time::DEF.dim,
+        quantities::Fluence::DEF.dim,
+        quantities::FluenceRate::DEF.dim,
         // the same dimensions again, a second derived each: two Derived of one dimension are one quantity
         Length::DEF.dim,
         Energy::DEF.dim,
@@ -196,7 +215,7 @@ const EXPRS: [QuantityExpr<'static>; 82] = {
         AbsorbedDose::DEF.dim,
         Resistance::DEF.dim,
     ];
-    let mut out = [QuantityExpr::RatioOf(Dim::ONE); 82];
+    let mut out = [QuantityExpr::RatioOf(Dim::ONE); 93];
     let mut i = 0;
     while i < DEFS.len() {
         out[i] = QuantityExpr::Spec(QuantityRef::Def(DEFS[i]));

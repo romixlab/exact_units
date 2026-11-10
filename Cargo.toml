@@ -161,6 +161,8 @@ photometric = []
 # Irradiance (W/m²), RadiantIntensity (W/sr), Radiance (W/(m²·sr))
 radiometric = []
 # Becquerel, Gray, Sievert, ElectronVolt; CoulombPerKilogram (Exposure, C/kg), GrayPerSecond (Gy/s), SievertPerHour
+# PerSquareMeter, PerSquareCentimeter (fluence), PerSquareMeterSecond, PerSquareCentimeterSecond (fluence rate); with
+# time and dimensionless the s⁻¹ aliases DecayConstant, CountRate, ReactionRate
 radiation = []
 # Ratio (duty, probability, scale): used next to any other group, so a group of its own
 dimensionless = []

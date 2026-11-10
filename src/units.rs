@@ -533,6 +533,24 @@ crate::unit! {
     #[cfg(feature = "radiation")]
     pub struct Becquerel = "Bq" (long "becquerel", ucum "Bq"), [s -1] quantity crate::quantities::Activity;
 
+    /// Particle fluence in particles per square meter, m⁻², a [Fluence](crate::quantities::Fluence).
+    #[cfg(feature = "radiation")]
+    pub struct PerSquareMeter = "m⁻²" (ascii "m^-2", long "per square metre" plural "per square metre", ucum "m-2"), [m -2] quantity crate::quantities::Fluence;
+
+    /// Particle fluence in particles per square centimeter, cm⁻² (10⁴ m⁻²), a [Fluence](crate::quantities::Fluence).
+    #[cfg(feature = "radiation")]
+    pub struct PerSquareCentimeter = "cm⁻²" (ascii "cm^-2", long "per square centimetre" plural "per square centimetre", ucum "cm-2"), [m -2] quantity crate::quantities::Fluence, Pow10(4);
+
+    /// Particle fluence rate in particles per square meter per second, m⁻²·s⁻¹, a
+    /// [FluenceRate](crate::quantities::FluenceRate).
+    #[cfg(feature = "radiation")]
+    pub struct PerSquareMeterSecond = "m⁻²·s⁻¹" (ascii "m^-2.s^-1", long "per square metre second" plural "per square metre second", ucum "m-2.s-1"), [m -2, s -1] quantity crate::quantities::FluenceRate;
+
+    /// Particle fluence rate in particles per square centimeter per second, cm⁻²·s⁻¹ (10⁴ m⁻²·s⁻¹), a
+    /// [FluenceRate](crate::quantities::FluenceRate): a reactor's neutron flux.
+    #[cfg(feature = "radiation")]
+    pub struct PerSquareCentimeterSecond = "cm⁻²·s⁻¹" (ascii "cm^-2.s^-1", long "per square centimetre second" plural "per square centimetre second", ucum "cm-2.s-1"), [m -2, s -1] quantity crate::quantities::FluenceRate, Pow10(4);
+
     /// Absorbed dose in grays, Gy (m²·s⁻², J/kg), an [AbsorbedDose](crate::quantities::AbsorbedDose): not a dose
     /// in [Sievert], which weights it by the radiation, and not a kerma, which the SI also gives the gray
     /// ([Kerma](crate::quantities::Kerma), `Of<Kerma, Gray>`).
@@ -1066,6 +1084,22 @@ pub type Kerma = Of<crate::quantities::Kerma, Gray>;
 /// are J/K. One becomes the other only by a named step (`as_entropy`, `as_heat_capacity`).
 #[cfg(feature = "thermal")]
 pub type Entropy = Of<crate::quantities::Entropy, HeatCapacity>;
+
+/// A decay constant in s⁻¹, λ: a [DecayConstant](crate::quantities::DecayConstant), so not an activity or a
+/// frequency, though [Becquerel] and [Hertz] are s⁻¹ too. λ·N is an activity by the named step `times_nuclei`; λ in
+/// another time unit is `Of<DecayConstant, Per<Ratio, Hour>>`.
+#[cfg(all(feature = "radiation", feature = "time", feature = "dimensionless"))]
+pub type DecayConstant = Of<crate::quantities::DecayConstant, Per<Ratio, Second>>;
+
+/// A count rate in counts per second, s⁻¹: a [CountRate](crate::quantities::CountRate), what a detector counts, so not
+/// an activity. R/ε is one by the named step `over_efficiency`.
+#[cfg(all(feature = "radiation", feature = "time", feature = "dimensionless"))]
+pub type CountRate = Of<crate::quantities::CountRate, Per<Ratio, Second>>;
+
+/// A reaction rate in reactions per second, s⁻¹: a [ReactionRate](crate::quantities::ReactionRate), σ·φ·N, so not an
+/// activity or a frequency. The activity it saturates to is the named step `saturation_activity`.
+#[cfg(all(feature = "radiation", feature = "time", feature = "dimensionless"))]
+pub type ReactionRate = Of<crate::quantities::ReactionRate, Per<Ratio, Second>>;
 
 /// A damping ratio, ζ: δ/ω₀ of a second-order system (x″ + 2ζω₀·x′ + ω₀²·x = 0), 1 at critical damping. A number
 /// that is a [DampingRatio](crate::quantities::DampingRatio), so it isn't a plain [Ratio] or a [QualityFactor]
