@@ -86,7 +86,7 @@ pages! {
     Nuclear = "recipes/nuclear.md";
     #[cfg(feature = "time")]
     VideoTime = "recipes/video_time.md";
-    #[cfg(feature = "dimensionless")]
+    #[cfg(all(feature = "dimensionless", feature = "information", feature = "time"))]
     ImageCodecs = "recipes/image_codecs.md";
     #[cfg(all(feature = "levels", feature = "photometric", feature = "time"))]
     Photography = "recipes/photography.md";

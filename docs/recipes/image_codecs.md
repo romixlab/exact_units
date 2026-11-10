@@ -11,10 +11,10 @@ Image and video codecs compute in integers on purpose: a decoder must give the s
 | JPEG quantization, Sq = round(S/Q) (T.81 A.3.4) | the quotient | nearest, the tie unnamed | |
 | JPEG dequantization, R = Sq·Q | yes | | |
 | Point transform (T.81 A.4, K.10) | | `Truncate` (AC, lossless), `Floor` (DC) | |
-| JFIF's Round, AV1's Round2, H.264/H.265 scaling | | a half up | |
+| JFIF's Round, AV1's Round2, H.264/H.265 scaling | | `NearestCeil` | |
 | H.273's Round (eq. 8) | | `NearestAway` | |
 | 5/3 wavelet, RCT, YCgCo-R | lossless | `Floor` | |
-| H.265's and H.264's QP scale, HRD bit rate | yes, at a run-time 2^e | | |
+| T.800's step size, H.265's QP scale, HRD bit rate and CPB size | yes, `CodecShape::MantissaExponent` | | |
 | 9/7 wavelet taps (T.800 Table F.4) | | | √15 and cube roots |
 | AV1's Cos128_Lookup (7.13.2) | | nearest | cos(kπ/128) |
 | Sample aspect ratio (H.264 Table E-1) | a table over 1/198 | | |
@@ -47,7 +47,7 @@ assert_eq!(by_2_pt(-3, 1, Rounding::Truncate), Some(-1));
 assert_eq!(by_2_pt(-3, 1, Rounding::Floor), Some(-2));
 ```
 
-JFIF defines Round(x) = ⌊x + 0.5⌋ (T.871 clause 7): a half goes up, toward +∞, also below zero. AV1's Round2(x, n) = (x + 2ⁿ⁻¹) >> n (section 4.7) is the same rounding, and so are H.265's scaling (eq. 8-309) and H.264's (eq. 8-337), which add half a step before the shift. None of the five roundings of today is it: `Ceil` agrees on halves but not on quarters, `NearestEven` and `NearestAway` part on −0.5. Today it is written as `Floor` of x plus half a step.
+JFIF defines Round(x) = ⌊x + 0.5⌋ (T.871 clause 7): a half goes up, toward +∞, also below zero. AV1's Round2(x, n) = (x + 2ⁿ⁻¹) >> n (section 4.7) is the same rounding, and so are H.265's scaling (eq. 8-309) and H.264's (eq. 8-337), which add half a step before the shift. This is `NearestCeil`, a tie toward +∞, and none of the other five: `Ceil` agrees on halves but not on quarters, `NearestEven` and `NearestAway` part on −0.5. The properties check it against ⌊x + 0.5⌋ on every quarter from −1.5 to 1.5, and that each other mode differs there.
 
 H.273 defines Round(x) = Sign(x)·Floor(Abs(x) + 0.5) (eq. 8): a half away from zero, `NearestAway`. Its YCgCo (eq. 51 to 53) rounds so, and its NOTE 3 warns that Cb and Cr can reach 1 << BitDepthC, one past their range. The properties walk every 8-bit colour and find it exactly where NOTE 3 says: Cb = 256 for pure green. A `u8` refuses it instead of wrapping it to 0.
 
@@ -78,16 +78,26 @@ Three scales in these standards have one shape: an integer mantissa times 2 to a
 - H.265's dequantization scale, levelScale[qP % 6] << (qP / 6) with levelScale = {40, 45, 51, 57, 64, 72} (8.6.3, eq. 8-309); H.264's is the same with its v tables (8.5.9, eq. 8-315 and 8-318; 8.5.12.1, eq. 8-336).
 - The HRD's BitRate = (bit_rate_value_minus1 + 1)·2^(6 + bit_rate_scale) bit/s and CpbSize = (cpb_size_value_minus1 + 1)·2^(4 + cpb_size_scale) bit (H.264 E.2.2, eq. E-81 and E-82; H.265 E.3.3, eq. E-87 and E-88).
 
-The exponent is known only at run time, so it is a run-time `Prefix`, and the product is exact:
+Each is a codec of `CodecShape::MantissaExponent`: the code splits into an exponent and a mantissa, and the value is `(mantissa + offset) · 2^(zero + step · exponent)`, exact. `J2kStepSize` decodes T.800's 16-bit code to Δb / 2^Rb, `HevcLevelScale` H.265's qP to its scale, and `HrdBitRate` and `HrdCpbSize` the HRD's two fields, packed as `scale << 32 | value_minus1`, to bit/s and bit. Encoding goes back: a value between two codes takes the one a named rounding picks, and a value that several codes give takes the lowest.
 
 ```rust
-use exact_units::{Overflow, Prefix, Rounding};
+use exact_units::{Exact, Rounding, codec::{Codec, HevcLevelScale, HrdBitRate, J2kStepSize}, units::Ratio};
 
-// bit_rate_value_minus1 = 15624, bit_rate_scale = 4: 16 Mbit/s
-let rate: Option<u64> = Prefix::from_pow2(6 + 4)
-    .and_then(|p| p.rescale(15_625_u32, Prefix::Unit, Rounding::Truncate, Overflow::Checked));
-assert_eq!(rate, Some(16_000_000));
+// εb = 8, μb = 1024: Δb = 2^(Rb − 8) · (1 + 1024/2048) = 2^Rb · 3/512
+let step = J2kStepSize::decode((8 << 11) | 1024).unwrap();
+assert_eq!(Exact::from_fixed(step), Exact::<Ratio>::checked_new(3, 512));
+
+// qP 26: levelScale[26 % 6] << (26 / 6) = 51 << 4
+assert_eq!(HevcLevelScale::decode(26).unwrap().get(), 816);
+
+// bit_rate_value_minus1 = 15 624, bit_rate_scale = 4: 16 Mbit/s
+let rate = HrdBitRate::decode((4 << 32) | 0x3D08).unwrap();
+assert_eq!(rate.get(), 16_000_000);
+// 250 000 · 2⁶ at scale 0 is the same rate: the lowest code
+assert_eq!(HrdBitRate::encode(rate, Rounding::NearestEven), Some(249_999));
 ```
+
+The properties walk every code of the first two and every scale of the HRD codes, and encode values on and between codes by every rounding.
 
 H.264's NOTE 2 in 8.5.8 says the scale "doubles for every increment of 6 in QPY" and grows "approximately 12 % for each increase of 1". The doubling is exact. The steps in between are the tables' own ratios, 45/40 = 1.125, 51/45 = 1.133…, 57/51 = 1.118…, never 2^(1/6) = 1.122…, which no formula of either standard contains. The properties check every qP from 0 to 51: H.265's steps are within 0.012 of 2^(1/6), H.264's within 0.089 (19/18 in the 8×8 table).
 
@@ -117,8 +127,7 @@ JFIF's `units` byte (T.871 10.1) picks what its densities mean. 0 means only the
 
 ## Where the crate falls short here
 
-- **A rounding is missing.** A half up, toward +∞, is JFIF's, AV1's, H.264's and H.265's rounding, and none of the five `Rounding` modes. It is written as `Floor` of x plus half a step.
-- **A mantissa times a power of two has no codec shape.** T.800's step size, H.265's QP scale and the HRD's rates are written as a run-time `Prefix`; IEEE 11073's SFLOAT has the same shape in base 10.
+- **A mantissa times a power of ten has no codec shape.** `MantissaExponent` is base 2; IEEE 11073's SFLOAT has the same shape in base 10.
 - **A code that picks the unit has no codec.** JFIF's `units` byte decodes to one of three kinds of value.
 - **No counted pixel or dot unit.** "Dots per inch" is a `Per<Ratio, Inch>` here.
 - **A quantization table is 64 run-time scales.** A `Fixed` has one compile-time scale, so a dequantized coefficient is an integer and its step a separate run-time value.
