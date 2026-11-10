@@ -815,3 +815,78 @@ impl<U: Unit, T: Storage + Int> fmt::Display for Scaled<U, T> {
         write_unit(Prefix::Unit, &U::EXPR, f)
     }
 }
+
+#[cfg(kani)]
+mod proofs {
+    use super::RunScale;
+    use crate::{Overflow, Rounding};
+
+    /// Every mode.
+    const MODES: [Rounding; 6] = [
+        Rounding::Truncate,
+        Rounding::Floor,
+        Rounding::Ceil,
+        Rounding::NearestEven,
+        Rounding::NearestAway,
+        Rounding::NearestCeil,
+    ];
+
+    /// The kernel's `u32` path alone: every `u8` count of either sign at every scale of odd `u8` parts and an exponent
+    /// within ±8 answers, and its answer `q` is `±m · num · 2^k / den` rounded as the mode promises, checked by
+    /// multiplications in `i64` (`e = p − q·d` against the step `d`), and exact exactly where `e` is 0. The scale is
+    /// built field by field, so no gcd runs: the arithmetic doesn't need the form reduced. The limbs and the gcd are
+    /// covered by the properties of `tests/props/run_scale.rs`.
+    #[kani::proof]
+    fn scaled_u32() {
+        let (m, num, den, k, neg): (u8, u8, u8, i8, bool) = (
+            kani::any(),
+            kani::any(),
+            kani::any(),
+            kani::any(),
+            kani::any(),
+        );
+        let i: usize = kani::any();
+        kani::assume(num % 2 == 1 && den % 2 == 1 && (-8..=8).contains(&k) && i < MODES.len());
+        let Some(&r) = MODES.get(i) else { return };
+        let s = RunScale {
+            num: num.into(),
+            den: den.into(),
+            pow2: k,
+        };
+        let Some((mag, exact)) = s.scaled_u32(m.into(), neg, r) else {
+            panic!("a u8 count at an 8-bit scale fits the u32 path");
+        };
+        let Some(q) = mag.settle::<i64>(neg, Overflow::Checked) else {
+            panic!("the quotient fits i64");
+        };
+        let shift = u32::from(k.unsigned_abs());
+        let mut p = i64::from(m) * i64::from(num);
+        let mut d = i64::from(den);
+        if k >= 0 {
+            p <<= shift;
+        } else {
+            d <<= shift;
+        }
+        if neg {
+            p = -p;
+        }
+        let e = p - q * d;
+        assert_eq!(exact, e == 0);
+        let off = e.abs();
+        match r {
+            Rounding::Floor => assert!((0..d).contains(&e)),
+            Rounding::Ceil => assert!(e <= 0 && e > -d),
+            Rounding::Truncate => assert!(off < d && (e == 0 || (e > 0) == (p > 0))),
+            _ => {
+                assert!(off <= d - off);
+                if off == d - off {
+                    match r {
+                        Rounding::NearestEven => assert!(q % 2 == 0),
+                        Rounding::NearestCeil => assert!(e < 0),
+                        _ => assert!((e > 0) != (p > 0)),
+                    }
+                }
+            }
+        }
+    }
+}

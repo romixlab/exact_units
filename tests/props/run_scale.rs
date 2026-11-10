@@ -3,14 +3,15 @@
 //! scales, to and from a `Fixed`) is the exact quotient, rounded as the mode promises and settled as the policy says,
 //! `None` exactly where the quotient isn't whole or doesn't fit. Two values compare by their exact value at any two
 //! scales. The reference is big integers ([round_div_big]): a `u128` count times a `u32` part times 2¹²⁷ passes
-//! `i128`. Kani proves the `u32` path of the kernel against [round_div] in `i128` on `i16` counts and `u8` parts, and
-//! a test walks every `u8` count at a set of scales whole.
+//! `i128`. Tests walk every `u8` count at a set of scales and every `i8` count at the pairs of `pairs_walked`
+//! whole. Kani proves the wrapping counter here on `u16`; the kernel's `u32` path is proved in `src/scaled.rs` on `u8`
+//! counts and parts, as a proof through the public API also explores the limbs and ran CBMC out of memory.
 #![expect(
     clippy::arithmetic_side_effects,
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
 
-use super::reference::{modulo, round_div};
+use super::reference::{assert_rounded, modulo, round_div};
 #[cfg(not(kani))]
 use super::reference::{range, round_div_big};
 use exact_units::num::Int;
@@ -218,6 +219,31 @@ pub(crate) fn compares<T: Storage + Int + Into<BigInt> + core::fmt::Debug>(
     assert_eq!(x == y, want.is_eq());
     let same = sa == sb;
     assert_eq!(x.same_repr(&y), same && a.into() == b.into());
+}
+
+/// The `u32` path: an `i8` count at `a` rescaled to `b`, checked by what the mode promises
+/// ([assert_rounded]), and `rescale` exact exactly where the quotient is whole.
+pub(crate) fn rescales_kani(x: i8, a: (u32, u32, i8), b: (u32, u32, i8), r: Rounding) {
+    let (Some(from), Some(to)) = (RunScale::new(a.0, a.1, a.2), RunScale::new(b.0, b.1, b.2))
+    else {
+        return;
+    };
+    let e = i32::from(a.2) - i32::from(b.2);
+    let mut k = i128::from(a.0) * i128::from(b.1);
+    let mut d = i128::from(a.1) * i128::from(b.0);
+    if e >= 0 {
+        k <<= e;
+    } else {
+        d <<= -e;
+    }
+    let p = i128::from(x) * k;
+    let s = Scaled::<Second, i16>::new(i16::from(x), from);
+    let got = s.rescale_rounded::<i64>(to, r).map(Scaled::get);
+    assert!(got.is_some());
+    let q = i128::from(got.unwrap_or(0));
+    assert_rounded(p, d, r, q);
+    let exact = s.rescale::<i64>(to).map(Scaled::get);
+    assert_eq!(exact.map(i128::from), (p == q * d).then_some(q));
 }
 
 /// The `u32` path against [round_div] in `i128`, for what Kani takes symbolic: an `i16` count at `n1/d1 · 2^e1`
@@ -459,6 +485,26 @@ mod tests {
         );
     }
 
+    /// Every i8 count and every mode at pairs of scales from 1/3 to 2⁸·255 and the field to 90 kHz, walked whole.
+    #[test]
+    fn pairs_walked() {
+        let pairs = [
+            ((1, 1, 0), (1, 3, 0)),
+            ((1, 3, 0), (1, 1, 0)),
+            ((1001, 60_000, 0), (1, 90_000, 0)),
+            ((7, 5, -2), (9, 4, 1)),
+            ((255, 1, 8), (1, 255, -8)),
+            ((1, 255, -8), (255, 1, 8)),
+        ];
+        for x in i8::MIN..=i8::MAX {
+            for (a, b) in pairs {
+                for r in MODES {
+                    rescales_kani(x, a, b, r);
+                }
+            }
+        }
+    }
+
     /// Every u8 count at a set of scales, every mode: the Kani shape walked whole.
     #[test]
     fn u8_counts_walked() {
@@ -504,31 +550,9 @@ mod tests {
 
 #[cfg(kani)]
 mod proofs {
-    use super::super::reference::MODES;
-
     /// Every u16 counter, move and reference: wrapping and unwrapping.
     #[kani::proof]
     fn wrapping_counter() {
         super::wraps_u16(kani::any(), kani::any(), kani::any());
-    }
-
-    /// Scales of the proof: 1, a third, powers of two each way, 8-bit parts at the ends of their exponents.
-    const SCALES: [(u8, u8, i8); 6] = [
-        (1, 1, 0),
-        (1, 3, 0),
-        (7, 5, -2),
-        (255, 1, 8),
-        (1, 255, -8),
-        (9, 4, 1),
-    ];
-
-    /// Every i16 count and every mode at every pair of [SCALES]: the `u32` path of the kernel against the quotient
-    /// in `i128`. Symbolic parts make the gcd's loop too deep for CBMC; the walk and the proptest cover them.
-    #[kani::proof]
-    #[kani::unwind(20)]
-    fn rescale_small() {
-        let (a, b, m): (usize, usize, usize) = (kani::any(), kani::any(), kani::any());
-        kani::assume(a < SCALES.len() && b < SCALES.len() && m < MODES.len());
-        super::rescales_small(kani::any(), SCALES[a], SCALES[b], MODES[m]);
     }
 }
