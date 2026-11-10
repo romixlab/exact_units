@@ -56,47 +56,10 @@ pub(crate) fn number(s: &str) -> Result<(Fraction, i32, &str), Kind> {
     Ok((q, dec.e.saturating_sub(den.e), rest))
 }
 
-/// `x · 2^pow2 · 10^pow10`, `None` exactly where that doesn't fit: the powers of 2 and 5 of `x` and of the factor
-/// are added up first, so the result is built in lowest terms and nothing larger is ever formed.
+/// `x · 2^pow2 · 10^pow10`, `None` exactly where that doesn't fit: the powers join the fraction's own before its
+/// form is chosen, so nothing larger is ever formed.
 pub(crate) fn scale(x: Fraction, pow2: i32, pow10: i32) -> Option<Fraction> {
-    if x.is_zero() {
-        return Some(x);
-    }
-    let (p, p2, p5) = strip(x.numer());
-    let (q, q2, q5) = strip(x.denom());
-    let twos = i64::from(p2)
-        .checked_sub(i64::from(q2))?
-        .checked_add(i64::from(pow2))?
-        .checked_add(i64::from(pow10))?;
-    let fives = i64::from(p5)
-        .checked_sub(i64::from(q5))?
-        .checked_add(i64::from(pow10))?;
-    let power = |base: u128, e: i64| base.checked_pow(u32::try_from(e.unsigned_abs()).ok()?);
-    let (mut num, mut den) = (p, q);
-    let (two, five) = (power(2, twos)?, power(5, fives)?);
-    if twos > 0 {
-        num = num.checked_mul(two)?;
-    } else {
-        den = den.checked_mul(two)?;
-    }
-    if fives > 0 {
-        num = num.checked_mul(five)?;
-    } else {
-        den = den.checked_mul(five)?;
-    }
-    Fraction::from_parts(x.is_negative(), num, den)
-}
-
-/// `n` without its factors 2 and 5, and how many of each it had; `n > 0`.
-fn strip(mut n: u128) -> (u128, u32, u32) {
-    let twos = n.trailing_zeros();
-    n >>= twos;
-    let mut fives = 0u32;
-    while n != 0 && n.is_multiple_of(5) {
-        n /= 5;
-        fives = fives.saturating_add(1);
-    }
-    (n, twos, fives)
+    x.scaled(i64::from(pow2), i64::from(pow10))
 }
 
 /// `±int.pre(rep)`, if `s` starts with a number that has a repetend; `None` for any other text.

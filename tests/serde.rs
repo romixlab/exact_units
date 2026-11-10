@@ -730,13 +730,17 @@ fn exact_as_its_number() {
     use exact_units::{Exact, Fraction};
 
     let f = Exact::<Hertz>::new(1_000_000, 3);
-    round_trip(&f, r#""333333.(3)""#, (false, 1_000_000u128, 3u128));
-    round_trip(&Fraction::new(-7, 2), r#""-3.5""#, (true, 7u128, 2u128));
-    round_trip(&Fraction::ZERO, r#""0""#, (false, 0u128, 1u128));
+    round_trip(&f, r#""333333.(3)""#, (false, 1u128, 3u128, 6i32));
+    round_trip(
+        &Fraction::new(-7, 2),
+        r#""-3.5""#,
+        (true, 7u128, 2u128, 0i32),
+    );
+    round_trip(&Fraction::ZERO, r#""0""#, (false, 0u128, 1u128, 0i32));
     round_trip(
         &Fraction::new(1, 7919),
         r#""1/7919""#,
-        (false, 1u128, 7919u128),
+        (false, 1u128, 7919u128, 0i32),
     );
     assert_eq!(
         serde_json::from_str::<Exact<Hertz>>("48000000").unwrap(),
@@ -822,8 +826,8 @@ fn with_unit_reads_an_exact_exactly() {
             r#""MHz" is not a number with its unit, like "1.5 Hz""#,
         ),
         (
-            "1e99 MHz",
-            r#""1e99 MHz" is a number past what a fraction of u128s holds exactly"#,
+            "1e2147483647 MHz",
+            r#""1e2147483647 MHz" is a number past what a fraction of u128s holds exactly"#,
         ),
         ("1/0 Hz", r#""1/0 Hz" is a fraction over 0"#),
     ] {

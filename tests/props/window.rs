@@ -10,6 +10,7 @@
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
 #![expect(clippy::panic, reason = "a property fails by panicking")]
+#![expect(clippy::expect_used, reason = "a property fails by panicking")]
 
 use core::cmp::Ordering;
 use exact_units::units::Ratio;
@@ -79,8 +80,8 @@ pub(crate) fn holds<T: Storage, B: Bounds<T>>(a: i128, b: i128, p: u128, q: u128
         fa,
         fb,
         tol,
-        p: t.numer(),
-        q: t.denom(),
+        p: t.numer().expect("a tolerance of u128s"),
+        q: t.denom().expect("a tolerance of u128s"),
     };
     tolerance_holds(&c);
     window_holds(&c);
@@ -134,7 +135,12 @@ fn tolerance_holds<T: Storage, B: Bounds<T>>(c: &Case<T, B>) {
         assert_eq!(e.is_zero(), a == b);
         if b != 0 {
             assert_eq!(
-                cmp_products(e.numer(), of, a.abs_diff(b), e.denom()),
+                cmp_products(
+                    e.numer().expect("an error of i128s"),
+                    of,
+                    a.abs_diff(b),
+                    e.denom().expect("an error of i128s")
+                ),
                 Ordering::Equal,
                 "{a} against {b}"
             );

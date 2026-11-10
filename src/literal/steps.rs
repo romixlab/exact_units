@@ -957,8 +957,13 @@ pub(crate) enum Shown {
         neg: bool,
         f: FloatFormat,
     },
-    /// An exact fraction `±num / den`, in the unit the message names.
-    Frac { neg: bool, num: u128, den: u128 },
+    /// An exact fraction `±num / den · 10^exp`, in the unit the message names.
+    Frac {
+        neg: bool,
+        num: u128,
+        den: u128,
+        exp: i32,
+    },
     /// NaN, in no range.
     Nan,
 }
@@ -994,7 +999,20 @@ impl Ratio {
         };
         let (neg, num, den) = match x {
             Shown::Steps(k) => (k < 0, Big::of(k.unsigned_abs()), Big::of(1)),
-            Shown::Frac { neg, num, den } => (neg, Big::of(num), Big::of(den)),
+            Shown::Frac { neg, num, den, exp } => {
+                let Some(p) = Big::pow10(exp.unsigned_abs()) else {
+                    return None;
+                };
+                let (num, den) = if exp >= 0 {
+                    (Big::of(num).mul(&p), Some(Big::of(den)))
+                } else {
+                    (Some(Big::of(num)), Big::of(den).mul(&p))
+                };
+                let (Some(num), Some(den)) = (num, den) else {
+                    return None;
+                };
+                (neg, num, den)
+            }
             Shown::Float { bits, neg, f } => {
                 let frac = f.bits - 1;
                 let field = (bits >> frac) as i64;

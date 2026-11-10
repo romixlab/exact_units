@@ -311,12 +311,21 @@ pub(crate) fn pow_exact(x: Fraction, e: Fraction) -> Option<Fraction> {
             Some(Fraction::ZERO)
         };
     }
-    let root = Fraction::from_parts(
-        false,
-        int_root(x.numer(), e.denom())?,
-        int_root(x.denom(), e.denom())?,
-    )?;
-    let p = pow_int(root, e.numer())?;
+    let q = e.denom()?;
+    // the q-th root of the mantissa, and of the power of ten where q divides it; the plain terms elsewhere
+    let (n, d) = x.mantissa();
+    let k = i128::from(x.exp10());
+    let root = if k.checked_rem(i128::try_from(q).ok()?)? == 0 {
+        Fraction::from_parts_exp10(
+            false,
+            int_root(n, q)?,
+            int_root(d, q)?,
+            i32::try_from(k.checked_div(i128::try_from(q).ok()?)?).ok()?,
+        )?
+    } else {
+        Fraction::from_parts(false, int_root(x.numer()?, q)?, int_root(x.denom()?, q)?)?
+    };
+    let p = pow_int(root, e.numer()?)?;
     if e.is_negative() {
         p.checked_recip()
     } else {
@@ -530,7 +539,8 @@ impl CurveDef<'_> {
     ///
     /// [OutOfRange](EncodeError::OutOfRange) beyond the codes' lights, [NearTie](EncodeError::NearTie) as above,
     /// [NotExact](EncodeError::NotExact) where a form can't be evaluated as an interval (an exponent's parts past
-    /// 2³², a form wire bytes named that this version doesn't know).
+    /// 2³², a form wire bytes named that this version doesn't know) or the light's plain terms pass `u128` where an
+    /// interval decides (a `Fraction` past them by its power of ten).
     pub fn encode_certified(
         &self,
         q: &Quantizer,
@@ -542,6 +552,11 @@ impl CurveDef<'_> {
         let mut certified = |q: &Quantizer, p: Probe| {
             if let Some(v) = self.exact_at(q, p) {
                 return Some(light.compare(v));
+            }
+            // the interval's order takes the light's plain terms: past u128 it can't decide, and says so
+            if light.numer().is_none() || light.denom().is_none() {
+                unknown = true;
+                return None;
             }
             for bits in CERTIFIED_BITS {
                 let Some(s) = self.span_at_probe(q, p, bits) else {

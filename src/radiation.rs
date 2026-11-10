@@ -302,7 +302,7 @@ impl Icrp60 {
         if l.is_negative() {
             return None;
         }
-        let (n, d) = (l.numer(), l.denom());
+        let (n, d) = (l.numer()?, l.denom()?);
         let of = "charged particles of a linear energy transfer";
         // L < 10 ⇔ n < 10·d; L ≤ 100 ⇔ n ≤ 100·d
         if n < d.checked_mul(10)? {

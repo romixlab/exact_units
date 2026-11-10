@@ -143,8 +143,10 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         };
         let tolerance = tolerance.into();
         let b = int(self.get());
-        let (p, q) = parts(tolerance);
-        let d = reach(b.unsigned_abs(), p, q, fit);
+        let d = match parts(tolerance) {
+            Some((p, q)) => reach(b.unsigned_abs(), p, q, fit),
+            None => reach_by_order(b.unsigned_abs(), tolerance, fit),
+        };
         let min = B::MIN.map_or(T::MIN_INT, |m| int(m).max(T::MIN_INT));
         let max = B::MAX.map_or(T::MAX_INT, |m| int(m).min(T::MAX_INT));
         // past the storage an end is cut to it, so a reach past i128 cuts the same
@@ -185,7 +187,14 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
                 "a tolerance between stored values is for integer storages"
             );
         };
-        let (p, q) = parts(tolerance.into());
+        let tolerance = tolerance.into();
+        let Some((p, q)) = parts(tolerance) else {
+            // a tolerance past u128 in its plain terms: |self − target| / |target| against it, exactly
+            let (a, b) = (int(self.get()), int(target.get()));
+            return a == b
+                || Fraction::from_parts(false, a.abs_diff(b), b.unsigned_abs())
+                    .is_some_and(|e| e <= tolerance.get().get());
+        };
         if T::BITS <= 32
             && let (Ok(p), Ok(q)) = (u32::try_from(p), u32::try_from(q))
         {
@@ -266,11 +275,41 @@ fn int<T: Storage>(x: T) -> i128 {
     }
 }
 
-/// `p` and `q` of `t = p/q`, in lowest terms, `q` at least 1.
+/// `p` and `q` of `t = p/q`, in lowest terms, `q` at least 1; `None` where either is past `u128` (a tolerance of
+/// many digits, or one below 10⁻³⁸).
 #[cfg(feature = "dimensionless")]
-fn parts(tolerance: Tolerance) -> (u128, u128) {
+fn parts(tolerance: Tolerance) -> Option<(u128, u128)> {
     let t = tolerance.get().get();
-    (t.numer(), t.denom())
+    Some((t.numer()?, t.denom()?))
+}
+
+/// [reach] for a tolerance `t` whose plain terms are past `u128`: the largest `d` with `d / of <= t` ([Fit::Inside])
+/// or the least with `d / of >= t` ([Fit::Outside]), `u128::MAX` past it, by bisection on the exact order of
+/// fractions (each `d / of` fits).
+#[cfg(feature = "dimensionless")]
+fn reach_by_order(of: u128, tolerance: Tolerance, fit: Fit) -> u128 {
+    let t = tolerance.get().get();
+    if of == 0 {
+        return 0;
+    }
+    // d / of at or below t
+    let below = |d: u128| Fraction::from_parts(false, d, of).is_some_and(|x| x <= t);
+    // the largest d below, by bisection over [lo, hi]: lo is below, hi + 1 isn't (or is past u128)
+    let (mut lo, mut hi) = (0u128, u128::MAX);
+    while lo < hi {
+        let mid = lo.saturating_add(hi.saturating_sub(lo).div_ceil(2));
+        if below(mid) {
+            lo = mid;
+        } else {
+            hi = mid.saturating_sub(1);
+        }
+    }
+    let exact = Fraction::from_parts(false, lo, of).is_some_and(|x| x == t);
+    if fit == Fit::Outside && !exact {
+        lo.saturating_add(1)
+    } else {
+        lo
+    }
 }
 
 /// `of · p/q` rounded down ([Fit::Inside]) or up ([Fit::Outside]), `u128::MAX` past it: how far a window reaches from

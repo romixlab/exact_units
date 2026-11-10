@@ -80,16 +80,12 @@ impl<U: Unit> fmt::Debug for Rounded<U> {
 
 /// `x · 10^places` rounded by `r`, `None` past `i128`.
 fn steps(x: Fraction, places: u8, r: Rounding) -> Option<i128> {
-    let p = Fraction::pow10(i8::try_from(places).ok()?)?;
-    x.checked_mul(p)?.round(r)
+    x.checked_mul(Fraction::pow10(places.into()))?.round(r)
 }
 
-/// `x · 10^e`, in two steps where `10^|e|` is past `u128` (|e| up to 76), `None` where the result doesn't fit.
+/// `x · 10^e`, `None` where the result doesn't fit.
 fn times_pow10(x: Fraction, e: i32) -> Option<Fraction> {
-    let half = e / 2;
-    let p = |e: i32| Fraction::pow10(i8::try_from(e).ok()?);
-    x.checked_mul(p(half)?)?
-        .checked_mul(p(e.checked_sub(half)?)?)
+    x.checked_mul(Fraction::pow10(e))
 }
 
 /// `n / 10^places` with exactly `places` digits after the point; the sign of `n`.

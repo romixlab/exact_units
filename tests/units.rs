@@ -149,7 +149,10 @@ fn quantities_of_markers() {
         (v * Exact::<Ratio>::new(2, 3)).unwrap().convert::<Volt>(),
         Some(Exact::int(1))
     );
-    assert_eq!(Exact::<Volt>::int(i128::MAX).scaled(Exact::int(4)), None);
+    assert_eq!(
+        Exact::<Volt>::int(i128::MAX).scaled(Exact::int(i128::MAX)),
+        None
+    );
 
     // decibels by kind: 20·lg for V/V and A/A, 10·lg for W/W, as a level in dB
     let db = |x: Option<Fixed<Decibel, One, f64>>, y: f64| (x.unwrap().get() - y).abs() < 1e-12;

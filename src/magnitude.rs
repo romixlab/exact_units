@@ -1119,6 +1119,26 @@ impl Magnitude {
         Some((num, den))
     }
 
+    /// The exponent of 10, and the magnitude without it; `None` for a half exponent of 10. What
+    /// [Fraction::from_magnitude](crate::Fraction::from_magnitude) keeps as its exponent, so `10⁻⁵⁰` is a `Fraction`.
+    #[must_use]
+    #[expect(
+        clippy::as_conversions,
+        reason = "const fn: From is not const on stable; i8 into i32"
+    )]
+    pub(crate) const fn pow10_apart(&self) -> Option<(i32, Magnitude)> {
+        if self.pow10 % 2 != 0 {
+            return None;
+        }
+        Some((
+            (self.pow10 / 2) as i32,
+            Magnitude {
+                pow10: 0,
+                rest: self.rest,
+            },
+        ))
+    }
+
     /// The factor as an `f64` (rounded, unlike the magnitude itself).
     ///
     /// # Panics

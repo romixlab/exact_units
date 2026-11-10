@@ -2,7 +2,7 @@
 //! set is the printed decimal exactly, with the printed uncertainty over it; the symbol m_u resolves to the set's
 //! m_u; the expressions over it, M_u = N_A·m_u and m_u·c² in eV, are the reference's products and land within half a
 //! last digit of the values CODATA prints for them, rounded on their own; and a value in daltons converts to grams
-//! with a set exactly, `None` only where the reference's result is past a `u128` fraction.
+//! with a set exactly, `None` only where no `Fraction` holds the reference's result.
 //!
 //! Magnitudes of a dozen primes and big rationals: no Kani proof.
 #![cfg(all(not(kani), feature = "mechanical"))]
@@ -10,6 +10,7 @@
     clippy::arithmetic_side_effects,
     reason = "big rationals, which don't overflow"
 )]
+#![expect(clippy::panic, reason = "a property fails by panicking")]
 #![expect(
     clippy::expect_used,
     reason = "a property fails by panicking where a value it checks isn't there"
@@ -47,8 +48,8 @@ fn rational_of(m: Magnitude) -> BigRational {
 
 /// A [Fraction] as an exact rational.
 fn rational_of_fraction(x: Fraction) -> BigRational {
-    let n = BigInt::from(x.numer());
-    BigRational::new(if x.is_negative() { -n } else { n }, x.denom().into())
+    let (n, d) = x.mantissa();
+    super::reference::rational_exp10(x.is_negative(), n, d, x.exp10().into())
 }
 
 /// `a` within half a unit of `10^last` of `b`.
@@ -104,8 +105,8 @@ pub(crate) fn set_as_printed<S: Constants>(e: &Edition) {
     within_half_ulp(&ev, &(printed * codata::pow10_rational(1, 6)), last + 6);
 }
 
-/// `num/den` daltons in grams under `S`: the reference's `num/den · m_u · 1000`, or `None` exactly where that is past
-/// a `u128` fraction.
+/// `num/den` daltons in grams under `S`: the reference's `num/den · m_u · 1000`, or `None` exactly where no `Fraction`
+/// holds that (its canonical form, `reference::canonical`).
 pub(crate) fn dalton_in_grams<S: Constants>(e: &Edition, num: i128, den: u128) {
     let Some(x) = Exact::<Dalton>::checked_new(num, den) else {
         return;
@@ -113,12 +114,11 @@ pub(crate) fn dalton_in_grams<S: Constants>(e: &Edition, num: i128, den: u128) {
     let (m_u, _) = codata::exact(e.m_u.value);
     let want = rational_of_fraction(x.get()) * m_u * BigRational::from_integer(BigInt::from(1000));
     let got = x.convert_with::<S, Gram>();
-    if super::reference::fits_u128(&want) {
-        assert!(got.is_some(), "{num}/{den} Da: {want} g fits");
-        let got = got.expect("checked above");
-        assert_eq!(rational_of_fraction(got.get()), want);
-    } else {
-        assert!(got.is_none(), "{num}/{den} Da: {want} g is past u128");
+    let form = super::reference::canonical(&want, 128, i32::MIN.into(), i32::MAX.into());
+    match (got, form) {
+        (Some(got), Some(_)) => assert_eq!(rational_of_fraction(got.get()), want),
+        (None, None) => {}
+        (got, form) => panic!("{num}/{den} Da: {got:?} for {want} g, whose form is {form:?}"),
     }
 }
 

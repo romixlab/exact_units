@@ -1,94 +1,173 @@
-//! Property 11: the arithmetic of a `Fraction` against exact rationals. On `u128` against `BigRational`: a sum,
-//! difference, product or quotient is the exact value in lowest terms (a zero `+0/1`), refused exactly where that
-//! doesn't fit (a sum whose cross terms pass 2¹²⁸ too, with a strategy aimed at that window), and the order is the
-//! exact one. Rounding to an integer is the reference's, `to_f64` is the nearest float (a tie to even),
-//! `from_f64` the float's exact value. An `Exact` and a `Fixed` convert and compare as the integers they are, and order as their exact values do
-//! for every value of the `Fixed` (floats of any size, ±∞, NaN without an order, products with the scale past `u128`). On
-//! `u8` (`Fraction8`, the same code) against `i64` arithmetic: drawn, and walked whole over every pair of `u8`
-//! numerators with denominators at both ends. The pieces (widening multiply, add, divide, gcd) are Kani proofs on
-//! `u8` limbs in `src/exact/fraction.rs`; the whole operations on `u128` are too large a SAT problem for Kani.
+//! Property 11: the arithmetic of a `Fraction` against exact rationals. A `Fraction` is `±num/den · 10^exp` in a
+//! canonical form, which `reference::canonical` finds by brute force over the exponents: on `u128` against
+//! `BigRational`, a sum, difference, product or quotient is the exact value in that form, refused exactly where no
+//! form fits (a sum whose aligned terms pass four limbs too, the window the book lists, with strategies aimed at it),
+//! and the order is the exact one, across exponents too. The plain lowest terms (`numer`, `denom`) are the value's or
+//! `None` past `u128`. Rounding to an integer is the reference's, `to_f64` is the nearest float (a tie to even,
+//! subnormals and ±∞ included), `from_f64` the float's exact value or refused where no form fits. An `Exact` and a
+//! `Fixed` convert and compare as the integers they are, and order as their exact values do for every value of the
+//! `Fixed` (floats of any size, ±∞, NaN without an order, products with the scale past `u128`, exponents far apart).
+//! On `u8` with an `i8` exponent (`Fraction8`, the same code) the same against `BigRational`: drawn, and walked over
+//! every pair of `u8` numerators with denominators and exponents at both ends. The pieces (widening multiply, the
+//! four-limb steps, divide, gcd, the 5s by the inverse) are Kani proofs on `u8` limbs in `src/exact/fraction.rs`; the
+//! whole operations are too large a SAT problem for Kani.
 #![expect(
     clippy::arithmetic_side_effects,
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
+#![expect(clippy::panic, reason = "a property fails by panicking")]
+#![expect(clippy::expect_used, reason = "a property fails by panicking")]
 
+#[cfg(not(kani))]
+use super::reference;
+#[cfg(not(kani))]
 use exact_units::Fraction8;
+#[cfg(not(kani))]
+use num_bigint::BigInt;
+#[cfg(not(kani))]
+use num_rational::BigRational;
 
-/// `±num/den`, `den > 0`.
-pub(crate) type Parts8 = (bool, u8, u8);
+/// `±num/den · 10^exp`, `den > 0`.
+pub(crate) type Parts8 = (bool, u8, u8, i8);
 
-/// The greatest common divisor, `gcd(0, n) = n`.
-fn gcd(mut a: u64, mut b: u64) -> u64 {
-    while b != 0 {
-        (a, b) = (b, a % b);
+/// A form as the reference gives it: the sign, the mantissa and the exponent.
+#[cfg(not(kani))]
+pub(crate) type Form = (bool, BigInt, BigInt, i64);
+
+/// The value of a `Fraction8`.
+#[cfg(not(kani))]
+fn big8(a: Fraction8) -> BigRational {
+    let (n, d) = a.mantissa();
+    reference::rational_exp10(a.is_negative(), n.into(), d.into(), a.exp10().into())
+}
+
+/// The form of a `Fraction8`.
+#[cfg(not(kani))]
+fn form8(a: Fraction8) -> Form {
+    let (n, d) = a.mantissa();
+    (a.is_negative(), n.into(), d.into(), a.exp10().into())
+}
+
+/// Whether a sum of `a` and `b` passes four limbs of `bits` once aligned: the term of the larger exponent times its
+/// power of ten and the other's denominator over their common factor, or the sum of both terms of one sign. Where it
+/// does, a refusal of a sum that would fit is the window the book lists.
+#[cfg(not(kani))]
+pub(crate) fn aligned_past(a: &Form, b: &Form, bits: u32) -> bool {
+    use num_integer_free::gcd;
+    let (a, b) = if a.3 >= b.3 { (a, b) } else { (b, a) };
+    let g = gcd(&a.2, &b.2);
+    let ten = BigInt::from(10).pow(u32::try_from(a.3 - b.3).unwrap_or(u32::MAX));
+    let x = &a.1 * (&b.2 / &g) * ten;
+    let y = &b.1 * (&a.2 / &g);
+    let limit = BigInt::from(1) << (4 * bits);
+    x >= limit || (a.0 == b.0 && x + y >= limit)
+}
+
+/// Euclid on big integers, written here.
+#[cfg(not(kani))]
+mod num_integer_free {
+    use num_bigint::BigInt;
+
+    pub(crate) fn gcd(a: &BigInt, b: &BigInt) -> BigInt {
+        let (mut a, mut b) = (a.clone(), b.clone());
+        while b != BigInt::from(0) {
+            let r = &a % &b;
+            (a, b) = (b, r);
+        }
+        a
     }
-    a
 }
 
-/// `a` as a signed numerator and a denominator.
-fn signed8(a: Fraction8) -> (i64, i64) {
-    let n = i64::from(a.numer());
-    (if a.is_negative() { -n } else { n }, i64::from(a.denom()))
-}
-
-/// In lowest terms, and a zero as `+0/1`.
-fn canonical8(r: Fraction8) {
-    assert!(r.denom() >= 1);
-    assert_eq!(gcd(u64::from(r.numer()), u64::from(r.denom())), 1, "{r:?}");
-    if r.is_zero() {
-        assert!(!r.is_negative() && r.denom() == 1, "{r:?}");
+/// `got` is `want` in the canonical form of `bits` and the exponents `lo..=hi`, or `None` exactly where no form of
+/// `want` fits; where `window`, a refusal of a form that fits is allowed (a sum in the window).
+#[cfg(not(kani))]
+pub(crate) fn exact_form(
+    got: Option<Form>,
+    want: &BigRational,
+    (bits, lo, hi): (u32, i64, i64),
+    window: bool,
+) {
+    match (got, reference::canonical(want, bits, lo, hi)) {
+        (Some(r), Some(c)) => assert_eq!(r, c, "{want}"),
+        (Some(r), None) => panic!("{r:?} for {want}, which has no form"),
+        (None, Some(c)) => assert!(window, "{want} fits as {c:?}, refused"),
+        (None, None) => {}
     }
 }
 
-/// `got` is `n/d` exactly, or `None` exactly where `n/d` in lowest terms doesn't fit.
-fn exact8(got: Option<Fraction8>, n: i64, d: i64) {
-    if let Some(r) = got {
-        canonical8(r);
-        let (rn, rd) = signed8(r);
-        assert_eq!(
-            i128::from(rn) * i128::from(d),
-            i128::from(n) * i128::from(rd)
-        );
-    } else {
-        let g = gcd(n.unsigned_abs(), d.unsigned_abs()).max(1);
-        let fits = u8::try_from(n.unsigned_abs() / g).is_ok()
-            && u8::try_from(d.unsigned_abs() / g).is_ok();
-        assert!(!fits, "{n}/{d} fits, refused");
-    }
+/// The plain lowest terms of `want` against `numer` and `denom`: each the value's, `None` past `bits`.
+#[cfg(not(kani))]
+pub(crate) fn plain(numer: Option<u128>, denom: Option<u128>, want: &BigRational, bits: u32) {
+    let limit = BigInt::from(1) << bits;
+    let fit = |x: &BigInt| (x < &limit).then(|| u128::try_from(x).expect("below the limit"));
+    assert_eq!(
+        numer,
+        fit(&want.numer().magnitude().clone().into()),
+        "{want}"
+    );
+    assert_eq!(denom, fit(want.denom()), "{want}");
 }
 
-/// Every operation of two `Fraction8`s against `i64` arithmetic: exact or refused as documented, in lowest terms,
-/// ordered exactly. `None` where a part is a zero denominator.
+#[cfg(not(kani))]
+const RANGE8: (u32, i64, i64) = (8, -128, 127);
+
+/// Every operation of two `Fraction8`s against `BigRational`: exact or refused as documented, in the canonical form,
+/// ordered exactly, rounded as the reference. A pair whose parts have a zero denominator or no form is skipped.
+#[cfg(not(kani))]
 pub(crate) fn ops8(a: Parts8, b: Parts8) {
-    let (Some(a), Some(b)) = (
-        Fraction8::from_parts(a.0, a.1, a.2),
-        Fraction8::from_parts(b.0, b.1, b.2),
-    ) else {
-        assert!(a.2 == 0 || b.2 == 0);
+    let made = |p: Parts8| {
+        let x = Fraction8::from_parts_exp10(p.0, p.1, p.2, p.3);
+        if p.2 != 0 {
+            let want = reference::rational_exp10(p.0, p.1.into(), p.2.into(), p.3.into());
+            exact_form(x.map(form8), &want, RANGE8, false);
+        } else {
+            assert_eq!(x, None);
+        }
+        x
+    };
+    let (Some(a), Some(b)) = (made(a), made(b)) else {
         return;
     };
-    canonical8(a);
-    let ((an, ad), (bn, bd)) = (signed8(a), signed8(b));
-    exact8(a.checked_add(b), an * bd + bn * ad, ad * bd);
-    exact8(a.checked_sub(b), an * bd - bn * ad, ad * bd);
-    exact8(a.checked_mul(b), an * bn, ad * bd);
+    let (ra, rb) = (big8(a), big8(b));
+    let (fa, fb) = (form8(a), form8(b));
+    let neg = |f: &Form| {
+        (
+            !f.0 && f.1 != BigInt::from(0),
+            f.1.clone(),
+            f.2.clone(),
+            f.3,
+        )
+    };
+    exact_form(
+        a.checked_add(b).map(form8),
+        &(&ra + &rb),
+        RANGE8,
+        aligned_past(&fa, &fb, 8),
+    );
+    exact_form(
+        a.checked_sub(b).map(form8),
+        &(&ra - &rb),
+        RANGE8,
+        aligned_past(&fa, &neg(&fb), 8),
+    );
+    exact_form(a.checked_mul(b).map(form8), &(&ra * &rb), RANGE8, false);
     if b.is_zero() {
         assert_eq!(a.checked_div(b), None);
+        assert_eq!(b.checked_recip(), None);
     } else {
-        let (n, d) = (an * bd, ad * bn);
-        let (n, d) = if d < 0 { (-n, -d) } else { (n, d) };
-        exact8(a.checked_div(b), n, d);
+        exact_form(a.checked_div(b).map(form8), &(&ra / &rb), RANGE8, false);
+        exact_form(b.checked_recip().map(form8), &rb.recip(), RANGE8, false);
     }
-    assert_eq!(
-        a.compare(b),
-        (an * bd).cmp(&(bn * ad)),
-        "{a:?} against {b:?}"
-    );
+    assert_eq!(a.compare(b), ra.cmp(&rb), "{a:?} against {b:?}");
+    assert_eq!(a == b, ra == rb);
+    assert_eq!(a.is_integer(), ra.is_integer(), "{a:?}");
+    plain(a.numer().map(u128::from), a.denom().map(u128::from), &ra, 8);
     assert_eq!(a.negate().checked_add(a), Some(Fraction8::ZERO));
     compare_fast8(a, b);
 }
 
 /// The number of bits up to the highest one set, 0 for 0.
+#[cfg(not(kani))]
 fn len8(x: u8) -> i64 {
     x.checked_ilog2().map_or(0, |l| i64::from(l) + 1)
 }
@@ -117,8 +196,11 @@ macro_rules! compare_fast {
             assert_eq!(a.compare(b), wide, "{a:?} against {b:?}");
             assert_eq!(a.compare_fast(b), wide, "{a:?} against {b:?}");
             let fast = a.compare_by_bits(b);
-            let (x, y) = ($len(a.numer()) + $len(b.denom()), $len(b.numer()) + $len(a.denom()));
-            let decides = a.is_negative() != b.is_negative() || proven(x, y, a.is_zero() || b.is_zero());
+            let ((an, ad), (bn, bd)) = (a.mantissa(), b.mantissa());
+            let (x, y) = ($len(an) + $len(bd), $len(bn) + $len(ad));
+            // of two exponents the fast path declines: the bit lengths of the mantissas alone say nothing
+            let decides = a.exp10() == b.exp10()
+                && (a.is_negative() != b.is_negative() || proven(x, y, a.is_zero() || b.is_zero()));
             assert_eq!(fast.is_some(), decides, "{a:?} against {b:?}: bit lengths {x}, {y}");
             if let Some(o) = fast {
                 assert_eq!(o, wide, "{a:?} against {b:?}");
@@ -129,6 +211,7 @@ macro_rules! compare_fast {
 
 compare_fast! {
     /// [compare_fast] on `u8`, walked whole with [ops8].
+    #[cfg(not(kani))]
     compare_fast8, Fraction8, len8
 }
 
@@ -180,57 +263,152 @@ pub(crate) mod big {
     use num_rational::BigRational;
 
     pub(crate) fn big(x: Fraction) -> BigRational {
-        reference::rational(x.is_negative(), x.numer(), x.denom())
+        let (n, d) = x.mantissa();
+        reference::rational_exp10(x.is_negative(), n, d, x.exp10().into())
     }
 
-    /// `got` is `want` in lowest terms (zero as `+0/1`), or `None` exactly where `want` doesn't fit.
-    fn exact(got: Option<Fraction>, want: &BigRational) {
-        match got {
-            Some(r) => {
-                assert_eq!(&big(r), want);
-                // BigRational is in lowest terms: so is r, if its parts are the same
-                assert_eq!(*want.numer().magnitude(), r.numer().into());
-                assert_eq!(*want.denom().magnitude(), r.denom().into());
-                if r.is_zero() {
-                    assert!(!r.is_negative() && r.denom() == 1);
-                }
-            }
-            None => assert!(!reference::fits_u128(want), "{want} fits, refused"),
-        }
+    /// The form of a `Fraction`.
+    pub(crate) fn form(x: Fraction) -> super::Form {
+        let (n, d) = x.mantissa();
+        (x.is_negative(), n.into(), d.into(), x.exp10().into())
     }
 
-    /// Every operation of two fractions against `BigRational`.
+    /// The range of a `Fraction`'s form: `u128` mantissas, an `i32` exponent.
+    const RANGE: (u32, i64, i64) = (128, i32::MIN as i64, i32::MAX as i64);
+
+    /// `got` is `want` in the canonical form, or `None` exactly where no form of `want` fits; a sum in the window
+    /// may be refused where `window`.
+    fn exact(got: Option<Fraction>, want: &BigRational, window: bool) {
+        super::exact_form(got.map(form), want, RANGE, window);
+    }
+
+    /// A `Fraction` of `want`'s canonical form, `None` where there is none.
+    pub(crate) fn fraction_of(want: &BigRational) -> Option<Fraction> {
+        let (neg, n, d, e) = reference::canonical(want, RANGE.0, RANGE.1, RANGE.2)?;
+        let x = Fraction::from_parts_exp10(
+            neg,
+            (&n).try_into().expect("fits"),
+            (&d).try_into().expect("fits"),
+            i32::try_from(e).expect("in range"),
+        );
+        assert_eq!(x.map(form), Some((neg, n, d, e)), "{want}");
+        x
+    }
+
+    /// Every operation of two fractions against `BigRational`, the plain terms, `is_integer`, rounding and the
+    /// nearest float of each.
     pub(crate) fn arith(a: Fraction, b: Fraction) {
         let (ra, rb) = (big(a), big(b));
-        exact(a.checked_add(b), &(&ra + &rb));
-        exact(a.checked_sub(b), &(&ra - &rb));
-        exact(a.checked_mul(b), &(&ra * &rb));
+        exact(Some(a), &ra, false);
+        let (fa, fb) = (form(a), form(b));
+        let neg = |f: &super::Form| (!f.0 && f.1 != 0.into(), f.1.clone(), f.2.clone(), f.3);
+        exact(
+            a.checked_add(b),
+            &(&ra + &rb),
+            super::aligned_past(&fa, &fb, 128),
+        );
+        exact(
+            a.checked_sub(b),
+            &(&ra - &rb),
+            super::aligned_past(&fa, &neg(&fb), 128),
+        );
+        exact(a.checked_mul(b), &(&ra * &rb), false);
         if b.is_zero() {
             assert_eq!(a.checked_div(b), None);
             assert_eq!(b.checked_recip(), None);
         } else {
-            exact(a.checked_div(b), &(&ra / &rb));
+            exact(a.checked_div(b), &(&ra / &rb), false);
+            exact(b.checked_recip(), &rb.recip(), false);
         }
         assert_eq!(a.cmp(&b), ra.cmp(&rb), "{a:?} against {b:?}");
         assert_eq!(a == b, ra == rb);
+        assert_eq!(a.is_integer(), ra.is_integer(), "{a:?}");
+        super::plain(a.numer(), a.denom(), &ra, 128);
+        round_any(a);
+        nearest_f64(a);
     }
 
-    /// A sum whose cross terms pass 2¹²⁸ but whose lowest terms fit: `a = s − b` for a small `s` and a large `b`, so
-    /// `a + b` is `s`, `s − a` is `b` and `a − s` is `−b`, each exact. Skipped where `a` itself doesn't fit.
-    pub(crate) fn sum_in_the_window(s: Fraction, b: Fraction) {
-        let a = &big(s) - &big(b);
-        if !reference::fits_u128(&a) {
-            return;
+    /// `x · 10^shift` by its parts: the same mantissa, the exponent moved; `None` where it leaves `i32`.
+    fn shifted(x: Fraction, shift: i32) -> Option<Fraction> {
+        if x.is_zero() {
+            return Some(x);
         }
-        let a = Fraction::from_parts(
-            a.numer() < &0.into(),
-            a.numer().magnitude().try_into().expect("fits"),
-            a.denom().magnitude().try_into().expect("fits"),
-        )
-        .expect("den > 0");
+        let (n, d) = x.mantissa();
+        Fraction::from_parts_exp10(x.is_negative(), n, d, x.exp10().checked_add(shift)?)
+    }
+
+    /// Near the ends of the exponent's range, where no `BigRational` reaches: every operation of `a · 10^k` and
+    /// `b · 10^k` is that of `a` and `b` shifted (a product's factors by about `k/2` each), the order the same. The
+    /// canonical form doesn't depend on where the value sits, as long as the range doesn't clamp it.
+    pub(crate) fn at_the_ends(a: Fraction, b: Fraction, k: i32) {
+        let (Some(sa), Some(sb)) = (shifted(a, k), shifted(b, k)) else {
+            return;
+        };
+        assert_eq!(shifted(sa, -k), Some(a));
+        assert_eq!(
+            sa.checked_add(sb),
+            a.checked_add(b).and_then(|x| shifted(x, k)),
+            "{sa:?} + {sb:?}"
+        );
+        assert_eq!(
+            sa.checked_sub(sb),
+            a.checked_sub(b).and_then(|x| shifted(x, k)),
+            "{sa:?} - {sb:?}"
+        );
+        assert_eq!(sa.checked_div(sb), a.checked_div(b), "{sa:?} / {sb:?}");
+        assert_eq!(sa.cmp(&sb), a.cmp(&b), "{sa:?} against {sb:?}");
+        assert_eq!(sa.compare_fast(sb), a.cmp(&b), "{sa:?} against {sb:?}");
+        if let Some(ab) = a.checked_mul(b) {
+            let k2 = k / 2;
+            if let (Some(ha), Some(hb)) = (shifted(a, k2), shifted(b, k - k2)) {
+                assert_eq!(ha.checked_mul(hb), shifted(ab, k), "{ha:?} * {hb:?}");
+            }
+        }
+        // past f64 and past i128 either way
+        let f = sa.to_f64();
+        if a.is_zero() {
+            assert_eq!(f, 0.0);
+        } else if k > 0 {
+            assert!(
+                f.is_infinite() && f.is_sign_negative() == a.is_negative(),
+                "{sa:?}: {f}"
+            );
+            assert_eq!(sa.round(Rounding::NearestEven), None);
+            assert_eq!(sa.numer(), None, "{sa:?}");
+        } else {
+            assert!(
+                f == 0.0 && f.is_sign_negative() == a.is_negative(),
+                "{sa:?}: {f}"
+            );
+            let floor = if a.is_negative() { -1 } else { 0 };
+            assert_eq!(sa.round(Rounding::Floor), Some(floor), "{sa:?}");
+            assert_eq!(sa.round(Rounding::NearestEven), Some(0), "{sa:?}");
+            assert!(!sa.is_integer() && sa.denom().is_none(), "{sa:?}");
+        }
+    }
+
+    /// `round` of any fraction is the reference's, `None` exactly past `i128`.
+    pub(crate) fn round_any(a: Fraction) {
+        let x = big(a);
+        for r in reference::MODES {
+            let want = reference::round_rational(&x, r);
+            assert_eq!(a.round(r), i128::try_from(&want).ok(), "{a:?} {r:?}");
+        }
+    }
+
+    /// A sum whose aligned terms are large but whose result fits: `a = s − b` for a small `s` and a large `b`, so
+    /// `a + b` is `s`, `s − a` is `b`, each exact unless the terms pass four limbs. Skipped where `a` has no form.
+    pub(crate) fn sum_in_the_window(s: Fraction, b: Fraction) {
+        let Some(a) = fraction_of(&(&big(s) - &big(b))) else {
+            return;
+        };
         arith(a, b);
-        assert_eq!(a.checked_add(b), Some(s), "{a:?} + {b:?}");
-        assert_eq!(s.checked_sub(a), Some(b), "{s:?} - {a:?}");
+        if !super::aligned_past(&form(a), &form(b), 128) {
+            assert_eq!(a.checked_add(b), Some(s), "{a:?} + {b:?}");
+        }
+        if !super::aligned_past(&form(s), &form(a.negate()), 128) {
+            assert_eq!(s.checked_sub(a), Some(b), "{s:?} - {a:?}");
+        }
     }
 
     /// `round` of `num/den` is the reference's.
@@ -304,11 +482,21 @@ pub(crate) mod big {
         assert_eq!(got, Some(want), "{text} of {num}/{den} {r:?}");
     }
 
-    /// `to_f64` is the float nearest the fraction, a tie to the even one; `from_f64` of it is that float exactly.
+    /// `to_f64` is the float nearest the fraction, a tie to the even one, ±∞ from half a step past `f64::MAX`;
+    /// `from_f64` of a finite one is that float exactly.
     pub(crate) fn nearest_f64(a: Fraction) {
         let x = big(a);
         let f = a.to_f64();
-        assert!(f.is_finite());
+        assert_eq!(f.is_sign_negative(), a.is_negative(), "{a:?}: {f}");
+        let abs = if a.is_negative() { -&x } else { x.clone() };
+        if f.is_infinite() {
+            // 2^1024 − 2^970: half a step past f64::MAX, where the nearest is ∞ (a tie goes to the even ∞)
+            let edge = BigRational::from_integer(
+                (num_bigint::BigInt::from(1) << 1024) - (num_bigint::BigInt::from(1) << 970),
+            );
+            assert!(abs >= edge, "{a:?}: ∞");
+            return;
+        }
         let off = |g: f64| {
             let g = BigRational::from_float(g).expect("finite");
             let d = &g - &x;
@@ -319,7 +507,15 @@ pub(crate) mod big {
             }
         };
         let (here, up, down) = (off(f), off(f.next_up()), off(f.next_down()));
-        assert!(here <= up && here <= down, "{a:?}: {f}");
+        #[expect(
+            clippy::float_cmp,
+            reason = "the largest float exactly, whose next one up is ∞"
+        )]
+        if f.abs() == f64::MAX {
+            assert!(here <= down, "{a:?}: {f}");
+        } else {
+            assert!(here <= up && here <= down, "{a:?}: {f}");
+        }
         if here == up || here == down {
             assert_eq!(f.to_bits() % 2, 0, "{a:?}: a tie to {f}, not to even");
         }
@@ -328,18 +524,17 @@ pub(crate) mod big {
         }
     }
 
-    /// A finite float is `from_f64`'s fraction exactly, or refused where that doesn't fit `u128`.
+    /// A finite float is `from_f64`'s fraction exactly, or refused where no form of it fits.
     pub(crate) fn from_f64(x: f64) {
         let got = Fraction::from_f64(x);
         match BigRational::from_float(x) {
             None => assert_eq!(got, None),
-            Some(want) => match got {
-                Some(r) => {
-                    assert_eq!(big(r), want);
+            Some(want) => {
+                exact(got, &want, false);
+                if let Some(r) = got {
                     assert_eq!(r.to_f64(), x);
                 }
-                None => assert!(!reference::fits_u128(&want), "{x} fits, refused"),
-            },
+            }
         }
     }
 
@@ -470,7 +665,17 @@ mod tests {
     use proptest::prelude::*;
 
     fn parts8() -> impl Strategy<Value = super::Parts8> {
-        (any::<bool>(), any::<u8>(), any::<u8>())
+        (
+            any::<bool>(),
+            any::<u8>(),
+            any::<u8>(),
+            prop_oneof![
+                2 => Just(0i8),
+                2 => -4i8..=4,
+                1 => any::<i8>(),
+                1 => proptest::sample::select(&[i8::MIN, i8::MIN + 1, i8::MAX - 1, i8::MAX][..]),
+            ],
+        )
     }
 
     proptest! {
@@ -484,6 +689,31 @@ mod tests {
             big::arith(a, b);
         }
 
+        #[test]
+        fn ops_at_the_ends(a in strategy::fraction(), b in strategy::fraction(), k in strategy::exp10_ends()) {
+            big::at_the_ends(a, b, k);
+        }
+
+        #[test]
+        fn ops_at_the_clamp(a in strategy::clamped(), b in strategy::fraction()) {
+            big::arith(a, b);
+            big::arith(b, a);
+        }
+
+        /// Two values of exponents `k` apart whose mantissas are near `10^k` apart: the order is decided by the
+        /// aligned product, not the bit lengths, and the sum aligns by `k`.
+        #[test]
+        fn orders_across_exponents(
+            neg in any::<bool>(), n in 1u128..=u128::MAX >> 4, d in 1u128..=u128::MAX,
+            e in strategy::exp10s(), k in 1u32..=38, j in -3i128..=3,
+        ) {
+            let f = |n: u128, e: i32| exact_units::Fraction::from_parts_exp10(neg, n, d, e).unwrap_or_default();
+            let a = f(n, e);
+            if let Some(m) = n.checked_mul(10u128.pow(k)).and_then(|m| m.checked_add_signed(j)) {
+                big::arith(a, f(m, e.saturating_sub(k.cast_signed())));
+            }
+        }
+
         /// Large denominators that share a factor with each other and none with the small sum: the cross terms pass
         /// 2¹²⁸.
         #[test]
@@ -493,6 +723,19 @@ mod tests {
         ) {
             let f = |(neg, n, d)| exact_units::Fraction::from_parts(neg, n, d).unwrap_or_default();
             big::sum_in_the_window(f(s), f(b));
+        }
+
+        /// The same with the exponents apart: a small sum and a large term whose aligned form passes four limbs or
+        /// nears it (Δ about 77), so both sides of the window are drawn.
+        #[test]
+        fn sums_in_the_window_across_exponents(
+            s in (any::<bool>(), 0u128..=1000, 1u128..=1000, -10i32..=10),
+            b in (any::<bool>(), 1u128..=u128::MAX, 1u128..=u128::MAX, 60i32..=90),
+        ) {
+            let f = |(neg, n, d, e)| exact_units::Fraction::from_parts_exp10(neg, n, d, e).unwrap_or_default();
+            big::sum_in_the_window(f(s), f(b));
+            let (sn, sd, se) = (s.1, s.2, s.3);
+            big::sum_in_the_window(f((s.0, sn, sd, se.saturating_sub(80))), f((b.0, b.1, b.2, -b.3)));
         }
 
         #[test]
@@ -665,7 +908,19 @@ mod tests {
         let max = Exact::of(Fraction::int(i128::MAX));
         let min = Exact::of(Fraction::int(i128::MIN));
         let tiny = Exact::of(Fraction::from_parts(false, 1, u128::MAX).unwrap());
-        for e in [max, min, tiny, -tiny, Exact::ZERO, Exact::int(1)] {
+        let atomic = Exact::of(Fraction::from_parts_exp10(false, 3, 7, -40).unwrap());
+        let far = Exact::of(Fraction::from_parts_exp10(true, 1, 3, 400).unwrap());
+        for e in [
+            max,
+            min,
+            tiny,
+            -tiny,
+            Exact::ZERO,
+            Exact::int(1),
+            atomic,
+            far,
+            -far,
+        ] {
             for x in [
                 f64::MAX,
                 f64::MIN,
@@ -684,18 +939,33 @@ mod tests {
         }
     }
 
-    /// Every pair of `u8` numerators, both signs, over denominators at both ends (1, 3, 128, 255): every refusal
-    /// of a sum, difference, product and quotient against the exact value.
+    /// Every pair of `u8` numerators, each pair with signs, denominators at both ends (1, 3, 5, 128, 250, 255) and
+    /// exponents near 0, far apart and at the ends of `i8` in turn (all of them over the walk): every refusal of a
+    /// sum, difference, product and quotient against the exact value. Then every combination of those for a few
+    /// numerators.
     #[test]
     fn walk_u8() {
-        const DENS: [u8; 4] = [1, 3, 128, 255];
+        const DENS: [u8; 6] = [1, 3, 5, 128, 250, 255];
+        const EXPS: [i8; 12] = [-128, -127, -60, -3, -1, 0, 1, 2, 3, 60, 126, 127];
+        // the exponents of the second walk: both ends, the middle and one step past it
+        const ENDS: [i8; 6] = [-128, -127, -1, 0, 1, 127];
         for an in 0..=u8::MAX {
             for bn in 0..=u8::MAX {
+                let i = usize::from(an) * 256 + usize::from(bn);
+                let (ad, bd) = (DENS[i % 6], DENS[(i / 6) % 6]);
+                let (ae, be) = (EXPS[(i / 36) % 12], EXPS[(i / 432) % 12]);
+                let (na, nb) = (i % 2 == 1, (i / 7) % 2 == 1);
+                super::ops8((na, an, ad, ae), (nb, bn, bd, be));
+            }
+        }
+        for an in [0u8, 1, 2, 5, 125, 128, 255] {
+            for bn in [1u8, 3, 25, 64, 255] {
                 for ad in DENS {
                     for bd in DENS {
-                        for (na, nb) in [(false, false), (false, true), (true, false), (true, true)]
-                        {
-                            super::ops8((na, an, ad), (nb, bn, bd));
+                        for ae in ENDS {
+                            for be in ENDS {
+                                super::ops8((false, an, ad, ae), (true, bn, bd, be));
+                            }
                         }
                     }
                 }
@@ -716,6 +986,53 @@ mod tests {
             Fraction::new(i128::MAX, u128::MAX),
             Fraction::new(i128::MIN, u128::MAX - 2),
         );
+    }
+
+    /// The ends of `i32`, where the range clamps: `1/10^MIN` is `10 · 10^MAX`, and the reverse; an `f64` and a
+    /// `Fixed` compare with both, and the text reads back.
+    #[test]
+    fn exponents_at_the_ends() {
+        use exact_units::{Exact, Fixed, Fraction, prefix::One, units::Hertz};
+        let (lo, hi) = (Fraction::pow10(i32::MIN), Fraction::pow10(i32::MAX));
+        assert_eq!(
+            lo.checked_recip(),
+            Fraction::from_parts_exp10(false, 10, 1, i32::MAX)
+        );
+        assert_eq!(hi.checked_recip(), Some(Fraction::pow10(i32::MIN + 1)));
+        assert_eq!(
+            Fraction::int(3).checked_div(hi),
+            Fraction::from_parts_exp10(false, 3, 1, i32::MIN + 1)
+        );
+        assert_eq!(
+            hi.checked_mul(Fraction::int(10)),
+            Fraction::from_parts_exp10(false, 10, 1, i32::MAX)
+        );
+        assert_eq!(
+            hi.checked_mul(Fraction::int(1 << 120))
+                .and_then(|x| x.checked_mul(Fraction::int(1 << 120))),
+            None
+        );
+        assert_eq!(lo.checked_mul(hi), Some(Fraction::new(1, 10)));
+        // the floats with a form: every one of magnitude 2⁻¹⁰⁷ to below 2¹⁸³, powers of two out to 2⁻¹⁸²
+        let full = |b: u64| f64::from_bits((b << 52) | ((1 << 52) - 1));
+        let float = |x: f64| Fraction::from_f64(x);
+        assert!(float(full(1023 - 107)).is_some() && float(full(1023 - 108)).is_none());
+        assert!(
+            float(full(1023 + 182)).is_some()
+                && float(f64::from_bits((1023 + 183) << 52)).is_none()
+        );
+        let small = |k: u64| float(f64::from_bits((1023 - k) << 52));
+        assert!(small(182).is_some() && small(183).is_none());
+        assert_eq!((float(5e-324), float(f64::MAX)), (None, None));
+        assert!(lo < small(182).unwrap() && hi > float(full(1023 + 182)).unwrap());
+        assert_eq!(
+            (lo.to_f64(), hi.to_f64(), (-hi).to_f64()),
+            (0.0, f64::INFINITY, f64::NEG_INFINITY)
+        );
+        let tiny = Fixed::<Hertz, One, f64>::try_new(5e-324).unwrap();
+        assert!(tiny > Exact::<Hertz>::of(lo) && tiny < Exact::<Hertz>::of(hi));
+        assert_eq!(lo.to_string(), format!("1e{}/1", i32::MIN));
+        assert_eq!(lo.to_string().parse::<Fraction>(), Ok(lo));
     }
 
     /// Found by the properties: a float whose last bit is below 2⁻¹²⁷ but whose mantissa ends in zeros.

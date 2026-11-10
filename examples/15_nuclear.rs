@@ -43,7 +43,7 @@ use exact_units::systems::{Natural, Si, natural::NaturalElectronVolt};
 use exact_units::units::{
     Becquerel, ElectronVolt, EquivalentDose, Gram, Gray, Joule, Per, Ratio, Second, Speed,
 };
-use exact_units::{Exact, Fixed, Prefix, Rounding};
+use exact_units::{Exact, Fixed, Fraction, Prefix, Rounding};
 
 exact_units::unit! {
     /// The dalton (unified atomic mass unit), 1 Da = 1 u = m_u: one twelfth of a ¹²C atom, measured in kg, so its
@@ -239,6 +239,19 @@ fn binding_energies() {
         .to_rounded::<Milli, i64>(Rounding::NearestEven)
         .unwrap();
     println!("  238U's rest energy: {rest18} (2018), {moved} more by 2022's");
+    // a mass in u is a mass in kg through m_u of the same set: 9.288·10⁻²⁶ kg for ⁵⁶Fe, exact, its plain
+    // denominator 5·10⁴² past u128 and its mantissa 69 bits over 3
+    let fe56 = Exact::<Dalton>::int(1)
+        .convert_with::<Codata2018, Gram>()
+        .unwrap()
+        .scaled(FE56.mass)
+        .unwrap();
+    let want = Fraction::from_parts_exp10(false, 464_410_728_234_705_748_821, 5, -42).unwrap();
+    assert_eq!(fe56, Exact::of(want));
+    println!(
+        "  56Fe's mass: {:e} (CODATA 2018's m_u)",
+        fe56.rounded(6, Rounding::NearestEven)
+    );
 }
 
 fn q_values() {
@@ -290,7 +303,7 @@ fn q_values() {
         .convert::<NaturalElectronVolt>()
         .unwrap();
     assert_eq!(natural.get(), q_alpha.get()); // SI's eV and Natural's eV¹ are one number
-    // into kg it needs a float: e/c² in kg per eV is 1.78·10⁻³⁶, no `Exact` of that size fits u128
+    // into kg as a float, by the factor e/c² of Natural to SI (1.78·10⁻³⁶ kg per eV), rounded once
     let defect = natural
         .to::<Milli, i64>()
         .unwrap()
@@ -298,10 +311,16 @@ fn q_values() {
         .convert_rounded::<Gram, Kilo, f64>(Rounding::NearestEven)
         .unwrap();
     println!("  Q of 226Ra as a mass: {defect:e}");
-    // the exact route refuses: the joules over c² in a u128 fraction overflow
+    // and exactly: the joules over c², 8.68·10⁻³⁰ kg, a 59-bit numerator over a 56-bit denominator times 10⁻³⁰
     let joules = q_alpha.convert::<Joule>().unwrap();
     let c = Exact::<Speed>::int(299_792_458);
-    assert!((joules / (c * c).unwrap()).is_none());
+    let mass = (joules / (c * c).unwrap())
+        .unwrap()
+        .convert::<Gram>()
+        .unwrap();
+    // the float route rounded once, within an ulp of the exact value
+    assert!((mass.to_f64() / 1000.0 / defect.get() - 1.0).abs() < 1e-15);
+    println!("  exactly: {:e}", mass.rounded(4, Rounding::NearestEven));
 }
 
 fn radium_activity() {
@@ -312,11 +331,12 @@ fn radium_activity() {
     let dalton = Exact::<Dalton>::int(1)
         .convert_with::<Codata2018, Gram>()
         .unwrap();
-    // one atom's mass in g, 3.75·10⁻²² g with 21 digits, needs a denominator of 10⁴² past a u128 fraction: the count
-    // is a float edge here, the half-life's 0.44 % far above the f64's rounding
-    assert!(dalton.scaled(RA226.mass).is_none());
-    let atoms = mass.to_f64() / (RA226.mass.to_f64() * dalton.to_f64());
-    println!("  N = {atoms:.6e} atoms");
+    // one atom's mass in g, 3.75·10⁻²² g with 21 digits over 10⁴², exact with its power of ten apart, and so is the
+    // count; the half-life's 0.44 % then makes the activity a float edge
+    let atom = dalton.scaled(RA226.mass).unwrap();
+    let count = (mass / atom).unwrap().as_ratio();
+    println!("  N = {:e} atoms", count.rounded(6, Rounding::NearestEven));
+    let atoms = count.to_f64();
 
     // T½ = 1600(7) y, NUBASE2020 Table I, in NUBASE's year
     let half_life = Exact::<YearNubase>::new_in::<Kilo>(16, 10);

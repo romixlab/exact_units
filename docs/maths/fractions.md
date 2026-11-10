@@ -6,7 +6,7 @@ level: basic
 
 A `Fixed` has its scale in the type: a whole number of µs, of 2⁻¹⁵, of 1/65535. Some values have no such scale. An STM32H7 PLL makes ref·(N + FRACN/8192)/(M·P): 519.999755859375 MHz for one setting, 80/3 MHz for a divider of 3. A planner that works these out on a host needs the value itself, exactly.
 
-`Exact<U>` is that value: the unit `U` in the type, the number a `Fraction` chosen at run time. A `Fraction` is a sign and a `u128` numerator and denominator, always in lowest terms. There is no scale and no storage to pick.
+`Exact<U>` is that value: the unit `U` in the type, the number a `Fraction` chosen at run time. A `Fraction` is a sign, a numerator and a denominator of `u128`, and a power of ten: `±num/den · 10^exp`. There is no scale and no storage to pick ([Range](#range) says what it holds).
 
 ```rust
 use exact_units::{Exact, Fraction, prefix::Mega, units::Hertz};
@@ -110,7 +110,32 @@ use exact_units::{Exact, quantities::DoseEquivalent, units::Gray};
 let _ = Exact::<Gray>::int(1).as_quantity::<DoseEquivalent>();
 ```
 
-Every operation refuses exactly the results that don't fit, in lowest terms. Multiply and divide cancel crosswise first. Add and subtract use Knuth's form with the cross terms in 256 bits, then reduce, so a sum that fits is never refused for a step that didn't. Comparing never overflows: its cross products are taken in 256 bits too. On a Cortex-M0, where those products are library calls, the bit lengths of the cross products decide first where they prove the order (a product of `x` and `y` has `bits(x) + bits(y) − 1` or `bits(x) + bits(y)` bits), which gives the same answer without multiplying. A compare with a `Fixed` does that on every target.
+Multiply and divide refuse exactly the results no form of which fits ([Range](#range)): the mantissas cancel crosswise first, the exponents add. Add and subtract align the term of the larger exponent to the other's, then use Knuth's form with the cross terms in 512 bits, so a sum is refused only where it doesn't fit, or in the one window the next section names. Comparing never overflows. Of one exponent, its cross products are taken in 256 bits. Of two, the bit lengths decide with the power of ten's bounded from both sides, and the aligned product in 512 bits where they don't. On a Cortex-M0, where those products are library calls, the bit lengths of the cross products decide first where they prove the order (a product of `x` and `y` has `bits(x) + bits(y) − 1` or `bits(x) + bits(y)` bits), which gives the same answer without multiplying. A compare with a `Fixed` does that on every target.
+
+## Range
+
+A `Fraction` holds 38 significant digits in each of the numerator and the denominator, times `10^±2³¹`. The power of ten is kept apart from the digits, so atomic scales cost nothing: the α energy of ²²⁶Ra as a mass is 8.68·10⁻³⁰ kg, a 59-bit numerator over a 56-bit denominator times 10⁻³⁰, where its plain lowest terms need a 155-bit denominator.
+
+```rust
+# #[cfg(all(feature = "radiation", feature = "mechanical"))] {
+use exact_units::{Exact, Fraction, Rounding, prefix::Kilo};
+use exact_units::units::{ElectronVolt, Gram, Joule, Speed};
+
+let q = Exact::<ElectronVolt>::new_in::<Kilo>(487_070_313, 100_000);
+let c = Exact::<Speed>::int(299_792_458);
+let m = (q.convert::<Joule>().unwrap() / (c * c).unwrap()).unwrap().convert::<Gram>().unwrap();
+assert_eq!(format!("{:e}", m.rounded(4, Rounding::NearestEven)), "8.6828e-27 g");
+// 10⁻⁵⁰ has no plain terms in u128, but is one Fraction
+let tiny = Fraction::pow10(-50);
+assert_eq!((tiny.mantissa(), tiny.exp10(), tiny.denom()), ((1, 1), -50, None));
+# }
+```
+
+Every value whose plain lowest terms fit `u128`s is a `Fraction`, as are many more. The form is canonical, so one value has one form and `==` compares forms: the exponent is the value's power of 5, moved only as far as the mantissa needs to fit. The mantissa then carries 2s (one bit each) but no 5s where it can help it: `0.2` is `2·10⁻¹`, `24 MHz` is `24·10⁶` Hz. `mantissa()` and `exp10()` give the parts, `from_parts_exp10` makes one from them. `numer()` and `denom()` are the plain lowest terms, `None` where they are past `u128`.
+
+What doesn't fit is a value whose significant digits pass 38 in the numerator or the denominator: a chain of four or more measured constants of 9 to 11 digits each multiplied together. Such a chain is refused, `None`.
+
+One window refuses a sum that would fit. Where the exponents of two terms are far apart (77 or more for full mantissas), the term of the larger one, aligned to the other's, can pass 512 bits. Its sum with the other term then has more than 38 digits in nearly every case, and is refused rightly. A sum whose result would still fit, because the two terms agree in so many low digits that the rest cancels down through 2s and 5s, is refused too. Such a sum needs terms of opposite sign whose low bits agree for hundreds of bits. The window is listed on [Where the crate falls short](../start/exact.md#where-the-crate-falls-short-today), and the properties draw sums on both sides of it.
 
 ## To and from `Fixed`
 
@@ -201,7 +226,7 @@ assert_eq!(format!("{:e}", b_per_a.rounded(3, Rounding::NearestEven)), "8.795e6 
 
 ## Reading
 
-Every form above reads back, with the units and prefixes `serde::with_unit` reads for a `Fixed`. The space before the unit is optional, and an exponent works too (`24e6 Hz`). Text that isn't a number with its unit, another unit, and a number past what a `Fraction` holds are refused.
+Every form above reads back, with the units and prefixes `serde::with_unit` reads for a `Fixed`. The space before the unit is optional, and an exponent works too (`24e6 Hz`). Text that isn't a number with its unit, another unit, and a number past what a `Fraction` holds are refused. A fraction whose mantissa has its power of ten is written with it on the numerator (`3e-40/7`), and reads back.
 
 ```rust
 use exact_units::{Exact, units::Hertz};
@@ -212,7 +237,7 @@ assert_eq!("1000/3 kHz".parse::<Exact<Hertz>>(), "333.(3)kHz".parse());
 assert!("24 MV".parse::<Exact<Hertz>>().is_err());
 ```
 
-With the `serde` feature, a config field takes `#[serde(with = "exact_units::serde::with_unit")]`. A `clocks.toml` can then say `target = "79.99998046875 MHz"`, and it is read exactly. Plain serde writes the number alone in the unit itself, as text in a human-readable format and as `(negative, numerator, denominator)` in a binary one. A float is refused, as its digits were rounded by the format's parser before the crate sees them.
+With the `serde` feature, a config field takes `#[serde(with = "exact_units::serde::with_unit")]`. A `clocks.toml` can then say `target = "79.99998046875 MHz"`, and it is read exactly. Plain serde writes the number alone in the unit itself, as text in a human-readable format and as `(negative, numerator, denominator, exponent)` in a binary one, the canonical form, which a read checks. A float is refused, as its digits were rounded by the format's parser before the crate sees them.
 
 ## Relative error and tolerance
 
@@ -283,4 +308,4 @@ assert_eq!(q!(+- 50 mV).window(setpoint).to_string(), "3283 mV ..= 3383 mV");
 
 ## Cost
 
-An `Exact` is 48 bytes, and its arithmetic is `u128` multiplies and divisions with a gcd at each step. That is fine on a host and slow on a microcontroller, where most `u128` operations are library calls. Firmware gets the results as `Fixed` constants. The type is `no_std` and needs no alloc, and nothing of it is linked unless it is used.
+An `Exact` is 48 bytes (the exponent sits in what was padding), and its arithmetic is `u128` multiplies and divisions with a gcd at each step, then the normalisation: the 2s and 5s stripped (a 5 by one multiply by its inverse modulo 2¹²⁸, no division) and the exponent placed. That is fine on a host and slow on a microcontroller, where most `u128` operations are library calls. Firmware gets the results as `Fixed` constants. The type is `no_std` and needs no alloc, and nothing of it is linked unless it is used.

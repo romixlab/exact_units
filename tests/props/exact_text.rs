@@ -34,7 +34,7 @@ fn exact<U: Unit>(x: Exact<U>) {
 pub(crate) fn written(x: Fraction) {
     let s = x.to_string();
     reads_back(&x, &s);
-    let mut den = x.denom();
+    let mut den = x.mantissa().1;
     while den.is_multiple_of(2) {
         den /= 2;
     }

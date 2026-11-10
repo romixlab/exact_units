@@ -134,15 +134,60 @@ mod strategy {
         ]
     }
 
-    /// A fraction of [u128s], either sign.
+    /// A fraction of [u128s] times a power of ten of [exp10s], either sign; one with no form is 0.
     pub(crate) fn fraction() -> impl Strategy<Value = exact_units::Fraction> {
         (
             any::<bool>(),
             u128s(),
             u128s().prop_filter("a denominator", |d| *d != 0),
+            exp10s(),
         )
-            .prop_map(|(neg, num, den)| {
-                exact_units::Fraction::from_parts(neg, num, den).unwrap_or_default()
+            .prop_map(|(neg, num, den, exp)| {
+                exact_units::Fraction::from_parts_exp10(neg, num, den, exp).unwrap_or_default()
+            })
+    }
+
+    /// Powers of ten: mostly 0 (the values of before), small ones, atomic scales, those near where a sum aligns past
+    /// four limbs (about 77), and past what an `f64` holds. The ends of `i32` are [exp10_ends]: a `BigRational` of
+    /// `10^2³¹` is past any reference.
+    pub(crate) fn exp10s() -> impl Strategy<Value = i32> {
+        prop_oneof![
+            4 => Just(0),
+            3 => -40i32..=40,
+            2 => prop_oneof![-60i32..=-25, 25i32..=60],
+            1 => 70i32..=85,
+            1 => -85i32..=-70,
+            1 => prop_oneof![-500i32..=-300, 300i32..=500],
+        ]
+    }
+
+    /// A shift of the exponent near either end of `i32`, leaving room for [exp10s] and the steps of an operation.
+    pub(crate) fn exp10_ends() -> impl Strategy<Value = i32> {
+        prop_oneof![
+            (i32::MAX - 2000)..=(i32::MAX - 1200),
+            (i32::MIN + 1200)..=(i32::MIN + 2000),
+        ]
+    }
+
+    /// Fractions where the exponent is clamped: a numerator of many 5s over a large denominator, or many 2s over a
+    /// small one, so the value's power of 5 is out of the range where the mantissa fits, and the exponent is that
+    /// range's end; at every exponent, the ends of `i32` included.
+    pub(crate) fn clamped() -> impl Strategy<Value = exact_units::Fraction> {
+        (
+            any::<bool>(),
+            0u32..=55,
+            1u128..=1000,
+            prop_oneof![(1u128 << 100)..=u128::MAX, 1u128..=1000],
+            0u32..=127,
+            exp10s(),
+        )
+            .prop_map(|(neg, fives, m, den, twos, exp)| {
+                let num = 5u128.pow(fives).checked_mul(m).unwrap_or(m);
+                let num = num
+                    .checked_shl(twos)
+                    .filter(|n| n >> twos == num)
+                    .unwrap_or(num);
+                exact_units::Fraction::from_parts_exp10(neg, num, den | 1, exp).unwrap_or_default()
             })
     }
 

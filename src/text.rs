@@ -19,7 +19,7 @@ impl Decimal {
     /// The decimal number at the start of `s` and the text after it: `"1.5 ms"` is 1.5 and `" ms"`. An optional
     /// sign, digits with at most one point and `_` between them, and an exponent (`e-3`) when a digit follows the
     /// `e` (`"5eV"` is 5 and `"eV"`). `None` when `s` doesn't start with a number, or its significant digits don't
-    /// fit 128 bits (trailing zeros, before or after the point, never count).
+    /// fit 128 bits (trailing zeros, before or after the point, never count), or the power of ten passes `i32`.
     pub(crate) fn parse(s: &str) -> Option<(Decimal, &str)> {
         let b = s.as_bytes();
         let mut i = 0usize;
@@ -41,18 +41,18 @@ impl Decimal {
                     } else {
                         &mut int_zeros
                     };
-                    *z = z.saturating_add(1);
+                    *z = z.checked_add(1)?;
                 }
                 b'1'..=b'9' => {
                     digits = true;
                     #[expect(clippy::arithmetic_side_effects, reason = "c is a digit, b'1'..=b'9'")]
                     let d = c - b'0';
-                    for _ in 0..=int_zeros.saturating_add(frac_zeros) {
+                    for _ in 0..=int_zeros.checked_add(frac_zeros)? {
                         m = m.checked_mul(10)?;
                     }
                     m = m.checked_add(u128::from(d))?;
                     if point {
-                        e = e.saturating_sub(frac_zeros.saturating_add(1));
+                        e = e.checked_sub(frac_zeros.checked_add(1)?)?;
                     }
                     (int_zeros, frac_zeros) = (0, 0);
                 }
@@ -62,7 +62,7 @@ impl Decimal {
             }
             i = i.saturating_add(1);
         }
-        e = e.saturating_add(int_zeros);
+        e = e.checked_add(int_zeros)?;
         if !digits {
             return None;
         }
@@ -75,7 +75,7 @@ impl Decimal {
                 j = j.saturating_add(1);
             }
             if let Some(b'0'..=b'9') = b.get(j) {
-                let mut x = 0i32;
+                let mut x = 0i64;
                 while let Some(&c) = b.get(j) {
                     match c {
                         b'0'..=b'9' => {
@@ -83,19 +83,20 @@ impl Decimal {
                                 clippy::arithmetic_side_effects,
                                 reason = "c is a digit, b'0'..=b'9'"
                             )]
-                            let d = i32::from(c - b'0');
-                            x = x.saturating_mul(10).saturating_add(d);
+                            let d = i64::from(c - b'0');
+                            x = x.checked_mul(10)?.checked_add(d)?;
                         }
                         b'_' => {}
                         _ => break,
                     }
                     j = j.saturating_add(1);
                 }
-                e = if eneg {
-                    e.saturating_sub(x)
+                let e64 = if eneg {
+                    i64::from(e).checked_sub(x)?
                 } else {
-                    e.saturating_add(x)
+                    i64::from(e).checked_add(x)?
                 };
+                e = i32::try_from(e64).ok()?;
                 i = j;
             }
         }
@@ -119,17 +120,17 @@ impl Decimal {
         self
     }
 
-    /// The same number times `10^k`.
+    /// The same number times `10^k`, `None` where the power of ten passes `i32`.
     #[cfg(feature = "serde")]
-    pub(crate) fn times_pow10(self, k: i32) -> Decimal {
-        Decimal {
+    pub(crate) fn times_pow10(self, k: i32) -> Option<Decimal> {
+        Some(Decimal {
             e: if self.m == 0 {
                 0
             } else {
-                self.e.saturating_add(k)
+                self.e.checked_add(k)?
             },
             ..self
-        }
+        })
     }
 
     /// As a level in dB: `None` past `i64` or [MAX_DECIMALS].
@@ -232,6 +233,18 @@ mod tests {
         assert_eq!(Decimal::parse("1_000"), Some((dec(false, 1, 3), "")));
         assert_eq!(Decimal::parse("5eV"), Some((dec(false, 5, 0), "eV")));
         assert_eq!(Decimal::parse("5e+2 V"), Some((dec(false, 5, 2), " V")));
+        // the power of ten at the ends of i32, and refused past them rather than cut to them
+        assert_eq!(
+            Decimal::parse("1e-2147483648"),
+            Some((dec(false, 1, i32::MIN), ""))
+        );
+        assert_eq!(
+            Decimal::parse("10e2147483646"),
+            Some((dec(false, 1, i32::MAX), ""))
+        );
+        assert_eq!(Decimal::parse("0.1e-2147483648"), None);
+        assert_eq!(Decimal::parse("1e2147483648"), None);
+        assert_eq!(Decimal::parse("1e99999999999999999999"), None);
         assert_eq!(Decimal::parse("-0"), Some((dec(false, 0, 0), "")));
         assert_eq!(Decimal::parse("7."), Some((dec(false, 7, 0), "")));
         assert_eq!(Decimal::parse(".5"), Some((dec(false, 5, -1), "")));
@@ -245,10 +258,6 @@ mod tests {
         assert_eq!(
             Decimal::parse("1234567890123456789012345678901234567891"),
             None
-        );
-        assert_eq!(
-            Decimal::parse("1e99999999999999"),
-            Some((dec(false, 1, i32::MAX), ""))
         );
     }
 

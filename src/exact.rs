@@ -63,7 +63,8 @@ macro_rules! bit_length_halved {
     }};
 }
 
-mod compare;
+mod big;
+pub(crate) mod compare;
 mod decimal;
 mod fraction;
 mod rounded;
@@ -492,7 +493,7 @@ impl<U: Unit> Exact<U> {
         if a.is_zero() {
             return Prefix::Unit;
         }
-        let at_least = |e: i8| Fraction::pow10(e).is_some_and(|p| a >= p);
+        let at_least = |e: i8| a >= Fraction::pow10(e.into());
         if is_ratio(&U::EXPR) {
             return if at_least(0) {
                 Prefix::Unit
@@ -620,7 +621,7 @@ fn prefix_for<U: Unit>(prefix: Prefix) -> Prefix {
 /// `x` of `U` in steps of `prefix` (`x / 10³` in kilo, `x / 2¹⁰` in kibi), `None` where it doesn't fit.
 fn value_in(x: Fraction, prefix: Prefix) -> Option<Fraction> {
     match prefix.pow10() {
-        Some(e) => x.checked_mul(Fraction::pow10(e.checked_neg()?)?),
+        Some(e) => x.checked_mul(Fraction::pow10(i32::from(e).checked_neg()?)),
         None => x.checked_div(Fraction::from_magnitude(&prefix.magnitude()?)?),
     }
 }
@@ -645,7 +646,7 @@ fn write_in<U: Unit>(x: Fraction, prefix: Prefix, f: &mut fmt::Formatter<'_>) ->
         return write_unit(prefix, unit, f);
     }
     let in_prefix = match prefix.pow10() {
-        Some(e) => Fraction::pow10(e.checked_neg().unwrap_or(0)).and_then(|p| x.checked_mul(p)),
+        Some(e) => x.checked_mul(Fraction::pow10(i32::from(e).saturating_neg())),
         None => scaled,
     };
     if let Some(s) = in_prefix {

@@ -389,7 +389,7 @@ fn steps<U: Unit, P: FixedScale, T: Storage>(
     dec: Decimal,
     prefix: TextPrefix,
 ) -> Result<T, Kind<T>> {
-    let value = dec.times_pow10(prefix.pow10);
+    let value = dec.times_pow10(prefix.pow10).ok_or(Kind::Fit)?;
     let Some((num, den)) = P::SCALE.to_ratio() else {
         // a scale with π or a root: the nearest values by f64, then the one that writes as the text
         let x = prefix.prefix.scale_f64(dec_to_f64(dec)) / P::SCALE.to_f64();

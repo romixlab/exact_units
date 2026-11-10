@@ -25,9 +25,11 @@ pub(crate) struct Expansion {
 }
 
 impl Expansion {
-    /// `x · 10^shift`, `None` when its repetend is longer than [MAX_PERIOD] (or a shift past 60 overflows the room).
+    /// `x · 10^shift`, `None` when its repetend is longer than [MAX_PERIOD] or its digits pass the room (a power of
+    /// ten that puts the point far from them).
     pub(crate) fn of(x: Fraction, shift: i32) -> Option<Expansion> {
-        let (num, den) = (x.numer(), x.denom());
+        let (num, den) = x.mantissa();
+        let shift = shift.checked_add(x.exp10())?;
         let mut e = Expansion {
             neg: x.is_negative(),
             digits: [0; CAP],
@@ -233,10 +235,15 @@ impl fmt::Display for Fraction {
     }
 }
 
-/// `-num/den`.
+/// `-num/den` in plain lowest terms where both fit `u128` (`1000000/7919`), else the mantissa with its power of ten
+/// on the numerator (`-3e-50/7`), as text reads it back.
 pub(crate) fn write_fraction(x: Fraction, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let sign = if x.is_negative() { "-" } else { "" };
-    write!(f, "{sign}{}/{}", x.numer(), x.denom())
+    if let (Some(num), Some(den)) = (x.numer(), x.denom()) {
+        return write!(f, "{sign}{num}/{den}");
+    }
+    let (num, den) = x.mantissa();
+    write!(f, "{sign}{num}e{}/{den}", x.exp10())
 }
 
 #[cfg(test)]

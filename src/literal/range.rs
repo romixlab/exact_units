@@ -941,8 +941,9 @@ const fn exact_in(t: Fraction, lo: Fraction, hi: Fraction, open: [bool; 2]) -> b
 const fn shown_fraction(x: Fraction) -> Shown {
     Shown::Frac {
         neg: x.is_negative(),
-        num: x.numer(),
-        den: x.denom(),
+        num: x.mantissa().0,
+        den: x.mantissa().1,
+        exp: x.exp10(),
     }
 }
 

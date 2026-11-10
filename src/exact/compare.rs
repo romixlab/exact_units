@@ -7,6 +7,7 @@
 //! over every input (`proofs` below).
 
 use super::Fraction;
+use super::big::Big;
 use crate::Repr;
 use core::cmp::Ordering;
 
@@ -242,8 +243,104 @@ pub(super) fn order(x: Repr, scale: Fraction, e: Fraction) -> Option<Ordering> {
     if sx != se || sx == 0 {
         return Some(sx.cmp(&se));
     }
-    let o = magnitude(m, k, (scale.numer(), scale.denom()), (e.numer(), e.denom()));
+    let (s, en) = (scale.mantissa(), e.mantissa());
+    let delta = i64::from(scale.exp10()).saturating_sub(i64::from(e.exp10()));
+    let o = across(m, k, s, en, delta);
     Some(if neg { o.reverse() } else { o })
+}
+
+/// `±m · 2^k` (`m != 0`) against `x`, exactly, for a binary bound of an interval ([crate::interval]); `None` for
+/// `|k|` past 1100, where [across] could need more limbs than [Big] has. A float's `k` is inside that, as are the
+/// bounds of any interval a curve's light works out.
+pub(crate) fn binary_against(neg: bool, m: u128, k: i64, x: Fraction) -> Option<Ordering> {
+    let below = if neg {
+        Ordering::Less
+    } else {
+        Ordering::Greater
+    };
+    if x.is_zero() || neg != x.is_negative() {
+        return Some(below);
+    }
+    let k = i32::try_from(k).ok().filter(|k| k.unsigned_abs() <= 1100)?;
+    let o = across(
+        m,
+        k,
+        (1, 1),
+        x.mantissa(),
+        i64::from(x.exp10()).saturating_neg(),
+    );
+    Some(if neg { o.reverse() } else { o })
+}
+
+/// `m · 2^k · sn/sd · 10^delta` against `en/ed`, all of them above 0. One exponent, or a power of ten that fits the
+/// mantissa it multiplies, is [magnitude]'s order; past that, the bit lengths with the powers of 5 bounded from both
+/// sides (log₂ 5 = 2.3219..), and the products in [Big] where they don't decide.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "bit lengths of at most 384, |k| and the bounds of the 5s far inside i64"
+)]
+fn across(m: u128, k: i32, (sn, sd): (u128, u128), (en, ed): (u128, u128), delta: i64) -> Ordering {
+    let ten = |x: u128, d: i64| {
+        10u128
+            .checked_pow(u32::try_from(d.unsigned_abs()).ok()?)
+            .and_then(|p| x.checked_mul(p))
+    };
+    if delta == 0 {
+        return magnitude(m, k, (sn, sd), (en, ed));
+    }
+    if delta > 0
+        && let Some(sn) = ten(sn, delta)
+    {
+        return magnitude(m, k, (sn, sd), (en, ed));
+    }
+    if delta < 0
+        && let Some(en) = ten(en, delta)
+    {
+        return magnitude(m, k, (sn, sd), (en, ed));
+    }
+    // 10^Δ is 5^Δ · 2^Δ: the 2s join k, the 5s multiply the side of the larger exponent
+    let shift = i64::from(k).saturating_add(delta);
+    let fives = delta.unsigned_abs();
+    let len = |x: u128| i64::from(x.bit_width());
+    let (la, lb) = (len(m) + len(sn) + len(ed), len(en) + len(sd));
+    let lo5 = i64::try_from(fives.saturating_mul(23_219) / 10_000)
+        .unwrap_or(i64::MAX)
+        .saturating_add(1);
+    let hi5 = i64::try_from(fives.saturating_mul(23_220) / 10_000)
+        .unwrap_or(i64::MAX)
+        .saturating_add(1);
+    // a has la − 2 to la bits before its 5s and shift, b has lb − 1 to lb
+    let (a_lo, a_hi, b_lo, b_hi) = if delta > 0 {
+        (la - 2 + lo5 + shift, la + hi5 + shift, lb - 1, lb)
+    } else {
+        (la - 2 + shift, la + shift, lb - 1 + lo5, lb + hi5)
+    };
+    if a_lo > b_hi {
+        return Ordering::Greater;
+    }
+    if a_hi < b_lo {
+        return Ordering::Less;
+    }
+    let five = u32::try_from(fives).unwrap_or(u32::MAX);
+    let a = Big::of(m).mul(sn).and_then(|a| a.mul(ed));
+    let b = Big::of(en).mul(sd);
+    let (a, b) = if delta > 0 {
+        (a.and_then(|a| a.mul_pow5(five)), b)
+    } else {
+        (a, b.and_then(|b| b.mul_pow5(five)))
+    };
+    let by = u32::try_from(shift.unsigned_abs()).unwrap_or(u32::MAX);
+    let (a, b) = match (a, b) {
+        (Some(a), Some(b)) if shift >= 0 => (a.shl(by), Some(b)),
+        (Some(a), Some(b)) => (Some(a), b.shl(by)),
+        _ => (None, None),
+    };
+    match (a, b) {
+        (Some(a), Some(b)) => a.cmp(&b),
+        // past the limbs, which the bounds above rule out: the side that passed is the larger
+        (None, _) => Ordering::Greater,
+        (_, None) => Ordering::Less,
+    }
 }
 
 /// Kani proofs of [Wide]'s arithmetic on `u8` limbs, against `u64` arithmetic: a product of three, the shift and the

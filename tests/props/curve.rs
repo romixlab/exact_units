@@ -29,7 +29,8 @@ const ROUNDINGS: [Rounding; 5] = [
 
 /// A `Fraction` as a big rational.
 fn big(f: Fraction) -> BigRational {
-    crate::reference::rational(f.is_negative(), f.numer(), f.denom())
+    let (n, d) = f.mantissa();
+    crate::reference::rational_exp10(f.is_negative(), n, d, f.exp10().into())
 }
 
 /// A big rational as a `Fraction`, where it fits.
@@ -592,6 +593,10 @@ fn the_certified_encode_refuses_what_it_cant_decide() {
     let enc = |y| pq.encode_certified(&NARROW10, y, Rounding::NearestEven, Domain::Signal);
     assert_eq!(enc(Fraction::int(10_001)), Err(EncodeError::OutOfRange));
     assert_eq!(enc(Fraction::int(-1)), Err(EncodeError::OutOfRange));
+    // a light with no plain terms in u128, 10⁻⁵⁰ cd/m² past black: the interval's order can't take it
+    let past = Fraction::pow10(-50);
+    assert!(past.denom().is_none());
+    assert_eq!(enc(past), Err(EncodeError::NotExact));
     // the tie between codes 500 and 501, bounded at 128 bits; a rational from its f64 bounds' midpoint sits within
     // one f64 gap of it, so the 8-bit interval holds it and can't decide
     let half = Fraction::new(2 * (500 - 64) + 1, 2 * 876);

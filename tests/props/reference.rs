@@ -227,11 +227,139 @@ pub(crate) fn rational(neg: bool, num: u128, den: u128) -> num_rational::BigRati
     num_rational::BigRational::new(if neg { -n } else { n }, den.into())
 }
 
-/// Whether `r` in lowest terms has a numerator and a denominator of at most `u128::MAX`.
+/// `±num/den · 10^exp` as an exact rational, in lowest terms.
 #[cfg(not(any(kani, fuzzing)))]
-pub(crate) fn fits_u128(r: &num_rational::BigRational) -> bool {
-    let max = num_bigint::BigInt::from(u128::MAX);
-    r.numer().magnitude() <= max.magnitude() && *r.denom() <= max
+pub(crate) fn rational_exp10(
+    neg: bool,
+    num: u128,
+    den: u128,
+    exp: i64,
+) -> num_rational::BigRational {
+    rational(neg, num, den) * pow10(exp)
+}
+
+/// `10^e` as an exact rational.
+#[cfg(not(any(kani, fuzzing)))]
+pub(crate) fn pow10(e: i64) -> num_rational::BigRational {
+    let p = num_rational::BigRational::from_integer(
+        num_bigint::BigInt::from(10).pow(u32::try_from(e.unsigned_abs()).unwrap_or(u32::MAX)),
+    );
+    if e < 0 { p.recip() } else { p }
+}
+
+/// A fraction's canonical form, `(negative, num, den, exp)` with `±num/den · 10^exp` the value: `num` and `den` in
+/// lowest terms below `2^bits`, `exp` in `lo..=hi`, the one nearest the value's power of 5. By bisection for the ends of
+/// the exponents where each part fits, independent of the crate's normalisation; `None` where no exponent fits.
+#[cfg(not(any(kani, fuzzing)))]
+pub(crate) fn canonical(
+    r: &num_rational::BigRational,
+    bits: u32,
+    lo: i64,
+    hi: i64,
+) -> Option<(bool, num_bigint::BigInt, num_bigint::BigInt, i64)> {
+    use num_bigint::{BigInt, Sign};
+    let zero = BigInt::from(0);
+    if *r.numer() == zero {
+        return Some((false, zero, BigInt::from(1), 0));
+    }
+    let neg = r.numer().sign() == Sign::Minus;
+    let r = if neg { -r } else { r.clone() };
+    // r = p/q · 2^t2 · 5^t5 with p, q prime to 10 (and to each other), so r / 10^e in lowest terms is p and q times
+    // the powers 2^(t2 − e) and 5^(t5 − e) on the side their sign says: no gcd per exponent
+    let strip = |x: &BigInt, f: u32| {
+        let (mut x, mut k) = (x.clone(), 0i64);
+        let f = BigInt::from(f);
+        while (&x % &f) == zero {
+            x /= &f;
+            k += 1;
+        }
+        (x, k)
+    };
+    let (p, n2) = strip(r.numer(), 2);
+    let (p, n5) = strip(&p, 5);
+    let (q, d2) = strip(r.denom(), 2);
+    let (q, d5) = strip(&q, 5);
+    let (t2, p5) = (n2 - d2, n5 - d5);
+    let limit = BigInt::from(1) << bits;
+    let five = |k: i64| BigInt::from(5).pow(u32::try_from(k).unwrap_or(u32::MAX));
+    let parts = |e: i64| {
+        let (a, b) = (t2 - e, p5 - e);
+        let (mut n, mut d) = (p.clone(), q.clone());
+        if a >= 0 {
+            n <<= a;
+        } else {
+            d <<= -a;
+        }
+        if b >= 0 {
+            n *= five(b);
+        } else {
+            d *= five(-b);
+        }
+        (n, d)
+    };
+    // the numerator of r / 10^e falls with e and the denominator rises, so each fits from or up to one exponent:
+    // the least e whose numerator fits and the largest whose denominator does, by bisection
+    let reach = i64::try_from(r.numer().bits() + r.denom().bits()).unwrap_or(i64::MAX)
+        + 2 * i64::from(bits)
+        + 4;
+    let (from, to) = ((p5 - reach).max(lo), (p5 + reach).min(hi));
+    if from > to {
+        return None;
+    }
+    let num_fits = |e: i64| parts(e).0 < limit;
+    let den_fits = |e: i64| parts(e).1 < limit;
+    if !num_fits(to) || !den_fits(from) {
+        return None;
+    }
+    let (mut a, mut b) = (from, to);
+    while a < b {
+        let mid = a + (b - a) / 2;
+        if num_fits(mid) { b = mid } else { a = mid + 1 }
+    }
+    let e_lo = a;
+    let (mut a, mut b) = (from, to);
+    while a < b {
+        let mid = a + (b - a + 1) / 2;
+        if den_fits(mid) { a = mid } else { b = mid - 1 }
+    }
+    let e_hi = a;
+    if e_lo > e_hi {
+        return None;
+    }
+    let e = p5.clamp(lo, hi).clamp(e_lo, e_hi);
+    let (n, d) = parts(e);
+    Some((neg, n, d, e))
+}
+
+/// `r` rounded to an integer by `mode`, exactly.
+#[cfg(not(any(kani, fuzzing)))]
+pub(crate) fn round_rational(r: &num_rational::BigRational, mode: Rounding) -> num_bigint::BigInt {
+    use num_bigint::BigInt;
+    use num_rational::BigRational;
+    let f = r.floor().to_integer();
+    let rem = r - BigRational::from_integer(f.clone());
+    if rem == BigRational::from_integer(0.into()) {
+        return f;
+    }
+    let half = BigRational::new(1.into(), 2.into());
+    let up = match mode {
+        Rounding::Floor => false,
+        Rounding::Ceil => true,
+        Rounding::Truncate => *r.numer() < BigInt::from(0),
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
+            match rem.cmp(&half) {
+                core::cmp::Ordering::Less => false,
+                core::cmp::Ordering::Greater => true,
+                core::cmp::Ordering::Equal => match mode {
+                    Rounding::NearestAway => *r.numer() > BigInt::from(0),
+                    // f is the floor, so a tie towards +∞ is always up
+                    Rounding::NearestCeil => true,
+                    _ => &f % 2 != BigInt::from(0),
+                },
+            }
+        }
+    };
+    if up { f + 1 } else { f }
 }
 
 /// The order of `a` against `10^(n/d)`, `d > 0`, exactly: `a^d` against `10^n` in big integers. A gain is above 0,

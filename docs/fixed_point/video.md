@@ -191,13 +191,13 @@ How it decides:
 
 The tests check it on every input where something else knows the answer. It equals the exact encode wherever that answers, at every code's light and every tie's. It never contradicts the `f64` edge. And it decides the ties the `f64` edge can only name, and whole cd/m² across the range.
 
-`CurveDef::decode_interval(x, bits)` gives the interval itself as an `Enclosure`. It compares exactly against a `Fraction` and gives `f64` bounds rounded outward. The decode stays an edge: PQ's light between black and white has no exact value, only bounds.
+`CurveDef::decode_interval(x, bits)` gives the interval itself as an `Enclosure`. It compares exactly against any `Fraction`, also one whose plain terms pass `u128`, and gives `f64` bounds rounded outward. The decode stays an edge: PQ's light between black and white has no exact value, only bounds.
 
 What it costs, against the certified `f64` edge (`from_light_f64`):
 
 | | Float-free certified | `f64` edge |
 |---|---|---|
-| Flash on a Cortex-M4F, one PQ encode, `opt-level = "s"`, LTO | 49 300 B | 47 290 B |
+| Flash on a Cortex-M4F, one PQ encode, `opt-level = "s"`, LTO | 62 920 B | 59 900 B |
 | Time per PQ encode on an x86-64 desktop | about 0.4 ms | about 9 µs |
 | Needs | integers | `libm`, `f64` (in software on an M4F) |
 

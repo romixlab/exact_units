@@ -12,8 +12,8 @@ The data are from the atomic mass evaluation AME2020 (Wang et al., Chinese Phys.
 |---|---|---|---|
 | Binding energy, Q-value from mass excesses | yes | | |
 | A mass in u to an energy | | m_u | |
-| An energy in eV to a mass in kg | the factor e/c² | | the kilograms: no u128 fraction holds them |
-| Atoms in a gram | | m_u | the count: no u128 fraction holds it |
+| An energy in eV to a mass in kg | the factor e/c², and the kilograms | | |
+| Atoms in a gram | yes, with the named set's m_u | m_u | |
 | Activity A = ln 2 · N/T½ | N/T½ | | ln 2 |
 | Reaction rate σ·φ·N | yes | | |
 | Gy to Sv | ICRP 60's w_R | w_R named by its set (ICRP 103, ICRP 60) | ICRP 103 neutrons' w_R(E) |
@@ -101,26 +101,32 @@ A mass table and its m_u belong to one edition: the generic `S` is where the cod
 In `systems::Natural` ħ = c = 1, and since the 2019 SI e and c are exact, so an energy in eV is a mass with no measured constant at all. SI's eV and Natural's eV¹ are the same number:
 
 ```rust
-use exact_units::{Exact, Rounding, prefix::{Kilo, Milli}, units::{ElectronVolt, Gram}};
+use exact_units::{Exact, Rounding, prefix::{Kilo, Milli}};
+use exact_units::units::{ElectronVolt, Gram, Joule, Speed};
 use exact_units::systems::{Natural, Si, natural::NaturalElectronVolt};
 
 // Q of ²²⁶Ra's α decay, 4870.70313 keV
 let q = Exact::<ElectronVolt>::new_in::<Kilo>(487_070_313, 100_000);
 let natural = q.to_system::<Natural>().convert::<NaturalElectronVolt>().unwrap();
 assert_eq!(natural.get(), q.get());
-// as a mass: e/c² is 1.78·10⁻³⁶ kg per eV, so the kilograms need a float
+// as a mass, rounded once into an f64: e/c² is 1.78·10⁻³⁶ kg per eV
 let kg = natural.to::<Milli, i64>().unwrap()
     .to_system::<Si>().convert_rounded::<Gram, Kilo, f64>(Rounding::NearestEven).unwrap();
 assert!((kg.get() / 8.6828e-30 - 1.0).abs() < 1e-4);
+// and exactly: the joules over c², 8.68·10⁻³⁰ kg, a 59-bit numerator over 56 bits times 10⁻³⁰
+let c = Exact::<Speed>::int(299_792_458);
+let m = (q.convert::<Joule>().unwrap() / (c * c).unwrap()).unwrap().convert::<Gram>().unwrap();
+assert!((m.to_f64() / 1000.0 / kg.get() - 1.0).abs() < 1e-15);
+assert_eq!(format!("{:e}", m.rounded(4, Rounding::NearestEven)), "8.6828e-27 g");
 ```
 
-The exact way refuses rather than rounds: the joules of that Q over c², as a fraction of `u128`s, need a denominator near 10⁴⁷, and `Exact`'s division gives `None`.
+The exact value is a `Fraction` with its power of ten apart from its digits ([Range](../maths/fractions.md#range)): as a plain fraction of `u128`s it would need a denominator near 10⁴⁷.
 
 ## A gram of radium in becquerels
 
 The activity of N atoms with half-life T½ is A = λ·N, with λ = ln 2/T½. Each piece has its own status:
 
-- N = m/(A_r·m_u). The molar mass constant M_u = N_A·m_u would put N_A in and take it out again: N_A is exact by the SI, and M_u is measured since 2019 with m_u, 0.999 999 999 65(30) g/mol in CODATA 2018 and 1.000 000 001 05(31) g/mol in CODATA 2022, either side of the 1 g/mol it was before (`constants::MOLAR_MASS_CONSTANT` is N_A·m_u, exactly). One atom of ²²⁶Ra in grams, 3.75·10⁻²² g to 21 digits, needs a denominator near 10⁴², past a `u128` fraction, so the count is a float edge, far below the half-life's own 0.44 %.
+- N = m/(A_r·m_u). The molar mass constant M_u = N_A·m_u would put N_A in and take it out again: N_A is exact by the SI, and M_u is measured since 2019 with m_u, 0.999 999 999 65(30) g/mol in CODATA 2018 and 1.000 000 001 05(31) g/mol in CODATA 2022, either side of the 1 g/mol it was before (`constants::MOLAR_MASS_CONSTANT` is N_A·m_u, exactly). One atom of ²²⁶Ra in grams, 3.75·10⁻²² g to 21 digits, has a denominator near 10⁴², and is exact all the same: a `Fraction` keeps its power of ten apart from its digits ([Range](../maths/fractions.md#range)). So is the count N.
 - T½ of ²²⁶Ra is 1600(7) y (NUBASE2020, Table I), in NUBASE's year: 1 y = 365.2422 d (NUBASE2020, §2.3), the tropical year, not the Julian 365.25 d. The crate has no year, so the page declares this one, with `conventional` naming where its value comes from.
 - ln 2 is exact as a `Magnitude` symbol, but no run-time value carries a symbol, so A = ln 2 · N/T½ is a float edge.
 - Decays per second are an activity only by the named step `as_quantity::<Activity>()`. A plain s⁻¹ doesn't `convert` to Bq.
@@ -144,8 +150,10 @@ exact_units::unit! {
 
 let a_r = Exact::<Ratio>::new_in::<Micro>(226_025_408_186, 1000); // AME2020: M(²²⁶Ra) in µu
 let dalton = Exact::<Dalton>::int(1).convert_with::<Codata2018, Gram>().unwrap();
-assert!(dalton.scaled(a_r).is_none()); // one atom in grams: past a u128 fraction
-let atoms = 1.0 / (a_r.to_f64() * dalton.to_f64());
+let atom = dalton.scaled(a_r).unwrap(); // one atom in grams, 21 digits over 10⁴²
+let n = (Exact::<Gram>::int(1) / atom).unwrap().as_ratio(); // exact
+assert_eq!(format!("{:e}", n.rounded(4, Rounding::NearestEven)), "2.6644e21");
+let atoms = n.to_f64();
 
 let t_half = Exact::<YearNubase>::new_in::<Kilo>(16, 10).convert::<Second>().unwrap();
 assert_eq!(t_half, Exact::int(50_491_081_728));
@@ -211,6 +219,6 @@ The coefficients are a fit, and every fit is a convention: which nuclides, which
 ## What the crate doesn't do yet
 
 - **No dalton, barn, curie or year among the units.** Each is declared above with `unit!`. The year needs a convention named (NUBASE's 365.2422 d, the Julian 365.25 d).
-- **`Exact` holds a `u128` fraction, without an exponent.** Atomic-scale values in SI units (10⁻³⁰ kg with c² below it, one atom's mass in grams), don't fit, and the arithmetic gives `None`.
+- **`Exact` holds 38 significant digits on each side of its fraction.** Atomic-scale values in SI units fit, as its power of ten is apart. A chain of four or more measured constants multiplied together passes that, and the arithmetic gives `None`.
 - **No quantity for a reaction rate or a decay constant.** Both are s⁻¹, but neither is a frequency nor an activity.
 - **No exact cube root.** A^(1/3) is a float, and so is ln 2 times a run-time value.

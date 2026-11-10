@@ -1,6 +1,7 @@
 //! serde of a [Fraction] and an [Exact] as the number alone, in the unit itself: in a human-readable format the
 //! text `{:#}` writes for the number (`"333.(3)"`, `"80000000"`, `"1000/7919"`), an integer read too; in a binary
-//! one the triple `(negative, numerator, denominator)` in lowest terms.
+//! one the quadruple `(negative, numerator, denominator, exponent)`, the canonical form ([Fraction::mantissa],
+//! [Fraction::exp10]).
 
 use crate::{Exact, Fraction};
 use ::serde::de::{self, Deserialize, Deserializer, SeqAccess, Visitor};
@@ -12,7 +13,8 @@ impl Serialize for Fraction {
         if serializer.is_human_readable() {
             serializer.collect_str(self)
         } else {
-            (self.is_negative(), self.numer(), self.denom()).serialize(serializer)
+            let (num, den) = self.mantissa();
+            (self.is_negative(), num, den, self.exp10()).serialize(serializer)
         }
     }
 }
@@ -22,7 +24,7 @@ impl<'de> Deserialize<'de> for Fraction {
         if deserializer.is_human_readable() {
             deserializer.deserialize_any(TextVisitor)
         } else {
-            deserializer.deserialize_tuple(3, PartsVisitor)
+            deserializer.deserialize_tuple(4, PartsVisitor)
         }
     }
 }
@@ -83,20 +85,22 @@ impl<'de> Visitor<'de> for PartsVisitor {
     type Value = Fraction;
 
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("(negative, numerator, denominator) in lowest terms")
+        f.write_str("(negative, numerator, denominator, exponent) in the canonical form")
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Fraction, A::Error> {
-        let missing = || de::Error::custom("(negative, numerator, denominator): too few");
+        let missing = || de::Error::custom("(negative, numerator, denominator, exponent): too few");
         let neg: bool = seq.next_element()?.ok_or_else(missing)?;
         let num: u128 = seq.next_element()?.ok_or_else(missing)?;
         let den: u128 = seq.next_element()?.ok_or_else(missing)?;
-        let x = Fraction::from_parts(neg, num, den)
-            .ok_or_else(|| de::Error::custom("a fraction over 0"))?;
+        let exp: i32 = seq.next_element()?.ok_or_else(missing)?;
+        let x = Fraction::from_parts_exp10(neg, num, den, exp)
+            .ok_or_else(|| de::Error::custom("a fraction over 0, or one no form of which fits"))?;
         // one value has one form, as on the wire
-        if (x.is_negative(), x.numer(), x.denom()) != (neg, num, den) {
+        if (x.is_negative(), x.mantissa(), x.exp10()) != (neg, (num, den), exp) {
             return Err(de::Error::custom(format_args!(
-                "{}{num}/{den} is not in lowest terms (a zero is +0/1)",
+                "{}{num}e{exp}/{den} is not the canonical form (lowest terms, the power of ten the value's power of 5 \
+                 where it fits, a zero +0/1e0)",
                 if neg { "-" } else { "" }
             )));
         }
