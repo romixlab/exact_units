@@ -85,6 +85,31 @@ use exact_units::{Exact, units::{Hertz, Second}};
 let _ = Exact::<Hertz>::int(1).convert::<Second>();
 ```
 
+The steps between quantities are `Fixed`'s, with the same checks and the same compile errors ([Quantities](quantities.md)). `as_quantity::<Q>()` names the quantity down the tree or across a kind, `up()` goes back up with no number changed, and `to_system::<S>()` then `convert::<U2>()` crosses into another system of units, exactly or `None`:
+
+```rust
+use exact_units::{Exact, prefix::Kilo, quantities::Activity};
+use exact_units::units::{Becquerel, ElectronVolt, Per, Ratio, Second};
+use exact_units::systems::{Natural, natural::NaturalElectronVolt};
+
+// 10¹¹ reactions per second: at saturation, the product's activity
+let rate = Exact::<Per<Ratio, Second>>::int(100_000_000_000);
+let a = rate.as_quantity::<Activity>().convert::<Becquerel>().unwrap();
+assert_eq!(a.to_string(), "100 GBq");
+// an α decay's Q as a mass in Natural units, where c = 1
+let q = Exact::<ElectronVolt>::new_in::<Kilo>(487_070_313, 100_000);
+let m = q.to_system::<Natural>().convert::<NaturalElectronVolt>().unwrap();
+assert_eq!(m.get(), q.get());
+```
+
+A plain s⁻¹ doesn't `convert` to Bq, and an absorbed dose is no dose equivalent by any step:
+
+```rust,compile_fail
+use exact_units::{Exact, quantities::DoseEquivalent, units::Gray};
+
+let _ = Exact::<Gray>::int(1).as_quantity::<DoseEquivalent>();
+```
+
 Every operation refuses exactly the results that don't fit, in lowest terms. Multiply and divide cancel crosswise first. Add and subtract use Knuth's form with the cross terms in 256 bits, then reduce, so a sum that fits is never refused for a step that didn't. Comparing never overflows: its cross products are taken in 256 bits too. On a Cortex-M0, where those products are library calls, the bit lengths of the cross products decide first where they prove the order (a product of `x` and `y` has `bits(x) + bits(y) − 1` or `bits(x) + bits(y)` bits), which gives the same answer without multiplying. A compare with a `Fixed` does that on every target.
 
 ## To and from `Fixed`

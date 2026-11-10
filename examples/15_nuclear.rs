@@ -269,14 +269,15 @@ fn q_values() {
     }
 
     // E = mc² with c = 1: Q as a mass, by the exact factor e/c² of `systems::Natural`
-    let q = q_alpha.to::<Milli, i64>().unwrap();
-    let natural = q
+    let natural = q_alpha
         .to_system::<Natural>()
-        .convert::<NaturalElectronVolt, Milli, i64>()
+        .convert::<NaturalElectronVolt>()
         .unwrap();
-    assert_eq!(natural.get(), q.get()); // SI's eV and Natural's eV¹ are one number
+    assert_eq!(natural.get(), q_alpha.get()); // SI's eV and Natural's eV¹ are one number
     // into kg it needs a float: e/c² in kg per eV is 1.78·10⁻³⁶, no `Exact` of that size fits u128
     let defect = natural
+        .to::<Milli, i64>()
+        .unwrap()
         .to_system::<Si>()
         .convert_rounded::<Gram, Kilo, f64>(Rounding::NearestEven)
         .unwrap();
@@ -306,11 +307,14 @@ fn radium_activity() {
     let half_life = Exact::<YearNubase>::new_in::<Kilo>(16, 10);
     let seconds = half_life.convert::<Second>().unwrap();
     assert_eq!(seconds, Exact::int(50_491_081_728));
-    // N/T½ is exact; A = ln 2 · N/T½, and ln 2 is a `Magnitude` symbol that no run-time value carries: a float edge
+    // N/T½ is exact, and decays per second are an activity by the named step, not by `convert`
     let rate = (atoms / seconds).unwrap();
-    let per_s = Fixed::<Per<Ratio, Second>, One, f64>::try_new(rate.to_f64() * LN_2).unwrap();
-    // decays per second are an activity by the named step, not by `convert`
-    let activity: Fixed<Becquerel, One, f64> = per_s.as_quantity::<Activity>().convert().unwrap();
+    let per_t = rate
+        .as_quantity::<Activity>()
+        .convert::<Becquerel>()
+        .unwrap();
+    // A = ln 2 · N/T½, and ln 2 is a `Magnitude` symbol that no run-time value carries: a float edge
+    let activity = Fixed::<Becquerel, One, f64>::try_new(per_t.to_f64() * LN_2).unwrap();
     let curies: Fixed<Curie, One, f64> = activity.convert_rounded(Rounding::NearestEven).unwrap();
     println!("  A = {:.4e} Bq = {:.4} Ci", activity.get(), curies.get());
     // the curie was once "a gram of radium"; with today's half-life a gram is 1.1 % short of it
@@ -329,13 +333,12 @@ fn reaction_rate() {
         .unwrap();
     assert_eq!(rate, Exact::int(100_000_000_000));
     println!("  R = σ·φ·N = {rate}");
-    // at saturation the product's activity equals R; `Exact` has no `as_quantity`, so through a `Fixed`
-    let saturation: Fixed<Becquerel, One, u64> = rate
-        .to::<One, u64>()
-        .unwrap()
+    // at saturation the product's activity equals R: a reaction rate becomes an activity by the named step
+    let saturation = rate
         .as_quantity::<Activity>()
-        .convert()
+        .convert::<Becquerel>()
         .unwrap();
+    assert_eq!(saturation, Exact::int(100_000_000_000));
     println!("  saturation activity: {saturation}");
 }
 

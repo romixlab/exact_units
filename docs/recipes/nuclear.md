@@ -74,15 +74,16 @@ A mass table and its m_u·c² belong to one edition. The crate's own [sets of co
 In `systems::Natural` ħ = c = 1, and since the 2019 SI e and c are exact, so an energy in eV is a mass with no measured constant at all. SI's eV and Natural's eV¹ are the same number:
 
 ```rust
-use exact_units::{Fixed, Rounding, prefix::{Kilo, Milli}, units::{ElectronVolt, Gram}};
+use exact_units::{Exact, Rounding, prefix::{Kilo, Milli}, units::{ElectronVolt, Gram}};
 use exact_units::systems::{Natural, Si, natural::NaturalElectronVolt};
 
-// Q of ²²⁶Ra's α decay, 4870.70313 keV, in meV
-let q = Fixed::<ElectronVolt, Milli, i64>::new(4_870_703_130);
-let natural = q.to_system::<Natural>().convert::<NaturalElectronVolt, Milli, i64>().unwrap();
+// Q of ²²⁶Ra's α decay, 4870.70313 keV
+let q = Exact::<ElectronVolt>::new_in::<Kilo>(487_070_313, 100_000);
+let natural = q.to_system::<Natural>().convert::<NaturalElectronVolt>().unwrap();
 assert_eq!(natural.get(), q.get());
 // as a mass: e/c² is 1.78·10⁻³⁶ kg per eV, so the kilograms need a float
-let kg = natural.to_system::<Si>().convert_rounded::<Gram, Kilo, f64>(Rounding::NearestEven).unwrap();
+let kg = natural.to::<Milli, i64>().unwrap()
+    .to_system::<Si>().convert_rounded::<Gram, Kilo, f64>(Rounding::NearestEven).unwrap();
 assert!((kg.get() / 8.6828e-30 - 1.0).abs() < 1e-4);
 ```
 
@@ -120,8 +121,9 @@ let atoms = (moles * n_a).unwrap().convert::<Ratio>().unwrap();
 let t_half = Exact::<YearNubase>::new_in::<Kilo>(16, 10).convert::<Second>().unwrap();
 assert_eq!(t_half, Exact::int(50_491_081_728));
 
-let per_s = Fixed::<Per<Ratio, Second>, One, f64>::try_new((atoms / t_half).unwrap().to_f64() * LN_2).unwrap();
-let a: Fixed<Becquerel, One, f64> = per_s.as_quantity::<Activity>().convert().unwrap();
+// N/T½ stays exact, an activity by the named step; × ln 2 is the float edge
+let per_t = (atoms / t_half).unwrap().as_quantity::<Activity>().convert::<Becquerel>().unwrap();
+let a = Fixed::<Becquerel, One, f64>::try_new(per_t.to_f64() * LN_2).unwrap();
 let ci: Fixed<Curie, One, f64> = a.convert_rounded(Rounding::NearestEven).unwrap();
 // the curie was once "a gram of radium": with today's half-life a gram is 1.1 % short of it
 assert!(ci.get() > 0.988 && ci.get() < 0.989);
@@ -148,7 +150,7 @@ let rate = ((sigma * phi).unwrap() * targets).unwrap().convert::<Per<Ratio, Seco
 assert_eq!(rate, Exact::int(100_000_000_000));
 ```
 
-The result is a plain s⁻¹. A reaction rate isn't periodic, so it isn't a frequency in Hz, and it isn't decays of a radionuclide, so it isn't an activity in Bq (SI Brochure, 9th ed., Table 4, note d). At saturation, the activity of the product equals that rate. That is a statement of physics, so it is the named step `as_quantity::<Activity>()`, which `Exact` doesn't have yet: go through a `Fixed` (`rate.to::<One, u64>()`).
+The result is a plain s⁻¹. A reaction rate isn't periodic, so it isn't a frequency in Hz, and it isn't decays of a radionuclide, so it isn't an activity in Bq (SI Brochure, 9th ed., Table 4, note d). At saturation, the activity of the product equals that rate. That is a statement of physics, so it is the named step `rate.as_quantity::<Activity>()`, then `convert::<Becquerel>()`.
 
 ## Gy is not Sv
 
@@ -192,7 +194,6 @@ The coefficients are a fit, and every fit is a convention: which nuclides, which
 - **m_u·c² and M_u have no set.** `constants::Constants` gives μ₀ and G only, and `Magnitude` has no symbol for the dalton, so a mass in u reaches an energy only through a number you write.
 - **No dalton, barn, curie or year among the units.** Each is declared above with `unit!`. The year needs a convention named (NUBASE's 365.2422 d, the Julian 365.25 d).
 - **`Exact` holds a `u128` fraction, without an exponent.** Atomic-scale values in SI units (10⁻³⁰ kg with c² below it), or N for a gram with CODATA's M_u, don't fit, and the arithmetic gives `None`.
-- **`Exact` has no `as_quantity` and no `to_system`.** An activity or a crossing to Natural goes through a `Fixed`.
 - **No quantity for a reaction rate or a decay constant.** Both are s⁻¹, but neither is a frequency nor an activity.
 - **No weighting step from Gy to Sv,** and one quantity, `DoseEquivalent`, stands for ICRP's equivalent dose (w_R) and the CIPM's dose equivalent (Q).
 - **No exact cube root.** A^(1/3) is a float, and so is ln 2 times a run-time value.

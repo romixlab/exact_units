@@ -120,6 +120,8 @@ pub use dim::DimWire;
 pub use dim::{BaseDef, BaseExp, BaseSource, Bases, Dim, Exp, MAX_TRUE_BASES};
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use dim::{BaseDefOwned, BaseExpOwned, DimOwned, DimWireOwned, NotCanonical};
+#[doc(inline)]
+pub use exact::Crossing as ExactCrossing;
 #[doc(hidden)]
 pub use exact::Fraction8;
 #[doc(hidden)]

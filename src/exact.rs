@@ -63,6 +63,7 @@ macro_rules! bit_length_halved {
 mod compare;
 mod decimal;
 mod fraction;
+mod steps;
 mod text;
 
 /// Not API: the order of a [Fixed]'s and an [Exact]'s magnitudes in their parts, the fast path by bit length and the
@@ -76,6 +77,7 @@ mod tolerance;
 
 use decimal::{Expansion, write_fraction};
 pub use fraction::{Fraction, Fraction8};
+pub use steps::Crossing;
 #[cfg(feature = "serde")]
 pub(crate) use text::read as read_text;
 pub use text::{ParseExactError, ParseFractionError};

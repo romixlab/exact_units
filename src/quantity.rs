@@ -61,7 +61,7 @@ use core::fmt;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
 
-mod steps;
+pub(crate) mod steps;
 
 /// How many levels a walk up a quantity tree follows: deeper data (or a cycle in data read at run time) is refused.
 pub const MAX_QUANTITY_DEPTH: usize = 32;

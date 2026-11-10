@@ -1305,7 +1305,7 @@ mod arith {
 
 /// The factor between two scales and storages, worked out at compile time by [Fixed::to].
 #[derive(Copy, Clone)]
-struct Conversion {
+pub(crate) struct Conversion {
     num: u128,
     den: u128,
     /// `num` and `den` in the width of the multiply: `i64` where not `wide`, `i128` (`num` only, `den` may be past it)
@@ -1404,9 +1404,15 @@ impl Conversion {
         Self::by::<T, T2>(m.resolve::<C>().value, rounding)
     }
 
-    /// The exact factor of [across](Self::across).
-    const fn across_factor<S: crate::System, U: Unit, P: FixedScale, U2: Unit, P2: FixedScale>()
-    -> Magnitude {
+    /// The exact factor of [across](Self::across), also [Exact](crate::Exact)'s crossing's (with `One` for both
+    /// scales).
+    pub(crate) const fn across_factor<
+        S: crate::System,
+        U: Unit,
+        P: FixedScale,
+        U2: Unit,
+        P2: FixedScale,
+    >() -> Magnitude {
         assert!(
             !U2::DIM.has_true_exps() || U2::DIM.system().same(&crate::SystemRef::Id(S::ID)),
             "to_system::<S>() converts into a unit of S: the target unit is of another system"

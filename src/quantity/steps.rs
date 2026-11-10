@@ -15,6 +15,32 @@ const fn same_factor<U: Unit, U2: Unit>() -> bool {
     }
 }
 
+/// The check of `as_quantity` from `U` to `Q`, for [Fixed] and [Exact](crate::Exact): a compile error where `Q` is
+/// not on one path with `U`'s quantity.
+pub(crate) const fn check_as_quantity<U: Unit, Q: QuantitySpec>() {
+    assert!(
+        U::QUANTITY.reaches_typed(Q::DEF),
+        "as_quantity: Q is not on one path with the unit's quantity (a sibling, or another tree)"
+    );
+}
+
+/// The checks of `up` from `U` to `U2`, for [Fixed] and [Exact](crate::Exact): a compile error for another
+/// dimension, another factor or a quantity below this one.
+pub(crate) const fn check_up<U: Unit, U2: Unit>() {
+    assert!(
+        U::DIM.same_typed(U2::DIM),
+        "up: the target unit has another dimension"
+    );
+    assert!(
+        same_factor::<U, U2>(),
+        "up: the target unit has another factor to SI (convert changes the number)"
+    );
+    assert!(
+        U::QUANTITY.converts_typed(U2::QUANTITY),
+        "up: the target's quantity is not this one or above it (as_quantity is the step down)"
+    );
+}
+
 impl<U: Unit, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// The same number as a `Q`, the named step down the tree of quantities or across a kind
     /// ([reaches](crate::QuantityExpr::reaches)): a length as a height, a derived `kg·m²/s²` as a kinetic energy,
@@ -43,12 +69,7 @@ impl<U: Unit, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// ```
     #[inline(always)]
     pub fn as_quantity<Q: QuantitySpec>(self) -> Fixed<Of<Q, U::Bare>, P, T, B> {
-        const {
-            assert!(
-                U::QUANTITY.reaches_typed(Q::DEF),
-                "as_quantity: Q is not on one path with the unit's quantity (a sibling, or another tree)"
-            );
-        }
+        const { check_as_quantity::<U, Q>() }
         Fixed::new_unchecked(self.get())
     }
 
@@ -76,20 +97,7 @@ impl<U: Unit, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     /// ```
     #[inline(always)]
     pub fn up<U2: Unit>(self) -> Fixed<U2, P, T, B> {
-        const {
-            assert!(
-                U::DIM.same_typed(U2::DIM),
-                "up: the target unit has another dimension"
-            );
-            assert!(
-                same_factor::<U, U2>(),
-                "up: the target unit has another factor to SI (convert changes the number)"
-            );
-            assert!(
-                U::QUANTITY.converts_typed(U2::QUANTITY),
-                "up: the target's quantity is not this one or above it (as_quantity is the step down)"
-            );
-        }
+        const { check_up::<U, U2>() }
         Fixed::new_unchecked(self.get())
     }
 }
