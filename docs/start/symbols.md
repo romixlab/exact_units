@@ -57,6 +57,8 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `C` | `Coulomb` | `electrical` | SI |
 | `Cal_IT` | `CalorieFoodIt` | `customary` | none |
 | `Cal_th` | `CalorieFoodTh` | `customary` | none |
+| `Ci` | `Curie` | `nuclear` | none |
+| `Da` | `Dalton` | `nuclear` | none |
 | `F` | `Farad` | `electrical` | SI |
 | `Gy` | `Gray` | `radiation` | SI |
 | `H` | `Henry` | `electrical` | SI |
@@ -66,6 +68,7 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `L` | `Litre` | `mechanical` | SI |
 | `N` | `Newton` | `mechanical` | SI |
 | `Pa` | `Pascal` | `mechanical` | SI |
+| `R` | `Roentgen` | `nuclear` | none |
 | `S` | `Siemens` | `electrical` | SI |
 | `Sv` | `Sievert` | `radiation` | SI |
 | `T` | `Tesla` | `electrical` | SI |
@@ -77,6 +80,7 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `Wb` | `Weber` | `electrical` | SI |
 | `at` | `AtmosphereTechnical` | `customary` | none |
 | `atm` | `AtmosphereStandard` | `customary` | none |
+| `b` | `Barn` | `nuclear` | none |
 | `bit` | `Bit` | `information` | SI and binary |
 | `block` | `Block` | `counting` | none |
 | `cal_IT` | `CalorieIt` | `customary` | none |
@@ -134,6 +138,7 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `quad` | `Quad` | `customary` | none |
 | `rad` | `Radian` | `angle` | SI |
 | `record` | `Record` | `counting` | none |
+| `rem` | `Rem` | `nuclear` | none |
 | `rev` | `Turn` | `angle` | none |
 | `ro` | `Rood` | `customary` | none |
 | `row` | `Row` | `counting` | none |
@@ -187,6 +192,7 @@ Each reads more than one way, so `q!` refuses it and names the readings. Write t
 | `Np` | `Neper`, `NeperLoss` | `q!(1 Neper)`, `q!(1 NeperLoss)` |
 | `PS` | `HorsepowerMetric`, peta `Siemens` | `q!(1 HorsepowerMetric)` |
 | `RT` | `TonRegister`, ronna `Tesla` | `q!(1 TonRegister)` |
+| `a` | `JulianYear`, `GregorianYear` | `q!(1 JulianYear)`, `q!(1 GregorianYear)` |
 | `ac` | `AcreInternational`, `AcreUsSurvey` | `q!(1 AcreInternational)`, `q!(1 AcreUsSurvey)` |
 | `bbl` | `BarrelPetroleum`, `BarrelFermentedLiquor`, `BarrelLiquidState`, `BarrelCistern`, `BarrelProofSpirits`, `BarrelDry`, `BarrelCranberry` | `q!(1 BarrelPetroleum)`, `q!(1 BarrelFermentedLiquor)`, `q!(1 BarrelLiquidState)`, `q!(1 BarrelCistern)`, `q!(1 BarrelProofSpirits)`, `q!(1 BarrelDry)`, `q!(1 BarrelCranberry)` |
 | `bu` | `BushelUs`, `BushelImperial` | `q!(1 BushelUs)`, `q!(1 BushelImperial)` |
@@ -219,11 +225,12 @@ Each reads more than one way, so `q!` refuses it and names the readings. Write t
 | `pt` | `PointDtp`, `PointPrinters`, `PintUsLiquid`, `PintUsDry`, `PintImperial` | `q!(1 PointDtp)`, `q!(1 PointPrinters)`, `q!(1 PintUsLiquid)`, `q!(1 PintUsDry)`, `q!(1 PintImperial)` |
 | `qr` | `QuarterImperialVolume`, `QuarterMass` | `q!(1 QuarterImperialVolume)`, `q!(1 QuarterMass)` |
 | `qt` | `QuartUsLiquid`, `QuartUsDry`, `QuartImperial` | `q!(1 QuartUsLiquid)`, `q!(1 QuartUsDry)`, `q!(1 QuartImperial)` |
-| `rd` | `RodInternational`, `RodUsSurvey` | `q!(1 RodInternational)`, `q!(1 RodUsSurvey)` |
+| `rd` | `Rad`, `RodInternational`, `RodUsSurvey` | `q!(1 Rad)`, `q!(1 RodInternational)`, `q!(1 RodUsSurvey)` |
 | `tbsp` | `TablespoonUs`, `TablespoonFda` | `q!(1 TablespoonUs)`, `q!(1 TablespoonFda)` |
 | `thm` | `ThermEc`, `ThermUs` | `q!(1 ThermEc)`, `q!(1 ThermUs)` |
 | `ton` | `TonWater`, `TonLong` | `q!(1 TonWater)`, `q!(1 TonLong)` |
 | `tsp` | `TeaspoonUs`, `TeaspoonFda` | `q!(1 TeaspoonUs)`, `q!(1 TeaspoonFda)` |
+| `y` | `TropicalYearNubase2020` | `q!(1 TropicalYearNubase2020)` |
 
 <!-- end: refused -->
 
@@ -332,9 +339,11 @@ These `unit!` symbols are no `q!` symbol: a compound one is written with operato
 | W/sr | `RadiantIntensity` |
 | W/(m²·sr) | `Radiance` |
 | keV/µm | `KiloElectronVoltPerMicrometer` |
-| C/kg | `Exposure` |
+| C/kg | `CoulombPerKilogram` |
 | Gy/s | `GrayPerSecond` |
 | Sv/h | `SievertPerHour` |
+| a (Gregorian) | `GregorianYear` |
+| y (NUBASE2020) | `TropicalYearNubase2020` |
 | ln 2 | `Ln2` |
 | ln 10 | `Ln10` |
 | cable (US) | `CableUs` |

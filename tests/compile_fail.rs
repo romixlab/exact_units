@@ -82,6 +82,16 @@ fn compile_fail_feature_off() {
     t.compile_fail("tests/compile_fail/q_feature_off.rs");
 }
 
+/// "rd" with both `nuclear` and `customary` on: the rad (UNIT-14) and the international rod share the symbol.
+#[cfg(all(feature = "q", feature = "nuclear", feature = "customary"))]
+#[test]
+fn compile_fail_q_nuclear_customary() {
+    require_rust_src();
+    let t = trybuild::TestCases::new();
+    t.pass("tests/compile_fail/pass_marker.rs");
+    t.compile_fail("tests/compile_fail/q_symbols_nuclear.rs");
+}
+
 /// A window from a tolerance and `is_within` on a float storage (NUM-23), with the pass fixture: the refusal is a
 /// `const` panic, post-monomorphization.
 #[cfg(feature = "dimensionless")]

@@ -24,7 +24,7 @@
 //! Each number names its table. Where the crate has no place for something (an activity from an `Exact`), the
 //! comment says so where the example works around it.
 //!
-//! `cargo run --example 15_nuclear --features radiation,systems,time,chemical,dimensionless,mechanical,libm,q`
+//! `cargo run --example 15_nuclear --features radiation,nuclear,systems,time,chemical,dimensionless,mechanical,libm,q`
 
 #![expect(
     clippy::print_stdout,
@@ -44,29 +44,14 @@ use exact_units::quantities::Activity;
 use exact_units::radiation::{Icrp60, Icrp103};
 use exact_units::systems::{Natural, Si, natural::NaturalElectronVolt};
 use exact_units::units::{
-    Becquerel, ElectronVolt, EquivalentDose, Gram, Gray, Joule, Per, Ratio, Second, Speed,
+    Barn, Becquerel, Curie, Dalton, ElectronVolt, EquivalentDose, Gram, Gray, Joule, Per, Ratio,
+    Second, Speed, TropicalYearNubase2020,
 };
 use exact_units::{Exact, Fixed, Fraction, Prefix, Rounding, exact};
 
 exact_units::unit! {
-    /// The dalton (unified atomic mass unit), 1 Da = 1 u = m_u: one twelfth of a ¹²C atom, measured in kg, so its
-    /// scale keeps the symbol m_u and a value in kg comes only from a named set (SI Brochure, 9th ed. V4.01, table 8).
-    struct Dalton = "Da" (long "dalton"), [kg 1], Exact(1 / 1, m_u 1);
-
-    /// The barn, 1 b = 100 fm² = 10⁻²⁸ m² (SI Brochure, 9th ed. V4.01, table 8): a nuclear cross section.
-    struct Barn = "b" (long "barn"), [m 2], Pow10(-28);
-
     /// A fluence rate in particles per square centimetre per second, cm⁻²·s⁻¹ (10⁴ m⁻²·s⁻¹).
     struct FluenceRate = "cm⁻²·s⁻¹" (ascii "cm^-2.s^-1"), [m -2, s -1], Pow10(4);
-
-    /// The curie, 3.7·10¹⁰ Bq exactly (12th CGPM, 1964, Resolution 7; SI Brochure, 9th ed. V4.01, appendix 1).
-    struct Curie = "Ci" (long "curie"), [s -1] quantity Activity, Exact(37000000000 / 1);
-
-    /// NUBASE2020's year, 1 y = 365.2422 d = 31 556 926.08 s (Kondev et al., Chinese Phys. C 45, 030001, 2021,
-    /// §2.3): the tropical year as NUBASE fixes it, not the Julian year of 365.25 d. NUBASE prints "= 31 556 926 s"
-    /// beside it, 0.08 s short of its own 365.2422 d; the day count is the definition here.
-    struct YearNubase = "y" (long "year (NUBASE2020)", prefixes only [Kilo, Mega, Giga]), [s 1],
-        Exact(3155692608 / 100), conventional("NUBASE2020, section 2.3", 2021);
 }
 
 /// An atomic mass from AME2020 in µu, as the ratio M/m_u it is: a mass spectrometer measures ratios of masses.
@@ -337,7 +322,7 @@ fn radium_activity() {
     let atoms = count.to_f64();
 
     // T½ = 1600(7) y, NUBASE2020 Table I, in NUBASE's year
-    let half_life = Exact::<YearNubase>::new_in::<Kilo>(16, 10);
+    let half_life = Exact::<TropicalYearNubase2020>::new_in::<Kilo>(16, 10);
     let seconds = half_life.convert::<Second>().unwrap();
     assert_eq!(seconds, Exact::int(50_491_081_728));
     // N/T½ is exact; A = ln 2 · N/T½, and ln 2 is a `Magnitude` symbol that no run-time value carries: a float edge

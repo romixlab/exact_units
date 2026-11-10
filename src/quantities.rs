@@ -15,6 +15,7 @@
 //!   kinds in the same shape ([AbsorbedDoseRate], [KermaRate], [DoseEquivalentRate], [EquivalentDoseRate],
 //!   [EffectiveDoseRate]).
 //! - [LinearEnergyTransfer], keV/µm: not a force.
+//! - [Exposure], C/kg: ionizing radiation's charge per mass of air, not a specific charge.
 //! - Electrical: [Resistance] (`Ohm`) and [Conductance] (`Siemens`), apart from V/A and A/V; [Power] with
 //!   [ApparentPower] (`VoltAmpere`) and [ReactivePower] (`Var`).
 //! - Electromagnetic, the SI side of Gaussian's rows ([systems](crate::systems)): [ElectricCurrent],
@@ -120,6 +121,11 @@ crate::quantity! {
     /// Linear energy transfer, L (ISO 80000-10): energy a charged particle loses per length of its track, in keV/µm.
     /// A kind of its own, not a force, though both are J/m.
     pub struct LinearEnergyTransfer = kind [kg 1, m 1, s -2];
+
+    /// Exposure, X (ISO 80000-10): ionizing radiation's charge liberated per mass of dry air,
+    /// [CoulombPerKilogram](crate::units::CoulombPerKilogram)'s and the röntgen's. A kind of its own, not a
+    /// specific charge, though both are C/kg.
+    pub struct Exposure = kind [kg -1, s 1, a 1];
 
     /// Resistance, R (ISO 80000-6): a component's V/A, not an amplifier's transimpedance.
     pub struct Resistance = kind [kg 1, m 2, s -3, a -2];

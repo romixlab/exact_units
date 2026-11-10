@@ -447,7 +447,7 @@ fn derived_names() {
         "Irradiance",
         "RadiantIntensity",
         "Radiance",
-        "Exposure",
+        "CoulombPerKilogram",
         "GrayPerSecond",
         "SievertPerHour",
     ] {
@@ -611,5 +611,82 @@ fn dose_rates_are_kinds() {
     assert_eq!(
         <units::GrayPerSecond as Unit>::QUANTITY,
         QuantityExpr::of::<quantities::AbsorbedDoseRate>()
+    );
+}
+
+/// The nuclear group (UNIT-14): dimensions, quantities and the exact conversions each named unit was built for.
+#[cfg(feature = "nuclear")]
+#[test]
+fn nuclear_units() {
+    use exact_units::{Fixed, QuantityExpr, prefix::One, quantities};
+    use units::{
+        Barn, Becquerel, CoulombPerKilogram, Curie, Dalton, Gram, Gray, GregorianYear, JulianYear,
+        Rad, Rem, Roentgen, Second, Sievert, TropicalYearNubase2020,
+    };
+
+    // the dalton has no quantity line, so it shares a gram's own: the two convert directly
+    assert_eq!(<Dalton as Unit>::DIM, <Gram as Unit>::DIM);
+    assert_eq!(<Dalton as Unit>::QUANTITY, <Gram as Unit>::QUANTITY);
+
+    // the barn is an area, 10⁻²⁸ m², the dimension's own quantity, like `units::Area`
+    assert_eq!(<Barn as Unit>::DIM, <units::Area as Unit>::DIM);
+    assert_eq!(<Barn as Unit>::QUANTITY, <units::Area as Unit>::QUANTITY);
+    assert_eq!(
+        <Barn as Unit>::EXPR.magnitude(),
+        Some(exact_units::Magnitude::pow10(-28))
+    );
+
+    // the curie is an activity, exactly 3.7e10 Bq
+    assert_eq!(
+        <Curie as Unit>::QUANTITY,
+        QuantityExpr::of::<quantities::Activity>()
+    );
+    assert_eq!(
+        Fixed::<Curie, One, u64>::new(1).convert::<Becquerel, One, u64>(),
+        Some(Fixed::new(37_000_000_000))
+    );
+
+    // the rad is an absorbed dose, 0.01 Gy; its symbol is "rd", not "rad" (the radian's)
+    assert_eq!(
+        <Rad as Unit>::QUANTITY,
+        QuantityExpr::of::<quantities::AbsorbedDose>()
+    );
+    assert_eq!(
+        Fixed::<Gray, One, u32>::new(1).convert::<Rad, One, u32>(),
+        Some(Fixed::new(100))
+    );
+
+    // the rem is a dose equivalent, 0.01 Sv, the bare sievert's own quantity
+    assert_eq!(
+        <Rem as Unit>::QUANTITY,
+        QuantityExpr::of::<quantities::DoseEquivalent>()
+    );
+    assert_eq!(<Rem as Unit>::QUANTITY, <Sievert as Unit>::QUANTITY);
+    assert_eq!(
+        Fixed::<Sievert, One, u32>::new(1).convert::<Rem, One, u32>(),
+        Some(Fixed::new(100))
+    );
+
+    // the röntgen is an exposure, 2.58e-4 C/kg exactly, the unit marker CoulombPerKilogram's quantity
+    assert_eq!(
+        <Roentgen as Unit>::QUANTITY,
+        QuantityExpr::of::<quantities::Exposure>()
+    );
+    assert_eq!(
+        <CoulombPerKilogram as Unit>::QUANTITY,
+        QuantityExpr::of::<quantities::Exposure>()
+    );
+    assert_eq!(<Roentgen as Unit>::DIM, <CoulombPerKilogram as Unit>::DIM);
+
+    // three years, never a bare one (rule 5): distinct symbols, distinct exact seconds
+    assert_eq!(<JulianYear as Unit>::EXPR.factor(), 31_557_600.0);
+    assert_eq!(<GregorianYear as Unit>::EXPR.factor(), 31_556_952.0);
+    assert_eq!(
+        <TropicalYearNubase2020 as Unit>::EXPR.magnitude(),
+        Some(exact_units::Magnitude::ratio(3_155_692_608, 100))
+    );
+    assert_eq!(
+        Fixed::<JulianYear, One, u32>::new(1).convert::<Second, One, u32>(),
+        Some(Fixed::new(31_557_600))
     );
 }

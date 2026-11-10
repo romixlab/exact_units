@@ -20,7 +20,8 @@
     feature = "q",
     feature = "std",
     feature = "quantities",
-    feature = "customary"
+    feature = "customary",
+    feature = "nuclear"
 ))]
 #![expect(
     clippy::arithmetic_side_effects,
@@ -917,13 +918,13 @@ fn text_reader_agrees() {
             }
             #[rustfmt::skip]
             let r = markers!(
-                Absorbance, Ampere, Arcminute, Arcsecond, AtmosphereStandard, AtmosphereTechnical, Baud, Becquerel, Bit, Block, BtuIt,
+                Absorbance, Ampere, Arcminute, Arcsecond, AtmosphereStandard, AtmosphereTechnical, Barn, Baud, Becquerel, Bit, Block, BtuIt,
                 BtuMean, BtuTh, Byte, CalorieFoodIt, CalorieFoodTh, CalorieIt, CalorieMean, CalorieTh, Candela,
-                Cental, Char, Chunk, CircularMil, Code, Coulomb, Cycle, Day, Degree, Doubleword, ElectronVolt, Entry,
-                Farad, Frame, Gon, Grain, Gram, Gray, Halfword, Hand, Henry, Hertz, Hour, Inch, Item, Joule, Katal, Kelvin,
+                Cental, Char, Chunk, CircularMil, Code, Coulomb, Curie, Cycle, Dalton, Day, Degree, Doubleword, ElectronVolt, Entry,
+                Farad, Frame, Gon, Grain, Gram, Gray, Halfword, Hand, Henry, Hertz, Hour, Inch, Item, JulianYear, Joule, Katal, Kelvin,
                 KilocalorieIt, KilocalorieTh, KilogramForce, Kip, Knot, Ksi, Line, Litre, Lumen, Lux, Meter,
                 Microinch, MilePerHour, Mole, Newton, Nibble, Nit, Ohm, OpticalDepth, OunceForce, Packet, Pascal,
-                Pennyweight, Poundal, PoundForce, Psf, Psi, Quad, Radian, Ratio, Record, Rood, Row, Sample, Second,
+                Pennyweight, Poundal, PoundForce, Psf, Psi, Quad, Rad, Radian, Ratio, Record, Rem, Roentgen, Rood, Row, Sample, Second,
                 Sector, Siemens, Sievert, Slug, Steradian, Stone, StreckSwedish, Tesla, Thou, TonForceShort, Tonne,
                 TonOfRefrigeration, TonOfTnt, TonShort, Torr, Turn, Var, Volt, VoltAmpere, Watt, Weber, Week, Word, Yard,
             );

@@ -1,0 +1,5 @@
+error: q!: `rd` reads more than one way (Rad, RodInternational, RodUsSurvey): write the one you mean as a type, as in q!(5 Rad)
+ --> tests/compile_fail/q_symbols_nuclear.rs:7:22
+  |
+7 |     let _ = t < q!(5 rd);
+  |                      ^^

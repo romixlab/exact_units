@@ -74,6 +74,7 @@ pages! {
     Timing = "recipes/timing.md";
     #[cfg(all(
         feature = "radiation",
+        feature = "nuclear",
         feature = "systems",
         feature = "chemical",
         feature = "dimensionless",

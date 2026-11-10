@@ -466,11 +466,30 @@ counted units, and the kinds that keep look-alike quantities apart.
   P2401#10nov-1911b.
 - 📋 **UNIT-13 Quantities of s⁻¹ beyond Hz and Bq** — decay constant, reaction rate, count rate, and the fluence
   rate (m⁻²·s⁻¹), with the named steps physics gives (λ·N is an activity). P2401#10nov-1911c.
-- 📋 **UNIT-14 Nuclear units** — barn, curie, rad ("rd": "rad" is the radian's), rem (a dose equivalent, as the
-  bare sievert), röntgen (with `Exposure` a kind for C/kg, apart from a specific charge) and years named apart (Julian
-  365.25 d; Gregorian 365.2425 d; NUBASE2020's 365.2422 d, `conventional`), an opt-in group `nuclear`. The dalton
-  waits for NUM-32 (P2401#10nov-1516b). The book's [nuclear physics recipes](docs/recipes/nuclear.md) declare the
-  barn, the curie and NUBASE's year with `unit!` meanwhile. P2401#10nov-1911d.
+- ✅ **UNIT-14 Nuclear units** — an opt-in group `nuclear`, not in `quantities` or `std`, as `customary` is:
+  `Dalton` (Da, 1 Da = m_u, NUM-32's symbol, no `quantity` line, so it converts to a gram directly, as `Gram`'s kg
+  has none either); `Barn` (b, 10⁻²⁸ m², SI Brochure, 9th ed., table 8); `Curie` (Ci, 3.7·10¹⁰ Bq exactly, 12th
+  CGPM 1964 Resolution 7, an `Activity`); `Rad` ("rd", not "rad", which is [Radian]'s: 0.01 Gy, an `AbsorbedDose`);
+  `Rem` (0.01 Sv, `DoseEquivalent`, the bare sievert's quantity, as decided); `Roentgen` (R, 2.58·10⁻⁴ C/kg exactly,
+  an `Exposure`). `Exposure` is now a kind of its own (m²·s⁻²'s kg⁻¹·s·A, apart from a specific charge): the unit
+  marker `units::Exposure` is `units::CoulombPerKilogram` with that quantity, `Exposure` a type alias by the name
+  of its quantity, as `AbsorbedDoseRate` is `GrayPerSecond`'s. Years, never a bare one (rule 5): `JulianYear` ("a",
+  365.25 d exactly, IAU, what "a", "ka", "Ma", "Ga" mean in the literature); `GregorianYear` ("a (Gregorian)",
+  365.2425 d exactly, the civil calendar's); `TropicalYearNubase2020` ("y (NUBASE2020)", 365.2422 d, measured, not
+  defined, so `Provenance::Conventional { source: "NUBASE2020", year: 2021 }`, Kondev et al., Chinese Phys. C 45,
+  030001 (2021), §2.3). None of the five nuclear-specific units (barn, curie, rad, rem, röntgen) or the Julian and
+  Gregorian years carries `conventional`: each is an exact number from an authoritative source (an SI Brochure
+  table, a CGPM resolution), as a customary unit's legal definition is, not a measured physical property. With
+  `customary` too, q!'s generated table (UNIT-11) refuses "rd", naming `Rad` beside
+  `customary::RodInternational` and `RodUsSurvey`: `rad` stays the radian's unqualified. The generator also refuses
+  the bare stems of the qualified year symbols: "a" names both `JulianYear` and `GregorianYear` (they share it),
+  "y" names `TropicalYearNubase2020` alone (a qualified symbol, no bare default) — a bare year is refused even at
+  the single letter, not only the word. The book's
+  [nuclear physics recipes](docs/recipes/nuclear.md) and `examples/15_nuclear.rs` use these units now, their local
+  `unit!` declarations of the dalton, the barn, the curie and NUBASE's year dropped (a fluence rate stays local,
+  UNIT-13). Tests: `tests/units.rs` (`nuclear_units`, dimensions, quantities and exact conversions; `derived_names`
+  and `symbols_are_unique_but_for_shared_units` updated for `CoulombPerKilogram`), `tests/quantities.rs` (`Exposure`
+  in `TREE`/`DEFS`), `tests/compile_fail/q_symbols_nuclear.rs` ("rd" refused with both features on). P2401#10nov-1911d.
 - 💡 **UNIT-15 ICRU 95's operational quantities** — ICRU Report 95 (2020) redefines the ambient and personal dose
   (H*, Hp, D′lens, D′local skin) from conversion coefficients to E, not from Q at a depth: quantities of their own
   beside ICRU 51's H*(10) and Hp(10) of UNIT-12. Needs the report in the library. P2401#10nov-1516c.

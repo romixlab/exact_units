@@ -550,9 +550,10 @@ crate::unit! {
     #[cfg(feature = "radiation")]
     pub struct KiloElectronVoltPerMicrometer = "keV/µm" (long "kiloelectronvolt per micrometre" plural "kiloelectronvolts per micrometre", ascii "keV/um", ucum "keV/um"), [kg 1, m 1, s -2] quantity crate::quantities::LinearEnergyTransfer, Exact(1602176634 / 1, pow10 -19);
 
-    /// Exposure to X and γ rays in coulombs per kilogram, C/kg (kg⁻¹·s·A, SI Brochure, 9th ed., table 6).
+    /// Exposure to X and γ rays in coulombs per kilogram, C/kg (kg⁻¹·s·A, SI Brochure, 9th ed., table 6), an
+    /// [Exposure](crate::quantities::Exposure): not a specific charge, though both are C/kg.
     #[cfg(feature = "radiation")]
-    pub struct Exposure = "C/kg" (long "coulomb per kilogram" plural "coulombs per kilogram", ucum "C/kg"), [kg -1, s 1, a 1];
+    pub struct CoulombPerKilogram = "C/kg" (long "coulomb per kilogram" plural "coulombs per kilogram", ucum "C/kg"), [kg -1, s 1, a 1] quantity crate::quantities::Exposure;
 
     /// Absorbed dose rate in grays per second, Gy/s (m²·s⁻³, SI Brochure, 9th ed., table 6), an
     /// [AbsorbedDoseRate](crate::quantities::AbsorbedDoseRate): not a dose equivalent rate in [SievertPerHour].
@@ -564,6 +565,67 @@ crate::unit! {
     /// `Fixed<SievertPerHour, Micro, T>`. Not an absorbed dose rate in [GrayPerSecond].
     #[cfg(feature = "radiation")]
     pub struct SievertPerHour = "Sv/h" (long "sievert per hour" plural "sieverts per hour", ucum "Sv/h"), [m 2, s -3] quantity crate::quantities::DoseEquivalentRate, Exact(1 / 3600);
+
+    // Nuclear: outside the SI, opt-in as `customary` is, not in `quantities` or `std`.
+
+    /// The dalton (unified atomic mass unit), Da, 1 Da = 1 u = m_u: one twelfth of a ¹²C atom's mass (SI Brochure,
+    /// 9th ed., table 8, note). m_u is measured (NUM-32), so its scale keeps the symbol: a value in kg or eV comes
+    /// only from a named set of constants, `convert_with`. No `quantity` line, as [Gram]'s kg has none: both share
+    /// their dimension's own quantity, so a dalton converts to a gram directly.
+    #[cfg(feature = "nuclear")]
+    pub struct Dalton = "Da" (long "dalton"), [kg 1], Exact(1 / 1, m_u 1);
+
+    /// Area in barns, b (10⁻²⁸ m², SI Brochure, 9th ed., table 8): a nuclear cross section.
+    #[cfg(feature = "nuclear")]
+    pub struct Barn = "b" (long "barn", ucum "bn"), [m 2], Pow10(-28);
+
+    /// Activity in curies, Ci (3.7·10¹⁰ Bq exactly; 12th CGPM, 1964, Resolution 7; SI Brochure, 9th ed., appendix 1),
+    /// an [Activity](crate::quantities::Activity): not a frequency in [Hertz].
+    #[cfg(feature = "nuclear")]
+    pub struct Curie = "Ci" (long "curie", ucum "Ci"), [s -1] quantity crate::quantities::Activity, Exact(37 / 1, pow10 9);
+
+    /// Absorbed dose in rads, rd (0.01 Gy; NIST SP 811, Appendix B; NIST HB 44, Appendix C), an
+    /// [AbsorbedDose](crate::quantities::AbsorbedDose): the symbol is "rd", not "rad", which is the radian's
+    /// ([Radian]). `customary`'s rod, [RodInternational], shares "rd": with both features on, q! refuses the
+    /// symbol, naming both.
+    #[cfg(feature = "nuclear")]
+    pub struct Rad = "rd" (long "rad" plural "rads", ucum "RAD"), [m 2, s -2] quantity crate::quantities::AbsorbedDose, Pow10(-2);
+
+    /// Dose equivalent in rems, rem (0.01 Sv; NIST SP 811, Appendix B; NIST HB 44, Appendix C): the SI's dose
+    /// equivalent H = Q·D, a bare [Sievert]'s quantity, [DoseEquivalent](crate::quantities::DoseEquivalent), not
+    /// ICRP's [EquivalentDose] or [EffectiveDose].
+    #[cfg(feature = "nuclear")]
+    pub struct Rem = "rem" (long "rem", ucum "REM"), [m 2, s -2] quantity crate::quantities::DoseEquivalent, Pow10(-2);
+
+    /// Exposure in röntgens, R (2.58·10⁻⁴ C/kg exactly, SI Brochure, 9th ed., table 8), an
+    /// [Exposure](crate::quantities::Exposure): not an absorbed dose or a dose equivalent, though all three were once
+    /// confused.
+    #[cfg(feature = "nuclear")]
+    pub struct Roentgen = "R" (long "roentgen", ucum "R"), [kg -1, s 1, a 1] quantity crate::quantities::Exposure, Exact(258 / 1, pow10 -6);
+
+    /// The Julian year, a (365.25 d, 31 557 600 s exactly; IAU): the astronomical year, what "a", "ka", "Ma" and
+    /// "Ga" mean in the literature. Not a calendar year: [GregorianYear] is the civil calendar's, 365.2425 d, and
+    /// [TropicalYearNubase2020] is NUBASE2020's own value for half-lives, 365.2422 d. A bare "year" is refused
+    /// (rule 5): each of the three has its own name, and q! refuses even the bare symbol "a", naming this and
+    /// [GregorianYear], since the two share its stem; write the type, `q!(5 JulianYear)`.
+    #[cfg(feature = "nuclear")]
+    pub struct JulianYear = "a" (long "year (Julian)" plural "years (Julian)", ucum "a_j"), [s 1], Exact(31557600 / 1);
+
+    /// The Gregorian calendar year, "a (Gregorian)" (365.2425 d, 31 556 952 s exactly): the civil calendar's mean
+    /// year over its 400-year leap cycle, apart from the astronomical [JulianYear] and NUBASE2020's
+    /// [TropicalYearNubase2020]. q! takes it only as a type or a quoted string, `q!(5 "a (Gregorian)")`: the
+    /// symbol's own stem, "a", is [JulianYear]'s too, so q! refuses it bare.
+    #[cfg(feature = "nuclear")]
+    pub struct GregorianYear = "a (Gregorian)" (long "year (Gregorian)" plural "years (Gregorian)", ucum "a_g"), [s 1], Exact(31556952 / 1);
+
+    /// NUBASE2020's year, "y (NUBASE2020)" (365.2422 d, 31 556 926.08 s; Kondev et al., Chinese Phys. C 45, 030001,
+    /// 2021, §2.3): the tropical year as NUBASE2020 adopts it for half-lives, measured, not defined, so its scale
+    /// carries the source: not the astronomical [JulianYear] or the civil [GregorianYear]. NUBASE2020 itself prints
+    /// "= 31 556 926 s" beside it, 0.08 s short of 365.2422 d; this unit takes the day count. q! refuses the bare
+    /// stem "y" too (no other reading needs it, but a qualified symbol picks no bare default): write the type,
+    /// `q!(5 TropicalYearNubase2020)`, or the quoted symbol, `q!(5 "y (NUBASE2020)")`.
+    #[cfg(feature = "nuclear")]
+    pub struct TropicalYearNubase2020 = "y (NUBASE2020)" (long "year (NUBASE2020)" plural "years (NUBASE2020)", ucum "a_t"), [s 1], Exact(3155692608 / 100), conventional("NUBASE2020", 2021);
 
     // Dimensionless
 
@@ -879,6 +941,11 @@ pub type EnergyDensity = Of<crate::quantities::EnergyDensity, Per<Joule, Volume>
 /// Absorbed dose rate in grays per second, Gy/s: the unit [GrayPerSecond] by the name of its quantity.
 #[cfg(feature = "radiation")]
 pub type AbsorbedDoseRate = GrayPerSecond;
+
+/// Exposure to X and γ rays in coulombs per kilogram, C/kg: the unit [CoulombPerKilogram] by the name of its
+/// quantity; the röntgen's, [Roentgen] with feature `nuclear`.
+#[cfg(feature = "radiation")]
+pub type Exposure = CoulombPerKilogram;
 
 /// ICRP's equivalent dose H_T in sieverts, Sv: an [EquivalentDose](crate::quantities::EquivalentDose), not the SI's
 /// dose equivalent H that a bare [Sievert] measures.
