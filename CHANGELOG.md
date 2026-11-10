@@ -680,6 +680,13 @@ firmware that only needs units in its types builds without it; the bytes don't d
   `src/quantities.rs` has them), so they're curated by hand in `eu_docs_ext/unit_info.py`, growing with the pages
   converted to this markup. Tests: `docs_ext/tests/test_unit_catalog.py`, `test_unit_markup.py`,
   `test_check_unit_macros.py`.
+- Book: [Nuclear physics](docs/recipes/nuclear.md) and [video time](docs/recipes/video_time.md) use the
+  `[[symbol]]` / `\unit{}` markup (P2401#10nov-1740): every crate-recognized unit symbol in their prose is now
+  linked and tooltipped, and the plain-text physics formulas they wrote by hand (`m_u·c²`, `λ = ln 2/T½`,
+  `B(A, Z) = a_V·A - ...`) are now KaTeX math, with descriptive subscripts upright (`m_{\mathrm{u}}`, not
+  `m_u`) per the SI Brochure 9th §5.1 / ISO 80000-1. A page-local example unit declared only in that page's own
+  doctest (nuclear.md's dalton, barn, curie) isn't in `q!`'s crate-wide table, so it stays plain prose, not
+  `[[..]]`, same as `A`, `Z` and other physics symbols that aren't exact_units unit markers at all.
 
 ### 🐛 Fixes
 

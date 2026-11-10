@@ -64,11 +64,14 @@ class Info:
 # Keyed by the bare marker (docs/start/symbols.md's Marker column).
 UNIT_INFO: dict[str, Info] = {
     "Ampere": Info("ampere", "electric current"),
+    "Barn": Info("barn", "area"),
     "Becquerel": Info("becquerel", "activity"),
     "Byte": Info("byte", "information"),
     "Bit": Info("bit", "information"),
     "Candela": Info("candela", "luminous intensity"),
     "Coulomb": Info("coulomb", "electric charge"),
+    "Curie": Info("curie", "activity"),
+    "Dalton": Info("dalton", "mass"),
     "Day": Info("day", "time"),
     "Degree": Info("degree", "angle"),
     "ElectronVolt": Info("electronvolt", "energy"),
