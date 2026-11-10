@@ -306,6 +306,11 @@ required-features = ["electrical", "angle", "dimensionless", "libm", "q"]
 name = "14_iq_downconvert"
 required-features = ["angle", "dimensionless", "electrical"]
 
+[[example]]
+# AME2020 masses to binding energies and Q-values, a radium source in Bq, a reaction rate in barns, Gy against Sv
+name = "15_nuclear"
+required-features = ["radiation", "systems", "time", "chemical", "dimensionless", "mechanical"]
+
 [profile.dev]
 split-debuginfo = "unpacked"
 

@@ -28,6 +28,7 @@ cargo run --example 01_timer --no-default-features --features time
 | 12 | [`12_wire`][ex12] | `shrink_wrap,time,electrical` | a reading sent to a PC tool, the same bytes as plain integers |
 | 13 | [`13_impedance_match`][ex13] | `electrical,angle,dimensionless,libm` | an antenna's Γ, VSWR and return loss; a dB limit as an integer compare |
 | 14 | [`14_iq_downconvert`][ex14] | `angle,dimensionless,electrical` | Q15 IQ samples mixed down by an NCO on a Cortex-M0 |
+| 15 | [`15_nuclear`][ex15] | `radiation,systems,time,chemical,dimensionless,mechanical` | AME2020 masses to binding energies and Q-values, a gram of radium in Bq, Gy against Sv ([Nuclear physics](nuclear.md)) |
 
 The lines that don't compile are in the files too, each with the compiler's real message.
 
@@ -45,3 +46,4 @@ The lines that don't compile are in the files too, each with the compiler's real
 [ex12]: https://github.com/romixlab/exact_units/blob/main/examples/12_wire.rs
 [ex13]: https://github.com/romixlab/exact_units/blob/main/examples/13_impedance_match.rs
 [ex14]: https://github.com/romixlab/exact_units/blob/main/examples/14_iq_downconvert.rs
+[ex15]: https://github.com/romixlab/exact_units/blob/main/examples/15_nuclear.rs

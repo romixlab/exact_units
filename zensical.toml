@@ -123,6 +123,7 @@ nav = [
     { "Recipes" = [
             "recipes/sensors.md",
             "recipes/timing.md",
+            "recipes/nuclear.md",
             "recipes/examples.md",
         ]
     },

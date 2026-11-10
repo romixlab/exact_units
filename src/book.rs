@@ -70,6 +70,15 @@ pages! {
     Wire = "wire/shrink_wrap.md";
     Sensors = "recipes/sensors.md";
     Timing = "recipes/timing.md";
+    #[cfg(all(
+        feature = "radiation",
+        feature = "systems",
+        feature = "chemical",
+        feature = "dimensionless",
+        feature = "mechanical",
+        feature = "time"
+    ))]
+    Nuclear = "recipes/nuclear.md";
     Magnitude = "nomicon/magnitude.md";
     Constants = "nomicon/constants.md";
 }
