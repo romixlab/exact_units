@@ -26,7 +26,7 @@ assert_eq!(LONG.get(), 5000);
 <figcaption>The range lives in the type. The bytes are still the plain <code>u16</code>.</figcaption>
 </figure>
 
-- `try_new` checks at run time and returns `Err(OutOfBounds)` outside.
+- `try_new` checks at run time and returns `Err(OutOfRange)` outside: the error holds the value, and its text names the range, unit and storage, `6000 ms is out of 1..=5000 ms (Second, u16)`.
 - `bounded` in a `const` is checked at compile time: a value outside doesn't build.
 - A value read from the wire is checked against the range too, so a device never sees an out-of-range setting.
 
@@ -46,10 +46,10 @@ A float's NaN is never within bounds but `MaybeNan`'s. `Unbounded` keeps ±∞; 
 so with `Finite`, a bounded type like `RangeDec`, made with `try_new` or `bounded` and added with `checked_add`:
 
 ```rust
-use exact_units::{Finite, Fixed, OutOfBounds, prefix::One, units::Volt};
+use exact_units::{Finite, Fixed, prefix::One, units::Volt};
 
 type V = Fixed<Volt, One, f32, Finite>;
-assert_eq!(V::try_new(f32::INFINITY), Err(OutOfBounds));
+assert_eq!(V::try_new(f32::INFINITY).unwrap_err().value(), f32::INFINITY);
 let big = V::bounded(f32::MAX);
 assert_eq!(big.checked_add(big), None);
 ```

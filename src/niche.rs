@@ -302,7 +302,7 @@ impl<U, P, T: Storage, B: Bounds<T>> RawValue for Fixed<U, P, T, B> {
 
     #[inline(always)]
     fn try_from_raw(raw: T) -> Result<Self, OutOfBounds> {
-        Fixed::try_new(raw)
+        Ok(Fixed::try_new(raw)?)
     }
 
     #[inline(always)]
@@ -328,7 +328,7 @@ impl<O: Origin<Unit = U>, U, P, T: Storage, B: Bounds<T>> RawValue for Point<O, 
 
     #[inline(always)]
     fn try_from_raw(raw: T) -> Result<Self, OutOfBounds> {
-        Point::try_from_raw(raw)
+        Ok(Point::try_from_raw(raw)?)
     }
 
     #[inline(always)]

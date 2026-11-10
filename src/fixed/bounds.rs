@@ -4,6 +4,7 @@ use super::storage::Storage;
 use crate::literal::Decimal;
 use crate::literal::big::BigDecimal;
 use crate::literal::steps::{FloatFormat, Value, float_parts};
+use core::marker::PhantomData;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::un::{
     I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14, I15, I16, I17, I18, I19, I20, I21,
@@ -63,7 +64,8 @@ pub trait Bounds<T: Storage>: Copy + Default + 'static {
     }
 }
 
-/// A value outside its [Bounds], or one that doesn't fit the storage.
+/// A value outside its [Bounds], or one that doesn't fit the storage. A [Fixed](super::Fixed) refuses with
+/// [OutOfRange], which holds the value and names the range, and `?` turns into this.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct OutOfBounds;
@@ -75,6 +77,107 @@ impl core::fmt::Display for OutOfBounds {
 }
 
 impl core::error::Error for OutOfBounds {}
+
+/// A value refused by a [Fixed](super::Fixed)'s [Bounds]: from [try_new](super::Fixed::try_new),
+/// [to_bounds](super::Fixed::to_bounds) and the serde read. It holds the value; the range, unit, scale and storage are
+/// its type's, so it is as large as `T`, and `Display` names them all:
+///
+/// ```
+/// use exact_units::{Fixed, Range, prefix::One, units::Ratio};
+///
+/// let e = Fixed::<Ratio, One, u8, Range<1, 63>>::try_new(0).unwrap_err();
+/// assert_eq!(e.value(), 0);
+/// assert_eq!(e.to_string(), "0 is out of 1..=63 (Ratio, u8)");
+/// ```
+///
+/// With a unit and a scale, the value and the range are in the scale's steps:
+///
+/// ```
+/// # #[cfg(feature = "time")] {
+/// use exact_units::{Fixed, Range, prefix::Milli, units::Second};
+///
+/// let e = Fixed::<Second, Milli, u16, Range<1, 5000>>::try_new(6000).unwrap_err();
+/// assert_eq!(e.to_string(), "6000 ms is out of 1..=5000 ms (Second, u16)");
+/// # }
+/// ```
+///
+/// A NaN says which bound would hold it, an open end is left out (`..=5`), and `?` turns it into an [OutOfBounds]
+/// where a function returns that.
+pub struct OutOfRange<U, P, T, B> {
+    /// The value refused.
+    value: T,
+    /// The unit, scale and bounds, in the type only.
+    _type: PhantomData<(U, P, B)>,
+}
+
+impl<U, P, T: Storage, B: Bounds<T>> OutOfRange<U, P, T, B> {
+    #[inline(always)]
+    pub(crate) const fn new(value: T) -> Self {
+        OutOfRange {
+            value,
+            _type: PhantomData,
+        }
+    }
+
+    /// The value refused, in steps of `P`.
+    #[inline(always)]
+    pub const fn value(&self) -> T {
+        self.value
+    }
+
+    /// The lowest value allowed, `B::MIN`: `None` for no limit.
+    #[inline(always)]
+    #[must_use]
+    pub const fn min(&self) -> Option<T> {
+        B::MIN
+    }
+
+    /// The highest value allowed, `B::MAX`: `None` for no limit.
+    #[inline(always)]
+    #[must_use]
+    pub const fn max(&self) -> Option<T> {
+        B::MAX
+    }
+}
+
+impl<U, P, T: Copy, B> Clone for OutOfRange<U, P, T, B> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<U, P, T: Copy, B> Copy for OutOfRange<U, P, T, B> {}
+
+/// The same value refused: the type says the rest.
+impl<U, P, T: PartialEq, B> PartialEq for OutOfRange<U, P, T, B> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl<U, P, T: Eq, B> Eq for OutOfRange<U, P, T, B> {}
+
+#[cfg(feature = "defmt")]
+impl<U, P, T: Storage + defmt::Format, B: Bounds<T>> defmt::Format for OutOfRange<U, P, T, B> {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        defmt::write!(f, "{} is out of ", self.value);
+        if let Some(min) = B::MIN {
+            defmt::write!(f, "{}", min);
+        }
+        defmt::write!(f, "..=");
+        if let Some(max) = B::MAX {
+            defmt::write!(f, "{}", max);
+        }
+        defmt::write!(f, " ({=str})", T::NAME);
+    }
+}
+
+impl<U, P, T, B> From<OutOfRange<U, P, T, B>> for OutOfBounds {
+    #[inline(always)]
+    fn from(_: OutOfRange<U, P, T, B>) -> Self {
+        OutOfBounds
+    }
+}
 
 /// No bounds: the whole range of the storage. The default of [Fixed](super::Fixed)'s `B`. Its overflow policy is
 /// checked: `+` is `T`'s (a panic on overflow in debug builds), and `checked_*`, `saturating_*` and `wrapping_*` name
@@ -154,17 +257,17 @@ impl Unlimited<f64> for MaybeNan {}
 /// with [unbounded](super::Fixed::unbounded). Only for floats: `Fixed<_, _, u16, Finite>` doesn't compile.
 ///
 /// ```
-/// use exact_units::{Finite, Fixed, OutOfBounds, prefix::One, units::Volt};
+/// use exact_units::{Finite, Fixed, prefix::One, units::Volt};
 ///
 /// type V = Fixed<Volt, One, f32, Finite>;
 /// const LIMIT: V = V::bounded(3.3);
-/// assert_eq!(V::try_new(f32::INFINITY), Err(OutOfBounds));
-/// assert_eq!(V::try_new(f32::NAN), Err(OutOfBounds));
+/// assert_eq!(V::try_new(f32::INFINITY).unwrap_err().value(), f32::INFINITY);
+/// assert!(V::try_new(f32::NAN).is_err());
 /// let big = V::bounded(f32::MAX);
 /// assert_eq!(big.checked_add(big), None); // the sum is +∞
 /// assert_eq!(LIMIT.checked_add(LIMIT).map(V::get), Some(6.6));
 /// let inf = Fixed::<Volt, One, f32>::bounded(f32::INFINITY);
-/// assert_eq!(inf.to_bounds::<Finite>(), Err(OutOfBounds));
+/// assert!(inf.to_bounds::<Finite>().is_err());
 /// ```
 ///
 /// ```compile_fail

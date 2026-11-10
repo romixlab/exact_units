@@ -11,8 +11,8 @@ use core::marker::PhantomData;
 use shrink_wrap::prelude::*;
 
 pub use bounds::{
-    Bounds, Finite, MaybeNan, NanFree, OutOfBounds, Range, RangeDec, RangeU64, Saturating,
-    Unbounded, Unlimited, Wrapping,
+    Bounds, Finite, MaybeNan, NanFree, OutOfBounds, OutOfRange, Range, RangeDec, RangeU64,
+    Saturating, Unbounded, Unlimited, Wrapping,
 };
 pub use prefix::{DecimalPrefix, FixedScale, ScaleDef};
 pub use rounding::{Overflow, Requantizer, Rounding, StorageKind, requantize};
@@ -323,14 +323,17 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     }
 }
 
+/// A [Fixed] in `B`, or the value it refused.
+type Checked<U, P, T, B> = Result<Fixed<U, P, T, B>, OutOfRange<U, P, T, B>>;
+
 impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
-    /// `value` in units of `P`, if it is within `B`.
+    /// `value` in units of `P`, if it is within `B`; else an [OutOfRange] that holds it and names the range.
     #[inline(always)]
-    pub fn try_new(value: T) -> Result<Self, OutOfBounds> {
+    pub fn try_new(value: T) -> Result<Self, OutOfRange<U, P, T, B>> {
         if B::contains(value) {
             Ok(Self::new_unchecked(value))
         } else {
-            Err(OutOfBounds)
+            Err(OutOfRange::new(value))
         }
     }
 
@@ -750,7 +753,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     }
 
     /// The same value with other bounds, if it is within them.
-    pub fn to_bounds<B2: Bounds<T>>(self) -> Result<Fixed<U, P, T, B2>, OutOfBounds> {
+    pub fn to_bounds<B2: Bounds<T>>(self) -> Checked<U, P, T, B2> {
         Fixed::try_new(self.value)
     }
 
@@ -1736,16 +1739,58 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> fmt::Debug for Fixed<U, P
         write!(f, " {}", T::NAME)?;
         if B::MIN.is_some() || B::MAX.is_some() {
             f.write_str(", ")?;
-            if let Some(min) = B::MIN {
-                min.fmt_number(f)?;
-            }
-            f.write_str("..=")?;
-            if let Some(max) = B::MAX {
-                max.fmt_number(f)?;
-            }
+            write_range::<T, B>(f)?;
         }
         f.write_str(")")
     }
+}
+
+/// `6000 ms is out of 1..=5000 ms (Second, u16)`.
+impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> fmt::Display for OutOfRange<U, P, T, B> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.value().is_nan() {
+            return write!(
+                f,
+                "NaN is no value of a NaN-free float ({}, {}; the bound MaybeNan holds NaN)",
+                U::EXPR.name(),
+                T::NAME
+            );
+        }
+        self.value().fmt_number(f)?;
+        write_prefix_unit::<P>(U::EXPR, f)?;
+        f.write_str(" is out of ")?;
+        write_range::<T, B>(f)?;
+        write_prefix_unit::<P>(U::EXPR, f)?;
+        write!(f, " ({}, {})", U::EXPR.name(), T::NAME)
+    }
+}
+
+/// `OutOfRange(0, 1..=63)`: the value and the range, without the unit, so it needs no [Unit] (`Display` names it).
+impl<U, P, T: Storage, B: Bounds<T>> fmt::Debug for OutOfRange<U, P, T, B> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("OutOfRange(")?;
+        self.value().fmt_number(f)?;
+        f.write_str(", ")?;
+        write_range::<T, B>(f)?;
+        f.write_str(")")
+    }
+}
+
+impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> core::error::Error
+    for OutOfRange<U, P, T, B>
+{
+}
+
+/// `1..=5000`, `..=5000` or `1..=`.
+pub(crate) fn write_range<T: Storage, B: Bounds<T>>(f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    if let Some(min) = B::MIN {
+        min.fmt_number(f)?;
+    }
+    f.write_str("..=")?;
+    if let Some(max) = B::MAX {
+        max.fmt_number(f)?;
+    }
+    Ok(())
 }
 
 /// `1500 µs`, like `Display`.
@@ -1863,7 +1908,7 @@ impl<P: prefix::SubSecond, T: UnsignedStorage, B: Bounds<T>> TryFrom<core::time:
                 s.checked_add(whole)
             })
             .ok_or(OutOfBounds)?;
-        Self::try_new(T::from_u64(v).ok_or(OutOfBounds)?)
+        Ok(Self::try_new(T::from_u64(v).ok_or(OutOfBounds)?)?)
     }
 }
 
@@ -2092,8 +2137,36 @@ mod tests {
     #[test]
     fn bounds() {
         type T = Fixed<Second, Milli, u16, Range<1, 5000>>;
-        assert_eq!(T::try_new(0), Err(OutOfBounds));
-        assert_eq!(T::try_new(5001), Err(OutOfBounds));
+        assert_eq!(T::try_new(0), Err(OutOfRange::new(0)));
+        let e = T::try_new(5001).unwrap_err();
+        assert_eq!((e.value(), e.min(), e.max()), (5001, Some(1), Some(5000)));
+        assert_eq!(e.to_string(), "5001 ms is out of 1..=5000 ms (Second, u16)");
+        assert_eq!(format!("{e:?}"), "OutOfRange(5001, 1..=5000)");
+        assert_eq!(OutOfBounds::from(e), OutOfBounds);
+        assert_eq!(
+            T::try_new(4000)
+                .unwrap()
+                .to_bounds::<Range<1, 1000>>()
+                .unwrap_err()
+                .to_string(),
+            "4000 ms is out of 1..=1000 ms (Second, u16)"
+        );
+        type Low = Fixed<Volt, Milli, i16, Range<-32768, -1>>;
+        assert_eq!(
+            Low::try_new(0).unwrap_err().to_string(),
+            "0 mV is out of -32768..=-1 mV (Volt, i16)"
+        );
+        type Fin = Fixed<Volt, One, f32, Finite>;
+        assert_eq!(
+            Fixed::<Volt, Milli, f32, RangeDec<-5, 25, -1>>::try_new(-0.75)
+                .unwrap_err()
+                .to_string(),
+            "-0.75 mV is out of -0.5..=2.5 mV (Volt, f32)"
+        );
+        assert_eq!(
+            Fin::try_new(f32::NAN).unwrap_err().to_string(),
+            "NaN is no value of a NaN-free float (Volt, f32; the bound MaybeNan holds NaN)"
+        );
         let t = T::try_new(4000).unwrap();
         assert_eq!(t.checked_add(t), None);
         assert_eq!(t.saturating_add(t).get(), 5000);
@@ -2331,8 +2404,9 @@ mod tests {
     fn u5_range_bounds() {
         type T = Fixed<Volt, Milli, U5, Range<0, 20>>;
         assert!(T::try_new(U5::new(20).unwrap()).is_ok());
-        assert_eq!(T::try_new(U5::new(21).unwrap()), Err(OutOfBounds));
-        assert_eq!(T::try_new(U5::new(31).unwrap()), Err(OutOfBounds));
+        let e = T::try_new(U5::new(21).unwrap()).unwrap_err();
+        assert_eq!(e.to_string(), "21 mV is out of 0..=20 mV (Volt, U5)");
+        assert!(T::try_new(U5::new(31).unwrap()).is_err());
     }
 
     #[test]

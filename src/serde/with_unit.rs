@@ -70,7 +70,7 @@
 //! # }
 //! ```
 
-use super::OutOfRange;
+use crate::OutOfRange;
 use crate::exact::read_text as read_exact;
 use crate::fixed::write_prefix_unit;
 use crate::text::unit::{TextPrefix, UnitText, prefix_of};

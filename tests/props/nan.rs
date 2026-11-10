@@ -8,7 +8,7 @@
 
 use exact_units::prefix::One;
 use exact_units::units::{Ampere, Volt};
-use exact_units::{Finite, Fixed, MaybeNan, OutOfBounds};
+use exact_units::{Finite, Fixed, MaybeNan};
 
 type V = Fixed<Volt, One, f32>;
 type M = Fixed<Volt, One, f32, MaybeNan>;
@@ -43,7 +43,7 @@ pub(crate) fn constructs(x: f32) {
             assert!(!x.is_nan());
             assert_eq!(v.get().to_bits(), x.to_bits());
         }
-        Err(OutOfBounds) => assert!(x.is_nan(), "{x:e} refused"),
+        Err(_) => assert!(x.is_nan(), "{x:e} refused"),
     }
     let m = M::of(x);
     assert!(same(m.get(), x));
@@ -143,7 +143,7 @@ pub(crate) fn finite_constructs(x: f32) {
             assert_eq!(f.get().to_bits(), x.to_bits());
             assert_eq!(f.unbounded().get().to_bits(), x.to_bits());
         }
-        Err(OutOfBounds) => assert!(!x.is_finite(), "{x:e} refused"),
+        Err(_) => assert!(!x.is_finite(), "{x:e} refused"),
     }
     assert_eq!(
         M::of(x)
@@ -445,7 +445,7 @@ mod tests {
         assert_eq!(nan.to::<Milli, f32>(), None);
         assert_eq!(nan.to::<Milli, i32>(), None);
         assert_eq!(nan.not_nan(), None);
-        assert_eq!(nan.to_bounds::<exact_units::Unbounded>(), Err(OutOfBounds));
+        assert!(nan.to_bounds::<exact_units::Unbounded>().is_err());
         let inf = V::bounded(f32::INFINITY);
         assert_eq!(
             inf.to::<Milli, f32>(),

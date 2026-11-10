@@ -74,6 +74,11 @@ fn bounds_are_checked_on_reading() {
         "6000 ms is out of 1..=5000 ms (Second, u16)"
     );
     assert!(json_err::<Timeout>("0").starts_with("0 ms is out of 1..=5000 ms (Second, u16)"));
+    // the same error as try_new's
+    assert_eq!(
+        json_err::<Timeout>("6000"),
+        Timeout::try_new(6000).unwrap_err().to_string()
+    );
     // postcard's error has no text: refused all the same
     assert_eq!(
         postcard_err::<Timeout, _>(6000u16),

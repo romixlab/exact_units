@@ -22,10 +22,13 @@ assert!(!shut_down); // the check never trips
 So a float `Fixed` is never NaN unless its type says so. Every way a value comes in refuses NaN: `try_new`, `bounded`, the wire, serde, text and every conversion. `new` and `From` don't compile for a float, since they can't refuse anything:
 
 ```rust
-use exact_units::{Fixed, OutOfBounds, prefix::One, units::Volt};
+use exact_units::{Fixed, prefix::One, units::Volt};
 
 type V = Fixed<Volt, One, f32>;
-assert_eq!(V::try_new(f32::NAN), Err(OutOfBounds));
+assert_eq!(
+    V::try_new(f32::NAN).unwrap_err().to_string(),
+    "NaN is no value of a NaN-free float (Volt, f32; the bound MaybeNan holds NaN)"
+);
 assert_eq!(V::try_new(1.5).map(V::get), Ok(1.5));
 const LIMIT: V = V::bounded(3.3); // NaN here would be a compile error
 ```
@@ -149,16 +152,16 @@ assert_eq!((inf + inf).not_nan(), Some(inf));
 A value that must stay a number says so with the bound `Finite`, which refuses ±∞ and NaN. Like every bounded type it has no operators: `try_new`, `bounded` and `checked_*`, which is `None` where the result isn't finite.
 
 ```rust
-use exact_units::{Finite, Fixed, OutOfBounds, prefix::One, units::Volt};
+use exact_units::{Finite, Fixed, prefix::One, units::Volt};
 
 type V = Fixed<Volt, One, f32, Finite>;
-assert_eq!(V::try_new(f32::INFINITY), Err(OutOfBounds));
-assert_eq!(V::try_new(f32::NAN), Err(OutOfBounds));
+assert!(V::try_new(f32::INFINITY).is_err());
+assert!(V::try_new(f32::NAN).is_err());
 let big = V::bounded(f32::MAX);
 assert_eq!(big.checked_add(big), None); // the sum would be +∞
 
 let inf = Fixed::<Volt, One, f32>::bounded(f32::INFINITY);
-assert_eq!(inf.to_bounds::<Finite>(), Err(OutOfBounds));
+assert!(inf.to_bounds::<Finite>().is_err());
 ```
 
 ```rust,compile_fail

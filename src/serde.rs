@@ -53,14 +53,12 @@ pub mod with_unit;
 
 use crate::complex::{Complex, ComplexStorage, Polar};
 use crate::decibel::{Decibels, MAX_DECIMALS};
-use crate::fixed::write_prefix_unit;
 use crate::niche::{Clipped, Niched, Niches, Rails, RawValue};
 use crate::text;
 use crate::{Bounds, Fixed, FixedScale, Origin, Point, Storage, Unit, Unlimited};
 use ::serde::de::{self, Deserialize, Deserializer};
 use ::serde::ser::{Serialize, Serializer};
 use core::fmt;
-use core::marker::PhantomData;
 
 impl<U, P, T: Storage + Serialize, B: Bounds<T>> Serialize for Fixed<U, P, T, B> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -73,54 +71,8 @@ impl<'de, U: Unit, P: FixedScale, T: Storage + Deserialize<'de>, B: Bounds<T>> D
 {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = T::deserialize(deserializer)?;
-        Self::try_new(value).map_err(|_| de::Error::custom(OutOfRange::<U, P, T, B>::new(value)))
+        Self::try_new(value).map_err(de::Error::custom)
     }
-}
-
-/// `6000 ms is out of 1..=5000 ms (Second, u16)`: a value read for a [Fixed] outside its bounds.
-pub(crate) struct OutOfRange<U, P, T, B> {
-    value: T,
-    _type: PhantomData<(U, P, B)>,
-}
-
-impl<U, P, T, B> OutOfRange<U, P, T, B> {
-    pub(crate) fn new(value: T) -> Self {
-        OutOfRange {
-            value,
-            _type: PhantomData,
-        }
-    }
-}
-
-impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> fmt::Display for OutOfRange<U, P, T, B> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.value.is_nan() {
-            return write!(
-                f,
-                "NaN is no value of a NaN-free float ({}, {}; the bound MaybeNan holds NaN)",
-                U::EXPR.name(),
-                T::NAME
-            );
-        }
-        self.value.fmt_number(f)?;
-        write_prefix_unit::<P>(U::EXPR, f)?;
-        f.write_str(" is out of ")?;
-        write_range::<T, B>(f)?;
-        write_prefix_unit::<P>(U::EXPR, f)?;
-        write!(f, " ({}, {})", U::EXPR.name(), T::NAME)
-    }
-}
-
-/// `1..=5000`, `..=5000` or `1..=`.
-fn write_range<T: Storage, B: Bounds<T>>(f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    if let Some(min) = B::MIN {
-        min.fmt_number(f)?;
-    }
-    f.write_str("..=")?;
-    if let Some(max) = B::MAX {
-        max.fmt_number(f)?;
-    }
-    Ok(())
 }
 
 impl<O: Origin<Unit = U>, U, P, T: Storage + Serialize, B: Bounds<T>> Serialize
@@ -235,7 +187,7 @@ impl<'de, U: Unit, P: FixedScale, T: Storage + Deserialize<'de>, A: Copy + Deser
 
 #[cfg(feature = "counting")]
 mod index {
-    use super::write_range;
+    use crate::fixed::write_range;
     use crate::{Index, IndexFrom1, Seq, UnsignedStorage};
     use ::serde::de::{self, Deserialize, Deserializer};
     use ::serde::ser::{Serialize, Serializer};

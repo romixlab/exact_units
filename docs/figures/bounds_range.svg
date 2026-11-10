@@ -19,5 +19,5 @@
   <text x="265.045" y="46" text-anchor="middle" class="green">Range&lt;1, 5000&gt;: try_new is Ok</text>
   <circle cx="40.0" cy="70" r="6" class="accent"/>
   <circle cx="580.0" cy="70" r="6" class="accent"/>
-  <text x="40.0" y="120" class="accent">0 and 6000: Err(OutOfBounds), at construction and on every read from the wire</text>
+  <text x="40.0" y="120" class="accent">0 and 6000: Err(OutOfRange), at construction and on every read from the wire</text>
 </svg>

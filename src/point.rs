@@ -18,7 +18,7 @@
 use crate::fixed::Number;
 use crate::fixed::format::pad;
 use crate::{
-    Bounds, Fixed, FixedScale, Magnitude, MaybeNan, OutOfBounds, Repr, Storage, Unbounded, Unit,
+    Bounds, Fixed, FixedScale, Magnitude, MaybeNan, OutOfRange, Repr, Storage, Unbounded, Unit,
     UnitExpr, Unlimited,
 };
 use core::cmp::Ordering;
@@ -753,7 +753,7 @@ impl<O: Origin<Unit = U>, U, P, T: Storage, B: Bounds<T>> Point<O, Fixed<U, P, T
 
     /// The point `raw` steps from the origin, if `raw` is within `B`.
     #[inline(always)]
-    pub fn try_from_raw(raw: T) -> Result<Self, OutOfBounds> {
+    pub fn try_from_raw(raw: T) -> Result<Self, OutOfRange<U, P, T, B>> {
         Fixed::try_new(raw).map(Self::new)
     }
 
