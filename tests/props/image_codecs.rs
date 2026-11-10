@@ -744,6 +744,77 @@ fn ycbcr_matrices_from_kr_and_kb() {
     }
 }
 
+/// H.265's levelScale (8.6.3, eq. 8-309).
+const LEVEL_SCALE: [i64; 6] = [40, 45, 51, 57, 64, 72];
+
+/// H.264's v for the 4×4 (eq. 8-315) and 8×8 (eq. 8-318) transforms: row m, column the coefficient's place.
+const V4: [[i64; 3]; 6] = [
+    [10, 16, 13],
+    [11, 18, 14],
+    [13, 20, 16],
+    [14, 23, 18],
+    [16, 25, 20],
+    [18, 29, 23],
+];
+/// See [V4].
+const V8: [[i64; 6]; 6] = [
+    [20, 18, 32, 19, 25, 24],
+    [22, 19, 35, 21, 28, 26],
+    [26, 23, 42, 24, 33, 31],
+    [28, 25, 45, 26, 35, 33],
+    [32, 28, 51, 30, 40, 38],
+    [36, 32, 58, 34, 46, 43],
+];
+
+/// The step of a scale table at `qp`: `table[qp % 6] << (qp / 6)`, as H.265's eq. 8-309 and H.264's eq. 8-336 form
+/// it, through a run-time prefix 2^(qp / 6).
+fn qp_step(table: [i64; 6], qp: u8) -> i64 {
+    let mantissa = table.get(usize::from(qp % 6)).copied().unwrap_or(0);
+    let exponent = i8::try_from(qp / 6).unwrap_or(0);
+    Prefix::from_pow2(exponent)
+        .and_then(|p| {
+            p.rescale(
+                mantissa,
+                Prefix::Unit,
+                Rounding::Truncate,
+                Overflow::Checked,
+            )
+        })
+        .unwrap_or_else(|| panic!("the step at {qp} fits an i64"))
+}
+
+/// H.264's NOTE 2 (8.5.8): the scale "doubles for every increment of 6 in QPY", "approximately 12 % for each
+/// increase of 1". The doubling is exact in both standards and every step rises, but the steps between are the
+/// tables' own ratios: none is 2^(1/6), H.265's are within 0.012 of it (45/40 = 1.125, 80/72 = 1.111…), H.264's
+/// within 0.089 (19/18 = 1.0556 in the 8×8 table).
+#[cfg(not(kani))]
+#[test]
+fn qp_doubles_every_six_and_no_step_is_the_sixth_root_of_two() {
+    use num_bigint::BigInt;
+    let mut tables: Vec<([i64; 6], i64)> = vec![(LEVEL_SCALE, 12)];
+    for c in 0..3 {
+        tables.push((V4.map(|row| row.get(c).copied().unwrap_or(0)), 89));
+    }
+    for c in 0..6 {
+        tables.push((V8.map(|row| row.get(c).copied().unwrap_or(0)), 89));
+    }
+    for (table, within) in tables {
+        for qp in 0..=51 {
+            let (a, b) = (qp_step(table, qp), qp_step(table, qp + 1));
+            assert_eq!(qp_step(table, qp + 6), 2 * a, "{table:?} at {qp}");
+            assert!(b > a);
+            // b/a against 2^(1/6), exactly: (b/a)^6 against 2, and b/a ∓ within/1000 on either side of it
+            let (a, b) = (BigInt::from(a), BigInt::from(b));
+            assert_ne!(b.pow(6), 2 * a.pow(6));
+            let thousand = BigInt::from(1000);
+            let lo: BigInt = &thousand * &b - within * &a;
+            let hi: BigInt = &thousand * &b + within * &a;
+            let two: BigInt = 2 * (&thousand * &a).pow(6);
+            assert!(lo.pow(6) < two && two < hi.pow(6), "{table:?}: {a} to {b}");
+        }
+    }
+}
+
 #[cfg(not(any(kani, fuzzing)))]
 mod props {
     use proptest::prelude::*;
