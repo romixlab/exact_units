@@ -698,10 +698,11 @@ fn decimals(x: &num_rational::BigRational, places: u8) -> String {
 }
 
 /// The forward and inverse matrices from K_R and K_B are each other's inverse, exactly. JFIF prints them to four
-/// decimals (T.871 clause 7), and every one is the exact entry rounded. T.800 prints them to five or six (G.3), with
-/// three last digits off: G-10's 0,16875 and 0,331260 (the exact entries round to 0.16874 and 0.331264) and G-13's
-/// 0,34413 (0.34414). G-9 prints Y0 = −0,299·I0 − 0,587·I1 + 0,114·I2: with those signs the inverse G-12 to G-14 does
-/// not undo it, with plus signs it does.
+/// decimals (T.871 clause 7), and every one is the exact entry rounded. T.800 prints them to five or six (G.3), and
+/// three are off: G-10's 0,16875 (the exact entry rounds to 0.16874) and G-13's 0,34413 (0.34414) by one in the last
+/// place, G-10's 0,331260 (0.331264) by four in the sixth decimal, though 0,33126 would be right to five. G-9 prints
+/// Y0(x, y) = −0,299 I0(x, y) − 0,587 I1(x, y) + 0,114 I2(x, y): with those signs the inverse G-12 to G-14 does not
+/// undo it, with plus signs it does.
 #[cfg(not(kani))]
 #[test]
 fn ycbcr_matrices_from_kr_and_kb() {
@@ -740,19 +741,28 @@ fn ycbcr_matrices_from_kr_and_kb() {
     for (x, printed) in jfif {
         assert_eq!(decimals(x, 4), printed);
     }
-    // T.800, as printed, and the exact entry to as many places
+    // T.800, as printed, the exact entry to as many places, and how far apart they are in units of the last place
     let t800 = [
-        (blue_r, "-0.16875", "-0.16874"),
-        (blue_g, "-0.331260", "-0.331264"),
-        (red_g, "-0.41869", "-0.41869"),
-        (red_b, "-0.08131", "-0.08131"),
-        (green_blue, "-0.34413", "-0.34414"),
-        (green_red, "-0.71414", "-0.71414"),
+        (blue_r, "-0.16875", "-0.16874", 1),
+        (blue_g, "-0.331260", "-0.331264", 4),
+        (red_g, "-0.41869", "-0.41869", 0),
+        (red_b, "-0.08131", "-0.08131", 0),
+        (green_blue, "-0.34413", "-0.34414", 1),
+        (green_red, "-0.71414", "-0.71414", 0),
     ];
-    for (x, printed, exact) in t800 {
+    let last_places =
+        |text: &str| -> i64 { text.replace(['-', '.'], "").parse().unwrap_or(i64::MAX) };
+    for (x, printed, exact, off) in t800 {
         let places = u8::try_from(printed.len() - 3).unwrap_or(0);
         assert_eq!(decimals(x, places), exact, "{printed}");
+        assert_eq!(
+            (last_places(printed) - last_places(exact)).abs(),
+            off,
+            "{printed}"
+        );
     }
+    // G-10's 0,331260 is 4 off in the sixth decimal; at five places, 0,33126, it would be right
+    assert_eq!(decimals(blue_g, 5), "-0.33126");
 }
 
 /// H.265's levelScale (8.6.3, eq. 8-309).

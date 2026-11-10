@@ -119,9 +119,10 @@ H.264's sample aspect ratio indicator (Table E-1, H.265 Table E.1 the same) has 
 JFIF's and JPEG 2000's Y′CbCr matrices come from BT.601's K_R = 0.299 and K_B = 0.114. Every entry is then a rational: Cb divides by 2(1 − K_B) = 1.772 and Cr by 2(1 − K_R) = 1.402 (T.871 clause 7). The property builds both matrices exactly, checks that each undoes the other, and rounds the entries to the printed places:
 
 - JFIF's four-decimal entries (0.1687, 0.3313, 0.4187, 0.0813, 0.3441, 0.7141) are all right.
-- T.800's G-10 prints 0,16875 and 0,331260, which are 0.16874 and 0.331264.
-- T.800's G-13 prints 0,34413, which is 0.34414.
-- T.800's G-9 prints Y0 = −0,299·I0 − 0,587·I1 + 0,114·I2. Its inverse, G-12 to G-14, undoes the matrix with plus signs, not that one.
+- T.800's G-10 prints 0,16875, which is 0.16874: one off in the last place.
+- T.800's G-10 prints 0,331260, which is 0.331264 (0.587/1.772 = 0.331 264 1…): four off in the sixth decimal. As 0,33126 it would be right to five places.
+- T.800's G-13 prints 0,34413, which is 0.34414: one off in the last place.
+- T.800's G-9 prints Y0(x, y) = −0,299 I0(x, y) − 0,587 I1(x, y) + 0,114 I2(x, y). Its inverse, G-12 to G-14, undoes the matrix with plus signs, not that one.
 
 JFIF's `units` byte (T.871 10.1) picks what its densities mean. 0 means only the pixel aspect ratio, Vdensity:Hdensity. 1 means dots per inch, "dots per 2.54 cm". 2 means dots per cm. In dots per metre, 72 dpi is 360 000/127 exactly. One byte choosing among three kinds of value is something a codec, with its one `Linear`, can't say; the example uses an enum.
 
