@@ -11,9 +11,9 @@
 #[allow(
     dead_code,
     unreachable_pub,
-    reason = "only the reader's entry is used here"
+    reason = "only the reader's entries are used here"
 )]
-mod pure;
+pub(crate) mod pure;
 
 use pure::grammar::literal;
 use pure::model::Tok;

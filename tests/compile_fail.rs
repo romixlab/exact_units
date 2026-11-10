@@ -69,6 +69,7 @@ fn compile_fail_q() {
     t.compile_fail("tests/compile_fail/fixed_dim_mismatch.rs");
     t.compile_fail("tests/compile_fail/fixed_grammar.rs");
     t.compile_fail("tests/compile_fail/fixed_point.rs");
+    t.compile_fail("tests/compile_fail/exact_literal.rs");
     t.compile_fail("tests/compile_fail/level_inexact.rs");
 }
 

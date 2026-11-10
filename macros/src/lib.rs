@@ -120,6 +120,67 @@ pub fn fixed(input: TokenStream) -> TokenStream {
     }
 }
 
+/// `exact!($crate; 8071.31806 keV)`: the constant `exact_units::literal::LiteralIn<N, E, Unit>::EXACT`, the literal
+/// as an `Exact` of the unit as `q!` reads it, its prefix folded into the number. Called by exact_units' `exact!`,
+/// which writes the `$crate;` in front. A mode of its own, as [fixed] is: one literal, no point, level or range.
+#[proc_macro]
+pub fn exact(input: TokenStream) -> TokenStream {
+    let mut trees = input.into_iter();
+    let mut krate = Vec::new();
+    for t in trees.by_ref() {
+        if matches!(&t, TokenTree::Punct(p) if p.as_char() == ';') {
+            break;
+        }
+        krate.push(t);
+    }
+    let mut side = Side { trees: vec![None] };
+    let toks = side.convert(trees.collect());
+    if let Ok(Input::Range { .. } | Input::Tolerance { .. }) = range::input(&toks, 0) {
+        let e = Error::at(
+            0,
+            "a range or a tolerance is no one value, and exact! is an Exact: write each end as exact!(..), or check a value with v.is_in(q!(..))",
+        );
+        return error(&e, &side, "exact!");
+    }
+    match grammar::literal(&toks, 0) {
+        Ok(lit) => match (&lit.at, &lit.unit) {
+            (None, Unit::Level { id, .. }) => {
+                let e = Error::at(
+                    *id,
+                    format!(
+                        "`{}` is a level, and exact! an amount of a unit: a level is no fraction of its unit",
+                        side.text(*id)
+                    ),
+                );
+                error(&e, &side, "exact!")
+            }
+            (None, unit) => {
+                let mut out = Out::new(&krate);
+                out.krate("::literal::LiteralIn::<");
+                out.number(&lit);
+                out.unit(unit, &side);
+                out.text(">::EXACT");
+                out.ts
+            }
+            (Some(at), _) => {
+                let id = match at {
+                    At::Symbol { id, .. } => *id,
+                    At::Type(ids) => ids.first().copied().unwrap_or(0),
+                };
+                let e = Error::at(
+                    id,
+                    format!(
+                        "`{}` names an origin, and exact! is an amount, an Exact: write the amount from the origin, or compare a Point with q!(..)",
+                        side.text(id)
+                    ),
+                );
+                error(&e, &side, "exact!")
+            }
+        },
+        Err(e) => error(&e, &side, "exact!"),
+    }
+}
+
 /// The compiler's token under each id of the copy; id 0 is the macro's call.
 struct Side {
     trees: Vec<Option<TokenTree>>,

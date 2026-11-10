@@ -14,6 +14,7 @@ Each macro here gives a value worked out at compile time, so nothing of it runs 
 |---|---|---|
 | `fixed!(3.3)`, `fixed!(100 m/s)` | A typed constant from a decimal: the stored integer is worked out from the context's unit and scale. | [`fixed!`](literals.md#fixed) |
 | `q!(100 m/s)`, `q!(25 degC)` | A decimal with its unit, compared exactly with a `Fixed` or a `Point`. Default feature `q`. | [`q!`](literals.md#q), [the symbols of `q!`](symbols.md) |
+| `exact!(8071.31806 keV)` | A decimal with its unit as an `Exact` of that unit, the prefix folded in exactly; `q!(..).to_exact()` the same. Default feature `q`. | [`exact!`](literals.md#exact) |
 | `db!(-3)` | A gain at a level in decibels, as the stored value nearest to it. | [`db!`](../levels/decibels.md#db-a-level-as-a-constant) |
 | `np!(-1)` | A gain at a level in nepers, as the stored value nearest to it. | [Neper](../levels/decibels.md#neper) |
 | `assert_in!(X, q!(..))` | A constant checked against a `q!` range at compile time, `X` itself where it is in it, else a compile error. | [Checked at compile time](literals.md#checked-at-compile-time) |

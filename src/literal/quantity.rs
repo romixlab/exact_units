@@ -155,6 +155,48 @@ use crate::{Bounds, Exact, Fixed, FixedScale, Fraction, Magnitude, NanFree, Unit
 impl<const N: i64, const E: i16, S> LiteralIn<N, E, S> {
     /// The literal as a value: what `q!` gives.
     pub const NEW: Self = LiteralIn(PhantomData);
+
+    /// The literal as an [Exact] of its own unit, `N · 10^E` of `S`: what [exact!](crate::exact) gives. Every
+    /// literal is one, its power of ten kept apart ([Fraction::from_parts_exp10]), so `1.66053906892e-27` and
+    /// `5e-300` are exact too.
+    pub const EXACT: Exact<S> = Exact::from_literal(Decimal::new(N, E));
+
+    /// The literal as an [Exact] of its own unit: `q!(8071.31806 keV).to_exact()` is
+    /// [exact!(8071.31806 keV)](crate::exact), an `Exact<ElectronVolt>` of 8071318.06 eV.
+    ///
+    /// ```
+    /// # #[cfg(feature = "radiation")] {
+    /// use exact_units::{Exact, Fraction, exact, q, units::ElectronVolt};
+    /// let d: Exact<ElectronVolt> = q!(8071.31806 keV).to_exact();
+    /// assert_eq!(d, exact!(8071.31806 keV));
+    /// assert_eq!(d, Exact::new(807_131_806, 100));
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn to_exact(self) -> Exact<S> {
+        Self::EXACT
+    }
+}
+
+/// `x` as a [Fraction], exactly: its digits and its power of ten, which [Fraction::from_parts_exp10] keeps apart.
+#[expect(
+    clippy::as_conversions,
+    reason = "const fn: From is not const on stable; an i16 into an i32"
+)]
+#[expect(
+    clippy::panic,
+    reason = "a compile error in const code: never reached, as an i64's digits fit u128 at any i16 exponent"
+)]
+const fn exact_of(x: Decimal) -> Fraction {
+    match Fraction::from_parts_exp10(
+        x.num() < 0,
+        x.num().unsigned_abs() as u128,
+        1,
+        x.exp() as i32,
+    ) {
+        Some(f) => f,
+        None => panic!("a literal no Fraction holds"),
+    }
 }
 
 impl<const N: i64, const E: i16, S> Clone for LiteralIn<N, E, S> {
@@ -609,6 +651,52 @@ macro_rules! q {
     ($($t:tt)*) => { $crate::__macros::q!($crate; $($t)*) };
 }
 
+/// The literal [q!](crate::q) reads as an [Exact] of its unit, worked out at compile time: `exact!(8071.31806 keV)`
+/// is an `Exact<ElectronVolt>` of 8071318.06 eV, usable in `const`. The sibling of [fixed!](crate::fixed), which
+/// gives a [Fixed] the context names: the same reader and symbol table, the same compile errors for an unknown or
+/// ambiguous symbol.
+///
+/// - The unit is the one `q!` reads, its SI prefix folded into the value exactly: `exact!(2.5 mV)` is an
+///   `Exact<Volt>` of 1/400, `exact!(100 km/h)` an `Exact<Per<Metre, Hour>>` of 100000. Another unit of the same
+///   dimension is [Exact::convert] away.
+/// - Every decimal is a value, of any size: the power of ten stays apart from the digits, so
+///   `exact!(1.66053906892e-27 kg)` is exact. Negative values too: `exact!(-3.1 mV)`.
+/// - A ratio names its unit as `q!` does: `exact!(5 %)`, `exact!(0.5 Ratio)`.
+/// - A point (`25 degC`), a level (`-3 dB`) or a range is a compile error: an `Exact` is an amount of a unit.
+///
+/// `q!(..).to_exact()` is the same value from a `q!` literal ([LiteralIn::to_exact]).
+///
+/// ```
+/// # #[cfg(all(feature = "radiation", feature = "mechanical", feature = "time"))] {
+/// use exact_units::{Exact, Fraction, exact, units::{ElectronVolt, Meter, Speed}};
+/// const N: Exact<ElectronVolt> = exact!(8071.31806 keV); // AME2020's mass excess of the neutron
+/// assert_eq!(N, Exact::new(807_131_806, 100));
+/// assert_eq!(exact!(-1.5 mm), Exact::<Meter>::new(-3, 2000));
+/// assert_eq!(exact!(36 km/h).convert::<Speed>(), Some(Exact::int(10)));
+/// assert_eq!(exact!(5e-300 m).get(), Fraction::new(5, 1).checked_mul(Fraction::pow10(-300)).unwrap());
+/// # }
+/// ```
+///
+/// An unknown symbol doesn't compile, nor does a point or a level:
+///
+/// ```compile_fail
+/// let x = exact_units::exact!(3 furlongs);
+/// ```
+///
+/// ```compile_fail
+/// # #[cfg(feature = "thermal")] {
+/// let x = exact_units::exact!(25 degC);
+/// # }
+/// ```
+///
+/// ```compile_fail
+/// let x = exact_units::exact!(-3 dB);
+/// ```
+#[macro_export]
+macro_rules! exact {
+    ($($t:tt)*) => { $crate::__macros::exact!($crate; $($t)*) };
+}
+
 // A unit without a dimension, for a literal whose unit starts with a negative power: `q!(5 s^-1)` is
 // `Per<Unitless, Second>`. Not a unit for an API: it is in no feature group, as every literal may need it.
 crate::unit! {
@@ -940,6 +1028,16 @@ pub(super) const fn fraction<S: Unit, U: Unit>(x: Decimal) -> Fraction {
     match Fraction::from_parts(x.num() < 0, p, q) {
         Some(f) => f,
         None => panic!("a literal's fraction has a denominator of 0"),
+    }
+}
+
+impl<U> Exact<U> {
+    /// Decimal `x` of `U` as an `Exact`, exactly: what [LiteralIn::EXACT] and [exact!](crate::exact) give, as a
+    /// `const fn` the properties of `tests/props` reach at run time.
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn from_literal(x: Decimal) -> Self {
+        Exact::of(exact_of(x))
     }
 }
 

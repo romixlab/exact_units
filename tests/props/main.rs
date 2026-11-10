@@ -43,6 +43,8 @@ mod panics;
 mod point;
 mod prefix;
 #[cfg(all(feature = "q", not(kani)))]
+mod q_exact;
+#[cfg(all(feature = "q", not(kani)))]
 mod q_float;
 #[cfg(all(feature = "q", feature = "electrical", not(kani)))]
 mod q_level;

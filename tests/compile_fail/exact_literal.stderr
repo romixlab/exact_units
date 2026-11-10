@@ -1,0 +1,43 @@
+error: exact!: `furlongs` is no unit symbol q! knows: write a symbol (m/s, km/h, mV), its type (Speed, units::Volt), or a string for one Rust's lexer can't take ("°")
+ --> tests/compile_fail/exact_literal.rs:6:22
+  |
+6 |     let _ = exact!(3 furlongs);
+  |                      ^^^^^^^^
+
+error: exact!: `rd` reads more than one way (RodInternational, RodUsSurvey): write the one you mean as a type, as in q!(5 RodInternational)
+ --> tests/compile_fail/exact_literal.rs:7:22
+  |
+7 |     let _ = exact!(2 rd);
+  |                      ^^
+
+error: exact!: `degC` names an origin, and exact! is an amount, an Exact: write the amount from the origin, or compare a Point with q!(..)
+ --> tests/compile_fail/exact_literal.rs:8:23
+  |
+8 |     let _ = exact!(25 degC);
+  |                       ^^^^
+
+error: exact!: `AbsoluteZero` names an origin, and exact! is an amount, an Exact: write the amount from the origin, or compare a Point with q!(..)
+ --> tests/compile_fail/exact_literal.rs:9:28
+  |
+9 |     let _ = exact!(300 K @ AbsoluteZero);
+  |                            ^^^^^^^^^^^^
+
+error: exact!: `dB` is a level, and exact! an amount of a unit: a level is no fraction of its unit
+  --> tests/compile_fail/exact_literal.rs:10:23
+   |
+10 |     let _ = exact!(-3 dB);
+   |                       ^^
+
+error: exact!: a range or a tolerance is no one value, and exact! is an Exact: write each end as exact!(..), or check a value with v.is_in(q!(..))
+  --> tests/compile_fail/exact_literal.rs:11:13
+   |
+11 |     let _ = exact!(4.9 V ..= 5.1 V);
+   |             ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `$crate::__macros::exact` which comes from the expansion of the macro `exact` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: exact!: a unit is missing after the number: q!(100 m/s), q!(5 %), q!(0.5 Ratio); fixed!(..) is a number in the unit of its context
+  --> tests/compile_fail/exact_literal.rs:12:20
+   |
+12 |     let _ = exact!(5);
+   |                    ^

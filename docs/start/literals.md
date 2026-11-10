@@ -2,16 +2,17 @@
 level: basic
 ---
 
-# Literals: `fixed!` and `q!`
+# Literals: `fixed!`, `q!` and `exact!`
 
 Three ways to write a number with its unit, each for a different place:
 
 - **`fixed!`** names a typed `const`: a limit, a setpoint, a conversion factor, fixed before the firmware runs.
 - **`q!`** compares a `Fixed` against a decimal in its own units, with no named constant: `speed < q!(100 m/s)`.
-- **[`Exact`](../maths/fractions.md)** is the one for a host or a planner: a value no fixed scale holds, worked
-  out as an exact fraction at run time.
+- **`exact!`** writes a value for [`Exact`](../maths/fractions.md), the one for a host or a planner: a value no fixed
+  scale holds, worked out as an exact fraction at run time. `exact!(8071.31806 keV)` is an `Exact<ElectronVolt>`,
+  in `const` too, written as the table prints it.
 
-`fixed!` and `q!` are both worked out at compile time, down to the one integer compare or constant a device runs;
+`fixed!`, `q!` and `exact!` are all worked out at compile time, down to the one integer compare or constant a device runs;
 [Where they belong](#where-they-belong) at the end of this page shows that compare's own instructions.
 
 ## `fixed!`
@@ -542,6 +543,32 @@ let _ = Fixed::<GallonUs, One, i16>::new(1) < q!(5 gal); // the US gallon, or th
 # }
 # #[cfg(not(feature = "customary"))] compile_error!("the gal case needs customary");
 ```
+
+## `exact!`
+
+`fixed!` gives the `Fixed` its context names; `exact!` gives an [`Exact`](../maths/fractions.md) of the unit the literal itself names. It reads the literal as `q!` does, with the same symbol table and the same compile errors for an unknown or an ambiguous symbol, and folds the prefix into the value exactly:
+
+```rust
+# #[cfg(all(feature = "radiation", feature = "mechanical", feature = "time"))] {
+use exact_units::{Exact, exact, q, units::{ElectronVolt, Speed}};
+
+// AME2020's mass excess of the neutron, as it prints it
+const D_N: Exact<ElectronVolt> = exact!(8071.31806 keV);
+assert_eq!(D_N, Exact::new(807_131_806, 100)); // 8071318.06 eV
+
+assert_eq!(exact!(-1.5 mm).to_string(), "-1.5 mm");
+assert_eq!(exact!(36 km/h).convert::<Speed>(), Some(Exact::int(10)));
+assert_eq!(q!(8071.31806 keV).to_exact(), D_N);
+# }
+```
+
+- The type is `Exact<U>`, `U` the unit as `q!` reads it: `keV` is `ElectronVolt`, `km/h` is `Per<Meter, Hour>`. [`convert`](../maths/fractions.md) takes it to another unit of the same dimension, exactly or `None`.
+- Every decimal is a value, of any size: the power of ten stays apart from the digits, so `exact!(1.66053906892e-27 kg)` and `exact!(5e-300 m)` are exact. Negative values too.
+- `q!(..).to_exact()` is the same value from a `q!` literal that is already there.
+- A point (`25 degC`), a level (`-3 dB`) or a range doesn't compile: an `Exact` is an amount of a unit. A bare number has no unit to read; `Exact::int(5)` or `exact!(5 %)` says which.
+- `exact!(text)` is the `Exact` that `text.parse()` reads at run time, checked for every decimal and SI prefix the property draws (`tests/props/q_exact.rs`).
+
+Which one to pick: `fixed!` where the value goes into a device's typed constant, `q!` where it is only compared, `exact!` where it is a value to compute with exactly, on a host or in a test.
 
 ## Angles: pick a unit that carries π
 
