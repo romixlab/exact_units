@@ -77,7 +77,7 @@ fn rational_le(bytes: [u8; 8]) -> (i64, i64) {
 /// The whole number of stops k of a ratio that is 2^k exactly, `None` for any other: log2 of a rational is rational
 /// only for a power of two. The crate has no exact logarithm of an `Exact`; this is the case APEX needs.
 fn whole_stops(x: Fraction) -> Option<i16> {
-    let (num, den) = (x.numer(), x.denom());
+    let (num, den) = (x.numer()?, x.denom()?);
     if num.is_power_of_two() && den.is_power_of_two() {
         i16::try_from(i64::from(num.trailing_zeros()) - i64::from(den.trailing_zeros())).ok()
     } else {
@@ -87,7 +87,7 @@ fn whole_stops(x: Fraction) -> Option<i16> {
 
 /// 2^k as a fraction.
 fn pow2(k: i16) -> Fraction {
-    Fraction::pow2(i8::try_from(k).unwrap()).unwrap()
+    Fraction::pow2(i32::from(k)).unwrap()
 }
 
 fn main() {
