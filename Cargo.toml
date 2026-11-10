@@ -322,6 +322,7 @@ required-features = [
     "dimensionless",
     "mechanical",
     "libm",
+    "q",
 ]
 
 [[example]]

@@ -21,28 +21,23 @@ The data are from the atomic mass evaluation AME2020 (Wang et al., Chinese Phys.
 
 ## Binding energies and Q-values: exact
 
-AME2020 prints each nuclide's mass excess Δ = (M − A·u)·c² in keV. A binding energy is B = Z·Δ(¹H) + N·Δ(n) − Δ, and a decay's Q-value is Δ(parent) minus the daughters' Δ. Both are sums of printed decimals, so `Exact` gives them exactly:
+AME2020 prints each nuclide's mass excess Δ = (M − A·u)·c² in keV. A binding energy is B = Z·Δ(¹H) + N·Δ(n) − Δ, and a decay's Q-value is Δ(parent) minus the daughters' Δ. Both are sums of printed decimals, so `Exact` gives them exactly. `exact!` writes each value as AME2020 prints it: the literal `q!` reads, an `Exact<ElectronVolt>` with the prefix folded into the value, worked out at compile time.
 
 ```rust
-use exact_units::{Exact, prefix::Kilo, units::ElectronVolt};
-
-const fn kev(num: i128, den: u128) -> Exact<ElectronVolt> {
-    Exact::new_in::<Kilo>(num, den)
-}
+use exact_units::{Exact, exact, units::ElectronVolt};
 
 // AME2020, mass_1.mas20: Δ(n), Δ(¹H), Δ(⁵⁶Fe)
-let d_n = kev(807_131_806, 100_000);
-let d_h = kev(7_288_971_064, 1_000_000);
-let d_fe56 = kev(-60_607_163, 1000);
+const D_N: Exact<ElectronVolt> = exact!(8071.31806 keV);
+let (d_n, d_h, d_fe56) = (D_N, exact!(7288.971064 keV), exact!(-60607.163 keV));
 
 let b = (((d_h * 26).unwrap() + (d_n * 30).unwrap()).unwrap() - d_fe56).unwrap();
 assert_eq!(b.to_string(), "492.259952464 MeV");
 // B/A, against AME2020's own column, 8790.3563 keV, which is rounded to 0.1 eV
 let per_a = (b / 56).unwrap();
-assert!((per_a - kev(87_903_563, 10_000)).unwrap().abs() <= Exact::new(1, 20));
+assert!((per_a - exact!(8790.3563 keV)).unwrap().abs() <= Exact::new(1, 20));
 
 // the α decay of ²²⁶Ra: Q = Δ(²²⁶Ra) − Δ(²²²Rn) − Δ(⁴He)
-let q = ((kev(23_667_576, 1000) - kev(16_371_957, 1000)).unwrap() - kev(242_491_587, 100_000)).unwrap();
+let q = ((exact!(23667.576 keV) - exact!(16371.957 keV)).unwrap() - exact!(2424.91587 keV)).unwrap();
 assert_eq!(q.to_string(), "4.87070313 MeV");
 ```
 
@@ -67,7 +62,7 @@ let g = Exact::<Dalton>::int(1).convert::<Gram>();
 With a set, m_u·c² is the set's m_u in kg times c², which the SI fixes, in eV. AME2020's Table A prints CODATA 2018's as 931 494.102 42 keV, rounded on its own; from the m_u CODATA prints in kg it is 2.9 meV less, inside the 0.28 eV uncertainty of both. The difference between editions shows in a rest energy. ²³⁸U's M·c² moves by 309 eV between the two, two hundred times the 1.5 eV uncertainty AME2020 gives its mass:
 
 ```rust
-use exact_units::{Exact, prefix::{Kilo, Micro}, units::{ElectronVolt, Ratio, Speed}};
+use exact_units::{Exact, prefix::Micro, units::{ElectronVolt, Ratio, Speed}};
 use exact_units::constants::{Codata2018, Codata2022, Constants};
 
 exact_units::unit! {
@@ -83,7 +78,7 @@ fn dalton_energy<S: Constants>() -> Exact<ElectronVolt> {
 }
 
 // AME2020 Table A's m_u·c², 931 494.102 42 keV: 2.9 meV above the one from m_u in kg
-let table_a = Exact::<ElectronVolt>::new_in::<Kilo>(93_149_410_242, 100_000);
+let table_a: Exact<ElectronVolt> = exact_units::exact!(931494.10242 keV);
 let below = (table_a - dalton_energy::<Codata2018>()).unwrap();
 assert!(below > Exact::new(28, 10_000) && below < Exact::new(29, 10_000));
 
@@ -106,7 +101,7 @@ use exact_units::units::{ElectronVolt, Gram, Joule, Speed};
 use exact_units::systems::{Natural, Si, natural::NaturalElectronVolt};
 
 // Q of ²²⁶Ra's α decay, 4870.70313 keV
-let q = Exact::<ElectronVolt>::new_in::<Kilo>(487_070_313, 100_000);
+let q: Exact<ElectronVolt> = exact_units::exact!(4870.70313 keV);
 let natural = q.to_system::<Natural>().convert::<NaturalElectronVolt>().unwrap();
 assert_eq!(natural.get(), q.get());
 // as a mass, rounded once into an f64: e/c² is 1.78·10⁻³⁶ kg per eV

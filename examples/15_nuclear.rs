@@ -18,10 +18,13 @@
 //! the step without one. The semi-empirical mass formula ends the tour: its volume and asymmetry terms are exact, the
 //! surface, Coulomb and pairing terms need A^(1/3), a float edge by necessity.
 //!
+//! AME2020's values are written as it prints them, `exact!(8071.31806 keV)`: the literal `q!` reads, as an `Exact` of
+//! its unit, the prefix folded into the value exactly.
+//!
 //! Each number names its table. Where the crate has no place for something (an activity from an `Exact`), the
 //! comment says so where the example works around it.
 //!
-//! `cargo run --example 15_nuclear --features radiation,systems,time,chemical,dimensionless,mechanical,libm`
+//! `cargo run --example 15_nuclear --features radiation,systems,time,chemical,dimensionless,mechanical,libm,q`
 
 #![expect(
     clippy::print_stdout,
@@ -43,7 +46,7 @@ use exact_units::systems::{Natural, Si, natural::NaturalElectronVolt};
 use exact_units::units::{
     Becquerel, ElectronVolt, EquivalentDose, Gram, Gray, Joule, Per, Ratio, Second, Speed,
 };
-use exact_units::{Exact, Fixed, Fraction, Prefix, Rounding};
+use exact_units::{Exact, Fixed, Fraction, Prefix, Rounding, exact};
 
 exact_units::unit! {
     /// The dalton (unified atomic mass unit), 1 Da = 1 u = m_u: one twelfth of a ¹²C atom, measured in kg, so its
@@ -66,11 +69,6 @@ exact_units::unit! {
         Exact(3155692608 / 100), conventional("NUBASE2020, section 2.3", 2021);
 }
 
-/// A mass excess or an energy from AME2020, in keV, exact as printed.
-const fn kev(num: i128, den: u128) -> Exact<ElectronVolt> {
-    Exact::new_in::<Kilo>(num, den)
-}
-
 /// An atomic mass from AME2020 in µu, as the ratio M/m_u it is: a mass spectrometer measures ratios of masses.
 const fn micro_u(num: i128, den: u128) -> Exact<Ratio> {
     Exact::new_in::<Micro>(num, den)
@@ -89,63 +87,63 @@ const NEUTRON: Nuclide = Nuclide {
     name: "n",
     z: 0,
     a: 1,
-    excess: kev(807_131_806, 100_000),
+    excess: exact!(8071.31806 keV),
     mass: micro_u(100_866_491_590, 100_000),
 };
 const H1: Nuclide = Nuclide {
     name: "1H",
     z: 1,
     a: 1,
-    excess: kev(7_288_971_064, 1_000_000),
+    excess: exact!(7288.971064 keV),
     mass: micro_u(1_007_825_031_898, 1_000_000),
 };
 const HE4: Nuclide = Nuclide {
     name: "4He",
     z: 2,
     a: 4,
-    excess: kev(242_491_587, 100_000),
+    excess: exact!(2424.91587 keV),
     mass: micro_u(400_260_325_413, 100_000),
 };
 const FE56: Nuclide = Nuclide {
     name: "56Fe",
     z: 26,
     a: 56,
-    excess: kev(-60_607_163, 1000),
+    excess: exact!(-60607.163 keV),
     mass: micro_u(55_934_935_537, 1000),
 };
 const NI62: Nuclide = Nuclide {
     name: "62Ni",
     z: 28,
     a: 62,
-    excess: kev(-66_746_440, 1000),
+    excess: exact!(-66746.440 keV),
     mass: micro_u(61_928_344_753, 1000),
 };
 const U235: Nuclide = Nuclide {
     name: "235U",
     z: 92,
     a: 235,
-    excess: kev(40_918_782, 1000),
+    excess: exact!(40918.782 keV),
     mass: micro_u(235_043_928_117, 1000),
 };
 const U238: Nuclide = Nuclide {
     name: "238U",
     z: 92,
     a: 238,
-    excess: kev(47_307_732, 1000),
+    excess: exact!(47307.732 keV),
     mass: micro_u(238_050_786_936, 1000),
 };
 const RA226: Nuclide = Nuclide {
     name: "226Ra",
     z: 88,
     a: 226,
-    excess: kev(23_667_576, 1000),
+    excess: exact!(23667.576 keV),
     mass: micro_u(226_025_408_186, 1000),
 };
 const RN222: Nuclide = Nuclide {
     name: "222Rn",
     z: 86,
     a: 222,
-    excess: kev(16_371_957, 1000),
+    excess: exact!(16371.957 keV),
     mass: micro_u(222_017_576_017, 1000),
 };
 
@@ -201,10 +199,10 @@ fn binding_energies() {
     println!("Binding energies from AME2020's mass excesses (exact):");
     // AME2020's own B/A column, keV
     for (x, printed) in [
-        (&FE56, kev(87_903_563, 10_000)),
-        (&NI62, kev(87_945_555, 10_000)),
-        (&U235, kev(75_909_151, 10_000)),
-        (&U238, kev(75_701_262, 10_000)),
+        (&FE56, exact!(8790.3563 keV)),
+        (&NI62, exact!(8794.5555 keV)),
+        (&U235, exact!(7590.9151 keV)),
+        (&U238, exact!(7570.1262 keV)),
     ] {
         let b = binding(x);
         let per_a = (b / x.a).unwrap();
@@ -258,7 +256,7 @@ fn q_values() {
     println!("Q-values (exact):");
     // α decay of ²²⁶Ra: Q = Δ(²²⁶Ra) − Δ(²²²Rn) − Δ(⁴He)
     let q_alpha = ((RA226.excess - RN222.excess).unwrap() - HE4.excess).unwrap();
-    assert_eq!(q_alpha, kev(487_070_313, 100_000));
+    assert_eq!(q_alpha, exact!(4870.70313 keV));
     // the α's share of it, non-relativistic and with atomic masses: an approximate formula, worked exactly
     let share = (RN222.mass / (RN222.mass + HE4.mass).unwrap())
         .unwrap()
@@ -274,21 +272,21 @@ fn q_values() {
     for (name, parent, daughter, printed) in [
         (
             "60Co -> 60Ni",
-            kev(-61_650_437, 1000),
-            kev(-64_473_243, 1000),
-            kev(28_228_058, 10_000),
+            exact!(-61650.437 keV),
+            exact!(-64473.243 keV),
+            exact!(2822.8058 keV),
         ),
         (
             "137Cs -> 137Ba",
-            kev(-86_545_772, 1000),
-            kev(-87_721_401, 1000),
-            kev(11_756_285, 10_000),
+            exact!(-86545.772 keV),
+            exact!(-87721.401 keV),
+            exact!(1175.6285 keV),
         ),
         (
             "3H -> 3He",
-            kev(1_494_981_090, 100_000),
-            kev(1_493_121_888, 100_000),
-            kev(1_859_202, 100_000),
+            exact!(14949.81090 keV),
+            exact!(14931.21888 keV),
+            exact!(18.59202 keV),
         ),
     ] {
         let q = (parent - daughter).unwrap();
@@ -413,10 +411,10 @@ fn doses() {
 
 /// The semi-empirical mass formula's coefficients in keV, fitted by least squares to AME2020's experimental binding
 /// energies (2457 nuclides with N, Z ≥ 8, pairing δ·a_P/√A): a convention of this example, not of a standard.
-const A_V: i128 = 15_566;
+const A_V: Exact<ElectronVolt> = exact!(15566 keV);
 const A_S: f64 = 17_341.0;
 const A_C: f64 = 705.0;
-const A_A: i128 = 22_879;
+const A_A: Exact<ElectronVolt> = exact!(22879 keV);
 const A_P: f64 = 12_419.0;
 
 /// B(A, Z) = a_V·A − a_S·A^(2/3) − a_C·Z(Z−1)/A^(1/3) − a_A·(A−2Z)²/A + δ·a_P/√A, in keV: the volume and
@@ -424,7 +422,7 @@ const A_P: f64 = 12_419.0;
 fn semf(x: &Nuclide) -> (Exact<ElectronVolt>, f64) {
     let (a, z, n) = (x.a, x.z, x.a - x.z);
     let asym = (a - 2 * z) * (a - 2 * z);
-    let exact = (kev(A_V * a, 1) - (kev(A_A * asym, 1) / a).unwrap()).unwrap();
+    let exact = ((A_V * a).unwrap() - ((A_A * asym).unwrap() / a).unwrap()).unwrap();
     #[expect(
         clippy::cast_precision_loss,
         clippy::as_conversions,
