@@ -304,11 +304,9 @@ fn quantizing_e_prime_is_the_standards_int() {
                 x - 2560,
                 r,
             ));
-            ties += u32::from(quantize_matches_int::<NarrowChroma12, Rational<1, 3584>, _>(
-                CHROMA12,
-                x - 2560,
-                r,
-            ));
+            ties += u32::from(
+                quantize_matches_int::<NarrowChroma12, Rational<1, 3584>, _>(CHROMA12, x - 2560, r),
+            );
         }
         // the negative ties are real, not a case the walk never reaches
         assert!(ties > 0);
