@@ -136,8 +136,8 @@ pub(crate) fn sv_of_speed(s: u32) {
 }
 
 /// The code `x` sixths of a stop rounds to by `md` among labels of whole stops `stops` (code `i` is `stops[i]`):
-/// the exact one, else the one below or above as the mode says, a tie to the even code (`NearestEven`) or the value
-/// farther from zero (`NearestAway`); past an end, the nearest modes take the end and the others refuse.
+/// the exact one, else the one below or above as the mode says, a tie to the even code (`NearestEven`), the value
+/// farther from zero (`NearestAway`) or the greater one (`NearestCeil`); past an end, the nearest modes take the end and the others refuse.
 fn label_rounded(stops: &[i16], x: i16, md: Rounding) -> Option<usize> {
     let sixth = |i: usize| stops.get(i).map(|s| s * 6);
     if let Some(i) = (0..stops.len()).find(|&i| sixth(i) == Some(x)) {
@@ -157,24 +157,26 @@ fn label_rounded(stops: &[i16], x: i16, md: Rounding) -> Option<usize> {
                 above.filter(|_| x < 0)
             }
         }
-        Rounding::NearestEven | Rounding::NearestAway => match (below, above) {
-            (Some(b), Some(a)) => {
-                let (vb, va) = (sixth(b).unwrap(), sixth(a).unwrap());
-                let (db, da) = (x - vb, va - x);
-                Some(if db < da {
-                    b
-                } else if da < db {
-                    a
-                } else if md == Rounding::NearestEven {
-                    if b % 2 == 0 { b } else { a }
-                } else if vb.unsigned_abs() > va.unsigned_abs() {
-                    b
-                } else {
-                    a
-                })
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
+            match (below, above) {
+                (Some(b), Some(a)) => {
+                    let (vb, va) = (sixth(b).unwrap(), sixth(a).unwrap());
+                    let (db, da) = (x - vb, va - x);
+                    Some(if db < da {
+                        b
+                    } else if da < db || md == Rounding::NearestCeil {
+                        a
+                    } else if md == Rounding::NearestEven {
+                        if b % 2 == 0 { b } else { a }
+                    } else if vb.unsigned_abs() > va.unsigned_abs() {
+                        b
+                    } else {
+                        a
+                    })
+                }
+                (b, a) => b.or(a),
             }
-            (b, a) => b.or(a),
-        },
+        }
     }
 }
 

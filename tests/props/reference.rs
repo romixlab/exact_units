@@ -451,7 +451,7 @@ pub(crate) fn stops_rounded(r: u64, k: u32, md: Rounding) -> i128 {
     match md {
         Rounding::Floor | Rounding::Truncate => floor,
         Rounding::Ceil => floor + 1,
-        Rounding::NearestEven | Rounding::NearestAway => {
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
             let sq = &p * &p;
             let mid = BigUint::from(1_u8) << (2 * m + 1);
             assert!(sq != mid, "r^2k is never an odd power of two");
