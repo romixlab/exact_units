@@ -185,7 +185,7 @@ const fn hrd_forbidden(scale: i128) -> CodeSpan {
 
 /// The HRD's maximum input bit rate of a CPB, BitRate = (bit_rate_value_minus1 + 1) · 2^(6 + bit_rate_scale) bit/s
 /// (H.264 E.2.2, eq. E-81; H.265 E.3.3, eq. E-87). The two fields sit apart in the stream (`bit_rate_scale` in 4
-/// bits, `bit_rate_value_minus1` as ue(v)); the code is both in one `u64`, `bit_rate_scale << 32 |
+/// bits, `bit_rate_value_minus1` as an Exp-Golomb code); the code is both in one `u64`, `bit_rate_scale << 32 |
 /// bit_rate_value_minus1`. Up to 2³² · 2²¹ bit/s, which a `u32` doesn't hold. A rate has more than one code where a
 /// mantissa is even (2 · 2⁶ is 1 · 2⁷): encoding gives the lowest.
 ///
