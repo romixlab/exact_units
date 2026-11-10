@@ -2,6 +2,12 @@
 
 ### 🚀 Features
 
+- Book: search's highlighted result is clearable (P2401#10nov-1740). Opening a search result left its words
+  marked on the page with no way to clear them, and `?h=` in the URL forever (a reload kept re-highlighting, a
+  copied link carried the query along). Esc, or a small "✕ clear highlight" control (`docs/javascripts/clear_highlight.js`,
+  shown only once the highlighter has actually marked something, watched for with a `MutationObserver` since
+  the marks land asynchronously through zensical's search worker), now removes the marks and drops `?h=` from
+  the URL together, via `history.replaceState`.
 - `Fraction` holds 38 significant digits in each of its numerator and denominator, times `10^±2³¹` (NUM-33): a strict superset of the values before, still `Copy`, `const` and 48 bytes. `examples/15_nuclear.rs` works its three refusals exactly now: Q_α(²²⁶Ra)/c² as 8.6828·10⁻³⁰ kg, N = m/M·N_A with CODATA 2018's M_u, and ⁵⁶Fe's mass in kg through m_u. `from_parts_exp10` makes one from its parts, `from_magnitude` keeps a magnitude's power of ten as the exponent (`10⁻⁵⁰` is a `Fraction`), and `to_f64` is correctly rounded at every exponent, subnormals and ±∞ included. Multiply and divide refuse exactly the results no form of which fits; the order is exact across exponents, by bit lengths first; add and subtract align in 512 bits, and a sum of terms 77 or more decimal places apart that would fit only by cancelling is refused (the book's [Range](docs/maths/fractions.md#range) and its falls-short list). `{}` writes `NUMeEXP/DEN` where a fraction needs its exponent, and text reads it back. A `Fixed` compares with an `Exact` across any exponent. Tests: `tests/props/exact.rs` against `BigRational` with the canonical form by brute force (`reference::canonical`), strategies at large and small exponents, at the clamp, at the window and at the ends of `i32`; the u8 walk with `i8` exponents; Kani proofs of the four-limb steps and of a 5 stripped by its inverse.
 - `codec::video` (LVL-8, P2401#10nov-1005b): video's narrow-range quantizers as exact codecs and the PQ transfer curve as a named float edge, to see how the codec design fares on non-linear signals that don't use their whole code range. `Narrow8`, `NarrowChroma8`, `Narrow10` and `NarrowChroma10` code a component as ITU-R BT.709-6 Part 2 item 3.4 (and BT.2100-3 Table 9 on 10 bits) does, `D = 219·E′ + 16` and `224·E′ + 128` times 2ⁿ⁻⁸; their `Linear` is the signal E′ itself, an exact `Fixed<Ratio, Rational<1, 219>, i16, Range<..>>`, bounded to the codes item 4.7 calls video data (1..=254, 10-bit 4..=1019, footroom and headroom included), the timing references spare and free for a niche; the nominal levels are named (`BLACK`, `WHITE`, `ZERO`, `NOMINAL_MIN`, `NOMINAL_MAX`). A new `CodecShape::Offset { zero }` is their shape: the scale stays in the `Fixed`, the codec adds the offset. `Pq` is BT.2100-3 Table 4's PQ (first SMPTE ST 2084): the five constants as exact `Magnitude`s, `c₁ = c₃ − c₂ + 1` checked at compile time (E′ = 1 is exactly 10 000 cd/m²), and the curve as a float edge with feature `libm`, `eotf_f64`, `inverse_eotf_f64`, `to_nits_f64` and `from_nits_f64`: every 10-bit code but black and white means an irrational luminance, so PQ is no `Codec`. `Pq` is the first `Curve`, `CurveKind::Float`. Tests: `tests/props/video.rs` (every code of the four quantizers by both paths, every E′ in steps of 1/4096 against the standard's INT, timing references as niches, PQ's 877 codes and every whole cd/m² from 0 to 10 000, a Kani proof of `Narrow8`). `just test` runs with `libm` now. Book: [Video codes and transfer curves](docs/fixed_point/video.md), which also lists where the codec design falls short (an exact-only `formula`, rounding in the `Linear`'s domain, no layered shapes, exponents typed as `Magnitude`, one `CurveKind` per curve, `CodecDef` without the `Raw`'s width).
 - `Point`, `Index`, `IndexFrom1` and `Seq` gain `series(cells)` (PT-7, SW-60, API-50), the transparent series
@@ -684,9 +690,10 @@ firmware that only needs units in its types builds without it; the bytes don't d
   `[[symbol]]` / `\unit{}` markup (P2401#10nov-1740): every crate-recognized unit symbol in their prose is now
   linked and tooltipped, and the plain-text physics formulas they wrote by hand (`m_u·c²`, `λ = ln 2/T½`,
   `B(A, Z) = a_V·A - ...`) are now KaTeX math, with descriptive subscripts upright (`m_{\mathrm{u}}`, not
-  `m_u`) per the SI Brochure 9th §5.1 / ISO 80000-1. A page-local example unit declared only in that page's own
-  doctest (nuclear.md's dalton, barn, curie) isn't in `q!`'s crate-wide table, so it stays plain prose, not
-  `[[..]]`, same as `A`, `Z` and other physics symbols that aren't exact_units unit markers at all.
+  `m_u`) per the SI Brochure 9th §5.1 / ISO 80000-1. The dalton, the barn and the curie are `[[Da]]`, `[[b]]`
+  and `[[Ci]]` now that UNIT-14 gives them crate-wide symbols; the tropical year stays plain "y" (q!'s table
+  refuses the bare stem, a qualified symbol's own), same as `A`, `Z` and other physics symbols that aren't
+  exact_units unit markers at all.
 
 ### 🐛 Fixes
 

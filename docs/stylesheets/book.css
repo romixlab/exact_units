@@ -482,6 +482,32 @@
   margin-bottom: 0.2rem;
 }
 
+/* The clear-highlight control (docs/javascripts/clear_highlight.js): zensical's search.highlight marks a
+   result's words and leaves ?h= in the URL with no way to clear either. Esc or this small pill, styled like
+   the reading-level badge above it in the page, removes the marks and drops ?h= together. JS-inserted only
+   when there's something to clear, so it never shows on an ordinary visit. */
+.md-typeset button.eu-clear-highlight {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 0.6rem;
+  padding: 0.15em 0.65em;
+  border: 1px solid var(--eu-soft);
+  border-radius: 999px;
+  background: none;
+  color: var(--eu-soft);
+  font-family: var(--md-text-font);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.md-typeset button.eu-clear-highlight:hover,
+.md-typeset button.eu-clear-highlight:focus {
+  border-color: var(--md-accent-fg-color);
+  color: var(--md-accent-fg-color);
+}
+
 /* A unit symbol in prose (the `[[symbol]]` markup, docs_ext/eu_docs_ext/unit_markup.py): upright, in the body
    font (not code's monospace, so it doesn't read as a value), a subtle tint, a tooltip with its name and
    quantity, linked to its row in docs/start/symbols.md. No underline until hover, so a sentence full of them

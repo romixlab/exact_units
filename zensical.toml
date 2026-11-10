@@ -144,6 +144,7 @@ extra_javascript = [
     "vendor/katex/katex.min.js",
     "vendor/katex/contrib/auto-render.min.js",
     "javascripts/katex.js",
+    "javascripts/clear_highlight.js",
 ]
 
 # Search splits words as Zensical's default separator does, except at `!`: `db!`, `np!`, `q!` and `fixed!` stay one
