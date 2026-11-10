@@ -1,6 +1,6 @@
 //! Property: a set bound ([OneOf]) and the CAN FD data length code ([CanFdDlc]), the first `Table` codec, against
-//! the lengths written out here from ISO 11898-1:2015's DLC coding of an FD frame (the same table as Linux's
-//! `can_fd_dlc2len`). A `u8` length is taken by `try_new` exactly when it is one of the set, refused with the set
+//! the lengths written out here from ST RM0468 Rev 3, §61.4.1, Table 503 "DLC coding in FDCAN" (ISO 11898-1:2015's
+//! coding; the same table as Linux's `can_fd_dlc2len`). A `u8` length is taken by `try_new` exactly when it is one of the set, refused with the set
 //! named otherwise, and rounded into the set by every [Rounding] as a brute-force reference picks; every byte as a
 //! DLC decodes to the reference's length (codes 16..=255 are spare), the data path (`CodecDef`) decodes and encodes
 //! as the typed one does, and every length and every rounding encodes to the code the reference finds. 256 values
@@ -14,7 +14,7 @@ use exact_units::{Fixed, OneOf, Rounding, ValueSet};
 /// A CAN FD payload length.
 type Len = Fixed<Byte, One, u8, OneOf<CanFdLengths>>;
 
-/// The length of each DLC 0..=15 of an FD frame, written out from the standard's table.
+/// The length of each DLC 0..=15 of an FD frame, written out from RM0468's Table 503.
 const DLC_LENGTHS: [i128; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
 
 /// Every rounding.

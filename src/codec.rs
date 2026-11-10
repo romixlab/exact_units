@@ -930,7 +930,8 @@ impl Codec for MuLawSingleZero {
 }
 
 /// The data lengths of a CAN FD frame, in bytes: 0..=8, 12, 16, 20, 24, 32, 48 and 64, the lengths its 4-bit
-/// [data length code](CanFdDlc) can say (ISO 11898-1:2015, the DLC coding of an FD frame). A [ValueSet] for
+/// [data length code](CanFdDlc) can say (ISO 11898-1:2015; checked against ST RM0468 Rev 3, §61.4.1, Table 503). A
+/// [ValueSet] for
 /// [OneOf]: `Fixed<Byte, One, u8, OneOf<CanFdLengths>>` is a payload length that a frame can carry,
 /// and nothing else.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -941,8 +942,9 @@ impl ValueSet for CanFdLengths {
 }
 
 /// The data length code (DLC) of a CAN FD frame: 4 bits that say how many data bytes follow, 0..=8 as themselves and
-/// 9..=15 as 12, 16, 20, 24, 32, 48 and 64 bytes (ISO 11898-1:2015's DLC coding of an FD frame; the same table is
-/// Linux's `can_fd_dlc2len`, `drivers/net/can/dev/length.c`). The first [CodecShape::Table] codec: its [DEF](Codec::DEF)
+/// 9..=15 as 12, 16, 20, 24, 32, 48 and 64 bytes. ISO 11898-1:2015 defines the coding; the table is checked against
+/// ST's RM0468 Rev 3 (STM32H72x/73x reference manual), §61.4.1, Table 503 "DLC coding in FDCAN", p. 2510, and Linux's
+/// `can_fd_dlc2len` (`drivers/net/can/dev/length.c`) has the same. The first [CodecShape::Table] codec: its [DEF](Codec::DEF)
 /// carries the table, and the typed path encodes through the same table and the same rounding as a client that
 /// has only the data.
 ///

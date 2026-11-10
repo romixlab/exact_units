@@ -128,8 +128,9 @@ spare codes with them. A `Coded` read from the wire refuses a spare code, as `tr
 ## A table: the CAN FD DLC
 
 A CAN FD frame says how many data bytes it carries in a 4-bit data length code (DLC). Codes 0 to 8 are the length
-itself; 9 to 15 are 12, 16, 20, 24, 32, 48 and 64 bytes. That is ISO 11898-1:2015's DLC coding of an FD frame. The
-same table is Linux's `can_fd_dlc2len` (`drivers/net/can/dev/length.c`). A classic CAN frame reads 9 to 15 as 8
+itself; 9 to 15 are 12, 16, 20, 24, 32, 48 and 64 bytes. ISO 11898-1:2015 defines the coding; the table here is
+checked against ST's RM0468 Rev 3 (STM32H72x/73x reference manual), §61.4.1, Table 503 "DLC coding in FDCAN", p. 2510.
+Linux's `can_fd_dlc2len` (`drivers/net/can/dev/length.c`) has the same table. A classic CAN frame reads 9 to 15 as 8
 bytes: a different codec.
 
 `CanFdDlc` is this table as a `Codec`, the first behind `CodecShape::Table`:
