@@ -783,6 +783,15 @@ impl CurveDef<'_> {
         domain: Domain,
     ) -> Result<i128, EncodeError<i128>> {
         let q = q.within(self).ok_or(EncodeError::OutOfRange)?;
+        // a light at an end code's exact light is that code: the closed-form inverse misplaces it where the curve
+        // is flat there (PQ takes E′ up to c₁^m₂ to black, and its inverse gives that end for 0 cd/m²)
+        let exact = Fraction::from_f64(light);
+        for end in [q.low, q.high] {
+            let at = q.signal(end).and_then(|s| self.decode_exact(s));
+            if exact.is_some() && at == exact {
+                return Ok(end);
+            }
+        }
         let x = self.inverse_f64(light).ok_or(EncodeError::OutOfRange)?;
         let pos = x / q.step.to_f64() + q.zero.to_f64_lossy();
         let (low, high) = (q.low.to_f64_lossy(), q.high.to_f64_lossy());
@@ -848,7 +857,7 @@ impl CurveDef<'_> {
         };
         decided.or_else(|(below, above)| {
             // the exact path settles what f64 can't, where its decodes are exact (a light at a code's own light)
-            Fraction::from_f64(light)
+            exact
                 .and_then(|y| self.encode_exact(&q, y, rounding, domain).ok())
                 .ok_or(EncodeError::NearTie { below, above })
         })

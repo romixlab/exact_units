@@ -355,6 +355,26 @@ proptest! {
     }
 }
 
+/// PQ's black by every rounding is code 64, whose light is 0 exactly, by the `f64` edge as by the exact one: the
+/// closed-form inverse puts 0 cd/m² at E′ = c₁^m₂ ≈ 7·10⁻⁷, the top of the stretch that decodes to black, which
+/// rounded up to code 65 before the edge took a light at an end code's exact light as that code.
+#[test]
+fn pq_black_is_code_64_by_every_rounding() {
+    for r in ROUNDINGS {
+        for d in [Domain::Signal, Domain::Light] {
+            assert_eq!(
+                Pq::DEF.encode_f64(&NARROW10, 0.0, r, d),
+                Ok(64),
+                "{r:?} in {d:?}"
+            );
+            assert_eq!(
+                Pq::DEF.encode_exact(&NARROW10, Fraction::ZERO, r, d),
+                Ok(64)
+            );
+        }
+    }
+}
+
 /// The ends of the square curve's lights in `f64`, and past them.
 #[test]
 fn the_f64_edge_at_the_ends() {
