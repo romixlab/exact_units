@@ -258,9 +258,10 @@ A `Segment`'s `CurveForm` is written in the decode direction, signal to light, e
 - `RationalPower { m1, m2, c1, c2, c3 }`: PQ's own shape, `y = (max(x^(1/m2) − c1, 0)/(c2 − c3·x^(1/m2)))^(1/m1)`,
   exact where the two nested roots are rational — for PQ that is `x = 0` and `x = 1` alone.
 
-The data path is the same algorithm from the data alone: `CurveDef::decode_exact`, `encode_exact`, and (feature
-`libm`) `decode_f64`, `encode_f64`, over a `Quantizer { zero, step, low, high }` — the code layer under the curve,
-not a type.
+The data path is the same algorithm from the data alone: `CurveDef::decode_exact`, `encode_exact`,
+`encode_certified`, `decode_interval` (float-free, [next](#certified-without-floats-from_light_certified-by-integer-intervals)),
+and (feature `libm`) `decode_f64`, `encode_f64`, over a `Quantizer { zero, step, low, high }` — the code layer
+under the curve, not a type.
 
 ## `Transfer<Q, C>`: the quantizer and the curve as one `Codec`
 
@@ -291,10 +292,11 @@ assert!(mid.light_f64().is_some());
 ## Encoding light: `Domain::Signal` or `Domain::Light`
 
 Encoding a light to a code needs "nearest" to mean something, and video's standards and a perceptual nearest don't
-agree: they quantize the *signal* (`Domain::Signal`, what the quantizer's own `Rounding` does), not the decoded
-*light* (`Domain::Light`). The two differ only for the `Nearest*` roundings — `Floor`, `Ceil` and `Truncate` pick the
-same code in both, every curve here being monotonic — so a caller names the domain beside the `Rounding`, as it
-names the `Rounding` itself.
+agree: they quantize the *signal* (`Domain::Signal`, what the quantizer's own `Rounding` does — `Rounding::NearestCeil`
+for the standards' own tie, [as decoding does](video.md#limits-of-the-codec-design)), not the decoded *light*
+(`Domain::Light`). The two differ only for the `Nearest*` roundings — `Floor`, `Ceil` and `Truncate` pick the same
+code in both, every curve here being monotonic — so a caller names the domain beside the `Rounding`, as it names
+the `Rounding` itself.
 
 ```rust
 use exact_units::codec::{Coded, Domain, Transfer};
@@ -306,11 +308,11 @@ type Code = Coded<Transfer<Narrow10, Pq>>;
 // a light strictly between codes 866 and 867: past the signal-domain tie (so Signal rounds up)
 // but short of the midpoint of the two codes' decoded lights (so Light rounds down)
 let light = Fixed::<Nit, One, f64>::try_new(4535.88).unwrap();
-assert_eq!(Code::from_light_f64(light, Rounding::NearestEven, Domain::Signal).map(|c| c.raw()), Ok(867));
-assert_eq!(Code::from_light_f64(light, Rounding::NearestEven, Domain::Light).map(|c| c.raw()), Ok(866));
+assert_eq!(Code::from_light_f64(light, Rounding::NearestCeil, Domain::Signal).map(|c| c.raw()), Ok(867));
+assert_eq!(Code::from_light_f64(light, Rounding::NearestCeil, Domain::Light).map(|c| c.raw()), Ok(866));
 ```
 
-## Exact where it can be, a certified float edge where it can't
+## Exact comparisons: `from_light_exact`, refused where it can't decide
 
 `from_light_exact` (`CurveDef::encode_exact` on the data path) decides a code by comparing the light with exact
 decodes only, so it is the true code even where the signal itself is irrational — and `EncodeError::NotExact` where
@@ -335,10 +337,44 @@ assert_eq!(
 );
 ```
 
-Where the exact path can't decide, `light_f64`/`from_light_f64` (feature `libm`) are the float edge, named so — but
-a certified one, not a convenience: the light is taken as exact, and the code is the true one for it, computed in
-`f64` with the curve's own error bound (`F64_MARGIN`, 2⁻³⁰ of a code: well above every curve's real `pow`/`exp`
-error here, and tested against the exact path wherever both answer).
+## Certified without floats: `from_light_certified`, by integer intervals
+
+Where the exact path can't decide, the *light* is still rational — it's the curve's irrational decode that stands
+between it and a comparison, not the light itself — so deciding doesn't have to mean rounding to `f64`.
+`from_light_certified` (`CurveDef::encode_certified`) compares `light` against an *interval* instead: binary
+fractions with up to 128-bit mantissas, `lo ≤ y ≤ hi`, proven to hold the curve's true (possibly irrational) light
+because every step of the evaluation — powers, roots, `e^x` — is rounded outward (`CurveForm::decode_interval`,
+`CurveDef::decode_interval`, the `Enclosure` they give: `compare` against an exact `Fraction`, `contains`, `to_f64`
+rounded outward). No `libm`, no FPU, the same answer on every target:
+
+```rust
+use exact_units::codec::{Coded, Domain, Transfer};
+use exact_units::codec::video::{Narrow10, Pq};
+use exact_units::{Exact, Rounding};
+
+type Code = Coded<Transfer<Narrow10, Pq>>;
+
+// agrees with from_light_exact wherever that answers
+let peak = Exact::int(10_000);
+assert_eq!(Code::from_light_certified(peak, Rounding::NearestAway, Domain::Signal).map(|c| c.raw()), Ok(940));
+
+// and decides where from_light_exact couldn't: 5 000 cd/m² isn't exact, but no float is needed to place it
+// among PQ's codes
+let mid = Exact::int(5_000);
+assert_eq!(Code::from_light_certified(mid, Rounding::NearestAway, Domain::Signal).map(|c| c.raw()), Ok(876));
+```
+
+The search tries 64 bits of root precision first, then 128 only where that isn't enough, and almost always
+decides: `EncodeError::NearTie` only where `light` lies within the interval's width of a tie or a code's own
+light, 2⁻¹¹⁶ of it relative at worst on PQ's 10-bit codes — far inside the `f64` edge's 2⁻³⁰ margin, next. The
+interval engine is the crate's own (`src/interval.rs`), shared with the literals and levels, not a dependency.
+
+## The float edge, certified too: `from_light_f64`, within a margin
+
+Where floats are the easier way there (feature `libm`), `light_f64`/`from_light_f64` are a second certified path,
+not a convenience: the light is taken as exact, and the code is the true one for it, computed in `f64` with the
+curve's own error bound (`F64_MARGIN`, 2⁻³⁰ of a code: well above every curve's real `pow`/`exp` error here, and
+tested against the exact path wherever both answer).
 
 ```rust
 use exact_units::codec::{Coded, Domain, Transfer};

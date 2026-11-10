@@ -143,9 +143,10 @@ assert_eq!((Bam16::of(49152) + Bam16::of(32768)).get(), 16384);
 ```
 
 Encoding a transfer curve's light back to a code is the same promise from the other side. Where an exact comparison
-can't decide (the light is irrational, as PQ's is for almost every code), the certified float edge decides in
-`f64` instead — but it, too, names where it can't: within a stated margin of a tie, it refuses rather than guess
-which code wins, naming both ([The certified float edge](../fixed_point/codecs.md#exact-where-it-can-be-a-certified-float-edge-where-it-cant)):
+can't decide (the light is irrational, as PQ's is for almost every code), a certified path decides instead —
+float-free, by integer intervals ([certified without floats](../fixed_point/codecs.md#certified-without-floats-from_light_certified-by-integer-intervals)),
+or in `f64` where that's the easier way — but each, too, names where it can't: within a stated margin of a tie, it
+refuses rather than guess which code wins, naming both ([the float edge](../fixed_point/codecs.md#the-float-edge-certified-too-from_light_f64-within-a-margin)):
 
 ```rust
 use exact_units::codec::{Coded, Domain, EncodeError, Transfer};
