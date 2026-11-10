@@ -932,15 +932,14 @@ impl Curve for Hlg {
 /// 0.018, doesn't correspond exactly (`1.099·0.018^0.45 − 0.099 ≈ 0.081248`, a sixth decimal past 0.081), the
 /// standard's own rounding of two independently printed numbers, as sRGB's two breakpoints disagree too.
 ///
-/// The power segment is [RationalPower](CurveForm::RationalPower) (PQ's form) with `m₂ = 1` and `c₃ = 0`, which
-/// reduces exactly to `((x − c₁)/c₂)^(1/m₁)`: a quotient of two exact `Fraction`s (always exact, however large the
-/// numbers), raised to a rational power by the root rule. [CurveForm::Power] cannot express this curve: its
-/// `gain` would have to be `1.099^(−20/9)`, irrational, and a `Fraction` cannot hold that. [Light](Curve::Light)
-/// is [Ratio](crate::units::Ratio): a scene light is relative, no physical unit ([Referred::Scene]).
+/// The power segment is [CurveForm::Power] with the divisor inside the base, `scale = 1000/1099` and `shift =
+/// 99/1099` (`(V′ + 0.099)/1.099 = scale·V′ + shift`, both exact): a `gain` outside the power would have to be
+/// `1.099^(−20/9)`, irrational, and a `Fraction` cannot hold that. [Light](Curve::Light) is
+/// [Ratio]: a scene light is relative, no physical unit ([Referred::Scene]).
 ///
 /// Exact at both ends (the doctest below): V′ = 0 gives E = 0 (the toe); V′ = 1 gives E = 1, since `((1 +
-/// 0.099)/1.099)^(20/9) = 1^(20/9) = 1`. [CurveKind::Float] like every curve with a non-integer power: almost no
-/// other V′ is a rational's 9th power.
+/// 0.099)/1.099)^(20/9) = 1^(20/9) = 1`. [CurveKind::Float](super::CurveKind::Float) like every curve with a
+/// non-integer power: almost no other V′ is a rational's 9th power.
 ///
 /// ```
 /// # #[cfg(feature = "photometric")] {
@@ -965,7 +964,7 @@ impl Bt709 {
     pub const BREAK: Fraction = Fraction::new(81, 1000);
 
     /// BT.709's inverse OETF as data: the toe ([Affine](CurveForm::Affine)) below [BREAK](Self::BREAK), the power
-    /// ([RationalPower](CurveForm::RationalPower)) at and above it.
+    /// ([Power](CurveForm::Power)) at and above it.
     pub const DEF: CurveDef<'static> = CurveDef {
         id: MarkerId {
             crate_name: "exact_units",
@@ -989,12 +988,12 @@ impl Bt709 {
             },
             Segment {
                 from: Bt709::BREAK,
-                form: CurveForm::RationalPower {
-                    m1: Fraction::new(9, 20),
-                    m2: Fraction::ONE,
-                    c1: Fraction::new(-99, 1000),
-                    c2: Fraction::new(1099, 1000),
-                    c3: Fraction::ZERO,
+                form: CurveForm::Power {
+                    gain: Fraction::ONE,
+                    scale: Fraction::new(1000, 1099),
+                    shift: Fraction::new(99, 1099),
+                    exponent: Fraction::new(20, 9),
+                    offset: Fraction::ZERO,
                 },
             },
         ]),

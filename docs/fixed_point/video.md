@@ -313,7 +313,7 @@ HLG's light is relative scene light. A display turns it into display light by th
 
 ITU-R BT.709-6 Part 2 item 1.2 defines the OETF, the scene light E a camera turns into the signal V′: `V′ = 4.5E` below E = 0.018, `V′ = 1.099·E^0.45 − 0.099` at and above it. `Bt709` is its inverse, written as the crate's curves are, signal to light: `E = V′/4.5` below V′ = 0.081, `E = ((V′ + 0.099)/1.099)^(20/9)` at and above it. 0.081 is the decode direction's own breakpoint; the commonly quoted light-side one, 0.018, doesn't correspond to it exactly (`1.099·0.018^0.45 − 0.099 ≈ 0.081248`, a sixth decimal past 0.081), the standard's own rounding of two independently printed numbers — the same gap sRGB's two breakpoints have.
 
-The power segment is `CurveForm::RationalPower` (PQ's form) with m₂ = 1 and c₃ = 0, which reduces to `((x − c₁)/c₂)^(1/m₁)`: a quotient of two exact `Fraction`s (always exact), raised to a rational power by the root rule. `CurveForm::Power` cannot express this curve on its own: its `gain` would have to be 1.099^(−20/9), irrational, and a `Fraction` cannot hold that.
+The power segment is `CurveForm::Power` with the divisor inside the base, `scale = 1000/1099` and `shift = 99/1099` (so `scale·V′ + shift = (V′ + 0.099)/1.099`, both exact): a `gain` outside the power would have to be 1.099^(−20/9), irrational, and a `Fraction` cannot hold that.
 
 Exact at both ends: V′ = 0 gives E = 0; V′ = 1 gives E = 1, since `((1 + 0.099)/1.099)^(20/9) = 1`. Everywhere else V′ is almost never a rational's 9th power, so `Bt709::KIND` is `CurveKind::Float`, like PQ.
 
