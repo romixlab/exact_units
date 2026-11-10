@@ -633,12 +633,11 @@ impl<U, T: Storage + Int> Scaled<U, T> {
         }
     }
 
-    /// `self` in steps of `P`: through one run-time scale where `scale / P` has a form here, else on the limbs.
+    /// `self` in steps of `P`: as [by_ratio] where `P` has a form as a [RunScale] (then no [Magnitude] code is
+    /// linked), else on the limbs with `P`'s magnitude.
     fn in_steps_of<P: FixedScale>(self, r: Rounding) -> Option<(bool, Mag, bool)> {
-        if let Some(p) = RunOf::<P>::RUN
-            && let Some(k) = self.scale.checked_div(p)
-        {
-            return k.scaled(self.value, r);
+        if let Some(p) = RunOf::<P>::RUN {
+            return by_ratio(self.value, self.scale, p, r);
         }
         let k = Scale::<P>::exact(Scale::<P>::RECIP)?;
         limbs::scaled(&Both(&self.scale, &k), self.value, r)
@@ -722,16 +721,14 @@ fn by_ratio<T: Int>(x: T, from: RunScale, to: RunScale, r: Rounding) -> Option<(
     limbs::scaled(&Both(&from, &to.recip()), x, r)
 }
 
-/// `x` steps of `P` in steps of `to`, as [by_ratio].
+/// `x` steps of `P` in steps of `to`, as [Scaled::in_steps_of] the other way.
 fn from_steps_of<P: FixedScale, T: Int>(
     x: T,
     to: RunScale,
     r: Rounding,
 ) -> Option<(bool, Mag, bool)> {
-    if let Some(p) = RunOf::<P>::RUN
-        && let Some(k) = p.checked_div(to)
-    {
-        return k.scaled(x, r);
+    if let Some(p) = RunOf::<P>::RUN {
+        return by_ratio(x, p, to, r);
     }
     let k = Scale::<P>::exact(Scale::<P>::SCALE)?;
     limbs::scaled(&Both(&k, &to.recip()), x, r)

@@ -244,6 +244,12 @@ required-features = ["information", "std"]
 name = "curve_size"
 required-features = ["libm", "std"]
 
+# a count at a run-time time base (Ticks) to 90 kHz against a Fixed's, flash and routines on thumbv7em and
+# thumbv6m: builds tools/scaled_size
+[[test]]
+name = "scaled_size"
+required-features = ["std"]
+
 # examples/NN_*.rs: one story each, in reading order; the README's Examples section lists them
 [[example]]
 # the unit and scale in the type: µs and ms don't mix, a conversion is exact or refused, and no_std

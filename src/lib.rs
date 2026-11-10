@@ -93,10 +93,10 @@ pub mod quantity;
 #[cfg(feature = "radiation")]
 pub mod radiation;
 pub mod registry;
-#[cfg(feature = "shrink_wrap")]
 mod scaled;
 #[cfg(feature = "serde")]
 pub mod serde;
+#[cfg(feature = "shrink_wrap")]
 mod si_expr;
 mod si_prefix;
 pub mod system;

@@ -1,0 +1,39 @@
+# A count at a stream's time base known at run time (exact_units' Ticks) into a 90 kHz Fixed, beside the same
+# conversion between two compile-time scales: three firmware images for Cortex-M whose flash and linked routines
+# tests/scaled_size.rs checks. Not part of the crate: a workspace of its own, never published.
+[package]
+name = "scaled_size"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "fixed"
+test = false
+bench = false
+
+[[bin]]
+name = "ticks_u32"
+test = false
+bench = false
+
+[[bin]]
+name = "ticks_u64"
+test = false
+bench = false
+
+[dependencies]
+exact_units = { path = "../..", default-features = false, features = ["time"] }
+
+# as a firmware's release build: small, whole-program
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+debug = false
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
