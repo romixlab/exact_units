@@ -10,6 +10,7 @@
     clippy::arithmetic_side_effects,
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
+#![expect(clippy::panic, reason = "a property fails by panicking")]
 
 use super::reference::modulo;
 use exact_units::prefix::Rational;
@@ -47,6 +48,11 @@ clocks! {
 macro_rules! wraps {
     ($($name:ident: $origin:ty, $t:ty, $bits:literal;)*) => {$(
         /// `a + v` and `b − a` on the clock against [modulo], for `a` and `b` on the circle.
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "a and b are reduced into [0, 2^bits), which the storage holds"
+        )]
         pub(crate) fn $name(a: $t, b: $t, v: $t) {
             type P = Point<$origin, Fixed<Second, Tick90k, $t>>;
             let m = 1i128 << $bits;
@@ -75,14 +81,24 @@ wraps! {
 /// in all, each 1601 or 1602, and the same as the reference's quotients.
 pub(crate) fn cadence(k: u64, r: exact_units::Rounding) {
     let total = |k: u64| {
-        let samples = Fixed::<Second, Frame30k, u64>::new(k).to_rounded::<Sample48k, u64>(r);
-        let got = i128::from(samples.unwrap().get());
-        assert_eq!(got, super::reference::round_div(i128::from(k) * 8008, 5, r), "frame {k} {r:?}");
+        let Some(samples) = Fixed::<Second, Frame30k, u64>::new(k).to_rounded::<Sample48k, u64>(r)
+        else {
+            panic!("frame {k}: its samples fit a u64");
+        };
+        let got = i128::from(samples.get());
+        assert_eq!(
+            got,
+            super::reference::round_div(i128::from(k) * 8008, 5, r),
+            "frame {k} {r:?}"
+        );
         got
     };
     let counts = [1, 2, 3, 4, 5].map(|i| total(k + i) - total(k + i - 1));
     assert_eq!(counts.iter().sum::<i128>(), 8008, "{counts:?}");
-    assert!(counts.iter().all(|c| (1601..=1602).contains(c)), "{counts:?}");
+    assert!(
+        counts.iter().all(|c| (1601..=1602).contains(c)),
+        "{counts:?}"
+    );
 }
 
 #[cfg(not(kani))]
@@ -105,7 +121,10 @@ mod tests {
         ]
     }
 
-    #[expect(clippy::cast_possible_truncation, reason = "a u32 clock takes the low 32 bits of a drawn value")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a u32 clock takes the low 32 bits of a drawn value"
+    )]
     fn u32_around() -> impl Strategy<Value = u32> {
         around(32).prop_map(|x| x as u32)
     }
@@ -149,8 +168,14 @@ mod tests {
 
     #[test]
     fn scales() {
-        assert_eq!(<Rational<1_080_000, 27_000_000>>::SCALE, <Rational<1, 25>>::SCALE);
-        assert_eq!(Frame30k::SCALE, Tick60k::SCALE.mul(exact_units::Magnitude::pow2(1)));
+        assert_eq!(
+            <Rational<1_080_000, 27_000_000>>::SCALE,
+            <Rational<1, 25>>::SCALE
+        );
+        assert_eq!(
+            Frame30k::SCALE,
+            Tick60k::SCALE.mul(exact_units::Magnitude::pow2(1))
+        );
     }
 
     /// Every frame of an hour at 30000/1001 Hz, every rounding: the cadence of 5 frames from each.
