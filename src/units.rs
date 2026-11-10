@@ -373,6 +373,12 @@ crate::unit! {
     #[cfg(feature = "levels")]
     pub struct Bel = "B" (long "bel", ucum "B"), base(Neper), Exact(1 / 2, ln10 1);
 
+    /// A level in stops ((ln 2)/2 [Neper], exactly): log2 of a power ratio, the factor of 2 in light of photography,
+    /// 2·log2 of a root-power one. Exif's APEX values (CIPA DC-008 Annex C: Av, Tv, Bv, Sv, Ev) are levels in it. Not
+    /// the octave of a frequency interval, whose ratio is of no power: a stop of a light ratio is 3.0103 [Decibel].
+    #[cfg(feature = "levels")]
+    pub struct Stop = "stop" (long "stop"), base(Neper), Exact(1 / 2, ln2 1);
+
     /// A loss in nepers, Np: a [Neper] level signed as a loss, positive for a decay, as attenuation coefficients and
     /// datasheets write it. A base of its own, so a loss doesn't convert to a gain: `as_gain` negates. Written
     /// `Loss<Neper>` ([Loss]).

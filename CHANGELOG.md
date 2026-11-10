@@ -694,6 +694,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
   and `[[Ci]]` now that UNIT-14 gives them crate-wide symbols; the tropical year stays plain "y" (q!'s table
   refuses the bare stem, a qualified symbol's own), same as `A`, `Z` and other physics symbols that aren't
   exact_units unit markers at all.
+- Photographic exposure (LVL-12, P2401#10nov-2121c). `units::Stop`, a level unit of (ln 2)/2 Np: log2 of a power ratio, the factor of 2 in light, as `Bel` is (ln 10)/2 Np. It is not the octave of a frequency interval, which stays planned in LVL-1. `to_level` and `to_gain` work a level in stops by `log2` and `exp2`, so a power of two is its whole number of stops in `f64`. Photometric quantities (cd, lm, lx, cd/m², lm·s, lx·s) and radiant exposure (J/m²) gain the power level form, so `Per<Lux, Lux>` goes to stops or dB as `Per<Watt, Watt>` does. New module `exposure` (feature `levels`), from Exif 3.1 (CIPA DC-008-2026): `Apex`, an APEX value in sixths of a stop; `apex_from_exif` reads an Exif RATIONAL exactly or refuses it; `f_number` and `exposure_time` give √2^Av and 2^−Tv as exact `Magnitude`s for whole stops, with `f_number_f64` and `exposure_time_f64` as the float edge between them; `sensitivity_value` gives Annex C's Sv = log2(S/3.125) where it is exact; `ApertureLabel` and `ShutterLabel` are `Table` codecs from Table 55's labels (f/11, 1/125) to their exact values (8√2, 1/128 s), with a named rounding back; `SensitivityType` is Exif's tag 34864.
 
 ### 🐛 Fixes
 

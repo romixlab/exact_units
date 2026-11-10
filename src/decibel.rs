@@ -662,6 +662,32 @@ impl<U: Unit, P: FixedScale, T: crate::Storage, B: Bounds<T>> Fixed<U, P, T, B> 
         Self::try_new(T::from_float(x)?).ok()
     }
 
+    /// The level in octaves of power, the photographer's stops: `log2(x)` of a power ratio, `2·log2(x)` of a
+    /// root-power one, NaN for a gain below 0. By `log2`, so a power of two gives its whole number of stops.
+    pub(crate) fn stops_f64(self) -> f64 {
+        let form = const { Self::LEVEL_FORM };
+        let x = match self.get().to_repr() {
+            #[expect(
+                clippy::as_conversions,
+                clippy::cast_precision_loss,
+                reason = "a level in stops is an f64, rounded"
+            )]
+            crate::Repr::Int(i) => i as f64,
+            crate::Repr::Float(x) => x,
+        };
+        let x = x * const { P::SCALE.to_f64() * U::EXPR.factor() };
+        2.0 * form.np_per_ln() * math::log2(x)
+    }
+
+    /// The gain of a level in stops, by the form of [stops_f64](Self::stops_f64), by `exp2`: `None` as for
+    /// [from_np](Self::from_np).
+    pub(crate) fn from_stops(stops: f64) -> Option<Self> {
+        let form = const { Self::LEVEL_FORM };
+        let x = math::exp2(stops / (2.0 * form.np_per_ln()));
+        let x = x / const { P::SCALE.to_f64() * U::EXPR.factor() };
+        Self::try_new(T::from_float(x)?).ok()
+    }
+
     /// The number [to_np_f32](Self::to_np_f32) holds, worked out in `f32`.
     pub(crate) fn np_f32(self) -> f32 {
         #[expect(

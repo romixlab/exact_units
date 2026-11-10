@@ -355,11 +355,13 @@ enum Via {
     Db(f64),
     /// The level in stored steps is `np · factor`.
     Np(f64),
+    /// The level in stored steps is `stops · factor`, stops the octaves of power (`log2` of a power ratio).
+    Stop(f64),
 }
 
 #[cfg(any(feature = "std", feature = "libm"))]
 impl Via {
-    /// For a level in `P · L`, stored steps per dB or Np, signed by `L` (a loss counts negative).
+    /// For a level in `P · L`, stored steps per dB, stop or Np, signed by `L` (a loss counts negative).
     #[expect(
         clippy::panic,
         reason = "a compile error in const code (a panic at run time), as documented: a level unit without an exact scale"
@@ -372,8 +374,13 @@ impl Via {
         // the decibel in nepers, (ln 10)/20
         let db = crate::Magnitude::LN10.div(crate::Magnitude::ratio(20, 1));
         let per_db = db.div(step);
+        // the stop in nepers, (ln 2)/2
+        let in_stops = crate::Magnitude::LN2.div(crate::Magnitude::ratio(2, 1));
+        let per_stop = in_stops.div(step);
         if per_db.is_rational() {
             Via::Db(sign * per_db.to_f64())
+        } else if per_stop.is_rational() {
+            Via::Stop(sign * per_stop.to_f64())
         } else {
             Via::Np(sign * step.recip().to_f64())
         }
@@ -385,7 +392,7 @@ impl<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>> Fixe
     /// This gain as a level in `L` (Np, dB, a loss in them), scale `P2` and storage `T2`: `ln(x)` Np of a ratio of
     /// root-power quantities (V/V, A/A), `½·ln(x)` Np of one of powers (W/W), negated for a loss. A logarithm is no
     /// exact number: the level is worked in `f64` (`log10` for a step that is a whole fraction of a dB, so 20 dB stays
-    /// 20 dB, else `ln`) and rounded once by `r` to an integer `T2` (a float `T2` takes the nearest float). Within an
+    /// 20 dB, `log2` for one of a [Stop](crate::units::Stop), so a power of two is its whole number of stops, else `ln`) and rounded once by `r` to an integer `T2` (a float `T2` takes the nearest float). Within an
     /// `f64` ulp of a rounding step the result can be one step off. `None` where it doesn't fit `T2`, or for a gain of
     /// 0 or below. A kind without a level form (a plain [Ratio](crate::units::Ratio)) or a target that isn't a level
     /// doesn't compile. Feature `std` or `libm`.
@@ -421,6 +428,7 @@ impl<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>> Fixe
         let x = match const { Via::of::<L, P2>() } {
             Via::Db(k) => self.db_f64() * k,
             Via::Np(k) => self.np_f64() * k,
+            Via::Stop(k) => self.stops_f64() * k,
         };
         if !x.is_finite() {
             return None;
@@ -474,6 +482,7 @@ impl<U: Unit, P: crate::FixedScale, T: crate::Storage, B: crate::Bounds<T>> Fixe
         match const { Via::of::<U, P>() } {
             Via::Db(k) => Fixed::from_db(v / k),
             Via::Np(k) => Fixed::from_np(v / k),
+            Via::Stop(k) => Fixed::from_stops(v / k),
         }
     }
 }

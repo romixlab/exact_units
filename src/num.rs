@@ -181,6 +181,9 @@ pub(crate) mod math {
     // levels in nepers
     #[cfg(feature = "libm")]
     pub(crate) use libm::{exp as exp_e, expf as exp_ef, log as ln, logf as lnf};
+    // levels in stops
+    #[cfg(feature = "libm")]
+    pub(crate) use libm::{exp2, log2};
     // the polar form's arg and from_polar, angles only
     #[cfg(all(feature = "libm", feature = "angle"))]
     pub(crate) use libm::{atan2, atan2f, sincos, sincosf};
@@ -215,6 +218,16 @@ pub(crate) mod math {
         #[inline(always)]
         pub(crate) fn exp_ef(x: f32) -> f32 {
             x.exp()
+        }
+
+        #[inline(always)]
+        pub(crate) fn log2(x: f64) -> f64 {
+            x.log2()
+        }
+
+        #[inline(always)]
+        pub(crate) fn exp2(x: f64) -> f64 {
+            x.exp2()
         }
 
         #[inline(always)]

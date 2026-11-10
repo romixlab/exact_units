@@ -109,6 +109,7 @@ pub(crate) static UNITS: &[Entry] = &[
     Entry { symbol: "slug", marker: "units::Slug", group: "customary", prefixes: Prefixes::None, pow10: 0 },
     Entry { symbol: "sr", marker: "units::Steradian", group: "angle", prefixes: Prefixes::Si, pow10: 0 },
     Entry { symbol: "st", marker: "units::Stone", group: "customary", prefixes: Prefixes::None, pow10: 0 },
+    Entry { symbol: "stop", marker: "units::Stop", group: "levels", prefixes: Prefixes::None, pow10: 0 },
     Entry { symbol: "streck", marker: "units::StreckSwedish", group: "customary", prefixes: Prefixes::None, pow10: 0 },
     Entry { symbol: "t", marker: "units::Tonne", group: "customary", prefixes: Prefixes::SiFromKilo, pow10: 0 },
     Entry { symbol: "tTNT", marker: "units::TonOfTnt", group: "customary", prefixes: Prefixes::None, pow10: 0 },

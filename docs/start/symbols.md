@@ -148,6 +148,7 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `slug` | `Slug` | `customary` | none |
 | `sr` | `Steradian` | `angle` | SI |
 | `st` | `Stone` | `customary` | none |
+| `stop` | `Stop` | `levels` | none |
 | `streck` | `StreckSwedish` | `customary` | none |
 | `t` | `Tonne` | `customary` | SI from kilo up |
 | `tTNT` | `TonOfTnt` | `customary` | none |

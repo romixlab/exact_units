@@ -67,6 +67,8 @@ pub mod decibel;
 mod declare;
 mod dim;
 mod exact;
+#[cfg(feature = "levels")]
+pub mod exposure;
 mod fixed;
 #[cfg(feature = "counting")]
 mod index;

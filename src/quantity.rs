@@ -363,12 +363,42 @@ impl LevelForm {
     }
 }
 
-/// Dimensions of power quantities: W, J, W/m².
-const POWER: [Dim<'static>; 3] = [
+/// Dimensions of power quantities: W, J, W/m², J/m², and the photometric ones, whose ratios are of light power
+/// weighted by the eye: cd, lm, lx, cd/m², lm·s, lx·s (a photograph's exposure H).
+const POWER: [Dim<'static>; 10] = [
     Dim::new(-3, 2, 1, 0, 0, 0, 0),
     Dim::new(-2, 2, 1, 0, 0, 0, 0),
     Dim::new(-3, 0, 1, 0, 0, 0, 0),
+    Dim::new(-2, 0, 1, 0, 0, 0, 0),
+    photometric(0, 0, false),
+    photometric(0, 0, true),
+    photometric(0, -2, true),
+    photometric(0, -2, false),
+    photometric(1, 0, true),
+    photometric(1, -2, true),
 ];
+
+/// cd·s^`s`·m^`m`, times sr where `sr` (lm is cd·sr, the radian a distinguished base).
+const fn photometric(s: i8, m: i8, sr: bool) -> Dim<'static> {
+    Dim::with_list(
+        [
+            crate::Exp::int(s),
+            crate::Exp::int(m),
+            crate::Exp::ZERO,
+            crate::Exp::ZERO,
+            crate::Exp::ZERO,
+            crate::Exp::ZERO,
+            crate::Exp::ONE,
+        ],
+        if sr { &STERADIAN } else { &[] },
+    )
+}
+
+/// sr, rad² of the distinguished base `Radian`.
+const STERADIAN: [crate::BaseExp<'static>; 1] = [crate::BaseExp {
+    base: MarkerId::RADIAN,
+    exp: crate::Exp::int(2),
+}];
 
 /// Dimensions of root-power quantities: V, A, Pa, V/m, A/m, and √W of power waves (an S-parameter `b/a`).
 const ROOT_POWER: [Dim<'static>; 6] = [
@@ -1515,6 +1545,29 @@ mod tests {
             Some(LevelForm::RootPower)
         );
         assert_eq!(derived(ONE).level_form(), None);
+    }
+
+    #[cfg(all(feature = "photometric", feature = "time"))]
+    #[test]
+    fn photometric_ratios_are_powers() {
+        use crate::Unit;
+        use crate::units::{Candela, Lumen, Lux, Nit, Second, Times};
+        for d in [
+            Candela::DIM,
+            Lumen::DIM,
+            Lux::DIM,
+            Nit::DIM,
+            <Times<Lumen, Second>>::DIM,
+            <Times<Lux, Second>>::DIM,
+        ] {
+            assert_eq!(QuantityExpr::RatioOf(d).level_form(), Some(LevelForm::Power));
+            assert_eq!(QuantityExpr::RatioOf(d).const_level_form(), Some(Some(LevelForm::Power)));
+        }
+        // luminous efficacy (lm/W) is no power
+        assert_eq!(
+            QuantityExpr::RatioOf(crate::units::LuminousEfficacy::DIM).level_form(),
+            None
+        );
     }
 
     #[test]
