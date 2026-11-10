@@ -70,7 +70,13 @@ use shrink_wrap::prelude::*;
 /// ```
 #[cfg_attr(
     feature = "shrink_wrap",
-    derive_shrink_wrap(borrowed, owned(feature = "std"), transparent, validate = Self::validate)
+    derive_shrink_wrap(
+        borrowed,
+        owned(feature = "std"),
+        transparent,
+        series(cells),
+        validate = Self::validate
+    )
 )]
 #[repr(transparent)]
 #[cfg_attr(
@@ -251,7 +257,13 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> Sub for Index<Of, T, B> {
 /// ```
 #[cfg_attr(
     feature = "shrink_wrap",
-    derive_shrink_wrap(borrowed, owned(feature = "std"), transparent, validate = Self::validate)
+    derive_shrink_wrap(
+        borrowed,
+        owned(feature = "std"),
+        transparent,
+        series(cells),
+        validate = Self::validate
+    )
 )]
 #[repr(transparent)]
 pub struct IndexFrom1<Of, T: UnsignedStorage, B: Bounds<T> = Unbounded> {
@@ -338,7 +350,7 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> IndexFrom1<Of, T, B> {
 /// ```
 #[cfg_attr(
     feature = "shrink_wrap",
-    derive_shrink_wrap(borrowed, owned(feature = "std"), transparent)
+    derive_shrink_wrap(borrowed, owned(feature = "std"), transparent, series(cells))
 )]
 #[repr(transparent)]
 pub struct Seq<Of, T: UnsignedStorage> {

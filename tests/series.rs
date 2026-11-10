@@ -35,6 +35,42 @@ struct FixedSample {
     duty: exact_units::Fixed<exact_units::units::Ratio, exact_units::prefix::Centi, u8>,
 }
 
+#[derive_shrink_wrap(borrowed, owned, series, derive(Clone, Copy, Debug, PartialEq))]
+struct PlainT {
+    /// The same µs since boot as [PointSample]'s.
+    t_us: u32,
+}
+
+#[derive_shrink_wrap(borrowed, owned, series, derive(Clone, Copy, Debug, PartialEq))]
+struct PointSample {
+    /// A device clock point in µs since boot (PT-7): the same bytes as the plain `t_us` of [PlainT].
+    t: exact_units::Point<exact_units::origins::DeviceBoot, exact_units::Micros<u32>>,
+}
+
+/// A `Series` of a [Point] field (PT-7) has the bytes of the same series of its plain number, and reads back the
+/// same values.
+#[test]
+fn point_field_is_a_plain_column() {
+    use exact_units::Point;
+    let plain: Vec<PlainT> = (0..64u32)
+        .map(|k| PlainT {
+            t_us: 1_000_000 + k * 40,
+        })
+        .collect();
+    let points: Vec<PointSample> = plain
+        .iter()
+        .map(|p| PointSample {
+            t: Point::from_raw(p.t_us),
+        })
+        .collect();
+    let plain_bytes = Series::new(&plain).to_ww_bytes_owned().unwrap();
+    let point_bytes = Series::new(&points).to_ww_bytes_owned().unwrap();
+    assert_eq!(point_bytes, plain_bytes);
+    within_bound::<PointSample>(points.len(), &point_bytes);
+    let back = SeriesOwned::<PointSample>::from_ww_bytes_owned(&point_bytes).unwrap();
+    assert_eq!(back.iter().copied().collect::<Vec<_>>(), points);
+}
+
 /// A `Series` of `Fixed` fields has the bytes of the same series of plain numbers, and reads back the same values.
 #[test]
 fn fixed_fields_are_plain_columns() {

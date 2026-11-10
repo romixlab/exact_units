@@ -2,6 +2,12 @@
 
 ### 🚀 Features
 
+- `Point`, `Index`, `IndexFrom1` and `Seq` gain `series(cells)` (PT-7, SW-60, API-50), the transparent series
+  `Fixed` already has: a `Series` of a `Point` field has the same bytes as the plain number it holds and reads
+  back the same values (`tests/series.rs`). This lets `ww_si::Timed<V, Tm>` derive `series(cells)` with
+  `t: Point<DeviceBoot, Micros<u32>>` (wire_weaver STD-110). `Point::wrapping_add` / `wrapping_sub` (by a `Fixed`
+  of the same step): for a `Linear` origin without bounds, wraps around at the edge of `T` like a counter instead
+  of panicking as `+` and `-` do — a device clock point stored as `u32` µs wraps every 71.6 min.
 - `codec` module (LVL-6): `Coded<C, V, T>`, a value given by a non-linear code instead of a `Fixed`'s linear step,
   the bytes of `C::Raw`, like `Niched`. `Codec` (`type Raw: Storage`, `type Linear`, `const DEF: CodecDef`, a
   total `decode` and `encode(Linear, Rounding) -> Option<Raw>`); `CodecDef` names a `CodecShape` as data (`MuLaw`,

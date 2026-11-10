@@ -471,6 +471,14 @@ and clocks with a named epoch.
   and u8, angles in their period; Kani proofs over i16), `tests/compile_fail/q_point.rs`. Docs:
   [Points and amounts](docs/points/points.md#comparing-with-a-literal).
 - ✅ **PT-6 Point ranges** — `p.is_in(q!(20 degC ..= 25 degC))`, `q!(-40 ..= 85 degC)`, `q!(25 degC +- 0.5)`, `q!(68 degF ..= 77 degF)`: both ends at one origin (NUM-22 parses them into `LiteralRange` of two `LiteralAt` types, refusing a part of a point, mixed origins and a tolerance in another unit), each folded into the point's frame as PT-5 folds one literal, then by NUM-22's rules: two compares, an end that is no stored value refused unless `, Inside` or `, Outside` (the message names the stored values in the point's frame, `2000 = 20 K @ Celsius`), no empty or always-true range. Integer storages, `Linear` origins. Tests: `tests/props/q_range_point.rs` (against `reference::range_order` over `q_point::order_at`, every `i16` walked), `tests/compile_fail/q_range_at.rs`, `q_range_modulo.rs`, `tests/q_asm.rs`. Docs: [A range of points](docs/points/points.md#a-range-of-points). P2401#8nov-0605c.
+- ✅ **PT-7 `Point` as a `Series` column, `wrapping_add`/`wrapping_sub`** — `Point` gains `series(cells)` the way
+  `Fixed` has it (transparent series, DER-18): a `Series` of a struct holding a `Point` field has the same bytes
+  as the plain number it holds and reads back the same values (`tests/series.rs`). `Index`, `IndexFrom1` and
+  `Seq` gain it too, same shape (one value field, the rest `PhantomData`). This lets `ww_si::Timed<V, Tm>`
+  derive `series(cells)` with `t: Point<DeviceBoot, Micros<u32>>` (wire_weaver STD-110).
+  `Point::wrapping_add`/`wrapping_sub` (by a `Fixed` of the same step), for a `Linear` origin without bounds:
+  wraps around at the edge of `T` like a counter instead of panicking on overflow in debug as `+`/`-` do — a
+  device clock point stored as `u32` µs wraps every 71.6 min. P2401#10nov-1015.
 
 ## Levels (`LVL`)
 

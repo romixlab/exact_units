@@ -390,7 +390,7 @@ macro_rules! origin {
 /// ```
 #[cfg_attr(
     feature = "shrink_wrap",
-    derive_shrink_wrap(borrowed, owned(feature = "std"), transparent)
+    derive_shrink_wrap(borrowed, owned(feature = "std"), transparent, series(cells))
 )]
 #[repr(transparent)]
 pub struct Point<O, F> {
@@ -963,6 +963,44 @@ where
     pub fn checked_diff(self, rhs: Self) -> Option<PointDiff<O, P, T>> {
         <O::Modulus as PointArith<P, T>>::checked_diff(self.raw(), rhs.raw())
             .and_then(Fixed::from_number)
+    }
+}
+
+impl<O, U, P, T: Storage, B: Unlimited<T>> Point<O, Fixed<U, P, T, B>>
+where
+    O: Origin<Unit = U, Modulus = Linear>,
+{
+    /// `self + v`, wrapping around at the edge of `T` like a counter: a device clock stored as `u32` µs wraps every
+    /// 71.6 min, instead of panicking as `+` does. Only without bounds, and only for a [Linear] origin (a [Modulo]
+    /// one already wraps at its own period in `+`).
+    ///
+    /// ```
+    /// use exact_units::{Fixed, Point, origins::DeviceBoot, prefix::Micro, units::Second};
+    ///
+    /// type DeviceMicros = Point<DeviceBoot, Fixed<Second, Micro, u32>>;
+    /// let t = DeviceMicros::from_raw(u32::MAX);
+    /// assert_eq!(t.wrapping_add(Fixed::new(2)), DeviceMicros::from_raw(1));
+    /// ```
+    #[inline(always)]
+    #[must_use]
+    pub fn wrapping_add(self, v: Fixed<U, P, T>) -> Self {
+        Self::new(Fixed::of(self.raw().wrapping_add(v.get())))
+    }
+
+    /// `self - v`, wrapping around at the edge of `T`, instead of panicking as `-` does. Only without bounds, and
+    /// only for a [Linear] origin.
+    ///
+    /// ```
+    /// use exact_units::{Fixed, Point, origins::DeviceBoot, prefix::Micro, units::Second};
+    ///
+    /// type DeviceMicros = Point<DeviceBoot, Fixed<Second, Micro, u32>>;
+    /// let t = DeviceMicros::from_raw(1);
+    /// assert_eq!(t.wrapping_sub(Fixed::new(2)), DeviceMicros::from_raw(u32::MAX));
+    /// ```
+    #[inline(always)]
+    #[must_use]
+    pub fn wrapping_sub(self, v: Fixed<U, P, T>) -> Self {
+        Self::new(Fixed::of(self.raw().wrapping_sub(v.get())))
     }
 }
 
