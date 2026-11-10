@@ -18,7 +18,7 @@
 
 #[cfg(not(kani))]
 use exact_units::Magnitude;
-use exact_units::Rounding;
+use exact_units::{Fixed, Rounding};
 use exact_units::codec::{Codec, Coded};
 use exact_units::exposure::{ApertureLabel, Apex, ShutterLabel, apex_from_exif, sensitivity_value};
 #[cfg(not(kani))]
@@ -73,7 +73,7 @@ pub(crate) fn whole_stop_gain(k: i8) {
 /// An Exif RATIONAL `num / den` as an [Apex]: exactly `6 · num / den` sixths where that is a whole number that fits
 /// `i16`, else `None`; a `den` of 0 refused.
 pub(crate) fn exif_rational(num: i64, den: i64) {
-    let got = apex_from_exif(num, den).map(|a| a.get());
+    let got = apex_from_exif(num, den).map(Fixed::get);
     let want = if den == 0 {
         None
     } else {
@@ -130,7 +130,7 @@ pub(crate) fn whole_stops_exact(sixths: i16) {
 
 /// Annex C's Sv = log2(S/3.125) of a speed `s`: whole stops exactly where `8·s/25` is a power of two, else `None`.
 pub(crate) fn sv_of_speed(s: u32) {
-    let got = sensitivity_value(s).map(|a| a.get());
+    let got = sensitivity_value(s).map(Fixed::get);
     let q = u64::from(s) * 8;
     let want = (q % 25 == 0 && (q / 25).is_power_of_two())
         .then(|| i16::try_from((q / 25).trailing_zeros() * 6).unwrap());

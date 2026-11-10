@@ -84,6 +84,8 @@ pages! {
     Nuclear = "recipes/nuclear.md";
     #[cfg(feature = "time")]
     VideoTime = "recipes/video_time.md";
+    #[cfg(all(feature = "levels", feature = "photometric", feature = "time"))]
+    Photography = "recipes/photography.md";
     Magnitude = "nomicon/magnitude.md";
     Constants = "nomicon/constants.md";
 }
