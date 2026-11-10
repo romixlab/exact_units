@@ -24,6 +24,8 @@ use core::marker::PhantomData;
 use core::ops::{Add, AddAssign, Sub, SubAssign};
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
+#[cfg(feature = "shrink_wrap")]
+use shrink_wrap::refused::{Refused, RefusedNum, Rule};
 
 /// A 0-based position in a table of `Of`, stored as `T` within the bounds `B`: `Index<Sample, u32>` is a sample's
 /// place in a capture, `Index<Byte, u32>` an offset. On the wire exactly the `T`.
@@ -175,14 +177,15 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> Index<Of, T, B> {
             .and_then(Fixed::from_number)
     }
 
-    /// Run on every value read from the wire: a position outside `B` is [shrink_wrap::Error::SubtypeOutOfRange].
+    /// Run on every value read from the wire: a position outside `B` is [shrink_wrap::Error::SubtypeOutOfRange], and
+    /// the refusal names the position and the range.
     #[cfg(feature = "shrink_wrap")]
     #[inline(always)]
-    fn validate(&self) -> Result<(), ShrinkWrapError> {
+    fn validate(&self) -> Result<(), Refused> {
         if B::contains(self.index) {
             Ok(())
         } else {
-            Err(ShrinkWrapError::SubtypeOutOfRange)
+            Err(crate::fixed::refused_by::<T, B>(self.index))
         }
     }
 }
@@ -308,12 +311,15 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> IndexFrom1<Of, T, B> {
     }
 
     /// Run on every value read from the wire: 0 and a number outside `B` are
-    /// [shrink_wrap::Error::SubtypeOutOfRange].
+    /// [shrink_wrap::Error::SubtypeOutOfRange]; the refusal says that 0 is no number (it counts from 1), or names
+    /// the number and the range.
     #[cfg(feature = "shrink_wrap")]
     #[inline(always)]
-    fn validate(&self) -> Result<(), ShrinkWrapError> {
-        if self.number == T::ZERO || !B::contains(self.number) {
-            Err(ShrinkWrapError::SubtypeOutOfRange)
+    fn validate(&self) -> Result<(), Refused> {
+        if self.number == T::ZERO {
+            Err(Refused::new(RefusedNum::Int(0), Rule::NotZero))
+        } else if !B::contains(self.number) {
+            Err(crate::fixed::refused_by::<T, B>(self.number))
         } else {
             Ok(())
         }

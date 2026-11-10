@@ -14,6 +14,8 @@ pub use bounds::{
     Bounds, Finite, MaybeNan, NanFree, OutOfBounds, OutOfRange, Range, RangeDec, RangeU64,
     Saturating, Unbounded, Unlimited, Wrapping,
 };
+#[cfg(feature = "shrink_wrap")]
+pub(crate) use bounds::{refused_by, refused_num};
 pub use prefix::{DecimalPrefix, FixedScale, ScaleDef};
 pub use rounding::{Overflow, Requantizer, Rounding, StorageKind, requantize};
 pub use storage::{Repr, Storage, StorageOrd, UnsignedStorage};
@@ -462,14 +464,16 @@ impl<U, P, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
         Fixed::new_unchecked(self.value)
     }
 
-    /// Run on every value read from the wire: a value outside `B` is [shrink_wrap::Error::SubtypeOutOfRange].
+    /// Run on every value read from the wire: a value outside `B` is [shrink_wrap::Error::SubtypeOutOfRange], and
+    /// the refusal names the value and the range (`from_ww_bytes_explained`: `6000 is out of 1..=5000`), NaN as never
+    /// NaN, ±∞ under [Finite] as never ±∞.
     #[cfg(feature = "shrink_wrap")]
     #[inline(always)]
-    fn validate(&self) -> Result<(), ShrinkWrapError> {
+    fn validate(&self) -> Result<(), Refused> {
         if B::contains(self.value) {
             Ok(())
         } else {
-            Err(ShrinkWrapError::SubtypeOutOfRange)
+            Err(refused_by::<T, B>(self.value))
         }
     }
 }
@@ -1914,7 +1918,7 @@ impl<P: prefix::SubSecond, T: UnsignedStorage, B: Bounds<T>> TryFrom<core::time:
 
 #[cfg(feature = "shrink_wrap")]
 /// The error type the derive's `validate` returns.
-type ShrinkWrapError = shrink_wrap::Error;
+type Refused = shrink_wrap::refused::Refused;
 
 #[cfg(all(test, feature = "std", feature = "shrink_wrap"))]
 mod tests {

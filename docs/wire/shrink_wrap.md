@@ -61,6 +61,24 @@ assert!(Timeout::from_ww_bytes(&zero).is_err()); // 0 ms is out of 1..=5000
 
 The same holds for `IndexFrom1` (0 is refused) and every bounded index.
 
+The plain read refuses with `SubtypeOutOfRange`, an error without data, so a firmware's `Result` stays a register wide. On a host (shrink_wrap's `refused` feature, on with `std`), `from_ww_bytes_explained` also names the stored number and the rule it broke, for a value nested in a struct or a list too:
+
+```rust
+use exact_units::{Fixed, Range, prefix::Milli, units::Second};
+use shrink_wrap::prelude::*;
+use shrink_wrap::refused::{Refused, RefusedNum};
+
+type Timeout = Fixed<Second, Milli, u16, Range<1, 5000>>;
+
+let bytes = 6000u16.to_ww_bytes(&mut [0u8; 4]).unwrap().to_vec();
+let e = <Timeout as DeserializeShrinkWrapOwned>::from_ww_bytes_explained(&bytes).unwrap_err();
+assert_eq!(e.error, shrink_wrap::Error::SubtypeOutOfRange);
+assert_eq!(e.refused, Some(Refused::out_of(RefusedNum::Int(6000), RefusedNum::Int(1), RefusedNum::Int(5000))));
+assert_eq!(e.to_string(), "6000 is out of 1..=5000");
+```
+
+The numbers are the stored ones, without the unit or the type: the reader knows which type it read, and `Timeout::try_new(6000)` gives the full `6000 ms is out of 1..=5000 ms (Second, u16)`. A float's numbers are printed widened to `f64`. A `Fixed` or an index out of its bounds names the range (an open end is the storage's own), NaN breaks `NotNan`, ±∞ under `Finite` breaks `Finite`, an `IndexFrom1` of 0 breaks `NotZero`, and a `Niched` number that is neither a value nor a niche, or a `Coded` spare code, is a code that means `NoValue`.
+
 ## In a WireWeaver API
 
 `Fixed` goes into properties, method arguments and `Series` like any type:

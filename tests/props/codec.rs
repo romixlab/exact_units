@@ -208,6 +208,7 @@ mod wire {
     };
     use exact_units::niche::{Niched, Null};
     use shrink_wrap::prelude::*;
+    use shrink_wrap::refused::{Refused, RefusedNum, Rule};
 
     const BUF: usize = 1024;
 
@@ -265,6 +266,14 @@ mod wire {
             let coded = Coded::<MuLawSingleZero>::from_ww_bytes(&bytes);
             if raw == 0x7F {
                 assert_eq!(coded.err(), Some(shrink_wrap::Error::SubtypeOutOfRange));
+                let explained =
+                    <Coded<MuLawSingleZero> as DeserializeShrinkWrapOwned>::from_ww_bytes_explained(
+                        &bytes,
+                    );
+                assert_eq!(
+                    explained.err().and_then(|e| e.refused),
+                    Some(Refused::new(RefusedNum::Int(0x7F), Rule::NoValue))
+                );
             } else {
                 assert_eq!(coded.map(Coded::raw).ok(), Some(raw), "{raw:#04x}");
             }

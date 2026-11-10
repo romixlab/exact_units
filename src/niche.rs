@@ -561,14 +561,17 @@ impl<T: Storage, V: RawValue<Raw = T>, N: Niches<T>> Niched<V, N, T> {
     }
 
     /// Run on every value read from the wire: neither a value within the bounds nor a code is
-    /// [shrink_wrap::Error::SubtypeOutOfRange].
+    /// [shrink_wrap::Error::SubtypeOutOfRange], and the refusal names the raw number as a code that means no value.
     #[cfg(feature = "shrink_wrap")]
     #[inline(always)]
-    fn validate(&self) -> Result<(), ShrinkWrapError> {
+    fn validate(&self) -> Result<(), Refused> {
         if Self::allows(self.raw) {
             Ok(())
         } else {
-            Err(ShrinkWrapError::SubtypeOutOfRange)
+            Err(Refused::new(
+                crate::fixed::refused_num(self.raw),
+                Rule::NoValue,
+            ))
         }
     }
 }
@@ -921,8 +924,7 @@ impl<V: RawValue, R: Rails> RawValue for Clipped<V, R> {
 }
 
 #[cfg(feature = "shrink_wrap")]
-/// The error type the derive's `validate` returns.
-type ShrinkWrapError = shrink_wrap::Error;
+use shrink_wrap::refused::{Refused, Rule};
 
 #[cfg(test)]
 mod tests;

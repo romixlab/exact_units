@@ -1,10 +1,14 @@
 //! Bounds of a [Fixed](super::Fixed): [Unbounded] by default, or a range checked on construction and on every read.
 
+#[cfg(feature = "shrink_wrap")]
+use super::storage::Repr;
 use super::storage::Storage;
 use crate::literal::Decimal;
 use crate::literal::big::BigDecimal;
 use crate::literal::steps::{FloatFormat, Value, float_parts};
 use core::marker::PhantomData;
+#[cfg(feature = "shrink_wrap")]
+use shrink_wrap::refused::{Refused, RefusedNum, Rule};
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::un::{
     I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14, I15, I16, I17, I18, I19, I20, I21,
@@ -39,6 +43,10 @@ pub trait Bounds<T: Storage>: Copy + Default + 'static {
     /// Whether a float may be NaN: `true` only for [MaybeNan]. Every other bound refuses NaN, [Unbounded] included:
     /// NaN is no number of the storage's range.
     const ALLOWS_NAN: bool = false;
+
+    /// Whether the range is every finite float: `true` only for [Finite]. A wire read refuses ±∞ by that rule
+    /// (`shrink_wrap::refused::Rule::Finite`) rather than as a value out of `MIN..=MAX`.
+    const EVERY_FINITE: bool = false;
 
     /// `MIN <= x <= MAX`, and not NaN unless [ALLOWS_NAN](Self::ALLOWS_NAN).
     #[inline(always)]
@@ -179,6 +187,46 @@ impl<U, P, T, B> From<OutOfRange<U, P, T, B>> for OutOfBounds {
     }
 }
 
+/// `x` as the number a wire read's refusal names: an integer exactly, a float widened to `f64`.
+#[cfg(feature = "shrink_wrap")]
+#[inline(always)]
+pub(crate) fn refused_num<T: Storage>(x: T) -> RefusedNum {
+    match x.to_repr() {
+        Repr::Int(i) => RefusedNum::Int(i),
+        Repr::Float(f) => RefusedNum::Float(f),
+    }
+}
+
+/// What a wire read says of `x`, which `B` refused: NaN as never NaN, ±∞ under [Finite] as never ±∞, any other value
+/// as out of `MIN..=MAX`, an open end the storage's own (−∞ or +∞ for a float), as
+/// [OutOfRange]'s `Display` names it without the unit and the storage.
+#[cfg(feature = "shrink_wrap")]
+#[inline(always)]
+pub(crate) fn refused_by<T: Storage, B: Bounds<T>>(x: T) -> Refused {
+    let value = refused_num(x);
+    if x.is_nan() {
+        return Refused::new(value, Rule::NotNan);
+    }
+    if B::EVERY_FINITE {
+        return Refused::new(value, Rule::Finite);
+    }
+    let low = B::MIN.map_or_else(|| storage_end::<T>(false), refused_num);
+    let high = B::MAX.map_or_else(|| storage_end::<T>(true), refused_num);
+    Refused::out_of(value, low, high)
+}
+
+/// The lowest or highest number of `T`, an open end of a range.
+#[cfg(feature = "shrink_wrap")]
+#[inline(always)]
+fn storage_end<T: Storage>(high: bool) -> RefusedNum {
+    match (T::IS_FLOAT, high) {
+        (true, false) => RefusedNum::Float(f64::NEG_INFINITY),
+        (true, true) => RefusedNum::Float(f64::INFINITY),
+        (false, false) => RefusedNum::Int(T::MIN_INT),
+        (false, true) => RefusedNum::Int(T::MAX_INT),
+    }
+}
+
 /// No bounds: the whole range of the storage. The default of [Fixed](super::Fixed)'s `B`. Its overflow policy is
 /// checked: `+` is `T`'s (a panic on overflow in debug builds), and `checked_*`, `saturating_*` and `wrapping_*` name
 /// the others.
@@ -296,12 +344,16 @@ impl Bounds<f32> for Finite {
     const MIN: Option<f32> = Some(f32::MIN);
 
     const MAX: Option<f32> = Some(f32::MAX);
+
+    const EVERY_FINITE: bool = true;
 }
 
 impl Bounds<f64> for Finite {
     const MIN: Option<f64> = Some(f64::MIN);
 
     const MAX: Option<f64> = Some(f64::MAX);
+
+    const EVERY_FINITE: bool = true;
 }
 
 impl NanFree for Finite {}

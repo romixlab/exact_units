@@ -1,7 +1,7 @@
 //! Property 9: the wire format (feature `shrink_wrap`). A value encodes, its bytes fit the type's `MAX_SIZE` where it
 //! has one, and decode to the same value; bytes from outside decode to an error or to a value that encodes and
 //! decodes the same again, never a panic. A dimension that isn't canonical doesn't decode, a bounded `Fixed` outside
-//! its bounds neither, a `Niched` number that is neither a value nor a niche code neither. Decoded units are walked (shown, their dimension and factor worked out) without a panic.
+//! its bounds neither (the read names the value and the range), a `Niched` number that is neither a value nor a niche code neither. Decoded units are walked (shown, their dimension and factor worked out) without a panic.
 //! Byte buffers, so no Kani proof; `fuzz/` runs the same functions.
 #![expect(
     clippy::arithmetic_side_effects,
@@ -21,6 +21,7 @@ use exact_units::{
 };
 use shrink_wrap::max_size::MaxSize;
 use shrink_wrap::prelude::*;
+use shrink_wrap::refused::{ReadError, Refused, RefusedNum, Rule};
 use shrink_wrap::series::{Series, SeriesOwned};
 
 /// Large enough for every value below: a unit tree of a few hundred names.
@@ -80,9 +81,14 @@ pub(crate) fn numbers(x: i16, y: u32) {
             round_trip(&b);
             assert_eq!(Bounded::from_ww_bytes(&bytes).ok(), Some(b));
         }
-        Err(_) => assert!(
-            Bounded::from_ww_bytes(&bytes).is_err(),
-            "{x} decodes past its bounds"
+        Err(_) => assert_eq!(
+            explained::<Bounded>(&bytes),
+            Refused::out_of(
+                RefusedNum::Int(x.into()),
+                RefusedNum::Int(-1000),
+                RefusedNum::Int(1000)
+            ),
+            "{x} decodes past its bounds or names another refusal"
         ),
     }
     // a bounded index is the number on the wire too, read only within its bounds
@@ -95,14 +101,40 @@ pub(crate) fn numbers(x: i16, y: u32) {
             round_trip(&i);
             assert_eq!(Slot::from_ww_bytes(&bytes).ok(), Some(i));
         }
-        Err(_) => assert!(
-            Slot::from_ww_bytes(&bytes).is_err(),
-            "index {y} decodes past its bounds"
+        Err(_) => assert_eq!(
+            explained::<Slot>(&bytes),
+            Refused::out_of(
+                RefusedNum::Int(y.into()),
+                RefusedNum::Int(0),
+                RefusedNum::Int(1000)
+            ),
+            "index {y} decodes past its bounds or names another refusal"
         ),
     }
-    let one = IndexFrom1::<Sample, u32>::try_new(y);
-    if let Ok(i) = one {
-        round_trip(&i);
+    // a number counts from 1: 0 is refused by that rule
+    type One1 = IndexFrom1<Sample, u32>;
+    match One1::try_new(y) {
+        Ok(i) => {
+            round_trip(&i);
+            assert_eq!(One1::from_ww_bytes(&bytes).ok(), Some(i));
+        }
+        Err(_) => assert_eq!(
+            explained::<One1>(&bytes),
+            Refused::new(RefusedNum::Int(0), Rule::NotZero),
+            "{y}"
+        ),
+    }
+}
+
+/// What the explained read of `bytes` as `T` refused: the read fails with `SubtypeOutOfRange`, as the plain one does.
+fn explained<T: DeserializeShrinkWrapOwned + Debug>(bytes: &[u8]) -> Refused {
+    match <T as DeserializeShrinkWrapOwned>::from_ww_bytes_explained(bytes) {
+        Ok(v) => panic!("{v:?} read from {bytes:02x?}"),
+        Err(ReadError {
+            error: shrink_wrap::Error::SubtypeOutOfRange,
+            refused: Some(r),
+        }) => r,
+        Err(e) => panic!("{e:?} from {bytes:02x?}: no refusal named"),
     }
 }
 
@@ -543,12 +575,17 @@ pub(crate) fn any_bytes(which: u8, bytes: &[u8]) {
             }
         }
         _ => {
-            // -127..=20 or the code 127, nothing else
-            if let Ok(n) =
-                Niched::<Fixed<Ratio, One, i8, Range<-127, 20>>, Null<127>>::from_ww_bytes(bytes)
-            {
+            // -127..=20 or the code 127, nothing else; any other number is named as a code without a value
+            type Temp = Niched<Fixed<Ratio, One, i8, Range<-127, 20>>, Null<127>>;
+            if let Ok(n) = Temp::from_ww_bytes(bytes) {
                 round_trip(&n);
                 assert!(n.raw() == 127 || (-127..=20).contains(&n.raw()), "{n:?}");
+            } else if let Some(&b) = bytes.first() {
+                let raw = i8::from_le_bytes([b]);
+                assert_eq!(
+                    explained::<Temp>(bytes),
+                    Refused::new(RefusedNum::Int(raw.into()), Rule::NoValue)
+                );
             }
         }
     }

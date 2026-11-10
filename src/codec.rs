@@ -49,6 +49,8 @@ use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 #[cfg(feature = "shrink_wrap")]
 use shrink_wrap::prelude::*;
+#[cfg(feature = "shrink_wrap")]
+use shrink_wrap::refused::{Refused, Rule};
 
 /// A non-linear encoding: `Raw` (the code on the wire) and `Linear` (the value it means). [decode](Self::decode)
 /// refuses exactly the [spare](CodecDef::spare) codes [DEF](Self::DEF) names (none for a codec whose every code is
@@ -464,12 +466,16 @@ impl<C: Codec<Linear = V, Raw = T>, V, T: Storage> Coded<C, V, T> {
         C::formula(self.raw)
     }
 
-    /// Run on every value read from the wire: a spare code is [shrink_wrap::Error::SubtypeOutOfRange].
+    /// Run on every value read from the wire: a spare code is [shrink_wrap::Error::SubtypeOutOfRange], and the
+    /// refusal names it as a code that means no value.
     #[cfg(feature = "shrink_wrap")]
     #[inline(always)]
-    fn validate(&self) -> Result<(), shrink_wrap::Error> {
+    fn validate(&self) -> Result<(), Refused> {
         if in_spans(Self::SPARE, self.raw) {
-            Err(shrink_wrap::Error::SubtypeOutOfRange)
+            Err(Refused::new(
+                crate::fixed::refused_num(self.raw),
+                Rule::NoValue,
+            ))
         } else {
             Ok(())
         }

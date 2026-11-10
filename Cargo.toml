@@ -215,6 +215,11 @@ required-features = ["shrink_wrap", "std"]
 name = "series"
 required-features = ["shrink_wrap"]
 
+# a wire read refused by a bound names the value and the range
+[[test]]
+name = "refused"
+required-features = ["shrink_wrap", "std"]
+
 # serde of the numbers and the with_unit text
 [[test]]
 name = "serde"
