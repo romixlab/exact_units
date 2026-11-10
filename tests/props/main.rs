@@ -68,6 +68,8 @@ mod reference;
 #[cfg(not(kani))]
 mod registry;
 mod rounding;
+#[cfg(feature = "time")]
+mod run_scale;
 #[cfg(all(not(kani), feature = "serde", feature = "std", feature = "shrink_wrap"))]
 mod serde_input;
 #[cfg(feature = "serde")]

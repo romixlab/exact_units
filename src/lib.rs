@@ -93,9 +93,10 @@ pub mod quantity;
 #[cfg(feature = "radiation")]
 pub mod radiation;
 pub mod registry;
+#[cfg(feature = "shrink_wrap")]
+mod scaled;
 #[cfg(feature = "serde")]
 pub mod serde;
-#[cfg(feature = "shrink_wrap")]
 mod si_expr;
 mod si_prefix;
 pub mod system;
@@ -161,6 +162,9 @@ pub use quantity::{Character, LevelForm, QuantityDef, QuantityExpr, QuantityRef,
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use quantity::{QuantityDefOwned, QuantityRefOwned};
 pub use registry::Registry;
+#[cfg(feature = "time")]
+pub use scaled::Ticks;
+pub use scaled::{RunScale, Scaled};
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use si_expr::SIExprOwned;
 #[cfg(feature = "shrink_wrap")]

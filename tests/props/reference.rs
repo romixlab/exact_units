@@ -1236,3 +1236,40 @@ pub(crate) mod codata {
         }
     }
 }
+
+/// [round_div] in big integers, for `d > 0`: the reference of the run-time scales (NUM-42), whose products pass
+/// `i128` (a `u128` count times a `u32` part times 2¹²⁷).
+pub(crate) fn round_div_big(
+    p: &num_bigint::BigInt,
+    d: &num_bigint::BigInt,
+    r: Rounding,
+) -> num_bigint::BigInt {
+    use num_bigint::BigInt;
+    // the Euclidean floor and its remainder, from the truncating ones: 0 <= rem < d
+    let (mut f, mut rem) = (p / d, p % d);
+    if rem < BigInt::ZERO {
+        f -= 1;
+        rem += d;
+    }
+    if rem == BigInt::ZERO {
+        return f;
+    }
+    let other = d - &rem;
+    let up = match r {
+        Rounding::Floor => false,
+        Rounding::Ceil => true,
+        Rounding::Truncate => p < &BigInt::ZERO,
+        Rounding::NearestEven | Rounding::NearestAway | Rounding::NearestCeil => {
+            match rem.cmp(&other) {
+                core::cmp::Ordering::Less => false,
+                core::cmp::Ordering::Greater => true,
+                core::cmp::Ordering::Equal => match r {
+                    Rounding::NearestAway => p > &BigInt::ZERO,
+                    Rounding::NearestCeil => true,
+                    _ => &f % 2 != BigInt::ZERO,
+                },
+            }
+        }
+    };
+    if up { f + 1 } else { f }
+}

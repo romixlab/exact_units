@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc ce0356d10c57ec95b58bde2e92d7558fc2deca27e61f91f3172ff8f07e1c4130 # shrinks to x = 19, s = RunScale { num: 1001, den: 1875, pow2: -5 }, r = Ceil
+cc ad9b9b8f5df15c27e2d19181c5ed8493a78397847d2da692c985750eabe9c7e9 # shrinks to a = 1, sa = RunScale { num: 1, den: 1, pow2: -1 }, b = 1, sb = RunScale { num: 1, den: 37, pow2: 0 }
+cc 5bbfcecb7835f380b965b652d21304dd34560c53ebdbdf8f88bab7295d9a493c # shrinks to a = 1, sa = RunScale { num: 1, den: 1001, pow2: 0 }, b = 1, sb = RunScale { num: 375, den: 1, pow2: 7 }

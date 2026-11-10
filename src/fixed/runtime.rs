@@ -12,12 +12,12 @@ use core::marker::PhantomData;
 /// `P`'s scale and its reciprocal as `'static` references, for the kernel to read in place; a compile error where the
 /// scale isn't a fraction of integers: a `Fixed` of such a scale (π/180) and integer storage has no exact run-time
 /// conversion to a prefix.
-struct Scale<P>(PhantomData<P>);
+pub(crate) struct Scale<P>(PhantomData<P>);
 
 impl<P: FixedScale> Scale<P> {
-    const SCALE: &'static Magnitude = &P::SCALE;
+    pub(crate) const SCALE: &'static Magnitude = &P::SCALE;
 
-    const RECIP: &'static Magnitude = &P::SCALE.recip();
+    pub(crate) const RECIP: &'static Magnitude = &P::SCALE.recip();
 
     const WHOLE: () = assert!(
         whole(&P::SCALE),
@@ -25,7 +25,7 @@ impl<P: FixedScale> Scale<P> {
     );
 
     /// `m` for the kernel, after `WHOLE` has checked it.
-    fn exact(m: &'static Magnitude) -> Option<Exact<'static>> {
+    pub(crate) fn exact(m: &'static Magnitude) -> Option<Exact<'static>> {
         let () = Self::WHOLE;
         Exact::of(m)
     }

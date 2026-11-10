@@ -33,7 +33,7 @@ mod product;
 pub(crate) use product::{Requant, check as check_product};
 mod exact_float;
 mod rounding;
-mod runtime;
+pub(crate) mod runtime;
 pub(crate) use rounding::{div_i128 as round_div_i128, nearest_entry, settle as settle_i128};
 #[cfg(feature = "levels")]
 pub(crate) use rounding::{round_f64, settle_f64};
@@ -812,7 +812,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Fixed<U, P, T, B> {
     }
 
     #[inline(always)]
-    fn clamped(mut x: T) -> Self {
+    pub(crate) fn clamped(mut x: T) -> Self {
         const {
             assert!(
                 B::SET.is_none(),
