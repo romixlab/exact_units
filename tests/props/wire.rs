@@ -11,13 +11,13 @@
 
 use core::fmt::Debug;
 use exact_units::niche::{J1939U16, Niched, Null, Reading};
-use exact_units::origins::Celsius;
+use exact_units::origins::{Celsius, DeviceBoot};
 use exact_units::prefix::{Centi, Milli, One};
-use exact_units::units::{Kelvin, Ratio, Sample, Volt};
+use exact_units::units::{Kelvin, Ratio, Sample, Second, Volt};
 use exact_units::{
     BaseExp, CompactError, Complex, Dim, DimWire, Exp, Fixed, FullScaleBits, Index, IndexFrom1,
-    Magnitude, Offset, Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, SIExpr, SIExprOwned,
-    Seq, Symbols, UnitDef, UnitDefOwned, UnitTable, tree,
+    Magnitude, Offset, Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, RunScale, SIExpr,
+    SIExprOwned, Scaled, Seq, Symbols, UnitDef, UnitDefOwned, UnitTable, tree,
 };
 use shrink_wrap::max_size::MaxSize;
 use shrink_wrap::prelude::*;
@@ -138,6 +138,39 @@ fn explained<T: DeserializeShrinkWrapOwned + Debug>(bytes: &[u8]) -> Refused {
     }
 }
 
+/// A run-time scale from its parts (NUM-42): the bytes `num`, `den` (`u32`, little-endian) and `pow2` (`i8`) decode
+/// exactly where they are the canonical form [RunScale::new] makes of them, and to that scale; a [Scaled] and a point
+/// of one round-trip.
+#[expect(clippy::expect_used, reason = "a property fails by panicking")]
+pub(crate) fn run_scale(num: u32, den: u32, pow2: i8, x: i64) {
+    let mut bytes = num.to_le_bytes().to_vec();
+    bytes.extend_from_slice(&den.to_le_bytes());
+    bytes.extend_from_slice(&pow2.to_le_bytes());
+    let canonical = RunScale::new(num, den, pow2).filter(|s| s.parts() == (num, den, pow2));
+    assert_eq!(
+        RunScale::from_ww_bytes(&bytes).ok(),
+        canonical,
+        "{num}/{den}·2^{pow2}"
+    );
+    let Some(s) = RunScale::new(num, den, pow2) else {
+        return;
+    };
+    let mut buf = vec![0u8; BUF];
+    let (n, d, e) = s.parts();
+    let mut want = n.to_le_bytes().to_vec();
+    want.extend_from_slice(&d.to_le_bytes());
+    want.extend_from_slice(&e.to_le_bytes());
+    assert_eq!(s.to_ww_bytes(&mut buf).expect("encodes"), &want[..]);
+    round_trip(&s);
+    let v = Scaled::<Second, i64>::new(x, s);
+    round_trip(&v);
+    let back = Scaled::<Second, i64>::from_ww_bytes(v.to_ww_bytes(&mut buf).expect("encodes"))
+        .expect("decodes");
+    assert!(back.same_repr(&v));
+    let low = u32::from_le_bytes(x.to_le_bytes()[..4].try_into().expect("four bytes"));
+    round_trip(&Point::<DeviceBoot, Scaled<Second, u32>>::at(low, s));
+}
+
 /// A `Series` of rows with `Fixed` fields round-trips and fits `Series::max_bytes`.
 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
 pub(crate) fn series(rows: &[(u32, i16, u8)]) {
@@ -160,7 +193,7 @@ pub(crate) fn series(rows: &[(u32, i16, u8)]) {
 #[derive_shrink_wrap(borrowed, owned, series, derive(Clone, Copy, Debug, PartialEq))]
 pub(crate) struct Row {
     /// µs.
-    t: Fixed<exact_units::units::Second, exact_units::prefix::Micro, u32>,
+    t: Fixed<Second, exact_units::prefix::Micro, u32>,
     /// mV.
     v: Fixed<Volt, Milli, i16>,
     /// %.
@@ -666,6 +699,11 @@ mod tests {
         #[test]
         fn numbers(x in strategy::i16(), y: u32) {
             super::numbers(x, y);
+        }
+
+        #[test]
+        fn run_scales(num in prop_oneof![any::<u32>(), 0..=64u32], den in prop_oneof![any::<u32>(), 0..=64u32, Just(90_000u32)], pow2: i8, x: i64) {
+            super::run_scale(num, den, pow2, x);
         }
 
         #[test]

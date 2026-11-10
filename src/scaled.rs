@@ -16,6 +16,8 @@ use crate::{Bounds, Fixed, FixedScale, Magnitude, Overflow, Prefix, Rounding, St
 use core::cmp::Ordering;
 use core::fmt;
 use core::marker::PhantomData;
+#[cfg(feature = "shrink_wrap")]
+use shrink_wrap::prelude::*;
 
 /// An exact positive scale known at run time: `num / den · 2^pow2`, `num` and `den` odd and coprime `u32`s, `pow2`
 /// within ±127. One form per value, so `==` and `Ord` are those of the value: `RunScale::ratio(2002, 120_000)` is
@@ -45,6 +47,13 @@ use core::marker::PhantomData;
 /// // past u64 the power of two is written apart
 /// assert_eq!(RunScale::new(3, 1, -100).unwrap().to_string(), "3·2⁻¹⁰⁰");
 /// ```
+///
+/// On the wire (`final_structure`): `num` and `den` as `u32`, `pow2` as `i8`; a form that isn't the canonical one
+/// (an even or zero part, a common factor, an exponent of −128) doesn't decode, so a value has one encoding.
+#[cfg_attr(
+    feature = "shrink_wrap",
+    derive_shrink_wrap(borrowed, owned(feature = "std"), final_structure, validate = Self::validate)
+)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RunScale {
@@ -381,6 +390,18 @@ impl RunScale {
     }
 }
 
+#[cfg(feature = "shrink_wrap")]
+impl RunScale {
+    /// Refuses a form that isn't the canonical one: what [new](Self::new) makes of its own parts is itself.
+    fn validate(&self) -> Result<(), shrink_wrap::Error> {
+        if RunScale::new(self.num, self.den, self.pow2) == Some(*self) {
+            Ok(())
+        } else {
+            Err(shrink_wrap::Error::SubtypeOutOfRange)
+        }
+    }
+}
+
 impl Rational for RunScale {
     fn pow2(&self) -> i32 {
         i32::from(self.pow2)
@@ -463,6 +484,12 @@ impl fmt::Display for RunScale {
 /// assert_eq!(pts.to_string(), "154112·1/15360 s");
 /// # }
 /// ```
+///
+/// On the wire (`final_structure`): the value as `T` is, then its [RunScale].
+#[cfg_attr(
+    feature = "shrink_wrap",
+    derive_shrink_wrap(borrowed, owned(feature = "std"), final_structure)
+)]
 pub struct Scaled<U, T> {
     /// The number of steps.
     value: T,

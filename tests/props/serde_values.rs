@@ -62,6 +62,39 @@ where
     }
 }
 
+/// A run-time scale (NUM-42) read from `{ num, den, pow2 }`: any fraction of nonzero parts reads as its exact value,
+/// in JSON and in postcard, or is refused exactly where it has no form; a scale and a `Scaled` read back as
+/// themselves, and a fraction that fits `u64` is written as it is (`pow2` 0).
+#[cfg(not(kani))]
+pub(crate) fn run_scale(num: u64, den: u64, pow2: i8, x: i32) {
+    use exact_units::{RunScale, Scaled};
+    let json = format!(r#"{{"num":{num},"den":{den},"pow2":{pow2}}}"#);
+    let got = serde_json::from_str::<RunScale>(&json).ok();
+    let want = RunScale::from_u64(num, den).and_then(|r| r.checked_mul(RunScale::pow2(pow2)?));
+    assert_eq!(got, want, "{json}");
+    let mut buf = [0u8; 64];
+    let n = postcard::to_slice(&(num, den, pow2), &mut buf)
+        .unwrap()
+        .len();
+    assert_eq!(postcard::from_bytes::<RunScale>(&buf[..n]).ok(), want);
+    let Some(s) = want else { return };
+    let text = serde_json::to_string(&s).unwrap();
+    assert_eq!(serde_json::from_str::<RunScale>(&text).unwrap(), s);
+    if let Some((n, d)) = s.to_ratio() {
+        assert_eq!(text, format!(r#"{{"num":{n},"den":{d},"pow2":0}}"#));
+    }
+    let v = Scaled::<Second, i32>::new(x, s);
+    let back: Scaled<Second, i32> =
+        serde_json::from_str(&serde_json::to_string(&v).unwrap()).unwrap();
+    assert!(back.same_repr(&v));
+    let n = postcard::to_slice(&v, &mut buf).unwrap().len();
+    assert!(
+        postcard::from_bytes::<Scaled<Second, i32>>(&buf[..n])
+            .unwrap()
+            .same_repr(&v)
+    );
+}
+
 /// Any bytes read as a [Reading]: an error, or a value in its bounds that writes back to the bytes it was read from
 /// (the first ones: postcard reads what it needs).
 pub(crate) fn any_bytes(bytes: &[u8]) {
@@ -221,6 +254,11 @@ mod tests {
     use proptest::prelude::*;
 
     proptest! {
+        #[test]
+        fn run_scales(num in prop_oneof![any::<u64>(), 0..=100u64, Just(120_000u64)], den in prop_oneof![any::<u64>(), 0..=100u64, Just(60_000u64)], pow2: i8, x: i32) {
+            super::run_scale(num, den, pow2, x);
+        }
+
         #[test]
         fn i32_reads_iff_in_bounds(raw in strategy::i32()) {
             super::reads_iff_in_bounds::<Volt, Milli, i32, Range<-100_000, 100_000>>(raw);

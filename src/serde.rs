@@ -25,6 +25,11 @@
 //! [MAX_DECIMALS] decimals. The error names the value and the bound:
 //! `6000 ms is out of 1..=5000 ms (Second, u16)`.
 //!
+//! - [RunScale](crate::RunScale): `{ num, den, pow2 }`, the scale as a fraction of `u64`s where one holds it (`pow2`
+//!   then 0), so a config reads `{ "num": 1001, "den": 60000, "pow2": 0 }`; `pow2` may be left out. Reading takes any
+//!   fraction of nonzero parts and reduces it exactly, or refuses one that has no form (a part past `u32` after its
+//!   factors of two). [Scaled](crate::Scaled): `{ value, scale }`; a point of one its `Scaled`.
+//!
 //! [with_unit] is the human form for a field: `"1.5 ms"`, read back exactly into the field's scale and storage.
 //!
 //! ```
@@ -182,6 +187,88 @@ impl<'de, U: Unit, P: FixedScale, T: Storage + Deserialize<'de>, A: Copy + Deser
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let PolarParts { abs, arg } = PolarParts::deserialize(deserializer)?;
         Ok(Polar::new(abs, arg))
+    }
+}
+
+mod run_scale {
+    use crate::num::Int;
+    use crate::{Origin, Point, RunScale, Scaled, Storage};
+    use ::serde::de::{self, Deserialize, Deserializer};
+    use ::serde::ser::{Serialize, Serializer};
+
+    /// A [RunScale] as serde writes it.
+    #[derive(::serde::Serialize, ::serde::Deserialize)]
+    #[serde(rename = "RunScale")]
+    struct Parts {
+        num: u64,
+        den: u64,
+        #[serde(default)]
+        pow2: i8,
+    }
+
+    impl Serialize for RunScale {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            let (num, den, pow2) = self.to_ratio().map_or_else(
+                || {
+                    let (n, d, e) = self.parts();
+                    (u64::from(n), u64::from(d), e)
+                },
+                |(n, d)| (n, d, 0),
+            );
+            Parts { num, den, pow2 }.serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for RunScale {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            let Parts { num, den, pow2 } = Parts::deserialize(deserializer)?;
+            RunScale::from_u64(num, den)
+                .and_then(|r| r.checked_mul(RunScale::pow2(pow2)?))
+                .ok_or_else(|| {
+                    de::Error::custom(
+                        "not a run-time scale: a part of 0, an odd part past u32 or an exponent of 2 past ±127",
+                    )
+                })
+        }
+    }
+
+    /// A [Scaled] as serde writes it.
+    #[derive(::serde::Serialize, ::serde::Deserialize)]
+    #[serde(rename = "Scaled")]
+    struct ScaledParts<T> {
+        value: T,
+        scale: RunScale,
+    }
+
+    impl<U, T: Storage + Int + Serialize> Serialize for Scaled<U, T> {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            ScaledParts {
+                value: self.get(),
+                scale: self.scale(),
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de, U, T: Storage + Int + Deserialize<'de>> Deserialize<'de> for Scaled<U, T> {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            let ScaledParts { value, scale } = ScaledParts::deserialize(deserializer)?;
+            Ok(Scaled::new(value, scale))
+        }
+    }
+
+    impl<O: Origin<Unit = U>, U, T: Storage + Int + Serialize> Serialize for Point<O, Scaled<U, T>> {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            self.coord().serialize(serializer)
+        }
+    }
+
+    impl<'de, O: Origin<Unit = U>, U, T: Storage + Int + Deserialize<'de>> Deserialize<'de>
+        for Point<O, Scaled<U, T>>
+    {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            Scaled::deserialize(deserializer).map(Point::new)
+        }
     }
 }
 
