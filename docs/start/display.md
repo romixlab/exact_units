@@ -127,9 +127,9 @@ This is the text alone. The type, equality, conversion, the wire and serde's num
 ```rust
 use exact_units::{Fixed, prefix::Kilo, units::Gram};
 
-let m = Fixed::<Gram, Kilo, f64>::try_new(8.682817001404815e-30).unwrap();
-assert_eq!(format!("{m:e}"), "8.682817001404815e-30 kg");
-assert_eq!(format!("{m:#e}"), "8.682817001404815e-27 g");
+let m = Fixed::<Gram, Kilo, f64>::try_new(8.6828e-30).unwrap();
+assert_eq!(format!("{m:e}"), "8.6828e-30 kg");
+assert_eq!(format!("{m:#e}"), "8.6828e-27 g");
 assert_eq!(format!("{m:.3e}"), "8.683e-30 kg");
 ```
 
