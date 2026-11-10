@@ -301,6 +301,8 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   `dimensionless`), so A = ln 2 · N/T½ is an `Exact<Per<Ln2, Second>>`-shaped value that stays exact until a named edge
   (NUM-38). `ln 2·a + b` and `convert` to a plain ratio don't compile. `tests/symbol_units.rs`. P2401#10nov-1911e, #10nov-1442.
 
+- 📋 **NUM-42 A number at a run-time exact scale** — `Scaled<U, T>`: a value at a scale known only at run time (a reduced `Ratio32` or what the design finds right), the unit still in the type; `Ticks<T> = Scaled<Second, T>` for a stream's own time base (H.264 E.2.1 and H.265 E.3.1 num_units_in_tick ÷ time_scale, AV1 6.4.3, an MP4 timescale). The same type holds JPEG's per-element quantization steps and H.264's HRD 2^(6 + bit_rate_scale) rates. `no_std`, no alloc; to and from `Fixed` exact-or-refused, or by a named `Rounding`; a `Scaled` point on a time scale; a shrink_wrap wire form; properties and a Cortex-M size check. Roman chose it on 10 Nov 2026 (option 3 of the video-time design call, PT-8). P2401#10nov-2134.
+
 ## Units and markers (`UNIT`)
 
 The unit markers themselves: SI derived units, Imperial and US customary, calendar units, more
@@ -520,6 +522,10 @@ and clocks with a named epoch.
   `Point::wrapping_add`/`wrapping_sub` (by a `Fixed` of the same step), for a `Linear` origin without bounds:
   wraps around at the edge of `T` like a counter instead of panicking on overflow in debug as `+`/`-` do — a
   device clock point stored as `u32` µs wraps every 71.6 min. P2401#10nov-1015.
+- ✅ **PT-8 Video time** — a worked example and a book recipe, no new API: H.264/H.265 VUI ticks as exact scale markers (`Rational<1001, 60000>`; 1 080 000/27 000 000 is the same scale as 1/25), the frame period per standard (2·tc in H.264 by Table E-6, one elemental interval in H.265 by Table E.7), RFC 6184 5.1's 32-bit 90 kHz timestamp as a `Point` on an origin with `modulus: Modulo<Rational<2^32, 90000>>` and a 33-bit count in a `u64`, conversions between clocks exact or by a named `Rounding` (a frame is 3003 ticks of 90 kHz, an H.264 tick 1501.5), the 48 kHz cadence each rounding gives (8008 samples every 5 frames), and drop-frame labels (counting_type 4) against true time through D-1's clockTimestamp, the drift exact (3/5000 s every ten minutes). Example `examples/16_video_time.rs` (the labels walked over a whole day); tests `tests/props/video_time.rs` (the conversions against the exact quotient, the cadence walked over an hour, both wrapping clocks against an `i128` modulo, Kani on `u16`). Docs: [Video time](docs/recipes/video_time.md). Gaps: NUM-42, PT-9, PT-10, PT-11. P2401#10nov-2121.
+- 📋 **PT-9 A modulo point's raw value reduced or refused** — `Point::from_raw` on a `Modulo` origin whose period is below `2^BITS` keeps a raw value past the period: a 33-bit PTS in a `u64` has `from_raw(1 << 33) != from_raw(0)`, though their difference is 0. `+`, `-` and `to` reduce; construction, serde and the wire don't. P2401#10nov-2134b.
+- 💡 **PT-10 Time code labels** — a label codec for hh:mm:ss;ff time codes with the counting types of H.264 Table D-3 / H.265 Table D.11 (drop-frame among them), frame to label and back, and D-1's clockTimestamp with tOffset the exact difference to true time. PT-8's example writes it by hand. P2401#10nov-2134c.
+- 💡 **PT-11 Unwrapping a modulo point** — a `Modulo` point (RTP's `u32` 90 kHz) into a `Linear` `u64` one, sharing ww_si's typed `TimeUnwrapper` core rather than a second unwrapper; where the core lives is to be asked first. P2401#10nov-2135.
 
 ## Levels (`LVL`)
 
