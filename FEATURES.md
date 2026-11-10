@@ -504,6 +504,7 @@ counted units, and the kinds that keep look-alike quantities apart.
   dimension by `as_quantity`, so a dose rate can be named the wrong kind. A quantity could declare its rate (absorbed
   dose → absorbed dose rate), so Q / time and rate · time keep the pair: a narrow, declared exception to "a product
   is never recognised as a named quantity". P2401#10nov-1516d.
+- 💡 **UNIT-18 Pixel, dot and macroblock** (P2401#10nov-1749b) — counted units for image densities and video limits: JFIF's dots per inch, JP2's grid points per metre, H.264's MaxMBPS (macroblocks per second) beside MaxLumaSr (luma samples per second), with the exact relation 1 macroblock = 256 luma samples. Settle whether dot, pixel and sample are one base or three. Found by LVL-13.
 
 ## Points and origins (`PT`)
 
@@ -650,6 +651,7 @@ non-linear named scales.
 - 📋 **LVL-14 A `Table` codec's nearest rounding past its ends** — a bug against `Codec`'s docs: `NearestEven` / `NearestAway` take the end code for a value past the table (Av 11 encodes as f/32), a saturation no name asks for; refuse it or document the clamp. P2401#10nov-1742.
 - 📋 **LVL-15 Loss twins of `Stop` and `Bel`** — `Loss<Stop>` (a neutral-density filter's density, Av as light lost) and `Loss<Bel>`; `to_level`'s compile error worded for any level, not decibels. P2401#10nov-1741b.
 - 🚧 **LVL-13 Integer codecs: the roundings, lossless transforms and printed constants of image and video standards** (P2401#10nov-2121b, plan `prj/P2401-wireweaver/design/imaging-plan.md` topics 1, 2, 3a) — JPEG (T.81, T.871), JPEG 2000 (T.800 08/2002), H.264, H.265, H.273 and AV1 as a stress test of the codec and rounding design. Done: the rounding chain (T.81's unnamed tie, A.4's `Truncate` and `Floor` at a run-time 2^Pt and every row of K.10, H.273's Round as `NearestAway`, JFIF's ⌊x + 0.5⌋ = AV1's Round2 = H.264's and H.265's add-half-then-shift matched by no mode, H.273's YCgCo NOTE 3 overflow); T.800's 5/3 and RCT and H.273's YCgCo-R lossless (walks, proptest, Kani proofs over `i16`); H.265's and H.264's QP scales at a run-time 2^(qP/6), doubling exactly, no step 2^(1/6); T.800's 19 9/7 parameters and AV1's 65 Cos128_Lookup entries certified by exact rational intervals; H.264's SAR table as a `Table` codec over 1/198 with niches; the Y′CbCr matrices exact from K_R and K_B. Misprints found: T.800 F-9's /4 (F-6 inverts /2), Table F.6's r₀ and F.4's γ one off in the 15th decimal, G-9's two minus signs, G-10's 0,16875 and 0,331260, G-13's 0,34413. Next: `CodecShape::MantissaExponent` (T.800 E-3's step size, levelScale << qP/6, HRD's rates) and `NearestCeil` for the half-up roundings, after the codec batch lands. Tests: `tests/props/image_codecs.rs`. Example: `examples/17_image_codecs.rs`. Docs: [Image and video codecs](docs/recipes/image_codecs.md).
+- 💡 **LVL-16 Codes beyond one `Linear`** (P2401#10nov-1749) — a code that picks the unit (JFIF's `units` byte, T.871 10.1; H.264 Table A-1's MaxBR units by profile) and a code whose value follows in other fields (H.264 Table E-1's Extended_SAR). A `Codec` has one `Linear`; `examples/17_image_codecs.rs` uses an enum. Found by LVL-13.
 
 ## Complex quantities (`CPX`)
 
