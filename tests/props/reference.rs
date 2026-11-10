@@ -434,6 +434,7 @@ pub(crate) fn order_exp(
 /// `k · log2(r)` rounded by `md`, for `r >= 1`: a level in `1/k` stops of the power ratio `r`, in integers. `r^k`
 /// lies in `[2^m, 2^(m+1))` for the floor `m`; it is exact where `r^k` is `2^m`, and the nearest compares
 /// `r^(2k)` with `2^(2m+1)`, which an odd power of two never equals, so there is no tie.
+#[cfg(any(feature = "std", feature = "libm"))]
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "BigUint arithmetic doesn't overflow; m is below 2^20"

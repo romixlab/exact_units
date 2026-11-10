@@ -18,13 +18,13 @@
 
 #[cfg(not(kani))]
 use exact_units::Magnitude;
-use exact_units::{Fixed, Rounding};
 use exact_units::codec::{Codec, Coded};
 use exact_units::exposure::{ApertureLabel, Apex, ShutterLabel, apex_from_exif, sensitivity_value};
 #[cfg(not(kani))]
 use exact_units::exposure::{exposure_time, f_number};
 #[cfg(all(not(kani), any(feature = "std", feature = "libm")))]
 use exact_units::exposure::{exposure_time_f64, f_number_f64};
+use exact_units::{Fixed, Rounding};
 
 /// Av of each label of Table 55's aperture column, in whole stops, written out from CIPA DC-008-2026 Annex C: the
 /// label "1" is Av 0, "32" Av 10.
@@ -37,7 +37,6 @@ const SHUTTER_TV: [i16; 17] = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
 /// `6 · log2 r`), by `md`, against the reference; a ratio of 0 refused.
 #[cfg(all(not(kani), any(feature = "std", feature = "libm")))]
 pub(crate) fn level_in_stops(r: u16, md: Rounding) {
-    use exact_units::Fixed;
     use exact_units::prefix::{One, Rational};
     use exact_units::units::{Lux, Per, Stop, Volt};
     let lux = Fixed::<Per<Lux, Lux>, One, u16>::new(r).to_level::<Stop, Rational<1, 6>, i32>(md);
@@ -54,7 +53,6 @@ pub(crate) fn level_in_stops(r: u16, md: Rounding) {
 /// `k` whole stops back to a gain: the power ratio is 2^k exactly, and the root-power one 2^(k/2) for an even `k`.
 #[cfg(all(not(kani), any(feature = "std", feature = "libm")))]
 pub(crate) fn whole_stop_gain(k: i8) {
-    use exact_units::Fixed;
     use exact_units::prefix::One;
     use exact_units::units::{Lux, Per, Stop, Volt};
     let level = Fixed::<Stop, One, i8>::new(k);
