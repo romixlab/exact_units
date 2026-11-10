@@ -186,7 +186,18 @@ assert_eq!(f.in_prefix(Prefix::Mega).to_string(), "0.(3) MHz");
 assert_eq!(Exact::<Hertz>::new(1_000_000, 7919).to_string(), "1000000/7919 Hz");
 ```
 
-A format's precision (`{:.3}`) doesn't round anything. A rounded number is `to_rounded` or `to_f64`, by name.
+A format's precision (`{:.3}`) doesn't round anything. A rounded number is `to_rounded` or `to_f64`, by name, and for a person `rounded(places, mode)`: a decimal with `places` digits after the point, rounded by the mode it names. `{}` writes it in the prefix `{}` would pick, or the one `in_prefix` gives, `{:#}` in the unit itself, `{:e}` in scientific notation. Its text reads back as the rounded value, not the exact one.
+
+```rust
+use exact_units::{Exact, Prefix, Rounding, prefix::Kilo, units::ElectronVolt};
+
+// ⁶²Ni's binding energy per nucleon repeats for longer than 12 digits
+let b_per_a = Exact::<ElectronVolt>::new_in::<Kilo>(68_157_805_479, 7_750_000);
+assert_eq!(b_per_a.in_prefix(Prefix::Kilo).to_string(), "68157805479/7750000 keV");
+let shown = b_per_a.rounded(4, Rounding::NearestEven).in_prefix(Prefix::Kilo);
+assert_eq!(shown.to_string(), "8794.5555 keV");
+assert_eq!(format!("{:e}", b_per_a.rounded(3, Rounding::NearestEven)), "8.795e6 eV");
+```
 
 ## Reading
 

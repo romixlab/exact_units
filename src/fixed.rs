@@ -1721,6 +1721,78 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> fmt::Display for Fixed<U,
     }
 }
 
+/// `{:e}`: the number as stored in scientific notation, then the prefix and the unit as `{}` writes them,
+/// `8.682817001404815e-30 kg` for a [Fixed] of grams in `Kilo` and an `f64`. For the primitive storages, which have
+/// a `LowerExp` of their own; a precision passes to it, as for `{}` (`{:.3e}` rounds the float's digits as Rust's
+/// float formatting does).
+///
+/// `{:#e}` writes the value in the unit itself where the scale is a power of ten, moving that power into the
+/// exponent, so the digits are the same and nothing is rounded: `8.682817001404815e-27 g`. Another scale (`1/65535`,
+/// π) has no exact place in the exponent, and `{:#e}` writes as `{:e}` does.
+///
+/// ```
+/// # #[cfg(feature = "mechanical")] {
+/// use exact_units::{Fixed, prefix::{Kilo, Micro}, units::{Gram, Second}};
+///
+/// let m = Fixed::<Gram, Kilo, f64>::try_new(8.682817001404815e-30).unwrap();
+/// assert_eq!(format!("{m:e}"), "8.682817001404815e-30 kg");
+/// assert_eq!(format!("{m:#e}"), "8.682817001404815e-27 g");
+/// assert_eq!(format!("{m:.3E}"), "8.683E-30 kg");
+/// let t = Fixed::<Second, Micro, u32>::new(1500);
+/// assert_eq!(format!("{t:e}"), "1.5e3 µs");
+/// assert_eq!(format!("{t:#e}"), "1.5e-3 s");
+/// # }
+/// ```
+impl<U: Unit, P: FixedScale, T: Storage + fmt::LowerExp, B: Bounds<T>> fmt::LowerExp
+    for Fixed<U, P, T, B>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_exp::<U, P>(f, 'e', |f| fmt::LowerExp::fmt(&self.value, f))
+    }
+}
+
+/// `{:E}`: as `{:e}` ([LowerExp](fmt::LowerExp)), with a capital `E`.
+impl<U: Unit, P: FixedScale, T: Storage + fmt::UpperExp, B: Bounds<T>> fmt::UpperExp
+    for Fixed<U, P, T, B>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_exp::<U, P>(f, 'E', |f| fmt::UpperExp::fmt(&self.value, f))
+    }
+}
+
+/// The number in scientific notation by `number` (which writes it with the formatter's flags), then the unit: in
+/// `P`'s prefix, or with `{:#}` and a power-of-ten `P` in the unit itself with that power added to the exponent.
+fn write_exp<U: Unit, P: FixedScale>(
+    f: &mut fmt::Formatter<'_>,
+    e: char,
+    number: impl Fn(&mut fmt::Formatter<'_>) -> fmt::Result,
+) -> fmt::Result {
+    let shift = P::SCALE.as_pow10().filter(|_| f.alternate());
+    let Some(shift) = shift else {
+        number(f)?;
+        return write_prefix_unit::<P>(U::EXPR, f);
+    };
+    let mut buf = crate::text::Buf::new();
+    let digits = Exp(&number);
+    match f.precision() {
+        Some(p) => fmt::Write::write_fmt(&mut buf, format_args!("{digits:.p$}"))?,
+        None => fmt::Write::write_fmt(&mut buf, format_args!("{digits}"))?,
+    }
+    let (mantissa, exp) = buf.as_str().split_once(e).ok_or(fmt::Error)?;
+    let exp: i32 = exp.parse().map_err(|_| fmt::Error)?;
+    write!(f, "{mantissa}{e}{}", exp.saturating_add(i32::from(shift)))?;
+    write_unit(Prefix::Unit, &U::EXPR, f)
+}
+
+/// The number of [write_exp], to be written into a buffer with only the formatter's precision.
+struct Exp<'a, F>(&'a F);
+
+impl<F: Fn(&mut fmt::Formatter<'_>) -> fmt::Result> fmt::Display for Exp<'_, F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        (self.0)(f)
+    }
+}
+
 pub(crate) fn write_prefix_unit<P: FixedScale>(
     unit: &UnitExpr,
     f: &mut fmt::Formatter<'_>,

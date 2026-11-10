@@ -41,7 +41,7 @@ use exact_units::units::{
     Becquerel, ElectronVolt, Gram, GramPerMole, Gray, Joule, Mole, Per, Ratio, Second, Sievert,
     Speed,
 };
-use exact_units::{Exact, Fixed, Rounding};
+use exact_units::{Exact, Fixed, Prefix, Rounding};
 
 exact_units::unit! {
     /// The barn, 1 b = 100 fm² = 10⁻²⁸ m² (SI Brochure, 9th ed. V4.01, table 8): a nuclear cross section.
@@ -200,13 +200,11 @@ fn binding_energies() {
         let per_a = (b / x.a).unwrap();
         // the column is rounded to 0.1 eV: half a step either way
         assert!(close(per_a, printed, Exact::new(1, 20)));
-        // B/A repeats past what `{}` writes as a decimal (62Ni's is 68157805479/7750000 keV): the float is for print
-        println!(
-            "  {:5}  B = {}, B/A = {:.4} keV",
-            x.name,
-            b,
-            per_a.to_f64() / 1e3
-        );
+        // B/A repeats past what `{}` writes as a decimal (62Ni's is 68157805479/7750000 keV): a rounding, named
+        let shown = per_a
+            .rounded(4, Rounding::NearestEven)
+            .in_prefix(Prefix::Kilo);
+        println!("  {:5}  B = {}, B/A = {shown}", x.name, b);
     }
     // ⁶²Ni, not ⁵⁶Fe, is the most tightly bound nucleus
     assert!((binding(&NI62) / 62).unwrap() > (binding(&FE56) / 56).unwrap());
@@ -281,7 +279,7 @@ fn q_values() {
         .to_system::<Si>()
         .convert_rounded::<Gram, Kilo, f64>(Rounding::NearestEven)
         .unwrap();
-    println!("  Q of 226Ra as a mass: {:e} kg", defect.get());
+    println!("  Q of 226Ra as a mass: {defect:e}");
     // the exact route refuses: the joules over c² in a u128 fraction overflow
     let joules = q_alpha.convert::<Joule>().unwrap();
     let c = Exact::<Speed>::int(299_792_458);

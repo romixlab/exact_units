@@ -155,3 +155,31 @@ fn polar_passes_the_precision_on() {
     assert_eq!(format!("{p:#.2}"), "0.05 Ω ∠ 0.15 rev");
     assert_eq!(format!("{p:<#20.2}|"), "0.05 Ω ∠ 0.15 rev   |");
 }
+
+/// `{:e}` is the storage's own scientific notation with the prefix and unit; `{:#e}` the same digits in the unit
+/// itself, the scale's power of ten moved into the exponent; a scale that is no power of ten writes as `{:e}`.
+#[test]
+fn scientific_moves_only_the_exponent() {
+    type Kg = Fixed<exact_units::units::Gram, exact_units::prefix::Kilo, f64>;
+    for x in [
+        8.682_817_001_404_815e-30,
+        -1.0,
+        6.02e23,
+        0.0,
+        f64::MIN_POSITIVE,
+        f64::MAX,
+    ] {
+        let m = Kg::try_new(x).unwrap();
+        assert_eq!(format!("{m:e}"), format!("{x:e} kg"));
+        assert_eq!(format!("{m:.2E}"), format!("{x:.2E} kg"));
+        let (mantissa, e) = format!("{x:e}")
+            .split_once('e')
+            .map(|(m, e)| (m.to_owned(), e.parse::<i32>().unwrap()))
+            .unwrap();
+        assert_eq!(format!("{m:#e}"), format!("{mantissa}e{} g", e + 3));
+    }
+    let t = Fixed::<Second, Micro, i64>::new(i64::MIN);
+    assert_eq!(format!("{t:e}"), format!("{:e} µs", i64::MIN));
+    assert_eq!(format!("{t:#e}"), "-9.223372036854775808e12 s");
+    assert_eq!(format!("{:#e}", Quarters::new(-6)), "-6e0·2⁻²");
+}

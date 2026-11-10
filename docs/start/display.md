@@ -120,6 +120,21 @@ assert_eq!(Fixed::<Per<Volt, Meter>, Milli, u8>::new(5).to_string(), "5 mV/m");
 
 This is the text alone. The type, equality, conversion, the wire and serde's numbers don't change. `serde::with_unit` reads every spelling here, and the older ones too: `m(dB/m)`, `·10⁻⁴ S/m`, `dS/m`. A quotient reads in any spelling people use, whichever one the field writes, so a `Density` takes `5 mg/L`, `5 g/m³` and `5 mg/mL`, and a `Conductivity` takes `5 uS/cm`.
 
+## `{:e}`: scientific notation
+
+`{:e}` and `{:E}` write the stored number in scientific notation, then the prefix and the unit as `{}` does. A float far from 1 then reads at a glance instead of as thirty zeros. `{:#e}` writes the value in the unit itself: where the scale is a power of ten, that power moves into the exponent and the digits stay the same, so nothing is rounded.
+
+```rust
+use exact_units::{Fixed, prefix::Kilo, units::Gram};
+
+let m = Fixed::<Gram, Kilo, f64>::try_new(8.682817001404815e-30).unwrap();
+assert_eq!(format!("{m:e}"), "8.682817001404815e-30 kg");
+assert_eq!(format!("{m:#e}"), "8.682817001404815e-27 g");
+assert_eq!(format!("{m:.3e}"), "8.683e-30 kg");
+```
+
+It is there for the primitive storages, which have their own `LowerExp`. A precision passes to that, as for `{}`.
+
 ## Precision, width, sign
 
 `{:#}` takes the usual format options. Precision rounds the printed digits, half to even:

@@ -246,6 +246,64 @@ pub(crate) mod big {
         );
     }
 
+    /// `x.rounded(places, r)` of `num/den` Hz: `{:#}` writes the reference's `round(x · 10^places)` with `places`
+    /// digits after the point, and `{:e}` a mantissa in [1, 10) (or 0) with `places` digits whose value is the
+    /// reference's rounding of `x / 10^k` for the exponent `k` it writes.
+    pub(crate) fn rounded(num: i32, den: u32, places: u8, r: Rounding) {
+        if den == 0 {
+            return;
+        }
+        let x = Exact::<Hertz>::new(i128::from(num), u128::from(den));
+        let p = u32::from(places);
+        // the plain form, written here from the digits of the reference's integer
+        let n = reference::round_div(i128::from(num) * 10i128.pow(p), i128::from(den), r);
+        let digits = format!("{:0>width$}", n.unsigned_abs(), width = places as usize + 1);
+        let (whole, frac) = digits.split_at(digits.len() - places as usize);
+        let sign = if n < 0 { "-" } else { "" };
+        let want = if places == 0 {
+            format!("{sign}{whole} Hz")
+        } else {
+            format!("{sign}{whole}.{frac} Hz")
+        };
+        assert_eq!(
+            format!("{:#}", x.rounded(places, r)),
+            want,
+            "{num}/{den} {places} {r:?}"
+        );
+        // the scientific form: parse it back and check it against the reference at the exponent it chose
+        let text = format!("{:e}", x.rounded(places, r));
+        let number = text.strip_suffix(" Hz").expect("the unit");
+        let (mantissa, k) = number.split_once('e').expect("an exponent");
+        let k: i32 = k.parse().expect("an integer exponent");
+        let after = mantissa.split_once('.').map_or(0, |(_, f)| f.len());
+        assert_eq!(after, places as usize, "{text}");
+        let m: Fraction = mantissa.parse().expect("a decimal");
+        let ten = Fraction::int(10);
+        if num == 0 {
+            assert!(m.is_zero() && k == 0, "{text}");
+            return;
+        }
+        assert!(m.abs() >= Fraction::ONE && m.abs() < ten, "{text}");
+        // round(x · 10^(places − k)) in i128: |x| < 2³¹ and k >= −10, places <= 6
+        let shift = i32::from(places) - k;
+        let (top, bottom) = if shift >= 0 {
+            (
+                i128::from(num) * 10i128.pow(shift.unsigned_abs()),
+                i128::from(den),
+            )
+        } else {
+            (
+                i128::from(num),
+                i128::from(den) * 10i128.pow(shift.unsigned_abs()),
+            )
+        };
+        let want = reference::round_div(top, bottom, r);
+        let got = m
+            .checked_mul(Fraction::int(10i128.pow(p)))
+            .and_then(|s| s.round(Rounding::Truncate));
+        assert_eq!(got, Some(want), "{text} of {num}/{den} {r:?}");
+    }
+
     /// `to_f64` is the float nearest the fraction, a tie to the even one; `from_f64` of it is that float exactly.
     pub(crate) fn nearest_f64(a: Fraction) {
         let x = big(a);
@@ -440,6 +498,13 @@ mod tests {
         #[test]
         fn rounds_as_the_reference(num in strategy::i64(), den in any::<u64>(), r in strategy::mode()) {
             big::round(num, den, r);
+        }
+
+        #[test]
+        fn rounded_as_the_reference(
+            num in any::<i32>(), den in any::<u32>(), places in 0u8..=6, r in strategy::mode(),
+        ) {
+            big::rounded(num, den, places, r);
         }
 
         #[test]

@@ -63,6 +63,7 @@ macro_rules! bit_length_halved {
 mod compare;
 mod decimal;
 mod fraction;
+mod rounded;
 mod steps;
 mod text;
 
@@ -77,6 +78,7 @@ mod tolerance;
 
 use decimal::{Expansion, write_fraction};
 pub use fraction::{Fraction, Fraction8};
+pub use rounded::Rounded;
 pub use steps::Crossing;
 #[cfg(feature = "serde")]
 pub(crate) use text::read as read_text;
@@ -547,19 +549,32 @@ impl<U: Unit> fmt::Debug for InPrefix<U> {
     }
 }
 
-/// `x` of `U` written in `prefix`, then the unit.
-fn write_in<U: Unit>(x: Fraction, prefix: Prefix, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let unit = &U::EXPR;
-    // a ratio is read with %, ‰, ppm, ppb or nothing: any other prefix is written as nothing, so it reads back
+/// The prefix `prefix` as `U` is written with: a ratio is read with %, ‰, ppm, ppb or nothing, so any other prefix
+/// is written as nothing and reads back.
+fn prefix_for<U: Unit>(prefix: Prefix) -> Prefix {
     let ratio_prefix = matches!(
         prefix,
         Prefix::Unit | Prefix::Centi | Prefix::Milli | Prefix::Micro | Prefix::Nano
     );
-    let prefix = if is_ratio(unit) && !ratio_prefix {
+    if is_ratio(&U::EXPR) && !ratio_prefix {
         Prefix::Unit
     } else {
         prefix
-    };
+    }
+}
+
+/// `x` of `U` in steps of `prefix` (`x / 10³` in kilo, `x / 2¹⁰` in kibi), `None` where it doesn't fit.
+fn value_in(x: Fraction, prefix: Prefix) -> Option<Fraction> {
+    match prefix.pow10() {
+        Some(e) => x.checked_mul(Fraction::pow10(e.checked_neg()?)?),
+        None => x.checked_div(Fraction::from_magnitude(&prefix.magnitude()?)?),
+    }
+}
+
+/// `x` of `U` written in `prefix`, then the unit.
+fn write_in<U: Unit>(x: Fraction, prefix: Prefix, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let unit = &U::EXPR;
+    let prefix = prefix_for::<U>(prefix);
     // a decimal prefix moves the point; any other scale divides
     let (scaled, shift) = match prefix.pow10() {
         Some(e) => (Some(x), i32::from(e).saturating_neg()),
