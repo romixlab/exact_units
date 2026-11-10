@@ -40,7 +40,7 @@
 //! ISO 100. The book's [Photography](https://exact.vhrd.tech/recipes/photography/) recipe writes each as the
 //! caller's named choice.
 
-use crate::codec::{Codec, CodecDef, CodecShape, CodeSpan};
+use crate::codec::{CodeSpan, Codec, CodecDef, CodecShape};
 use crate::exact::Exact;
 use crate::fixed::Fixed;
 use crate::fixed::prefix::Rational;
@@ -235,8 +235,8 @@ const SHUTTER_FIRST: i16 = -5;
 impl ShutterLabel {
     /// The labels as Table 55 prints them, by code.
     pub const LABELS: [&'static str; 17] = [
-        "30", "15", "8", "4", "2", "1", "1/2", "1/4", "1/8", "1/15", "1/30", "1/60", "1/125", "1/250", "1/500",
-        "1/1000", "1/2000",
+        "30", "15", "8", "4", "2", "1", "1/2", "1/4", "1/8", "1/15", "1/30", "1/60", "1/125",
+        "1/250", "1/500", "1/1000", "1/2000",
     ];
 
     /// The time each label writes, in seconds, as `(numerator, denominator)`: `(1, 125)` for "1/125", whose value is
@@ -365,13 +365,19 @@ impl SensitivityType {
     /// Whether the value is standard output sensitivity, alone or with others.
     #[must_use]
     pub const fn includes_sos(self) -> bool {
-        matches!(self, Self::Sos | Self::SosRei | Self::SosIsoSpeed | Self::SosReiIsoSpeed)
+        matches!(
+            self,
+            Self::Sos | Self::SosRei | Self::SosIsoSpeed | Self::SosReiIsoSpeed
+        )
     }
 
     /// Whether the value is the recommended exposure index, alone or with others.
     #[must_use]
     pub const fn includes_rei(self) -> bool {
-        matches!(self, Self::Rei | Self::SosRei | Self::ReiIsoSpeed | Self::SosReiIsoSpeed)
+        matches!(
+            self,
+            Self::Rei | Self::SosRei | Self::ReiIsoSpeed | Self::SosReiIsoSpeed
+        )
     }
 
     /// Whether the value is ISO speed, alone or with others.

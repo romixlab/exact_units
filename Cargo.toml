@@ -335,6 +335,11 @@ required-features = [
 name = "16_video_time"
 required-features = ["time"]
 
+[[example]]
+# Exif's APEX values as exact stops, the labels a camera marks, the meter's conventions named
+name = "18_photo_exposure"
+required-features = ["levels", "photometric", "time", "libm"]
+
 [profile.dev]
 split-debuginfo = "unpacked"
 

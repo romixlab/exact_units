@@ -23,6 +23,8 @@ mod dim;
 mod exact;
 #[cfg(not(kani))]
 mod exact_text;
+#[cfg(feature = "levels")]
+mod exposure;
 #[cfg(not(any(kani, fuzzing)))]
 mod float_conv;
 mod format;

@@ -431,6 +431,34 @@ pub(crate) fn order_exp(
     panic!("e^y and a too close for 10000 terms")
 }
 
+/// `k · log2(r)` rounded by `md`, for `r >= 1`: a level in `1/k` stops of the power ratio `r`, in integers. `r^k`
+/// lies in `[2^m, 2^(m+1))` for the floor `m`; it is exact where `r^k` is `2^m`, and the nearest compares
+/// `r^(2k)` with `2^(2m+1)`, which an odd power of two never equals, so there is no tie.
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "BigUint arithmetic doesn't overflow; m is below 2^20"
+)]
+pub(crate) fn stops_rounded(r: u64, k: u32, md: Rounding) -> i128 {
+    use num_bigint::BigUint;
+    assert!(r >= 1, "a level of a ratio of 0 is no number");
+    let p = BigUint::from(r).pow(k);
+    let m = p.bits() - 1;
+    let floor = i128::from(m);
+    if p == BigUint::from(1_u8) << m {
+        return floor;
+    }
+    match md {
+        Rounding::Floor | Rounding::Truncate => floor,
+        Rounding::Ceil => floor + 1,
+        Rounding::NearestEven | Rounding::NearestAway => {
+            let sq = &p * &p;
+            let mid = BigUint::from(1_u8) << (2 * m + 1);
+            assert!(sq != mid, "r^2k is never an odd power of two");
+            floor + i128::from(sq > mid)
+        }
+    }
+}
+
 /// The reference of `q!` ranges (property 31, `q_range.rs`): which stored values a range holds, and when it is
 /// refused.
 #[cfg(all(feature = "q", feature = "electrical"))]

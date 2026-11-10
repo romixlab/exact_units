@@ -1560,8 +1560,14 @@ mod tests {
             <Times<Lumen, Second>>::DIM,
             <Times<Lux, Second>>::DIM,
         ] {
-            assert_eq!(QuantityExpr::RatioOf(d).level_form(), Some(LevelForm::Power));
-            assert_eq!(QuantityExpr::RatioOf(d).const_level_form(), Some(Some(LevelForm::Power)));
+            assert_eq!(
+                QuantityExpr::RatioOf(d).level_form(),
+                Some(LevelForm::Power)
+            );
+            assert_eq!(
+                QuantityExpr::RatioOf(d).const_level_form(),
+                Some(Some(LevelForm::Power))
+            );
         }
         // luminous efficacy (lm/W) is no power
         assert_eq!(
