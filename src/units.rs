@@ -569,9 +569,10 @@ crate::unit! {
     // Nuclear: outside the SI, opt-in as `customary` is, not in `quantities` or `std`.
 
     /// The dalton (unified atomic mass unit), Da, 1 Da = 1 u = m_u: one twelfth of a ¹²C atom's mass (SI Brochure,
-    /// 9th ed., table 8, note). m_u is measured (NUM-32), so its scale keeps the symbol: a value in kg or eV comes
-    /// only from a named set of constants, `convert_with`. No `quantity` line, as [Gram]'s kg has none: both share
-    /// their dimension's own quantity, so a dalton converts to a gram directly.
+    /// 9th ed., table 8, note). m_u is measured (NUM-32), so its scale keeps the symbol, and a value comes only
+    /// from a named set of constants, `convert_with`. No `quantity` line, as [Gram]'s kg has none: both share
+    /// their dimension's own quantity, so the dimension matches with no step, but a plain `convert` to a gram still
+    /// doesn't compile, as the factor is no fraction without the set.
     #[cfg(feature = "nuclear")]
     pub struct Dalton = "Da" (long "dalton"), [kg 1], Exact(1 / 1, m_u 1);
 

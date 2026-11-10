@@ -467,8 +467,9 @@ counted units, and the kinds that keep look-alike quantities apart.
 - 📋 **UNIT-13 Quantities of s⁻¹ beyond Hz and Bq** — decay constant, reaction rate, count rate, and the fluence
   rate (m⁻²·s⁻¹), with the named steps physics gives (λ·N is an activity). P2401#10nov-1911c.
 - ✅ **UNIT-14 Nuclear units** — an opt-in group `nuclear`, not in `quantities` or `std`, as `customary` is:
-  `Dalton` (Da, 1 Da = m_u, NUM-32's symbol, no `quantity` line, so it converts to a gram directly, as `Gram`'s kg
-  has none either); `Barn` (b, 10⁻²⁸ m², SI Brochure, 9th ed., table 8); `Curie` (Ci, 3.7·10¹⁰ Bq exactly, 12th
+  `Dalton` (Da, 1 Da = m_u, NUM-32's symbol, no `quantity` line, so its dimension matches a gram's with no step,
+  as `Gram`'s kg has none either, but a value in grams still needs `convert_with` and a named set: the scale keeps
+  the symbol, not a fraction `convert` could use); `Barn` (b, 10⁻²⁸ m², SI Brochure, 9th ed., table 8); `Curie` (Ci, 3.7·10¹⁰ Bq exactly, 12th
   CGPM 1964 Resolution 7, an `Activity`); `Rad` ("rd", not "rad", which is [Radian]'s: 0.01 Gy, an `AbsorbedDose`);
   `Rem` (0.01 Sv, `DoseEquivalent`, the bare sievert's quantity, as decided); `Roentgen` (R, 2.58·10⁻⁴ C/kg exactly,
   an `Exposure`). `Exposure` is now a kind of its own (m²·s⁻²'s kg⁻¹·s·A, apart from a specific charge): the unit

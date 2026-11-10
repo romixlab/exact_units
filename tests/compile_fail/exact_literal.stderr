@@ -4,7 +4,7 @@ error: exact!: `furlongs` is no unit symbol q! knows: write a symbol (m/s, km/h,
 6 |     let _ = exact!(3 furlongs);
   |                      ^^^^^^^^
 
-error: exact!: `rd` reads more than one way (RodInternational, RodUsSurvey): write the one you mean as a type, as in q!(5 RodInternational)
+error: exact!: `rd` reads more than one way (Rad, RodInternational, RodUsSurvey): write the one you mean as a type, as in q!(5 Rad)
  --> tests/compile_fail/exact_literal.rs:7:22
   |
 7 |     let _ = exact!(2 rd);

@@ -624,7 +624,9 @@ fn nuclear_units() {
         Rad, Rem, Roentgen, Second, Sievert, TropicalYearNubase2020,
     };
 
-    // the dalton has no quantity line, so it shares a gram's own: the two convert directly
+    // the dalton has no quantity line, so it shares a gram's own: the dimension matches with no step, but a
+    // plain `convert` to Gram still doesn't compile (the scale keeps the symbol m_u; `convert_with` and a named
+    // set give a value)
     assert_eq!(<Dalton as Unit>::DIM, <Gram as Unit>::DIM);
     assert_eq!(<Dalton as Unit>::QUANTITY, <Gram as Unit>::QUANTITY);
 
