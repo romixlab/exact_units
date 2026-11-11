@@ -265,20 +265,23 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> Sub for Index<Of, T, B> {
 /// ```
 /// use exact_units::{IndexFrom1, Range, units};
 ///
-/// const MARCH: IndexFrom1<units::Month, u8, Range<1, 12>> = IndexFrom1::bounded(3);
+/// type MonthNo = IndexFrom1<units::Month, u8, Range<1, 12>>;
+/// const MARCH: MonthNo = MonthNo::bounded(3);
 /// assert_eq!(MARCH.get(), 3);
 /// ```
 ///
 /// ```compile_fail
 /// use exact_units::{IndexFrom1, Range, units};
 ///
-/// const NOPE: IndexFrom1<units::Month, u8, Range<1, 12>> = IndexFrom1::bounded(13);
+/// type MonthNo = IndexFrom1<units::Month, u8, Range<1, 12>>;
+/// const NOPE: MonthNo = MonthNo::bounded(13);
 /// ```
 ///
 /// ```compile_fail
 /// use exact_units::{IndexFrom1, Range, units};
 ///
-/// const ZERO: IndexFrom1<units::Month, u8, Range<1, 12>> = IndexFrom1::bounded(0);
+/// type MonthNo = IndexFrom1<units::Month, u8, Range<1, 12>>;
+/// const ZERO: MonthNo = MonthNo::bounded(0);
 /// ```
 #[cfg_attr(
     feature = "shrink_wrap",
