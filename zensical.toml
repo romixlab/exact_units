@@ -129,6 +129,18 @@ nav = [
             "recipes/video_time.md",
             "recipes/image_codecs.md",
             "recipes/photography.md",
+            { "RF" = [
+                    "recipes/rf/index.md",
+                    "recipes/rf/mismatch.md",
+                    "recipes/rf/link_budget.md",
+                    "recipes/rf/noise_cascade.md",
+                    "recipes/rf/fractional_n.md",
+                    "recipes/rf/two_ports.md",
+                    "recipes/rf/free_space.md",
+                    "recipes/rf/skin_depth.md",
+                    "recipes/rf/phase_noise.md",
+                ]
+            },
             "recipes/examples.md",
         ]
     },

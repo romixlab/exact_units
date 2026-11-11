@@ -327,7 +327,7 @@ fn db20_bracket(m: Magnitude) -> (f64, f64) {
 /// named, never a default (LVL-19, P2401#11nov-1406d).
 #[derive(Copy, Clone, Debug)]
 enum Dipole {
-    /// 2.15 dB, as most texts and regulators print it.
+    /// 2.15 dB, as most texts print it.
     Printed215,
     /// 2.14 dB, as some vendor guides and calculators print it: 10·lg 1.64 = 2.148.. cut to two decimals.
     Printed214,

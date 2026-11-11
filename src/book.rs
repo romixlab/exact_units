@@ -90,6 +90,23 @@ pages! {
     ImageCodecs = "recipes/image_codecs.md";
     #[cfg(all(feature = "levels", feature = "photometric", feature = "time"))]
     Photography = "recipes/photography.md";
+    RfRecipes = "recipes/rf/index.md";
+    #[cfg(all(feature = "electrical", feature = "levels", feature = "time", feature = "mechanical", any(feature = "std", feature = "libm")))]
+    RfMismatch = "recipes/rf/mismatch.md";
+    #[cfg(all(feature = "electrical", feature = "levels", feature = "time", feature = "mechanical", any(feature = "std", feature = "libm")))]
+    RfLinkBudget = "recipes/rf/link_budget.md";
+    #[cfg(all(feature = "electrical", feature = "levels", feature = "time", feature = "mechanical", any(feature = "std", feature = "libm")))]
+    RfNoiseCascade = "recipes/rf/noise_cascade.md";
+    #[cfg(all(feature = "electrical", feature = "levels", feature = "time", feature = "mechanical", any(feature = "std", feature = "libm")))]
+    RfFractionalN = "recipes/rf/fractional_n.md";
+    #[cfg(all(feature = "electrical", feature = "levels", feature = "time", feature = "mechanical", any(feature = "std", feature = "libm")))]
+    RfTwoPorts = "recipes/rf/two_ports.md";
+    #[cfg(all(feature = "electrical", feature = "levels", feature = "time", feature = "mechanical", any(feature = "std", feature = "libm")))]
+    RfFreeSpace = "recipes/rf/free_space.md";
+    #[cfg(all(feature = "electrical", feature = "levels", feature = "time", feature = "mechanical", any(feature = "std", feature = "libm")))]
+    RfSkinDepth = "recipes/rf/skin_depth.md";
+    #[cfg(all(feature = "electrical", feature = "levels", feature = "time", feature = "mechanical", any(feature = "std", feature = "libm")))]
+    RfPhaseNoise = "recipes/rf/phase_noise.md";
     Magnitude = "nomicon/magnitude.md";
     Constants = "nomicon/constants.md";
 }

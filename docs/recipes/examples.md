@@ -32,6 +32,7 @@ cargo run --example 01_timer --no-default-features --features time
 | 16 | [`16_video_time`][ex16] | `time` | H.264 time bases, RTP's wrapping 90 [[kHz]] clock, the 48 [[kHz]] cadence, drop-frame time codes against true time ([Video time](video_time.md)) |
 | 17 | [`17_image_codecs`][ex17] | `dimensionless,customary,q` | the roundings, lossless transforms, scales and printed constants of JPEG, JPEG 2000, H.264, H.265, H.273 and AV1 ([Image and video codecs](image_codecs.md)) |
 | 18 | [`18_photo_exposure`][ex18] | `levels,photometric,time,libm` | Exif's APEX values as exact stops, Table 55's labels against their values, the meter's K and C named ([Photography](photography.md)) |
+| 19 | [`19_rf`][ex19] | `electrical,fields,mechanical,time,angle,levels,dimensionless,libm` | mismatch, link budget, Friis, fractional-N, two-ports, η₀, skin depth and phase noise, each exact or at a named edge ([RF recipes](rf/index.md)) |
 
 The lines that don't compile are in the files too, each with the compiler's real message.
 
@@ -53,3 +54,4 @@ The lines that don't compile are in the files too, each with the compiler's real
 [ex16]: https://github.com/romixlab/exact_units/blob/main/examples/16_video_time.rs
 [ex17]: https://github.com/romixlab/exact_units/blob/main/examples/17_image_codecs.rs
 [ex18]: https://github.com/romixlab/exact_units/blob/main/examples/18_photo_exposure.rs
+[ex19]: https://github.com/romixlab/exact_units/blob/main/examples/19_rf.rs

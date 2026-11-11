@@ -113,6 +113,10 @@ const ALLOWED: &[(&str, &str)] = &[
         "79.99998046875",
         "an FDCAN clock, a finite decimal of a fraction: Exact's Display and parse, exactly",
     ),
+    (
+        "596.04644775390625",
+        "a Σ-Δ synthesizer's frequency error in mHz, 2441 MHz on 26 MHz in steps of 2⁻²⁴: Exact's Display, exactly",
+    ),
 ];
 
 /// Pages written by a generator (`just customary-docs`, `just q-symbols`), whose numbers are its own.
