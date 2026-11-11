@@ -20,6 +20,9 @@ pub enum Kind {
     Fit,
     /// A fraction over 0.
     Zero,
+    /// An exponent past what text may ask a [BigFraction](super::BigFraction) to work out
+    /// (`MAX_TEXT_EXP`).
+    Huge,
 }
 
 /// The number at the start of `s`, exactly, and the text after it: a decimal (`1.5`, `-2e-3`, `1_000`), one with its
@@ -135,10 +138,20 @@ pub(crate) fn read<U: Unit, R: ExactNum>(s: &str) -> Result<Exact<U, R>, Kind> {
     Ok(Exact::of(v))
 }
 
-/// Why text isn't a [Fraction]: not a number, or not one a fraction of `u128`s holds.
+/// [Kind::Huge] in words.
+const HUGE: &str = "an exponent past ±10000, more than text may ask to be worked out";
+
+/// Why text isn't a [Fraction] (or a [BigFraction](super::BigFraction)): not a number, or not one it holds.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ParseFractionError {
     kind: Kind,
+}
+
+impl ParseFractionError {
+    #[cfg(feature = "bignum")]
+    pub(crate) const fn of(kind: Kind) -> Self {
+        Self { kind }
+    }
 }
 
 impl fmt::Display for ParseFractionError {
@@ -146,6 +159,7 @@ impl fmt::Display for ParseFractionError {
         f.write_str(match self.kind {
             Kind::Fit => "a number past what a fraction of u128s holds exactly",
             Kind::Zero => "a fraction over 0",
+            Kind::Huge => HUGE,
             Kind::Form | Kind::Unit => "not a number: 1.5, -2e-3, 333.(3) or 1000/3",
         })
     }
@@ -214,6 +228,7 @@ impl<U: Unit> fmt::Display for ParseExactError<U> {
             Kind::Unit => write!(f, "not in{unit} (with or without an SI prefix)"),
             Kind::Fit => f.write_str("a number past what a fraction of u128s holds exactly"),
             Kind::Zero => f.write_str("a fraction over 0"),
+            Kind::Huge => f.write_str(HUGE),
         }
     }
 }

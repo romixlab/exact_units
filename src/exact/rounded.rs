@@ -1,6 +1,6 @@
 //! [Exact::rounded]: a decimal for a person, rounded by a named mode to a number of places.
 
-use super::{Exact, Fraction, prefix_for, value_in, write_in};
+use super::{Exact, ExactNum, Fraction, prefix_for, value_in, write_in};
 use crate::tree::write_unit;
 use crate::{Prefix, Rounding, Unit};
 use core::fmt;
@@ -35,8 +35,14 @@ impl<U: Unit> Exact<U> {
     /// ```
     #[must_use]
     pub const fn rounded(self, places: u8, r: Rounding) -> Rounded<U> {
+        Rounded::of(self, places, r)
+    }
+}
+
+impl<U, R: ExactNum> Rounded<U, R> {
+    pub(crate) const fn of(x: Exact<U, R>, places: u8, r: Rounding) -> Self {
         Rounded {
-            x: self,
+            x,
             places,
             rounding: r,
             prefix: None,
@@ -45,8 +51,8 @@ impl<U: Unit> Exact<U> {
 }
 
 /// An [Exact] as a decimal rounded by a named mode: [Exact::rounded].
-pub struct Rounded<U> {
-    x: Exact<U>,
+pub struct Rounded<U, R: ExactNum = Fraction> {
+    x: Exact<U, R>,
     places: u8,
     rounding: Rounding,
     prefix: Option<Prefix>,
@@ -64,28 +70,42 @@ impl<U> Rounded<U> {
     }
 }
 
-impl<U> Clone for Rounded<U> {
-    fn clone(&self) -> Self {
-        *self
+#[cfg(feature = "bignum")]
+impl<U> Rounded<U, super::BigFraction> {
+    /// The same, written in the prefix `p` by `{}`, as [Rounded::in_prefix] of a [Fraction].
+    #[must_use]
+    pub fn in_prefix(mut self, p: Prefix) -> Self {
+        self.prefix = Some(p);
+        self
     }
 }
 
-impl<U> Copy for Rounded<U> {}
+impl<U, R: ExactNum> Clone for Rounded<U, R> {
+    fn clone(&self) -> Self {
+        Self {
+            x: self.x.clone(),
+            ..*self
+        }
+    }
+}
 
-impl<U: Unit> fmt::Debug for Rounded<U> {
+impl<U, R: ExactNum + Copy> Copy for Rounded<U, R> {}
+
+impl<U: Unit, R: ExactNum> fmt::Debug for Rounded<U, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Rounded({self}, {:?})", self.rounding)
     }
 }
 
 /// `x · 10^places` rounded by `r`, `None` past `i128`.
-fn steps(x: Fraction, places: u8, r: Rounding) -> Option<i128> {
-    x.checked_mul(Fraction::pow10(places.into()))?.round(r)
+fn steps<R: ExactNum>(x: &R, places: u8, r: Rounding) -> Option<i128> {
+    x.checked_mul(&R::from_fraction(Fraction::pow10(places.into())))?
+        .round(r)
 }
 
 /// `x · 10^e`, `None` where the result doesn't fit.
-fn times_pow10(x: Fraction, e: i32) -> Option<Fraction> {
-    x.checked_mul(Fraction::pow10(e))
+fn times_pow10<R: ExactNum>(x: &R, e: i32) -> Option<R> {
+    x.checked_mul(&R::from_fraction(Fraction::pow10(e)))
 }
 
 /// `n / 10^places` with exactly `places` digits after the point; the sign of `n`.
@@ -104,50 +124,48 @@ fn write_places(n: i128, places: u8, f: &mut fmt::Formatter<'_>) -> fmt::Result 
     write!(f, "{sign}{whole}.{frac:0width$}")
 }
 
-impl<U: Unit> fmt::Display for Rounded<U> {
+impl<U: Unit, R: ExactNum> fmt::Display for Rounded<U, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let prefix = if f.alternate() {
             Prefix::Unit
         } else {
-            self.prefix.unwrap_or_else(|| self.x.auto_prefix())
+            self.prefix
+                .unwrap_or_else(|| super::auto_prefix_of::<U, R>(&self.x.value))
         };
         let prefix = prefix_for::<U>(prefix);
-        let in_prefix = value_in(self.x.value, prefix);
-        match in_prefix.and_then(|v| steps(v, self.places, self.rounding)) {
+        let in_prefix = value_in(&self.x.value, prefix);
+        match in_prefix.and_then(|v| steps(&v, self.places, self.rounding)) {
             Some(n) => {
                 write_places(n, self.places, f)?;
                 write_unit(prefix, &U::EXPR, f)
             }
-            None => write_in::<U, Fraction>(&self.x.value, prefix, f),
+            None => write_in::<U, R>(&self.x.value, prefix, f),
         }
     }
 }
 
-impl<U: Unit> Rounded<U> {
+impl<U: Unit, R: ExactNum> Rounded<U, R> {
     /// Scientific notation in the unit itself, `e` the letter of the exponent.
     fn write_exp(&self, e: char, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let x = self.x.value;
+        let x = &self.x.value;
         if x.is_zero() {
             write_places(0, self.places, f)?;
             write!(f, "{e}0")?;
             return write_unit(Prefix::Unit, &U::EXPR, f);
         }
-        // k with 10^k <= |x| < 10^(k+1): a u128 fraction is within 10^±39
-        let a = x.abs();
-        let Some(mut k) = (-39..=38i8).rev().find(|k| {
-            times_pow10(a, i32::from(*k).saturating_neg()).is_some_and(|m| m >= Fraction::ONE)
-        }) else {
-            return write_in::<U, Fraction>(&x, Prefix::Unit, f);
+        // k with 10^k <= |x| < 10^(k+1)
+        let Some(mut k) = x.decade() else {
+            return write_in::<U, R>(x, Prefix::Unit, f);
         };
-        let mantissa = |k: i8| {
+        let mantissa = |k: i32| {
             steps(
-                times_pow10(x, i32::from(k).saturating_neg())?,
+                &times_pow10(x, k.checked_neg()?)?,
                 self.places,
                 self.rounding,
             )
         };
         let Some(mut n) = mantissa(k) else {
-            return write_in::<U, Fraction>(&x, Prefix::Unit, f);
+            return write_in::<U, R>(x, Prefix::Unit, f);
         };
         // rounding up to 10.0..0: one more power of ten
         let ten = 10i128.checked_pow(u32::from(self.places).saturating_add(1));
@@ -161,13 +179,13 @@ impl<U: Unit> Rounded<U> {
     }
 }
 
-impl<U: Unit> fmt::LowerExp for Rounded<U> {
+impl<U: Unit, R: ExactNum> fmt::LowerExp for Rounded<U, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.write_exp('e', f)
     }
 }
 
-impl<U: Unit> fmt::UpperExp for Rounded<U> {
+impl<U: Unit, R: ExactNum> fmt::UpperExp for Rounded<U, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.write_exp('E', f)
     }

@@ -84,7 +84,7 @@ use core::marker::PhantomData;
 
 /// A value [with_unit](super::with_unit) writes and reads as text: a [Fixed] (written as `{:#}`, read exactly into
 /// its scale and storage) or an [Exact] (written as `{}`, with the prefix it picks, read exactly). Sealed.
-pub trait Value: Copy + sealed::Sealed {
+pub trait Value: sealed::Sealed + Sized {
     #[doc(hidden)]
     fn write_text<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error>;
 
@@ -129,7 +129,7 @@ pub mod option {
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
         match value {
-            Some(v) => serializer.serialize_some(&WithUnit(*v)),
+            Some(v) => serializer.serialize_some(&WithUnit(v)),
             None => serializer.serialize_none(),
         }
     }
@@ -169,9 +169,9 @@ pub mod option {
 }
 
 /// A value written as text, for [option] and collections.
-struct WithUnit<V>(V);
+struct WithUnit<'a, V>(&'a V);
 
-impl<V: Value> ::serde::Serialize for WithUnit<V> {
+impl<V: Value> ::serde::Serialize for WithUnit<'_, V> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.0.write_text(serializer)
     }
@@ -215,7 +215,7 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Value for Fixed<U, P, T, 
     }
 }
 
-impl<U: Unit, R: ExactNum + Copy> Value for Exact<U, R> {
+impl<U: Unit, R: ExactNum> Value for Exact<U, R> {
     fn write_text<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.collect_str(self)
     }

@@ -64,6 +64,10 @@ macro_rules! bit_length_halved {
 }
 
 mod big;
+#[cfg(feature = "bignum")]
+mod big_exact;
+#[cfg(feature = "bignum")]
+mod bignum;
 pub(crate) mod compare;
 mod decimal;
 mod fraction;
@@ -81,6 +85,10 @@ pub mod order_parts {
 #[cfg(feature = "dimensionless")]
 mod tolerance;
 
+#[cfg(feature = "bignum")]
+pub use big_exact::BigExact;
+#[cfg(feature = "bignum")]
+pub use bignum::{BigFraction, NotAFraction};
 use decimal::{Expansion, write_fraction};
 pub use fraction::{Fraction, Fraction8};
 pub use num::ExactNum;
@@ -332,6 +340,40 @@ impl<U> Exact<U> {
     #[must_use]
     pub const fn in_prefix(self, p: Prefix) -> InPrefix<U> {
         InPrefix { x: self, prefix: p }
+    }
+}
+
+/// Widening to the number of any size: where a value leaves what a [Fraction] holds is written, as no operator mixes
+/// the two.
+#[cfg(feature = "bignum")]
+impl<U> Exact<U> {
+    /// The same value as an `Exact<U, BigFraction>`, always: for a long exact calculation past what a [Fraction]
+    /// holds. Its size grows with the power of ten (`10^±k` takes 3.3·k bits).
+    ///
+    /// ```
+    /// # #[cfg(feature = "time")] {
+    /// use exact_units::{Exact, units::Hertz};
+    ///
+    /// let f = Exact::<Hertz>::new(80_000_000, 3);
+    /// let big = f.widen();
+    /// assert_eq!(big.to_string(), "26.(6) MHz");
+    /// assert_eq!(big.narrow(), Some(f));
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn widen(self) -> Exact<U, BigFraction> {
+        Exact::of(BigFraction::from(self.value))
+    }
+}
+
+/// The way back to a [Fraction], where it holds the value: [BigExact] has the rest of this type's API.
+#[cfg(feature = "bignum")]
+impl<U> Exact<U, BigFraction> {
+    /// The same value as an `Exact<U>` of a [Fraction], `None` where no `Fraction` holds it
+    /// ([BigFraction::to_fraction]).
+    #[must_use]
+    pub fn narrow(self) -> Option<Exact<U>> {
+        Some(Exact::of(self.value.to_fraction()?))
     }
 }
 
@@ -622,8 +664,8 @@ impl Exact<crate::units::Ratio> {
 
 /// An [Exact] written in a prefix: [Exact::in_prefix].
 pub struct InPrefix<U, R: ExactNum = Fraction> {
-    x: Exact<U, R>,
-    prefix: Prefix,
+    pub(crate) x: Exact<U, R>,
+    pub(crate) prefix: Prefix,
 }
 
 impl<U, R: ExactNum> Clone for InPrefix<U, R> {
@@ -664,10 +706,12 @@ fn prefix_for<U: Unit>(prefix: Prefix) -> Prefix {
 }
 
 /// `x` of `U` in steps of `prefix` (`x / 10³` in kilo, `x / 2¹⁰` in kibi), `None` where it doesn't fit.
-fn value_in(x: Fraction, prefix: Prefix) -> Option<Fraction> {
+fn value_in<R: ExactNum>(x: &R, prefix: Prefix) -> Option<R> {
     match prefix.pow10() {
-        Some(e) => x.checked_mul(Fraction::pow10(i32::from(e).checked_neg()?)),
-        None => x.checked_div(Fraction::from_magnitude(&prefix.magnitude()?)?),
+        Some(e) => x.checked_mul(&R::from_fraction(Fraction::pow10(
+            i32::from(e).checked_neg()?,
+        ))),
+        None => x.checked_div(&R::from_magnitude(&prefix.magnitude()?)?),
     }
 }
 
@@ -920,6 +964,91 @@ impl<U, U2, R: ExactNum> Div<Exact<U2, R>> for Exact<U, R> {
     /// `self / rhs` in `U / U2`, `None` for 0 and where the result doesn't fit.
     fn div(self, rhs: Exact<U2, R>) -> Self::Output {
         Some(Exact::of(tri!(self.value.checked_div(&rhs.value))))
+    }
+}
+
+/// The operators on references: a large number isn't cloned for each step, `(&a + &b)?`.
+impl<U, R: ExactNum> Add<&Exact<U, R>> for &Exact<U, R> {
+    type Output = Option<Exact<U, R>>;
+
+    /// `self + rhs`, `None` only when the result doesn't fit.
+    fn add(self, rhs: &Exact<U, R>) -> Self::Output {
+        Some(Exact::of(self.value.checked_add(&rhs.value)?))
+    }
+}
+
+impl<U, R: ExactNum> Sub<&Exact<U, R>> for &Exact<U, R> {
+    type Output = Option<Exact<U, R>>;
+
+    /// `self - rhs`, `None` only when the result doesn't fit.
+    fn sub(self, rhs: &Exact<U, R>) -> Self::Output {
+        Some(Exact::of(self.value.checked_sub(&rhs.value)?))
+    }
+}
+
+impl<U, R: ExactNum> Neg for &Exact<U, R> {
+    type Output = Exact<U, R>;
+
+    fn neg(self) -> Exact<U, R> {
+        Exact::of(self.value.negate())
+    }
+}
+
+impl<U, R: ExactNum> Mul<i128> for &Exact<U, R> {
+    type Output = Option<Exact<U, R>>;
+
+    fn mul(self, n: i128) -> Self::Output {
+        Some(Exact::of(
+            self.value
+                .checked_mul(&R::from_fraction(Fraction::int(n)))?,
+        ))
+    }
+}
+
+impl<U, R: ExactNum> Div<i128> for &Exact<U, R> {
+    type Output = Option<Exact<U, R>>;
+
+    fn div(self, n: i128) -> Self::Output {
+        Some(Exact::of(
+            self.value
+                .checked_div(&R::from_fraction(Fraction::int(n)))?,
+        ))
+    }
+}
+
+impl<U, R: ExactNum> Mul<&R> for &Exact<U, R> {
+    type Output = Option<Exact<U, R>>;
+
+    /// `self · k`, `None` where the result doesn't fit.
+    fn mul(self, k: &R) -> Self::Output {
+        Some(Exact::of(self.value.checked_mul(k)?))
+    }
+}
+
+impl<U, R: ExactNum> Div<&R> for &Exact<U, R> {
+    type Output = Option<Exact<U, R>>;
+
+    /// `self / k`, `None` for 0 and where the result doesn't fit.
+    fn div(self, k: &R) -> Self::Output {
+        Some(Exact::of(self.value.checked_div(k)?))
+    }
+}
+
+impl<U, U2, R: ExactNum> Mul<&Exact<U2, R>> for &Exact<U, R> {
+    type Output = Option<Exact<Times<U, U2>, R>>;
+
+    /// `self · rhs` in `U · U2`, `None` where the result doesn't fit.
+    fn mul(self, rhs: &Exact<U2, R>) -> Self::Output {
+        Some(Exact::of(self.value.checked_mul(&rhs.value)?))
+    }
+}
+
+impl<U, U2, R: ExactNum> Div<&Exact<U2, R>> for &Exact<U, R> {
+    type Output = Option<Exact<Per<U, U2>, R>>;
+
+    /// `self / rhs` in `U / U2`, `None` for 0 and where the result doesn't fit.
+    fn div(self, rhs: &Exact<U2, R>) -> Self::Output {
+        Some(Exact::of(self.value.checked_div(&rhs.value)?))
     }
 }
 

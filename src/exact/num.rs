@@ -8,7 +8,8 @@ use core::fmt;
 use core::hash::Hash;
 
 /// The number an [Exact](super::Exact) holds: [Fraction] (the default, `u128`s with a power of ten, `const`) and,
-/// once it lands, an arbitrary-precision one behind a feature. Sealed: the crate can change the set and the methods.
+/// with the feature `bignum`, `BigFraction` (any size, allocating). Sealed: the crate can change the set and the
+/// methods.
 ///
 /// An `Exact<U, R>` is written once over `R` for its operators, `Display`, parse, serde, the order against a
 /// [Fixed](crate::Fixed), [convert](super::Exact::convert) and its kin, and the crossing of
@@ -102,6 +103,9 @@ pub(crate) mod sealed {
 
         /// `self · 2^pow2 · 10^pow10`, `None` where it doesn't fit.
         fn scaled_by(self, pow2: i32, pow10: i32) -> Option<Self>;
+
+        /// `k` with `10^k <= |self| < 10^(k+1)`, `None` for 0 and where it can't be told.
+        fn decade(&self) -> Option<i32>;
     }
 }
 
@@ -124,6 +128,20 @@ impl sealed::Sealed for Fraction {
     #[inline]
     fn scaled_by(self, pow2: i32, pow10: i32) -> Option<Self> {
         text::scale(self, pow2, pow10)
+    }
+
+    fn decade(&self) -> Option<i32> {
+        // a u128 fraction's value is within 10^±39 of its power of ten
+        let a = self.abs();
+        let e = i64::from(self.exp10());
+        let k = (-39..=38i64).rev().find(|k| {
+            e.checked_add(*k)
+                .and_then(i64::checked_neg)
+                .and_then(|p| i32::try_from(p).ok())
+                .and_then(|p| a.checked_mul(Fraction::pow10(p)))
+                .is_some_and(|m| m >= Fraction::ONE)
+        })?;
+        i32::try_from(e.checked_add(k)?).ok()
     }
 }
 

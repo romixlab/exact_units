@@ -1,6 +1,6 @@
 //! The relative error of an achieved value against its target, exact, and a named tolerance it is checked against.
 
-use super::{Exact, Fraction};
+use super::{Exact, ExactNum, Fraction};
 use crate::Unit;
 use crate::prefix::{Centi, Micro, Nano};
 use crate::units::Ratio;
@@ -64,6 +64,12 @@ impl Tolerance {
     #[must_use]
     pub fn contains(self, error: Exact<Ratio>) -> bool {
         error.abs() <= self.t
+    }
+
+    /// Whether `error`, of any number, is within ±t.
+    #[cfg(feature = "bignum")]
+    pub(crate) fn holds<R: ExactNum>(self, error: &R) -> bool {
+        error.abs() <= R::from_fraction(self.t.get())
     }
 }
 
@@ -141,25 +147,26 @@ impl<U: Unit> Exact<U> {
 }
 
 /// A value outside its tolerance of a target ([Exact::within], [Fixed::within](crate::Fixed::within)): both values,
-/// the error and the tolerance. `V` is the type of the values, an [Exact] or a [Fixed](crate::Fixed).
+/// the error and the tolerance. `V` is the type of the values, an [Exact] or a [Fixed](crate::Fixed); `R` the number
+/// of the error, that of the `Exact`.
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub struct OffTarget<V> {
+pub struct OffTarget<V, R: ExactNum = Fraction> {
     /// The value checked.
     pub achieved: V,
     /// What it should be.
     pub target: V,
-    /// The relative error, `None` against a target of 0 (or, for an [Exact], where it overflows).
-    pub error: Option<Exact<Ratio>>,
+    /// The relative error, `None` against a target of 0 (or, for an [Exact] of a [Fraction], where it overflows).
+    pub error: Option<Exact<Ratio, R>>,
     /// What was allowed.
     pub tolerance: Tolerance,
     /// Whether the target is 0: why `error` is `None`, when it is.
     pub(crate) zero_target: bool,
 }
 
-impl<V: fmt::Display> fmt::Display for OffTarget<V> {
+impl<V: fmt::Display, R: ExactNum> fmt::Display for OffTarget<V, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (a, t, tol) = (&self.achieved, &self.target, self.tolerance);
-        match self.error {
+        match &self.error {
             Some(e) if tol.t.is_zero() => write!(f, "{a} is {e} off {t}, outside ±0 (exactly)"),
             Some(e) => write!(f, "{a} is {e} off {t}, outside {tol}"),
             // an Exact's error is refused past u128 too; a Fixed's only for a target of 0
@@ -171,10 +178,10 @@ impl<V: fmt::Display> fmt::Display for OffTarget<V> {
     }
 }
 
-impl<V: fmt::Display> fmt::Debug for OffTarget<V> {
+impl<V: fmt::Display, R: ExactNum> fmt::Debug for OffTarget<V, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "OffTarget({self})")
     }
 }
 
-impl<V: fmt::Display> core::error::Error for OffTarget<V> {}
+impl<V: fmt::Display, R: ExactNum> core::error::Error for OffTarget<V, R> {}

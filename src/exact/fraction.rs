@@ -1212,6 +1212,18 @@ impl Fraction {
         Self::from_split(self.neg, self.num, self.den, e.checked_add(pow2)?, e)
     }
 
+    /// `±n / d · 2^p2 · 5^p5` (`n` and `d` coprime) in the canonical form, `None` where no form fits: the narrowing of
+    /// a [BigFraction](super::BigFraction).
+    #[cfg(feature = "bignum")]
+    pub(crate) fn from_split_parts(neg: bool, n: u128, d: u128, p2: i64, p5: i64) -> Option<Self> {
+        // past these no form fits (the exponent is an i32), and the sums inside stay far from i64's ends
+        const FAR: i64 = 1 << 40;
+        if n == 0 || d == 0 || p2.abs() > FAR || p5.abs() > FAR {
+            return None;
+        }
+        Self::from_split(neg, n, d, p2, p5)
+    }
+
     /// `self · n`, `None` where the result doesn't fit.
     #[must_use]
     pub const fn checked_mul_int(self, n: i128) -> Option<Self> {

@@ -37,7 +37,8 @@
 //!
 //! `no_std`, no alloc, and no dependencies without features. `shrink_wrap` adds the wire format (`shrink_wrap`'s),
 //! `std` every unit group and with `shrink_wrap` the owned forms of the wire types, `defmt` their `defmt::Format`,
-//! `serde` their serde, `libm` the run-time dB without `std`. Unit groups are cargo features (`time`, `electrical`,
+//! `serde` their serde, `libm` the run-time dB without `std`, `bignum` an `Exact` of any size (`BigFraction`, with
+//! `alloc`). Unit groups are cargo features (`time`, `electrical`,
 //! `mechanical`, `angle`, `thermal`, `chemical`, `photometric`, `radiometric`, `radiation`, `fields`, `dimensionless`,
 //! `information`, `counting`, `levels`, `quantities` for all).
 //!
@@ -45,6 +46,9 @@
 //! built on this crate.
 
 // unit tests format with std also when the crate is built without it
+// BigFraction allocates: its integers grow as they need
+#[cfg(feature = "bignum")]
+extern crate alloc;
 #[cfg(all(test, not(feature = "std")))]
 extern crate std;
 
@@ -119,6 +123,9 @@ pub use complex::{
     Complex, ComplexStorage, Extended, Interleaved, IqStorage, Mac, NormStorage, Polar,
 };
 pub use contains::Contains;
+/// dashu's integers, of a [BigFraction]'s [numer](BigFraction::numer) and [denom](BigFraction::denom).
+#[cfg(feature = "bignum")]
+pub use dashu_int;
 #[doc(hidden)]
 pub use declare::{__dim_exp, __dim_set};
 #[cfg(feature = "shrink_wrap")]
@@ -132,6 +139,8 @@ pub use exact::Crossing as ExactCrossing;
 pub use exact::Fraction8;
 #[doc(hidden)]
 pub use exact::order_parts as __order_parts;
+#[cfg(feature = "bignum")]
+pub use exact::{BigExact, BigFraction, NotAFraction};
 pub use exact::{
     Exact, ExactNum, Fraction, InPrefix, ParseExactError, ParseFractionError, Rounded,
 };

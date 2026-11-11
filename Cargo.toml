@@ -107,6 +107,9 @@ libm = ["dep:libm", "levels"]
 # reading, and `serde::with_unit` for "1.5 ms" text: no_std, no alloc. With `std` also Magnitude and Offset, with
 # `std` and `shrink_wrap` the owned wire mirrors (DimOwned, CountedOwned, ProvenanceOwned), for RON snapshots of APIs
 serde = ["dep:serde"]
+# BigFraction, an Exact's arbitrary-precision number (Exact<U, BigFraction>), on dashu (pure Rust, no_std): needs
+# alloc only, adds a type and its impls and changes nothing else
+bignum = ["dep:dashu-int", "dep:dashu-ratio"]
 
 # unit groups: a firmware enables the ones it uses, `quantities` all of them but `customary`
 quantities = [
@@ -179,6 +182,9 @@ counting = []
 levels = ["dimensionless"]
 
 [dependencies]
+# BigFraction (feature bignum): arbitrary-precision integers and their reduced rationals, pure Rust, no_std + alloc
+dashu-int = { version = "0.6.2", default-features = false, optional = true }
+dashu-ratio = { version = "0.6.1", default-features = false, optional = true }
 defmt = { version = "1.1", optional = true }
 # q!, the unit literal: a proc-macro of this repository without dependencies of its own
 exact_units_macros = { version = "=0.1.0", path = "macros", optional = true }
@@ -355,7 +361,16 @@ required-features = ["levels", "photometric", "time", "libm"]
 [[example]]
 # RF as a stress test: mismatch, link budgets, Friis, fractional-N, two-ports, η₀, skin depth, phase noise
 name = "19_rf"
-required-features = ["electrical", "fields", "mechanical", "time", "angle", "levels", "dimensionless", "libm"]
+required-features = [
+    "electrical",
+    "fields",
+    "mechanical",
+    "time",
+    "angle",
+    "levels",
+    "dimensionless",
+    "libm",
+]
 
 [profile.dev]
 split-debuginfo = "unpacked"

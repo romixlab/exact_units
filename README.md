@@ -85,6 +85,7 @@ The API reference is on [docs.rs](https://docs.rs/exact_units).
 | `std`         | every unit group but `customary`; with `shrink_wrap` the owned wire mirrors                          |
 | `shrink_wrap` | the wire format of [WireWeaver](https://github.com/vhrdtech/wire_weaver); exact-width bit fields `U1`..`U64` / `I2`..`I64` (opt-in, not a default) |
 | `serde`       | `serde` for the numbers, `no_std` without alloc, bounds checked on reading; `"1.5 ms"` text with `serde::with_unit` (for `Fixed` and `Exact`); with `std` also `Magnitude` and `Offset` |
+| `bignum`      | `BigFraction`, an `Exact` of any size (`Exact<U, BigFraction>`) on the pure-Rust `dashu`; needs `alloc` only (opt-in) |
 | `defmt`       | `defmt::Format`                                                                                      |
 | `libm`        | `to_db` / `from_db` without `std`, from the pure-Rust `libm`; turns on `levels` for the dB and Np markers |
 

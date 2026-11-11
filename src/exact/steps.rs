@@ -98,8 +98,8 @@ impl<U: Unit> Exact<U> {
 /// form, so no value of no system stands in a type.
 #[must_use = "a crossing is finished by a convert"]
 pub struct Crossing<S, U, R: ExactNum = Fraction> {
-    value: Exact<U, R>,
-    _system: PhantomData<S>,
+    pub(super) value: Exact<U, R>,
+    pub(super) _system: PhantomData<S>,
 }
 
 impl<S, U, R: ExactNum> Clone for Crossing<S, U, R> {
