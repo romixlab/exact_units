@@ -7,6 +7,20 @@ edition = "2024"
 [package.metadata]
 cargo-fuzz = true
 
+# cargo-machete reads only fuzz_targets/*.rs's own `use`s, not the tests/props modules they pull in by #[path]
+# (fuzz_targets/props.rs): each of these is used there, not in a fuzz_targets file directly.
+[package.metadata.cargo-machete]
+ignored = [
+    # tests/props/reference.rs, exact_text.rs, q_text.rs, registry.rs, serde_input.rs, text.rs and wire.rs call it
+    "exact_units",
+    # tests/props/serde_input.rs derives Serialize/Deserialize and reads JSON through serde's Deserializer
+    "serde",
+    # tests/props/serde_input.rs reads arbitrary text as serde_json::Value and round-trips it
+    "serde_json",
+    # tests/props/wire.rs encodes and decodes the crate's shrink_wrap types
+    "shrink_wrap",
+]
+
 # a workspace of its own: the crate's builds, tests and lints never see this one (it needs nightly and libFuzzer)
 [workspace]
 
