@@ -90,6 +90,7 @@ pub(crate) static UNITS: &[Entry] = &[
     Entry { symbol: "lx", marker: "units::Lux", group: "photometric", prefixes: Prefixes::Si, pow10: 0 },
     Entry { symbol: "m", marker: "units::Meter", group: "mechanical", prefixes: Prefixes::Si, pow10: 0 },
     Entry { symbol: "mol", marker: "units::Mole", group: "chemical", prefixes: Prefixes::Si, pow10: 0 },
+    Entry { symbol: "month", marker: "units::Month", group: "counting", prefixes: Prefixes::None, pow10: 0 },
     Entry { symbol: "mph", marker: "units::MilePerHour", group: "customary", prefixes: Prefixes::None, pow10: 0 },
     Entry { symbol: "nibble", marker: "units::Nibble", group: "information", prefixes: Prefixes::None, pow10: 0 },
     Entry { symbol: "nit", marker: "units::Nit", group: "photometric", prefixes: Prefixes::Si, pow10: 0 },

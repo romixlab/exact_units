@@ -954,9 +954,30 @@ impl<const MIN: i64, const MAX: i64, const EXP: i8> Bounds<f32> for RangeDec<MIN
 
 /// Per integer storage: `bounded(value)`, a `const fn` constructor, a compile error for a value outside `B` in `const`
 /// code (a panic at run time); and [OneOf]'s bounds and [try_new_rounded](super::Fixed::try_new_rounded), which
-/// compare in the storage itself. `$get` is the storage's number as a primitive integer, for `const` code.
+/// compare in the storage itself; for an unsigned storage (marked `unsigned`) also
+/// [IndexFrom1::bounded](crate::IndexFrom1::bounded). `$get` is the storage's number as a primitive integer, for `const` code.
 macro_rules! bounded {
-    ($($ty:ident $x:ident => $get:expr;)*) => {$(
+    (@index unsigned $ty:ident $x:ident $get:expr) => {
+        #[cfg(feature = "counting")]
+        impl<Of, B: Bounds<$ty>> crate::IndexFrom1<Of, $ty, B> {
+            /// The number `number`, 1 the first: a compile error in `const` code when it is 0 or outside `B`, a
+            /// panic at run time ([try_new](Self::try_new) doesn't).
+            #[inline(always)]
+            pub const fn bounded(number: $ty) -> Self {
+                {
+                    let $x = number;
+                    if $get == 0 {
+                        panic!("an IndexFrom1 counts from 1, not 0");
+                    }
+                }
+                let _ = super::Fixed::<(), (), $ty, B>::bounded(number);
+                Self::new_unchecked(number)
+            }
+        }
+    };
+    ($($ty:ident $x:ident => $get:expr $(, $unsigned:ident)?;)*) => {$(
+        $(bounded!(@index $unsigned $ty $x $get);)?
+
         impl<U, P, B: Bounds<$ty>> super::Fixed<U, P, $ty, B> {
             /// `value` in units of `P`: a compile error in `const` code when it is outside `B`, a panic at run time
             /// ([try_new](Self::try_new) doesn't).
@@ -1098,10 +1119,10 @@ macro_rules! bounded_float {
 bounded_float!(f32 f64);
 
 bounded! {
-    u8 x => x;
-    u16 x => x;
-    u32 x => x;
-    u64 x => x;
+    u8 x => x, unsigned;
+    u16 x => x, unsigned;
+    u32 x => x, unsigned;
+    u64 x => x, unsigned;
     i8 x => x;
     i16 x => x;
     i32 x => x;
@@ -1110,74 +1131,74 @@ bounded! {
 
 #[cfg(feature = "shrink_wrap")]
 bounded! {
-    UNib32 x => x.0;
-    UVlq32 x => x.0;
-    UVlq64 x => x.0;
-    Nibble x => x.value();
-    U1 x => x.value();
-    U2 x => x.value();
-    U3 x => x.value();
-    U4 x => x.value();
-    U5 x => x.value();
-    U6 x => x.value();
-    U7 x => x.value();
-    U8 x => x.value();
-    U9 x => x.value();
-    U10 x => x.value();
-    U11 x => x.value();
-    U12 x => x.value();
-    U13 x => x.value();
-    U14 x => x.value();
-    U15 x => x.value();
-    U16 x => x.value();
-    U17 x => x.value();
-    U18 x => x.value();
-    U19 x => x.value();
-    U20 x => x.value();
-    U21 x => x.value();
-    U22 x => x.value();
-    U23 x => x.value();
-    U24 x => x.value();
-    U25 x => x.value();
-    U26 x => x.value();
-    U27 x => x.value();
-    U28 x => x.value();
-    U29 x => x.value();
-    U30 x => x.value();
-    U31 x => x.value();
-    U32 x => x.value();
-    U33 x => x.value();
-    U34 x => x.value();
-    U35 x => x.value();
-    U36 x => x.value();
-    U37 x => x.value();
-    U38 x => x.value();
-    U39 x => x.value();
-    U40 x => x.value();
-    U41 x => x.value();
-    U42 x => x.value();
-    U43 x => x.value();
-    U44 x => x.value();
-    U45 x => x.value();
-    U46 x => x.value();
-    U47 x => x.value();
-    U48 x => x.value();
-    U49 x => x.value();
-    U50 x => x.value();
-    U51 x => x.value();
-    U52 x => x.value();
-    U53 x => x.value();
-    U54 x => x.value();
-    U55 x => x.value();
-    U56 x => x.value();
-    U57 x => x.value();
-    U58 x => x.value();
-    U59 x => x.value();
-    U60 x => x.value();
-    U61 x => x.value();
-    U62 x => x.value();
-    U63 x => x.value();
-    U64 x => x.value();
+    UNib32 x => x.0, unsigned;
+    UVlq32 x => x.0, unsigned;
+    UVlq64 x => x.0, unsigned;
+    Nibble x => x.value(), unsigned;
+    U1 x => x.value(), unsigned;
+    U2 x => x.value(), unsigned;
+    U3 x => x.value(), unsigned;
+    U4 x => x.value(), unsigned;
+    U5 x => x.value(), unsigned;
+    U6 x => x.value(), unsigned;
+    U7 x => x.value(), unsigned;
+    U8 x => x.value(), unsigned;
+    U9 x => x.value(), unsigned;
+    U10 x => x.value(), unsigned;
+    U11 x => x.value(), unsigned;
+    U12 x => x.value(), unsigned;
+    U13 x => x.value(), unsigned;
+    U14 x => x.value(), unsigned;
+    U15 x => x.value(), unsigned;
+    U16 x => x.value(), unsigned;
+    U17 x => x.value(), unsigned;
+    U18 x => x.value(), unsigned;
+    U19 x => x.value(), unsigned;
+    U20 x => x.value(), unsigned;
+    U21 x => x.value(), unsigned;
+    U22 x => x.value(), unsigned;
+    U23 x => x.value(), unsigned;
+    U24 x => x.value(), unsigned;
+    U25 x => x.value(), unsigned;
+    U26 x => x.value(), unsigned;
+    U27 x => x.value(), unsigned;
+    U28 x => x.value(), unsigned;
+    U29 x => x.value(), unsigned;
+    U30 x => x.value(), unsigned;
+    U31 x => x.value(), unsigned;
+    U32 x => x.value(), unsigned;
+    U33 x => x.value(), unsigned;
+    U34 x => x.value(), unsigned;
+    U35 x => x.value(), unsigned;
+    U36 x => x.value(), unsigned;
+    U37 x => x.value(), unsigned;
+    U38 x => x.value(), unsigned;
+    U39 x => x.value(), unsigned;
+    U40 x => x.value(), unsigned;
+    U41 x => x.value(), unsigned;
+    U42 x => x.value(), unsigned;
+    U43 x => x.value(), unsigned;
+    U44 x => x.value(), unsigned;
+    U45 x => x.value(), unsigned;
+    U46 x => x.value(), unsigned;
+    U47 x => x.value(), unsigned;
+    U48 x => x.value(), unsigned;
+    U49 x => x.value(), unsigned;
+    U50 x => x.value(), unsigned;
+    U51 x => x.value(), unsigned;
+    U52 x => x.value(), unsigned;
+    U53 x => x.value(), unsigned;
+    U54 x => x.value(), unsigned;
+    U55 x => x.value(), unsigned;
+    U56 x => x.value(), unsigned;
+    U57 x => x.value(), unsigned;
+    U58 x => x.value(), unsigned;
+    U59 x => x.value(), unsigned;
+    U60 x => x.value(), unsigned;
+    U61 x => x.value(), unsigned;
+    U62 x => x.value(), unsigned;
+    U63 x => x.value(), unsigned;
+    U64 x => x.value(), unsigned;
     I2 x => x.value();
     I3 x => x.value();
     I4 x => x.value();

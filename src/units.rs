@@ -856,6 +856,10 @@ crate::unit! {
     /// A count of scans, scan: one reading of every channel of a multi-channel converter, a sample of each.
     #[cfg(feature = "counting")]
     pub struct Scan = "scan" (long "scan"), base;
+
+    /// A count of calendar months, month: 1 to 12 within a year (an index marker, as [Day] is for the day of the month); a month has no fixed length in seconds, so it has no scale to [Second].
+    #[cfg(feature = "counting")]
+    pub struct Month = "month" (long "month"), base;
 }
 
 // Compound

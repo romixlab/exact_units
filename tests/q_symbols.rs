@@ -1248,7 +1248,7 @@ fn text_reader_agrees() {
                 Sector, Siemens, Sievert, Slug, Steradian, Stone, Stop, StreckSwedish, Tesla, Thou, TonForceShort, Tonne,
                 TonOfRefrigeration, TonOfTnt, TonShort, Torr, Turn, Var, Volt, VoltAmpere, Watt, Weber, Week, Word, Yard,
                 Event, Pulse, Tick, Channel, Pin, Step, Segment, Session, Boot, Operation, Argument, Filter, Fifo, Buffer,
-                TimeQuantum, Scan,
+                TimeQuantum, Scan, Month,
             );
             match r {
                 Ok(()) => {}

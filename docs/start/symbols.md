@@ -129,6 +129,7 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `lx` | `Lux` | `photometric` | SI |
 | `m` | `Meter` | `mechanical` | SI |
 | `mol` | `Mole` | `chemical` | SI |
+| `month` | `Month` | `counting` | none |
 | `mph` | `MilePerHour` | `customary` | none |
 | `nibble` | `Nibble` | `information` | none |
 | `nit` | `Nit` | `photometric` | SI |

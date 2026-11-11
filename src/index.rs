@@ -258,6 +258,28 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> Sub for Index<Of, T, B> {
 /// assert!(Channel::try_new(0).is_err());
 /// assert!(Channel::try_new(5).is_err());
 /// ```
+///
+/// `bounded` is the `const fn` constructor: a compile error in `const` code for 0 or a number outside `B`, a panic
+/// at run time.
+///
+/// ```
+/// use exact_units::{IndexFrom1, Range, units};
+///
+/// const MARCH: IndexFrom1<units::Month, u8, Range<1, 12>> = IndexFrom1::bounded(3);
+/// assert_eq!(MARCH.get(), 3);
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{IndexFrom1, Range, units};
+///
+/// const NOPE: IndexFrom1<units::Month, u8, Range<1, 12>> = IndexFrom1::bounded(13);
+/// ```
+///
+/// ```compile_fail
+/// use exact_units::{IndexFrom1, Range, units};
+///
+/// const ZERO: IndexFrom1<units::Month, u8, Range<1, 12>> = IndexFrom1::bounded(0);
+/// ```
 #[cfg_attr(
     feature = "shrink_wrap",
     derive_shrink_wrap(
@@ -290,6 +312,16 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> IndexFrom1<Of, T, B> {
             _of: PhantomData,
             _bounds: PhantomData,
         })
+    }
+
+    /// The number without a check: the caller has seen it is not 0 and is in `B`.
+    #[inline(always)]
+    pub(crate) const fn new_unchecked(number: T) -> Self {
+        IndexFrom1 {
+            number,
+            _of: PhantomData,
+            _bounds: PhantomData,
+        }
     }
 
     /// The number as people count it, 1 the first.

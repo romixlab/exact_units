@@ -5599,6 +5599,16 @@
       "scale": null,
       "symbol": "kg·m/s"
     },
+    "Month": {
+      "description": "A count of calendar months, month: 1 to 12 within a year (an index marker, as Day is for the day of the month); a month has no fixed length in seconds, so it has no scale to Second.",
+      "dim": "Month",
+      "long": "month",
+      "plural": "months",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "month"
+    },
     "NauticalMileInternational": {
       "description": "Nautical mile (international): 1852 m (IHO, Monaco 1929).",
       "dim": "m",
