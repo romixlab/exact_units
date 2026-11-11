@@ -136,13 +136,16 @@ fn moved_of<U: Unit>(t: &str) -> Option<Prefix> {
     };
     // every power a scale can have: 10⁻⁹ on V/√Hz is written nV/√Hz; a binary prefix on a quotient, KiB/s
     let binary = [Prefix::Kibi, Prefix::Mebi, Prefix::Gibi, Prefix::Tebi];
-    (-63..=63i8).filter_map(Prefix::from_pow10).chain(binary).find(|p| {
-        moved(*p, &U::EXPR).is_some() && writes_as(PrefixText::<U>(*p, PhantomData), t)
-            || inside(*p, &U::EXPR).is_some_and(|inner| {
-                t.strip_prefix(inner.symbol())
-                    .is_some_and(|rest| writes_as(UnitText::<U>(PhantomData), rest))
-            })
-    })
+    (-63..=63i8)
+        .filter_map(Prefix::from_pow10)
+        .chain(binary)
+        .find(|p| {
+            moved(*p, &U::EXPR).is_some() && writes_as(PrefixText::<U>(*p, PhantomData), t)
+                || inside(*p, &U::EXPR).is_some_and(|inner| {
+                    t.strip_prefix(inner.symbol())
+                        .is_some_and(|rest| writes_as(UnitText::<U>(PhantomData), rest))
+                })
+        })
 }
 
 /// The scale of text that spells a quotient in any way people do, not only the one `{}` writes for `U`: `mS/cm` and

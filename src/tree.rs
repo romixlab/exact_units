@@ -842,7 +842,8 @@ fn on_quotient<'t, E: Tree<'t>>(prefix: Prefix, unit: &E) -> Option<Moved<'t>> {
     let q = quotient(unit)?;
     let numerator_takes = q.prefixes.is_none_or(|p| p.allows(prefix));
     let Some(k) = prefix.pow10() else {
-        let binary = q.prefixes.is_some() && q.takes_prefix && q.marker.is_empty() && prefix.is_named();
+        let binary =
+            q.prefixes.is_some() && q.takes_prefix && q.marker.is_empty() && prefix.is_named();
         return (binary && numerator_takes).then_some(Moved::Inside(prefix));
     };
     if k == 0 {
