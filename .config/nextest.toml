@@ -5,3 +5,15 @@ nextest-version = { required = "0.9.50" }
 [[profile.default.overrides]]
 filter = 'test(speed_literal_is_the_typed_const_compare)'
 success-output = "immediate"
+
+# The trybuild batches of tests/compile_fail.rs share one project, target/tests/trybuild/exact_units. nextest runs
+# each test in a process of its own, where trybuild's only guard is a best-effort lock file that another process
+# takes as stale once its mtime is 1.5 s old; under the full suite's load the holder's refresh thread falls that far
+# behind, the next batch rewrites the project mid-build, and cases that must fail compile ("Expected test case to
+# fail to compile, but it succeeded"). One at a time, they never share it.
+[test-groups]
+trybuild = { max-threads = 1 }
+
+[[profile.default.overrides]]
+filter = 'binary(compile_fail)'
+test-group = 'trybuild'
