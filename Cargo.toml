@@ -352,6 +352,11 @@ required-features = ["dimensionless", "customary", "q", "information", "time"]
 name = "18_photo_exposure"
 required-features = ["levels", "photometric", "time", "libm"]
 
+[[example]]
+# RF as a stress test: mismatch, link budgets, Friis, fractional-N, two-ports, η₀, skin depth, phase noise
+name = "19_rf"
+required-features = ["electrical", "fields", "mechanical", "time", "angle", "levels", "dimensionless", "libm"]
+
 [profile.dev]
 split-debuginfo = "unpacked"
 
