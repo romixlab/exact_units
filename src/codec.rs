@@ -1187,29 +1187,37 @@ impl ValueSet<u8> for CanFdLengths {
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct CanFdDlc;
 
-/// [CanFdDlc]'s table: the length of each code 0..=15, in bytes.
-const CAN_FD_DLC: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
+/// [CanFdDlc]'s table: the length of each code 0..=15, in bytes, as a [CodecShape::Table]'s entries. Written as a
+/// literal, the one source of the table: wire_weaver's crate walker reads a codec's definition from this source and
+/// evaluates no `const` code, and a reader sees the table where it is named. A firmware that never reads
+/// [Codec::DEF] links none of it: the typed path reads [CAN_FD_DLC], made from it at compile time.
+const CAN_FD_DLC_TABLE: [i128; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
 
-/// [CAN_FD_DLC] as a [CodecShape::Table]'s entries, widened in `const` code, for the data form only: a firmware
-/// that never reads [Codec::DEF] links none of it.
-#[cfg_attr(
-    not(feature = "information"),
-    expect(dead_code, reason = "CanFdDlc needs `information`")
-)]
+/// [CAN_FD_DLC_TABLE] in `u8`, the typed path's table and [CanFdLengths]' set.
+const CAN_FD_DLC: [u8; 16] = narrow_u8(&CAN_FD_DLC_TABLE);
+
+/// `table`'s entries as `u8`, in `const` code: an entry outside `0..=255` fails the build.
 #[expect(
     clippy::as_conversions,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
     clippy::indexing_slicing,
-    reason = "a const item: From is not const on stable, a u8 widens into an i128 exactly; i < 16, both arrays' length"
+    clippy::arithmetic_side_effects,
+    reason = "a const fn: TryFrom is not const on stable, the assert keeps the cast exact; i < N, both arrays' length"
 )]
-const CAN_FD_DLC_TABLE: [i128; 16] = {
-    let mut t = [0_i128; 16];
+const fn narrow_u8<const N: usize>(table: &[i128; N]) -> [u8; N] {
+    let mut t = [0_u8; N];
     let mut i = 0;
-    while i < 16 {
-        t[i] = CAN_FD_DLC[i] as i128;
+    while i < N {
+        assert!(
+            table[i] >= 0 && table[i] <= u8::MAX as i128,
+            "a table entry outside u8"
+        );
+        t[i] = table[i] as u8;
         i += 1;
     }
     t
-};
+}
 
 #[cfg(feature = "information")]
 impl Codec for CanFdDlc {

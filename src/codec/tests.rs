@@ -180,3 +180,18 @@ fn hlg_is_a_float_curve_by_its_forms() {
     assert_eq!(Hlg::KIND, CurveKind::Float);
     assert_eq!(<Hlg as Curve>::DEF.kind(), CurveKind::Float);
 }
+
+/// [CanFdDlc](super::CanFdDlc)'s two tables are one: the `u8` table the typed path reads is the literal
+/// [CAN_FD_DLC_TABLE](super::CAN_FD_DLC_TABLE) entry by entry, and the data form's shape is that literal.
+#[cfg(feature = "information")]
+#[test]
+fn can_fd_dlc_tables_are_one() {
+    use super::{CAN_FD_DLC, CAN_FD_DLC_TABLE, CanFdDlc, CodecShape};
+    for (code, (&len, &entry)) in CAN_FD_DLC.iter().zip(&CAN_FD_DLC_TABLE).enumerate() {
+        assert_eq!(i128::from(len), entry, "code {code}");
+    }
+    let CodecShape::Table(table) = CanFdDlc::DEF.shape else {
+        panic!("CanFdDlc is a Table codec");
+    };
+    assert_eq!(crate::system::slice_of(&table), Some(&CAN_FD_DLC_TABLE[..]));
+}
