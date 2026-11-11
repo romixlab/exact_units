@@ -118,7 +118,7 @@ impl<U: Unit> fmt::Display for Rounded<U> {
                 write_places(n, self.places, f)?;
                 write_unit(prefix, &U::EXPR, f)
             }
-            None => write_in::<U>(self.x.value, prefix, f),
+            None => write_in::<U, Fraction>(&self.x.value, prefix, f),
         }
     }
 }
@@ -137,7 +137,7 @@ impl<U: Unit> Rounded<U> {
         let Some(mut k) = (-39..=38i8).rev().find(|k| {
             times_pow10(a, i32::from(*k).saturating_neg()).is_some_and(|m| m >= Fraction::ONE)
         }) else {
-            return write_in::<U>(x, Prefix::Unit, f);
+            return write_in::<U, Fraction>(&x, Prefix::Unit, f);
         };
         let mantissa = |k: i8| {
             steps(
@@ -147,7 +147,7 @@ impl<U: Unit> Rounded<U> {
             )
         };
         let Some(mut n) = mantissa(k) else {
-            return write_in::<U>(x, Prefix::Unit, f);
+            return write_in::<U, Fraction>(&x, Prefix::Unit, f);
         };
         // rounding up to 10.0..0: one more power of ten
         let ten = 10i128.checked_pow(u32::from(self.places).saturating_add(1));

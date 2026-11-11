@@ -132,7 +132,9 @@ pub use exact::Crossing as ExactCrossing;
 pub use exact::Fraction8;
 #[doc(hidden)]
 pub use exact::order_parts as __order_parts;
-pub use exact::{Exact, Fraction, InPrefix, ParseExactError, ParseFractionError, Rounded};
+pub use exact::{
+    Exact, ExactNum, Fraction, InPrefix, ParseExactError, ParseFractionError, Rounded,
+};
 #[cfg(feature = "dimensionless")]
 pub use exact::{OffTarget, Tolerance};
 #[cfg(feature = "angle")]

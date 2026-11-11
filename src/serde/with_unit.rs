@@ -76,7 +76,7 @@ use crate::fixed::write_prefix_unit;
 use crate::text::unit::{TextPrefix, UnitText, prefix_of};
 use crate::text::{Buf, Decimal};
 use crate::tree::is_ratio;
-use crate::{Bounds, Exact, Fixed, FixedScale, ParseExactError, Storage, Unit};
+use crate::{Bounds, Exact, ExactNum, Fixed, FixedScale, ParseExactError, Storage, Unit};
 use ::serde::de::{self, Deserializer, Visitor};
 use ::serde::ser::Serializer;
 use core::fmt::{self, Write};
@@ -100,7 +100,7 @@ mod sealed {
 
     impl<U, P, T: crate::Storage, B: crate::Bounds<T>> Sealed for crate::Fixed<U, P, T, B> {}
 
-    impl<U> Sealed for crate::Exact<U> {}
+    impl<U, R: crate::ExactNum> Sealed for crate::Exact<U, R> {}
 }
 
 /// Writes `value` as text with its unit: a [Fixed] as `{:#}` writes it (`"1.5 ms"` is written `"0.0015 s"`), an
@@ -215,13 +215,13 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T>> Value for Fixed<U, P, T, 
     }
 }
 
-impl<U: Unit> Value for Exact<U> {
+impl<U: Unit, R: ExactNum + Copy> Value for Exact<U, R> {
     fn write_text<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.collect_str(self)
     }
 
     fn read_text<E: de::Error>(s: &str) -> Result<Self, E> {
-        read_exact::<U>(s)
+        read_exact::<U, R>(s)
             .map_err(|kind| E::custom(format_args!("{s:?} is {}", ParseExactError::<U>::new(kind))))
     }
 

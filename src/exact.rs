@@ -67,6 +67,7 @@ mod big;
 pub(crate) mod compare;
 mod decimal;
 mod fraction;
+mod num;
 mod rounded;
 mod steps;
 mod text;
@@ -82,6 +83,7 @@ mod tolerance;
 
 use decimal::{Expansion, write_fraction};
 pub use fraction::{Fraction, Fraction8};
+pub use num::ExactNum;
 pub use rounded::Rounded;
 pub use steps::Crossing;
 #[cfg(feature = "serde")]
@@ -148,8 +150,12 @@ pub use tolerance::{OffTarget, Tolerance};
 /// reads back (38 significant ones). Text in any of these forms reads back
 /// (`parse`, `serde::with_unit`). A rounded number is [to_rounded](Self::to_rounded) or [to_f64](Self::to_f64), by
 /// name: a format's precision (`{:.3}`) changes nothing.
-pub struct Exact<U> {
-    value: Fraction,
+///
+/// `R` is the number it holds, an [ExactNum]: [Fraction] by default, and so `Exact<Hertz>` is
+/// `Exact<Hertz, Fraction>`. Its `const fn`s are on that concrete type; the operators, `Display`, parse, serde, the
+/// order against a `Fixed`, [convert](Self::convert) and its kin are written once over `R`.
+pub struct Exact<U, R: ExactNum = Fraction> {
+    value: R,
     _unit: PhantomData<U>,
 }
 
@@ -163,18 +169,43 @@ macro_rules! tri {
     };
 }
 
-impl<U> Exact<U> {
-    /// 0.
-    pub const ZERO: Self = Self::of(Fraction::ZERO);
-
+impl<U, R: ExactNum> Exact<U, R> {
     /// The value `x` of `U`.
     #[must_use]
-    pub const fn of(x: Fraction) -> Self {
+    pub const fn of(x: R) -> Self {
         Self {
             value: x,
             _unit: PhantomData,
         }
     }
+
+    /// `x` in the prefix `p` (`24` of [Prefix::Mega] is 24 MHz on hertz), `None` past what `R` holds.
+    #[must_use]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "by value as every constructor of an Exact takes its number"
+    )]
+    pub fn from_prefix(x: R, p: Prefix) -> Option<Self> {
+        let s = R::from_magnitude(&p.magnitude()?)?;
+        Some(Self::of(x.checked_mul(&s)?))
+    }
+
+    /// The nearest `f64` (correctly rounded): for plots and logs, never a check.
+    #[must_use]
+    pub fn to_f64(self) -> f64 {
+        self.value.to_f64()
+    }
+
+    /// The number, by reference: what [get](Exact::get) gives, for code over any `R`.
+    #[cfg(feature = "serde")]
+    pub(crate) const fn num(&self) -> &R {
+        &self.value
+    }
+}
+
+impl<U> Exact<U> {
+    /// 0.
+    pub const ZERO: Self = Self::of(Fraction::ZERO);
 
     /// `num / den` of `U`. A zero `den` panics: in a `const` item a compile error, as for [Fraction::new].
     #[must_use]
@@ -223,12 +254,6 @@ impl<U> Exact<U> {
     pub const fn from_scaled(x: Fraction, scale: &Magnitude) -> Option<Self> {
         let s = tri!(Fraction::from_magnitude(scale));
         Some(Self::of(tri!(x.checked_mul(s))))
-    }
-
-    /// `x` in the prefix `p` (`24` of [Prefix::Mega] is 24 MHz on hertz), `None` past `u128`.
-    #[must_use]
-    pub fn from_prefix(x: Fraction, p: Prefix) -> Option<Self> {
-        Self::from_scaled(x, &p.magnitude()?)
     }
 
     /// The value, a [Fraction] of `U`.
@@ -291,10 +316,22 @@ impl<U> Exact<U> {
         Some(Exact::of(tri!(self.value.checked_div(rhs.value))))
     }
 
-    /// The nearest `f64` (correctly rounded): for plots and logs, never a check.
+    /// The exact value of a [Fixed]: `None` for a float that is NaN or infinite, a scale with π or a root, and past
+    /// `u128`.
     #[must_use]
-    pub fn to_f64(self) -> f64 {
-        self.value.to_f64()
+    pub fn from_fixed<P: FixedScale, T: Storage, B: Bounds<T>>(f: Fixed<U, P, T, B>) -> Option<Self>
+    where
+        U: Unit,
+    {
+        Self::from_fixed_as(f)
+    }
+
+    /// This value written in the prefix `p`: `in_prefix(Prefix::Mega)` of 80/3 MHz is `26.(6) MHz`. Where the value
+    /// in that prefix doesn't fit `u128`, in the unit itself; a ratio in %, ‰, ppm or ppb, any other prefix as none
+    /// (the forms text reads back).
+    #[must_use]
+    pub const fn in_prefix(self, p: Prefix) -> InPrefix<U> {
+        InPrefix { x: self, prefix: p }
     }
 }
 
@@ -375,14 +412,14 @@ const fn scale_of<P: FixedScale>() -> Fraction {
     }
 }
 
-impl<U: Unit> Exact<U> {
+impl<U: Unit, R: ExactNum> Exact<U, R> {
     /// The same value in `U2`, a unit of the same dimension and kind, if it fits: `Times<Hertz, Second>` as a
     /// [Ratio](crate::units::Ratio), minutes as seconds. Units of other dimensions or kinds, with an offset (°C) or a
     /// factor that isn't a fraction (degrees to radians) don't compile.
     #[must_use]
-    pub fn convert<U2: Unit>(self) -> Option<Exact<U2>> {
-        let k = const { factor::<U, U2>() };
-        Some(Exact::of(self.value.checked_mul(k)?))
+    pub fn convert<U2: Unit>(self) -> Option<Exact<U2, R>> {
+        let k = R::from_fraction(const { factor::<U, U2>() });
+        Some(Exact::of(self.value.checked_mul(&k)?))
     }
 
     /// The same value in `U2` with the measured constants of the factor (μ₀, G, m_u) taken from the set `C`, if it
@@ -408,30 +445,30 @@ impl<U: Unit> Exact<U> {
     /// assert_eq!((g22 - g18).unwrap(), Exact::new(232, 10u128.pow(35)));
     /// ```
     #[must_use]
-    pub fn convert_with<C: Constants, U2: Unit>(self) -> Option<Exact<U2>> {
-        let k = const { factor_with::<C, U, U2>() };
-        Some(Exact::of(self.value.checked_mul(k)?))
+    pub fn convert_with<C: Constants, U2: Unit>(self) -> Option<Exact<U2, R>> {
+        let k = R::from_fraction(const { factor_with::<C, U, U2>() });
+        Some(Exact::of(self.value.checked_mul(&k)?))
     }
 
     /// `1 / self` in `U2`, a unit of the reciprocal dimension: the period of a frequency, `f.recip::<Second>()`. `None`
     /// for 0 and past `u128`; a `U2` of another dimension doesn't compile.
     #[must_use]
-    pub fn recip<U2: Unit>(self) -> Option<Exact<U2>> {
-        let k = const { recip_factor::<U, U2>() };
-        Some(Exact::of(self.value.checked_recip()?.checked_mul(k)?))
+    pub fn recip<U2: Unit>(self) -> Option<Exact<U2, R>> {
+        let k = R::from_fraction(const { recip_factor::<U, U2>() });
+        Some(Exact::of(self.value.checked_recip()?.checked_mul(&k)?))
     }
 
-    /// The exact value of a [Fixed]: `None` for a float that is NaN or infinite, a scale with π or a root, and past
-    /// `u128`.
-    #[must_use]
-    pub fn from_fixed<P: FixedScale, T: Storage, B: Bounds<T>>(
+    /// The exact value of a [Fixed] as an `R`, for the `from_fixed` of each `R` (which names the `R` its type
+    /// infers): `None` for a float that is NaN or infinite, a scale with π or a root, and past what `R` holds.
+    fn from_fixed_as<P: FixedScale, T: Storage, B: Bounds<T>>(
         f: Fixed<U, P, T, B>,
     ) -> Option<Self> {
         let x = match f.get().to_repr() {
-            Repr::Int(i) => Fraction::int(i),
-            Repr::Float(x) => Fraction::from_f64(x)?,
+            Repr::Int(i) => R::from_fraction(Fraction::int(i)),
+            Repr::Float(x) => R::from_f64(x)?,
         };
-        Self::from_scaled(x, &P::SCALE)
+        let s = R::from_magnitude(&P::SCALE)?;
+        Some(Self::of(x.checked_mul(&s)?))
     }
 
     /// The same value as a [Fixed] of scale `P` in an integer storage `T`, if it is a whole number of `P` that fits
@@ -452,22 +489,15 @@ impl<U: Unit> Exact<U> {
         T::from_int(self.steps::<P, T>()?.round(r)?).and_then(Fixed::from_number)
     }
 
-    fn steps<P: FixedScale, T: Storage>(self) -> Option<Fraction> {
+    fn steps<P: FixedScale, T: Storage>(self) -> Option<R> {
         const {
             assert!(
                 !T::IS_FLOAT,
                 "an Exact goes to a float by name: to_f64, which rounds"
             );
         }
-        self.value.checked_div(const { scale_of::<P>() })
-    }
-
-    /// This value written in the prefix `p`: `in_prefix(Prefix::Mega)` of 80/3 MHz is `26.(6) MHz`. Where the value
-    /// in that prefix doesn't fit `u128`, in the unit itself; a ratio in %, ‰, ppm or ppb, any other prefix as none
-    /// (the forms text reads back).
-    #[must_use]
-    pub const fn in_prefix(self, p: Prefix) -> InPrefix<U> {
-        InPrefix { x: self, prefix: p }
+        self.value
+            .checked_div(&R::from_fraction(const { scale_of::<P>() }))
     }
 
     /// The prefix `{}` writes this value with: the largest power of 1000 that leaves at least 1 before the point and
@@ -489,44 +519,49 @@ impl<U: Unit> Exact<U> {
     /// ```
     #[must_use]
     pub fn auto_prefix(self) -> Prefix {
-        let a = self.value.abs();
-        if a.is_zero() {
-            return Prefix::Unit;
-        }
-        let at_least = |e: i8| a >= Fraction::pow10(e.into());
-        if is_ratio(&U::EXPR) {
-            return if at_least(0) {
-                Prefix::Unit
-            } else if at_least(-3) {
-                Prefix::Centi
-            } else if at_least(-7) {
-                Prefix::Micro
-            } else {
-                Prefix::Nano
-            };
-        }
-        if !takes_bare_prefix(&U::EXPR) {
-            return Prefix::Unit;
-        }
-        // a named unit takes the prefixes its names allow (eV all of them, though no power of ten of SI; km and min
-        // none); a compound one all of them where it is a power of ten of SI
-        let decimal = U::EXPR.magnitude().is_some_and(|m| m.as_pow10().is_some());
-        let takes = |p: Prefix| match U::EXPR.def() {
-            Some(d) => d.names.prefixes.allows(p),
-            None => decimal,
-        };
-        let mut smallest = Prefix::Unit;
-        for e in (-10..=10i8).rev().filter_map(|k| k.checked_mul(3)) {
-            let Some(p) = Prefix::si_from_pow10(e).filter(|p| takes(*p)) else {
-                continue;
-            };
-            if at_least(e) {
-                return p;
-            }
-            smallest = p;
-        }
-        smallest
+        auto_prefix_of::<U, R>(&self.value)
     }
+}
+
+/// [Exact::auto_prefix] of the value `x` of `U`.
+fn auto_prefix_of<U: Unit, R: ExactNum>(x: &R) -> Prefix {
+    let a = x.abs();
+    if a.is_zero() {
+        return Prefix::Unit;
+    }
+    let at_least = |e: i8| a >= R::from_fraction(Fraction::pow10(e.into()));
+    if is_ratio(&U::EXPR) {
+        return if at_least(0) {
+            Prefix::Unit
+        } else if at_least(-3) {
+            Prefix::Centi
+        } else if at_least(-7) {
+            Prefix::Micro
+        } else {
+            Prefix::Nano
+        };
+    }
+    if !takes_bare_prefix(&U::EXPR) {
+        return Prefix::Unit;
+    }
+    // a named unit takes the prefixes its names allow (eV all of them, though no power of ten of SI; km and min
+    // none); a compound one all of them where it is a power of ten of SI
+    let decimal = U::EXPR.magnitude().is_some_and(|m| m.as_pow10().is_some());
+    let takes = |p: Prefix| match U::EXPR.def() {
+        Some(d) => d.names.prefixes.allows(p),
+        None => decimal,
+    };
+    let mut smallest = Prefix::Unit;
+    for e in (-10..=10i8).rev().filter_map(|k| k.checked_mul(3)) {
+        let Some(p) = Prefix::si_from_pow10(e).filter(|p| takes(*p)) else {
+            continue;
+        };
+        if at_least(e) {
+            return p;
+        }
+        smallest = p;
+    }
+    smallest
 }
 
 /// A quotient `U/U` (Hz/Hz, V/V) is not a plain [Ratio](crate::units::Ratio): these are the named steps between them,
@@ -586,19 +621,29 @@ impl Exact<crate::units::Ratio> {
 }
 
 /// An [Exact] written in a prefix: [Exact::in_prefix].
-#[derive(Copy, Clone)]
-pub struct InPrefix<U> {
-    x: Exact<U>,
+pub struct InPrefix<U, R: ExactNum = Fraction> {
+    x: Exact<U, R>,
     prefix: Prefix,
 }
 
-impl<U: Unit> fmt::Display for InPrefix<U> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_in::<U>(self.x.value, self.prefix, f)
+impl<U, R: ExactNum> Clone for InPrefix<U, R> {
+    fn clone(&self) -> Self {
+        Self {
+            x: self.x.clone(),
+            prefix: self.prefix,
+        }
     }
 }
 
-impl<U: Unit> fmt::Debug for InPrefix<U> {
+impl<U, R: ExactNum + Copy> Copy for InPrefix<U, R> {}
+
+impl<U: Unit, R: ExactNum> fmt::Display for InPrefix<U, R> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_in::<U, R>(&self.x.value, self.prefix, f)
+    }
+}
+
+impl<U: Unit, R: ExactNum> fmt::Debug for InPrefix<U, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "InPrefix({self})")
     }
@@ -627,7 +672,20 @@ fn value_in(x: Fraction, prefix: Prefix) -> Option<Fraction> {
 }
 
 /// `x` of `U` written in `prefix`, then the unit.
-fn write_in<U: Unit>(x: Fraction, prefix: Prefix, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+fn write_in<U: Unit, R: ExactNum>(
+    x: &R,
+    prefix: Prefix,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    x.write_in::<U>(prefix, f)
+}
+
+/// [write_in] of a [Fraction].
+fn write_fraction_in<U: Unit>(
+    x: Fraction,
+    prefix: Prefix,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
     let unit = &U::EXPR;
     let prefix = prefix_for::<U>(prefix);
     // a decimal prefix moves the point; any other scale divides
@@ -658,19 +716,19 @@ fn write_in<U: Unit>(x: Fraction, prefix: Prefix, f: &mut fmt::Formatter<'_>) ->
     }
 }
 
-impl<U: Unit> fmt::Display for Exact<U> {
+impl<U: Unit, R: ExactNum> fmt::Display for Exact<U, R> {
     /// `{}` in the prefix [auto_prefix](Exact::auto_prefix) picks, `{:#}` in the unit itself.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let p = if f.alternate() {
             Prefix::Unit
         } else {
-            self.auto_prefix()
+            auto_prefix_of::<U, R>(&self.value)
         };
-        write_in::<U>(self.value, p, f)
+        write_in::<U, R>(&self.value, p, f)
     }
 }
 
-impl<U: Unit> fmt::Debug for Exact<U> {
+impl<U: Unit, R: ExactNum> fmt::Debug for Exact<U, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Exact({:?}", self.value)?;
         write_unit(Prefix::Unit, &U::EXPR, f)?;
@@ -678,41 +736,42 @@ impl<U: Unit> fmt::Debug for Exact<U> {
     }
 }
 
-impl<U> Clone for Exact<U> {
+impl<U, R: ExactNum> Clone for Exact<U, R> {
     fn clone(&self) -> Self {
-        *self
+        Self::of(self.value.clone())
     }
 }
 
-impl<U> Copy for Exact<U> {}
+/// `Copy` where its number is: `Exact<U>` is.
+impl<U, R: ExactNum + Copy> Copy for Exact<U, R> {}
 
-impl<U> Default for Exact<U> {
+impl<U, R: ExactNum> Default for Exact<U, R> {
     fn default() -> Self {
-        Self::ZERO
+        Self::of(R::zero())
     }
 }
 
-impl<U> PartialEq for Exact<U> {
+impl<U, R: ExactNum> PartialEq for Exact<U, R> {
     fn eq(&self, other: &Self) -> bool {
         self.value == other.value
     }
 }
 
-impl<U> Eq for Exact<U> {}
+impl<U, R: ExactNum> Eq for Exact<U, R> {}
 
-impl<U> PartialOrd for Exact<U> {
+impl<U, R: ExactNum> PartialOrd for Exact<U, R> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<U> Ord for Exact<U> {
+impl<U, R: ExactNum> Ord for Exact<U, R> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.value.cmp(&other.value)
     }
 }
 
-impl<U> Hash for Exact<U> {
+impl<U, R: ExactNum> Hash for Exact<U, R> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.value.hash(state);
     }
@@ -720,8 +779,8 @@ impl<U> Hash for Exact<U> {
 
 /// Equal where the order is ([PartialOrd]): exactly the same value. For NaN-free values; a [MaybeNan](crate::MaybeNan)
 /// compares by [eq_or](Fixed::eq_or).
-impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T> + NanFree> PartialEq<Fixed<U, P, T, B>>
-    for Exact<U>
+impl<U: Unit, R: ExactNum, P: FixedScale, T: Storage, B: Bounds<T> + NanFree>
+    PartialEq<Fixed<U, P, T, B>> for Exact<U, R>
 {
     fn eq(&self, other: &Fixed<U, P, T, B>) -> bool {
         self.partial_cmp(other) == Some(Ordering::Equal)
@@ -754,52 +813,55 @@ impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T> + NanFree> PartialEq<Fixed
 /// let _ = Exact::<Hertz>::int(3) < Fixed::<Hertz, PiSteps, i32>::new(1);
 /// # }
 /// ```
-impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T> + NanFree> PartialOrd<Fixed<U, P, T, B>>
-    for Exact<U>
+impl<U: Unit, R: ExactNum, P: FixedScale, T: Storage, B: Bounds<T> + NanFree>
+    PartialOrd<Fixed<U, P, T, B>> for Exact<U, R>
 {
     fn partial_cmp(&self, other: &Fixed<U, P, T, B>) -> Option<Ordering> {
-        compare::order(other.get().to_repr(), const { scale_of::<P>() }, self.value)
+        self.value
+            .order_of(other.get().to_repr(), const { scale_of::<P>() })
             .map(Ordering::reverse)
     }
 }
 
 /// See `PartialEq<Fixed> for Exact`.
-impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T> + NanFree> PartialEq<Exact<U>>
+impl<U: Unit, R: ExactNum, P: FixedScale, T: Storage, B: Bounds<T> + NanFree> PartialEq<Exact<U, R>>
     for Fixed<U, P, T, B>
 {
-    fn eq(&self, other: &Exact<U>) -> bool {
+    fn eq(&self, other: &Exact<U, R>) -> bool {
         other == self
     }
 }
 
 /// See `PartialOrd<Fixed> for Exact`.
-impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T> + NanFree> PartialOrd<Exact<U>>
-    for Fixed<U, P, T, B>
+impl<U: Unit, R: ExactNum, P: FixedScale, T: Storage, B: Bounds<T> + NanFree>
+    PartialOrd<Exact<U, R>> for Fixed<U, P, T, B>
 {
-    fn partial_cmp(&self, other: &Exact<U>) -> Option<Ordering> {
-        compare::order(self.get().to_repr(), const { scale_of::<P>() }, other.value)
+    fn partial_cmp(&self, other: &Exact<U, R>) -> Option<Ordering> {
+        other
+            .value
+            .order_of(self.get().to_repr(), const { scale_of::<P>() })
     }
 }
 
-impl<U> Add for Exact<U> {
+impl<U, R: ExactNum> Add for Exact<U, R> {
     type Output = Option<Self>;
 
-    /// [checked_add](Exact::checked_add).
+    /// `self + rhs`, `None` only when the result doesn't fit.
     fn add(self, rhs: Self) -> Option<Self> {
-        self.checked_add(rhs)
+        Some(Self::of(tri!(self.value.checked_add(&rhs.value))))
     }
 }
 
-impl<U> Sub for Exact<U> {
+impl<U, R: ExactNum> Sub for Exact<U, R> {
     type Output = Option<Self>;
 
-    /// [checked_sub](Exact::checked_sub).
+    /// `self - rhs`, `None` only when the result doesn't fit.
     fn sub(self, rhs: Self) -> Option<Self> {
-        self.checked_sub(rhs)
+        Some(Self::of(tri!(self.value.checked_sub(&rhs.value))))
     }
 }
 
-impl<U> Neg for Exact<U> {
+impl<U, R: ExactNum> Neg for Exact<U, R> {
     type Output = Self;
 
     fn neg(self) -> Self {
@@ -807,53 +869,57 @@ impl<U> Neg for Exact<U> {
     }
 }
 
-impl<U> Mul<i128> for Exact<U> {
+impl<U, R: ExactNum> Mul<i128> for Exact<U, R> {
     type Output = Option<Self>;
 
     fn mul(self, n: i128) -> Option<Self> {
-        self.checked_scale(Fraction::int(n))
+        let k = R::from_fraction(Fraction::int(n));
+        Some(Self::of(tri!(self.value.checked_mul(&k))))
     }
 }
 
-impl<U> Div<i128> for Exact<U> {
+impl<U, R: ExactNum> Div<i128> for Exact<U, R> {
     type Output = Option<Self>;
 
     fn div(self, n: i128) -> Option<Self> {
-        self.checked_unscale(Fraction::int(n))
+        let k = R::from_fraction(Fraction::int(n));
+        Some(Self::of(tri!(self.value.checked_div(&k))))
     }
 }
 
-impl<U> Mul<Fraction> for Exact<U> {
+impl<U, R: ExactNum> Mul<R> for Exact<U, R> {
     type Output = Option<Self>;
 
-    fn mul(self, k: Fraction) -> Option<Self> {
-        self.checked_scale(k)
+    /// `self · k`, `None` where the result doesn't fit.
+    fn mul(self, k: R) -> Option<Self> {
+        Some(Self::of(tri!(self.value.checked_mul(&k))))
     }
 }
 
-impl<U> Div<Fraction> for Exact<U> {
+impl<U, R: ExactNum> Div<R> for Exact<U, R> {
     type Output = Option<Self>;
 
-    fn div(self, k: Fraction) -> Option<Self> {
-        self.checked_unscale(k)
+    /// `self / k`, `None` for 0 and where the result doesn't fit.
+    fn div(self, k: R) -> Option<Self> {
+        Some(Self::of(tri!(self.value.checked_div(&k))))
     }
 }
 
-impl<U, U2> Mul<Exact<U2>> for Exact<U> {
-    type Output = Option<Exact<Times<U, U2>>>;
+impl<U, U2, R: ExactNum> Mul<Exact<U2, R>> for Exact<U, R> {
+    type Output = Option<Exact<Times<U, U2>, R>>;
 
-    /// [checked_times](Exact::checked_times).
-    fn mul(self, rhs: Exact<U2>) -> Self::Output {
-        self.checked_times(rhs)
+    /// `self · rhs` in `U · U2`, `None` where the result doesn't fit.
+    fn mul(self, rhs: Exact<U2, R>) -> Self::Output {
+        Some(Exact::of(tri!(self.value.checked_mul(&rhs.value))))
     }
 }
 
-impl<U, U2> Div<Exact<U2>> for Exact<U> {
-    type Output = Option<Exact<Per<U, U2>>>;
+impl<U, U2, R: ExactNum> Div<Exact<U2, R>> for Exact<U, R> {
+    type Output = Option<Exact<Per<U, U2>, R>>;
 
-    /// [checked_per](Exact::checked_per).
-    fn div(self, rhs: Exact<U2>) -> Self::Output {
-        self.checked_per(rhs)
+    /// `self / rhs` in `U / U2`, `None` for 0 and where the result doesn't fit.
+    fn div(self, rhs: Exact<U2, R>) -> Self::Output {
+        Some(Exact::of(tri!(self.value.checked_div(&rhs.value))))
     }
 }
 

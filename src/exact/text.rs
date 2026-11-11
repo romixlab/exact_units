@@ -1,6 +1,6 @@
 //! [Fraction] and [Exact] read from text, exactly: what `{}` writes reads back, and what a person writes in a config.
 
-use super::{Exact, Fraction};
+use super::{Exact, ExactNum, Fraction};
 use crate::Unit;
 use crate::text::Decimal;
 use crate::text::unit::{UnitText, prefix_of};
@@ -9,9 +9,9 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::str::FromStr;
 
-/// What went wrong reading a number.
+/// What went wrong reading a number. Not API: reachable only through the sealed [ExactNum](super::ExactNum).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum Kind {
+pub enum Kind {
     /// Not a number (with its unit).
     Form,
     /// The text after the number isn't the unit.
@@ -125,12 +125,12 @@ fn value(neg: bool, int: &str, pre: &str, rep: &str) -> Option<Fraction> {
 }
 
 /// The text `s` as a value of `U`: a number, then the unit with or without a prefix.
-pub(crate) fn read<U: Unit>(s: &str) -> Result<Exact<U>, Kind> {
-    let (x, e, rest) = number(s.trim())?;
+pub(crate) fn read<U: Unit, R: ExactNum>(s: &str) -> Result<Exact<U, R>, Kind> {
+    let (x, e, rest) = R::read_number(s.trim())?;
     let p = prefix_of::<U>(rest.trim()).ok_or(Kind::Unit)?;
     let v = e
         .checked_add(p.pow10)
-        .and_then(|e| scale(x, p.pow2, e))
+        .and_then(|e| x.scaled_by(p.pow2, e))
         .ok_or(Kind::Fit)?;
     Ok(Exact::of(v))
 }
@@ -220,13 +220,13 @@ impl<U: Unit> fmt::Display for ParseExactError<U> {
 
 impl<U: Unit> core::error::Error for ParseExactError<U> {}
 
-impl<U: Unit> FromStr for Exact<U> {
+impl<U: Unit, R: ExactNum> FromStr for Exact<U, R> {
     type Err = ParseExactError<U>;
 
     /// A number as [Fraction] reads it, then the unit with or without an SI or binary prefix, the space optional:
     /// `24 MHz`, `79.99998046875 MHz`, `1000/3 kHz`, `333.(3)kHz`; on a ratio `%`, `‰`, `ppm`, `ppb` or nothing.
     /// The units and spellings `serde::with_unit` reads for a `Fixed` of `U`.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        read::<U>(s).map_err(ParseExactError::new)
+        read::<U, R>(s).map_err(ParseExactError::new)
     }
 }

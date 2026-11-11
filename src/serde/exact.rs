@@ -3,7 +3,7 @@
 //! one the quadruple `(negative, numerator, denominator, exponent)`, the canonical form ([Fraction::mantissa],
 //! [Fraction::exp10]).
 
-use crate::{Exact, Fraction};
+use crate::{Exact, ExactNum, Fraction};
 use ::serde::de::{self, Deserialize, Deserializer, SeqAccess, Visitor};
 use ::serde::ser::{Serialize, Serializer};
 use core::fmt;
@@ -29,15 +29,15 @@ impl<'de> Deserialize<'de> for Fraction {
     }
 }
 
-impl<U> Serialize for Exact<U> {
+impl<U, R: ExactNum + Serialize> Serialize for Exact<U, R> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.get().serialize(serializer)
+        self.num().serialize(serializer)
     }
 }
 
-impl<'de, U> Deserialize<'de> for Exact<U> {
+impl<'de, U, R: ExactNum + Deserialize<'de>> Deserialize<'de> for Exact<U, R> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        Fraction::deserialize(deserializer).map(Exact::of)
+        R::deserialize(deserializer).map(Exact::of)
     }
 }
 

@@ -306,6 +306,26 @@ assert_eq!(setpoint.window(q!(+- 1 %), Fit::Inside), q!(+- 1 %, Inside).window(s
 assert_eq!(q!(+- 50 mV).window(setpoint).to_string(), "3283 mV ..= 3383 mV");
 ```
 
+## The number inside: `R`
+
+`Exact<U>` is short for `Exact<U, Fraction>`: the second parameter `R` is the number it holds, an `ExactNum`, and `Fraction` is its default. `Fraction` is the one there is today; an arbitrary-precision one, for exact work past 38 digits on a host, comes behind its own feature (NUM-41). Pick `Fraction`, by leaving `R` out, unless a value needs more than [Range](#range) holds.
+
+The two differ in where they can go. The `const fn`s (`new`, `int`, `new_in`, `checked_add`, `get`, `as_quantity` and the rest) are on `Exact<U, Fraction>`, because a trait method can't be `const` on stable Rust. The operators, `{}`, parsing, serde, the order against a `Fixed`, `convert`, `recip`, `to` and the crossing of `to_system` are written once for every `R`, so code of one's own can be generic over it:
+
+```rust
+use exact_units::{Exact, ExactNum, Fixed, prefix::One, units::Hertz};
+
+// for every number an Exact holds: the operators, the order against a Fixed and Display
+fn mean<R: ExactNum>(a: Exact<Hertz, R>, b: Exact<Hertz, R>) -> Option<Exact<Hertz, R>> {
+    (a + b)? / 2
+}
+let m = mean(Exact::int(1), Exact::int(2)).unwrap();
+assert!(m > Fixed::<Hertz, One, u8>::new(1));
+assert_eq!(m.to_string(), "1.5 Hz");
+```
+
+Generic code sees `ExactNum`'s methods on the number (`checked_add`, `checked_mul`, `round`, `to_f64` and their kin, each taking it by reference) and the operators on `Exact`, not the `const fn`s. A type is still written `Exact<Hertz>` in error messages: rustc leaves a defaulted parameter out. One thing does need `R`: a constructor whose arguments don't say which number it is (`Exact::from_fixed(f)`, `Exact::ZERO`) is on `Exact<U, Fraction>`, so it infers with no annotation, as before.
+
 ## Cost
 
 An `Exact` is 48 bytes (the exponent sits in what was padding), and its arithmetic is `u128` multiplies and divisions with a gcd at each step, then the normalisation: the 2s and 5s stripped (a 5 by one multiply by its inverse modulo 2¹²⁸, no division) and the exponent placed. That is fine on a host and slow on a microcontroller, where most `u128` operations are library calls. Firmware gets the results as `Fixed` constants. The type is `no_std` and needs no alloc, and nothing of it is linked unless it is used.

@@ -33,7 +33,7 @@ error[E0277]: can't compare `Fixed<Kelvin, One, i16>` with `LiteralAt<25, 0, Ste
    = help: the trait `PartialOrd<LiteralAt<25, 0, Steps, Celsius>>` is not implemented for `Fixed<Kelvin, One, i16>`
    = help: the following other types implement trait `PartialOrd<Rhs>`:
              `Fixed<U, P, T, B>` implements `PartialOrd<Fixed<U, P, T, B2>>`
-             `Fixed<U, P, T, B>` implements `PartialOrd<exact_units::Exact<U>>`
+             `Fixed<U, P, T, B>` implements `PartialOrd<exact_units::Exact<U, R>>`
              `Fixed<U, P, f32, B>` implements `PartialOrd<LevelLiteral<N, E, L>>`
              `Fixed<U, P, f32, B>` implements `PartialOrd<LiteralIn<N, E, S>>`
              `Fixed<U, P, f64, B>` implements `PartialOrd<LevelLiteral<N, E, L>>`

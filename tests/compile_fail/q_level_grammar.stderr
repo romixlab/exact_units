@@ -39,17 +39,17 @@ error[E0277]: can't compare `exact_units::Exact<Per<Volt, Volt>>` with `LevelLit
    |                                                 no implementation for `exact_units::Exact<Per<Volt, Volt>> < LevelLiteral<-3, 0, Db>` and `exact_units::Exact<Per<Volt, Volt>> > LevelLiteral<-3, 0, Db>`
    |
    = help: the trait `PartialOrd<LevelLiteral<-3, 0, Db>>` is not implemented for `exact_units::Exact<Per<Volt, Volt>>`
-help: `exact_units::Exact<U>` implements trait `PartialOrd<Rhs>`
+help: the following other types implement trait `PartialOrd<Rhs>`
   --> src/literal/quantity.rs
    |
    |   impl<U: Unit, S: Unit, const N: i64, const E: i16> PartialOrd<LiteralIn<N, E, S>> for Exact<U> {
-   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `PartialOrd<LiteralIn<N, E, S>>`
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `exact_units::Exact<U>` implements `PartialOrd<LiteralIn<N, E, S>>`
    |
   ::: src/exact.rs
    |
-   |   impl<U> PartialOrd for Exact<U> {
-   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `PartialOrd`
+   |   impl<U, R: ExactNum> PartialOrd for Exact<U, R> {
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `exact_units::Exact<U, R>` implements `PartialOrd`
 ...
-   | / impl<U: Unit, P: FixedScale, T: Storage, B: Bounds<T> + NanFree> PartialOrd<Fixed<U, P, T, B>>
-   | |     for Exact<U>
-   | |________________^ `PartialOrd<Fixed<U, P, T, B>>`
+   | / impl<U: Unit, R: ExactNum, P: FixedScale, T: Storage, B: Bounds<T> + NanFree>
+   | |     PartialOrd<Fixed<U, P, T, B>> for Exact<U, R>
+   | |_________________________________________________^ `exact_units::Exact<U, R>` implements `PartialOrd<Fixed<U, P, T, B>>`

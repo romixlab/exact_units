@@ -1,7 +1,7 @@
 //! The quantity steps of an [Exact], as [Fixed](crate::Fixed) has them: [as_quantity](Exact::as_quantity),
 //! [up](Exact::up) and [to_system](Exact::to_system) with its [Crossing].
 
-use super::{Exact, Fraction};
+use super::{Exact, ExactNum, Fraction};
 use crate::fixed::Conversion;
 use crate::prefix::One;
 use crate::quantity::steps::{check_as_quantity, check_up};
@@ -97,20 +97,23 @@ impl<U: Unit> Exact<U> {
 /// [convert](Self::convert) or [convert_with](Self::convert_with). It has no arithmetic, no `Display` and no wire
 /// form, so no value of no system stands in a type.
 #[must_use = "a crossing is finished by a convert"]
-pub struct Crossing<S, U> {
-    value: Exact<U>,
+pub struct Crossing<S, U, R: ExactNum = Fraction> {
+    value: Exact<U, R>,
     _system: PhantomData<S>,
 }
 
-impl<S, U> Clone for Crossing<S, U> {
+impl<S, U, R: ExactNum> Clone for Crossing<S, U, R> {
     fn clone(&self) -> Self {
-        *self
+        Self {
+            value: self.value.clone(),
+            _system: PhantomData,
+        }
     }
 }
 
-impl<S, U> Copy for Crossing<S, U> {}
+impl<S, U, R: ExactNum + Copy> Copy for Crossing<S, U, R> {}
 
-impl<S: System, U: Unit> fmt::Debug for Crossing<S, U> {
+impl<S: System, U: Unit, R: ExactNum> fmt::Debug for Crossing<S, U, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Crossing({:?})", self.value)
     }
@@ -133,19 +136,21 @@ const fn fraction_of(m: &Magnitude) -> Fraction {
     }
 }
 
-impl<S: System, U: Unit> Crossing<S, U> {
+impl<S: System, U: Unit, R: ExactNum> Crossing<S, U, R> {
     /// The value in the unit `U2` of `S`, `None` where it doesn't fit: as [Exact::convert], with the bridge's
     /// factor between. A factor that keeps μ₀, G or m_u has no number without a set: [convert_with](Self::convert_with).
     #[must_use]
-    pub fn convert<U2: Unit>(self) -> Option<Exact<U2>> {
+    pub fn convert<U2: Unit>(self) -> Option<Exact<U2, R>> {
         let k = const { fraction_of(&Conversion::across_factor::<S, U, One, U2, One>()) };
-        Some(Exact::of(self.value.value.checked_mul(k)?))
+        Some(Exact::of(
+            self.value.value.checked_mul(&R::from_fraction(k))?,
+        ))
     }
 
     /// [convert](Self::convert) with μ₀, G and m_u taken from the named set `C` ([constants](crate::constants)), as
     /// [Crossing::convert_with](crate::Crossing::convert_with) of a [Fixed](crate::Fixed).
     #[must_use]
-    pub fn convert_with<C: crate::constants::Constants, U2: Unit>(self) -> Option<Exact<U2>> {
+    pub fn convert_with<C: crate::constants::Constants, U2: Unit>(self) -> Option<Exact<U2, R>> {
         let k = const {
             fraction_of(
                 &Conversion::across_factor::<S, U, One, U2, One>()
@@ -153,6 +158,8 @@ impl<S: System, U: Unit> Crossing<S, U> {
                     .value,
             )
         };
-        Some(Exact::of(self.value.value.checked_mul(k)?))
+        Some(Exact::of(
+            self.value.value.checked_mul(&R::from_fraction(k))?,
+        ))
     }
 }
