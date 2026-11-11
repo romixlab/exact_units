@@ -152,36 +152,33 @@ impl Codec for HevcLevelScale {
 }
 
 /// The spare codes of [HrdBitRate] and [HrdCpbSize]: a `value_minus1` of 2³² − 1, which H.264 E.2.2 and H.265
-/// E.3.3 forbid ("in the range of 0 to 2³² − 2"), at each of the 16 scales, and every code past scale 15.
+/// E.3.3 forbid ("in the range of 0 to 2³² − 2"), at each of the 16 scales (the code `scale << 32 | 0xFFFF_FFFF`,
+/// the scale the hex digit above the low 32 bits), and every code past scale 15. Written out: wire_weaver's crate
+/// walker reads a codec's `DEF` from this source and evaluates no `const` code; `tests::hrd_spare_is_every_forbidden_code`
+/// checks the list against the rule.
 #[cfg(all(feature = "information", feature = "time"))]
 const HRD_SPARE: [CodeSpan; 17] = [
-    hrd_forbidden(0),
-    hrd_forbidden(1),
-    hrd_forbidden(2),
-    hrd_forbidden(3),
-    hrd_forbidden(4),
-    hrd_forbidden(5),
-    hrd_forbidden(6),
-    hrd_forbidden(7),
-    hrd_forbidden(8),
-    hrd_forbidden(9),
-    hrd_forbidden(10),
-    hrd_forbidden(11),
-    hrd_forbidden(12),
-    hrd_forbidden(13),
-    hrd_forbidden(14),
-    hrd_forbidden(15),
+    CodeSpan::one(0x0_FFFF_FFFF),
+    CodeSpan::one(0x1_FFFF_FFFF),
+    CodeSpan::one(0x2_FFFF_FFFF),
+    CodeSpan::one(0x3_FFFF_FFFF),
+    CodeSpan::one(0x4_FFFF_FFFF),
+    CodeSpan::one(0x5_FFFF_FFFF),
+    CodeSpan::one(0x6_FFFF_FFFF),
+    CodeSpan::one(0x7_FFFF_FFFF),
+    CodeSpan::one(0x8_FFFF_FFFF),
+    CodeSpan::one(0x9_FFFF_FFFF),
+    CodeSpan::one(0xA_FFFF_FFFF),
+    CodeSpan::one(0xB_FFFF_FFFF),
+    CodeSpan::one(0xC_FFFF_FFFF),
+    CodeSpan::one(0xD_FFFF_FFFF),
+    CodeSpan::one(0xE_FFFF_FFFF),
+    CodeSpan::one(0xF_FFFF_FFFF),
     CodeSpan {
         low: 16 << 32,
         high: 0xFFFF_FFFF_FFFF_FFFF,
     },
 ];
-
-/// The HRD code of `value_minus1 = 2³² − 1` at `scale`.
-#[cfg(all(feature = "information", feature = "time"))]
-const fn hrd_forbidden(scale: i128) -> CodeSpan {
-    CodeSpan::one((scale << 32) | 0xFFFF_FFFF)
-}
 
 /// The HRD's maximum input bit rate of a CPB, BitRate = (bit_rate_value_minus1 + 1) · 2^(6 + bit_rate_scale) bit/s
 /// (H.264 E.2.2, eq. E-81; H.265 E.3.3, eq. E-87). The two fields sit apart in the stream (`bit_rate_scale` in 4
@@ -296,5 +293,31 @@ impl Codec for HrdCpbSize {
     #[inline]
     fn encode(value: Self::Linear, rounding: Rounding) -> Option<u64> {
         encode_by_def::<Self>(value.get().into(), rounding)
+    }
+}
+
+#[cfg(all(test, feature = "information", feature = "time"))]
+mod tests {
+    use super::{CodeSpan, HRD_SPARE};
+
+    /// [HRD_SPARE] written out is the rule: `value_minus1 = 2³² − 1` at each scale 0..=15, then every code past
+    /// scale 15.
+    #[test]
+    fn hrd_spare_is_every_forbidden_code() {
+        let (forbidden, past) = HRD_SPARE.split_at(16);
+        for (scale, span) in (0_i128..).zip(forbidden) {
+            assert_eq!(
+                *span,
+                CodeSpan::one((scale << 32) | 0xFFFF_FFFF),
+                "scale {scale}"
+            );
+        }
+        assert_eq!(
+            past,
+            [CodeSpan {
+                low: 16 << 32,
+                high: i128::from(u64::MAX),
+            }]
+        );
     }
 }
