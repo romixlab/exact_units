@@ -1534,3 +1534,162 @@ pub(crate) mod interval {
         }
     }
 }
+
+/// RF's formulas on exact rationals in `i128`, written out from their sources without the crate: a fraction is a
+/// numerator and a positive denominator in lowest terms, a complex one a pair of them.
+pub(crate) mod rf {
+    /// `a / b` in lowest terms, `b > 0`.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub(crate) struct Q(pub(crate) i128, pub(crate) i128);
+
+    fn gcd(a: i128, b: i128) -> i128 {
+        let (mut a, mut b) = (a.abs(), b.abs());
+        while b != 0 {
+            (a, b) = (b, a % b);
+        }
+        a
+    }
+
+    impl Q {
+        /// `n / d` in lowest terms; panics for `d = 0`.
+        pub(crate) fn new(n: i128, d: i128) -> Q {
+            assert!(d != 0, "a fraction over 0");
+            let g = gcd(n, d).max(1) * d.signum();
+            Q(n / g, d / g)
+        }
+
+        pub(crate) fn int(n: i128) -> Q {
+            Q(n, 1)
+        }
+
+        pub(crate) fn add(self, o: Q) -> Q {
+            Q::new(self.0 * o.1 + o.0 * self.1, self.1 * o.1)
+        }
+
+        pub(crate) fn sub(self, o: Q) -> Q {
+            Q::new(self.0 * o.1 - o.0 * self.1, self.1 * o.1)
+        }
+
+        pub(crate) fn mul(self, o: Q) -> Q {
+            Q::new(self.0 * o.0, self.1 * o.1)
+        }
+
+        /// `None` for a division by 0.
+        pub(crate) fn div(self, o: Q) -> Option<Q> {
+            (o.0 != 0).then(|| Q::new(self.0 * o.1, self.1 * o.0))
+        }
+    }
+
+    /// A complex rational `re + j·im`.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub(crate) struct Cq(pub(crate) Q, pub(crate) Q);
+
+    impl Cq {
+        pub(crate) fn int(re: i128, im: i128) -> Cq {
+            Cq(Q::int(re), Q::int(im))
+        }
+
+        pub(crate) fn add(self, o: Cq) -> Cq {
+            Cq(self.0.add(o.0), self.1.add(o.1))
+        }
+
+        pub(crate) fn sub(self, o: Cq) -> Cq {
+            Cq(self.0.sub(o.0), self.1.sub(o.1))
+        }
+
+        pub(crate) fn mul(self, o: Cq) -> Cq {
+            Cq(
+                self.0.mul(o.0).sub(self.1.mul(o.1)),
+                self.0.mul(o.1).add(self.1.mul(o.0)),
+            )
+        }
+
+        /// `None` for a division by 0.
+        pub(crate) fn div(self, o: Cq) -> Option<Cq> {
+            let d = o.0.mul(o.0).add(o.1.mul(o.1));
+            let n = self.mul(Cq(o.0, Q::int(0).sub(o.1)));
+            Some(Cq(n.0.div(d)?, n.1.div(d)?))
+        }
+    }
+
+    /// VSWR = (1 + |Γ|)/(1 − |Γ|) of |Γ| = p/q, `0 <= p < q`: (q + p)/(q − p) (IEC 60050-726-07-07, Pozar §2.3).
+    pub(crate) fn vswr(p: i128, q: i128) -> Q {
+        Q::new(q + p, q - p)
+    }
+
+    /// The power delivered over the power available, 1 − |Γ|² of |Γ| = p/q: (q² − p²)/q² (Pozar §2.3).
+    pub(crate) fn delivered(p: i128, q: i128) -> Q {
+        Q::new(q * q - p * p, q * q)
+    }
+
+    /// Friis' cascade (Proc. IRE 32(7), 1944; ITU-R P.372-18 eq. 1 has its form): F₁ + Σ (Fᵢ − 1)/(G₁⋯Gᵢ₋₁).
+    pub(crate) fn friis(stages: &[(Q, Q)]) -> Option<Q> {
+        let (mut f, mut g) = (Q::int(0), Q::int(1));
+        for (i, &(fi, gi)) in stages.iter().enumerate() {
+            f = f.add(if i == 0 {
+                fi
+            } else {
+                fi.sub(Q::int(1)).div(g)?
+            });
+            g = g.mul(gi);
+        }
+        Some(f)
+    }
+
+    /// S of a two-port from its ABCD over a real `z0` (Pozar, Microwave Engineering, 4th ed., Table 4.2, the S
+    /// row): with Δ = A + B/Z₀ + CZ₀ + D, S₁₁ = (A + B/Z₀ − CZ₀ − D)/Δ, S₁₂ = 2(AD − BC)/Δ, S₂₁ = 2/Δ, S₂₂ = (−A +
+    /// B/Z₀ − CZ₀ + D)/Δ.
+    pub(crate) fn s_of_abcd(m: [[Cq; 2]; 2], z0: Q) -> Option<[[Cq; 2]; 2]> {
+        let [[a, b], [c, d]] = m;
+        let bz = b.div(Cq(z0, Q::int(0)))?;
+        let cz = c.mul(Cq(z0, Q::int(0)));
+        let den = a.add(bz).add(cz).add(d);
+        let two = Cq::int(2, 0);
+        Some([
+            [
+                a.add(bz).sub(cz).sub(d).div(den)?,
+                two.mul(a.mul(d).sub(b.mul(c))).div(den)?,
+            ],
+            [two.div(den)?, d.sub(a).add(bz).sub(cz).div(den)?],
+        ])
+    }
+
+    /// Z_in = Z₀(Z_L + jZ₀t)/(Z₀ + jZ_Lt) of a lossless line of real `z0` with t = tan βl (Pozar eq. 2.44).
+    pub(crate) fn z_in(z0: Q, zl: Cq, t: Q) -> Option<Cq> {
+        let z0c = Cq(z0, Q::int(0));
+        let jt = Cq(Q::int(0), t);
+        z0c.mul(zl.add(jt.mul(z0c))).div(z0c.add(jt.mul(zl)))
+    }
+
+    /// lg 2 to 26 decimals, below it: 0.30102999566398119521373889|47.. (the next one up is above it).
+    pub(crate) const LG2_E26: i128 = 30_102_999_566_398_119_521_373_889;
+
+    /// `⌊n·20·lg 2·10^k⌋` and the ceiling, from [LG2_E26]: `n·20·10^k·LG2_E26 / 10²⁶` and the same with
+    /// `LG2_E26 + 1` fall in the same unit step for every `n <= 255`, `k <= 6`, so both ends give it.
+    pub(crate) fn db_of_pow2(n: i128, k: u32) -> (i128, i128) {
+        let scale = 20 * n * 10i128.pow(k);
+        let den = 10i128.pow(26);
+        let lo = (scale * LG2_E26).div_euclid(den);
+        let hi = (scale * (LG2_E26 + 1)).div_euclid(den);
+        assert_eq!(lo, hi, "the digits of lg 2 don't decide n = {n}, k = {k}");
+        let exact = n == 0; // n·lg 2 is irrational for n > 0
+        (lo, if exact { lo } else { lo + 1 })
+    }
+
+    /// Whether `x / 10^9` is at most `10^(k/100)`, the power ratio of `k/10` dB: `x^100 <= 10^(k + 900)`, in big
+    /// integers (and `x^100 < ..` for `strict`).
+    pub(crate) fn below_pow10_centi(x: u64, k: i32, strict: bool) -> bool {
+        use num_bigint::BigUint;
+        let lhs = BigUint::from(x).pow(100);
+        let e = k + 900;
+        let (lhs, rhs) = if e >= 0 {
+            (lhs, BigUint::from(10u32).pow(e.unsigned_abs()))
+        } else {
+            (
+                lhs * BigUint::from(10u32).pow(e.unsigned_abs()),
+                BigUint::from(1u32),
+            )
+        };
+        if strict { lhs < rhs } else { lhs <= rhs }
+    }
+}

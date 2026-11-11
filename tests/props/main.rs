@@ -69,6 +69,8 @@ mod radiation;
 mod reference;
 #[cfg(not(kani))]
 mod registry;
+#[cfg(all(feature = "electrical", feature = "levels", feature = "time"))]
+mod rf;
 mod rounding;
 #[cfg(feature = "time")]
 mod run_scale;
