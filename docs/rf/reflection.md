@@ -10,8 +10,11 @@ $$
 \Gamma = \frac{Z - Z_0}{Z + Z_0}
 $$
 
-- **Γ is `Complex<Per<Volt, Volt>, One, F>`**, a ratio of root-power quantities: its `to_db` is 20·lg|Γ|, and `return_loss` is −20·lg|Γ|, a `Fixed<Loss<Decibel>, One, F>` positive for a passive load.
-- **VSWR** is `(1 + |Γ|) / (1 − |Γ|)`, the ratio of the standing wave's largest voltage to its smallest, a `Fixed<Per<Volt, Volt>, One, F>`; infinite at |Γ| ≥ 1.
+- **$\Gamma$ is `Complex<Per<Volt, Volt>, One, F>`**, a ratio of root-power quantities: its `to_db` is
+  $20 \cdot \lg|\Gamma|$, and `return_loss` is $-20 \cdot \lg|\Gamma|$, a `Fixed<Loss<Decibel>, One, F>` positive
+  for a passive load.
+- **VSWR** is `(1 + |Γ|) / (1 − |Γ|)`, the ratio of the standing wave's largest voltage to its smallest, a
+  `Fixed<Per<Volt, Volt>, One, F>`; infinite at $|\Gamma| \ge 1$.
 - **Mismatch loss** is `1 − |Γ|²`, the share of the incident power the load takes, a `Fixed<Per<Watt, Watt>, One, F>`: its `to_db` is 10·lg, the loss as a negative level (−0.51 dB at VSWR 2).
 
 ```rust
@@ -27,7 +30,9 @@ assert!(gamma.mismatch_loss().is_in(q!(0.888... W/W))); // 8/9 of the power, -0.
 # }
 ```
 
-Floats only: Γ is a complex quotient, rounded twice in integers. A firmware works Γ out once in floats (a bench tool, a reflectometer's host side), or tests a Q15 |Γ|² against a `db!(norm_sqr ..)` threshold without ever forming Γ — see [Levels, dBm and cable loss](levels.md#power-of-a-complex-value).
+Floats only: $\Gamma$ is a complex quotient, rounded twice in integers. A firmware works $\Gamma$ out once in
+floats (a bench tool, a reflectometer's host side), or tests a Q15 $|\Gamma|^2$ against a `db!(norm_sqr ..)`
+threshold without ever forming $\Gamma$ — see [Levels, dBm and cable loss](levels.md#power-of-a-complex-value).
 
 ## On the extended plane
 
@@ -47,7 +52,8 @@ assert_eq!(oscillator.reflection(z0), Extended::Infinity);
 # }
 ```
 
-`reflection` computes Γ by Smith's division: no part of Z or Z₀ is squared, so a part past the square root of the float's largest value still gives Γ, and the result is never NaN — the larger of the real and imaginary parts of the denominator is nonzero, and the quotient has its sign.
+`reflection` computes $\Gamma$ by Smith's division: no part of Z or Z₀ is squared, so a part past the square root
+of the float's largest value still gives $\Gamma$, and the result is never NaN — the larger of the real and imaginary parts of the denominator is nonzero, and the quotient has its sign.
 
 ## Why no error, ever
 

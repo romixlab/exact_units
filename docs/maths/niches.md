@@ -4,13 +4,13 @@ level: advanced
 
 # Niche codes and rails
 
-Many protocols keep a few raw values for something that is not a number. J1939 sends 0xFF for "not available" and 0xFE for "error". SunSpec sends 0x8000 for a point the device doesn't implement. A BLE RSSI of 127 means "no reading", and Matter writes null as the top or bottom of the integer. Read as a number, such a code becomes a temperature of 215 °C.
+Many protocols keep a few raw values for something that is not a number. J1939 sends 0xFF for "not available" and 0xFE for "error". SunSpec sends 0x8000 for a point the device doesn't implement. A BLE RSSI of 127 means "no reading", and Matter writes null as the top or bottom of the integer. Read as a number, such a code becomes a temperature of 215 [[°C]].
 
 `Niched<V, N>` keeps these codes apart from the values. It stores the raw number only, so the bytes in memory and on the wire stay the same. `get()` gives the value or the meaning of the code, never the code as a number.
 
 ## The J1939 coolant temperature
 
-SPN 110 is one byte: 1 °C per bit from −40 °C ([Register formulas](../points/registers.md#bus-formulas)). 0 to 250 are temperatures, 251 to 253 are reserved, 0xFE is an error and 0xFF is not available.
+SPN 110 is one byte: 1 [[°C]] per bit from −40 [[°C]] ([Register formulas](../points/registers.md#bus-formulas)). 0 to 250 are temperatures, 251 to 253 are reserved, 0xFE is an error and 0xFF is not available.
 
 <figure class="eu-figure" markdown="0">
 --8<-- "figures/niche_codes.svg"
@@ -110,7 +110,7 @@ A value without bounds takes every number of its storage, so it leaves no room f
 
 ## Rails: a value with a mark
 
-A rail is not a code. A 12-bit ADC reads 4095 for 3.3 V and for anything above it. A Q15 after saturation holds its largest value for every larger result. The number is still a value, but it is a limit, not a measurement.
+A rail is not a code. A 12-bit ADC reads 4095 for 3.3 [[V]] and for anything above it. A Q15 after saturation holds its largest value for every larger result. The number is still a value, but it is a limit, not a measurement.
 
 `Clipped<V>` marks the two ends of `V`'s range (its bounds, or the storage's ends without them). `get()` answers `Clip::AtMost` at the low end, `Clip::AtLeast` at the high end and `Clip::Exact` in between. `LowRail` or `HighRail` makes only one end a rail.
 
@@ -126,7 +126,7 @@ assert_eq!(Adc::try_from_raw(4095).map(Adc::get), Ok(Clip::AtLeast(Volts::bounde
 assert_eq!(Adc::try_from_raw(4095).unwrap().to_string(), "≥ 4095·11/13650 V");
 ```
 
-The two combine. The coolant temperature above sits at its low rail at −40 °C, and its five top byte values are codes, so its full type is `Niched<Clipped<Temp>, J1939U8>`. That is still one byte.
+The two combine. The coolant temperature above sits at its low rail at −40 [[°C]], and its five top byte values are codes, so its full type is `Niched<Clipped<Temp>, J1939U8>`. That is still one byte.
 
 ## On the wire and in serde
 

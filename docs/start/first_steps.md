@@ -54,7 +54,7 @@ The scale `P` says how big one step is. Every scale is an exact number, never a 
 | `One` | $1$ | `Fixed<Volt, One, i32>`: whole volts |
 | `Milli`, `Micro`, `Kilo`, ... | $10^{-3}$, $10^{-6}$, $10^{3}$ | every SI prefix from `Quecto` to `Quetta` |
 | `Kibi`, `Mebi`, `Gibi`, `Tebi` | $2^{10}$, $2^{20}$, ... | `Kibibytes<u16>` |
-| `Pow10<E>` | $10^{E}$ | `Pow10<-4>`: tenths of a millisecond in s |
+| `Pow10<E>` | $10^{E}$ | `Pow10<-4>`: tenths of a millisecond in [[s]] |
 | `Pow2<E>` | $2^{E}$ | `Pow2<-15>`: the step of Q15 |
 | `Rational<N, D>` | $N / D$ | `Rational<1, 65535>`: one step of a 16-bit duty |
 | `FullScale<V, BITS>` | $V / 2^{BITS}$ | one step of an ADC |

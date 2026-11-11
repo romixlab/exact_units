@@ -4,9 +4,9 @@ level: advanced
 
 # Levels, dBm and cable loss
 
-dBm is a power level against a fixed reference, 1 mW: nothing new, a `Per<Watt, Watt>` power ratio of the
+dBm is a power level against a fixed reference, 1 [[mW]]: nothing new, a `Per<Watt, Watt>` power ratio of the
 measured power to that reference, the same idiom [dBFS](../levels/thresholds.md#dbfs) uses against full scale.
-The kind of a W/W ratio already picks 10·lg ([Decibels](../levels/decibels.md#the-kind-picks-the-formula)), so
+The kind of a [[W/W]] ratio already picks 10·lg ([Decibels](../levels/decibels.md#the-kind-picks-the-formula)), so
 `to_db` gives dBm directly, as a `Fixed<Decibel, One, f64>`:
 
 ```rust
@@ -26,7 +26,7 @@ A receiver's own dBm reading converts the other way, `from_db` or `from_db_const
 
 ## Cable loss over a run
 
-A coax or a fibre's loss is a rate, dB per unit length, and `Fixed::over` turns it into the loss across a run — the general technique is [Levels per length, time and frequency](../levels/rates.md#attenuation-per-length). A transmitter at +30 dBm into 10 m of RG-58 (17.7 dB/100 m, [Decibels](../levels/decibels.md#neper)):
+A coax or a fibre's loss is a rate, dB per unit length, and `Fixed::over` turns it into the loss across a run — the general technique is [Levels per length, time and frequency](../levels/rates.md#attenuation-per-length). A transmitter at +30 dBm into 10 [[m]] of RG-58 (17.7 dB/100 [[m]], [Decibels](../levels/decibels.md#neper)):
 
 ```rust
 # #[cfg(all(feature = "levels", feature = "mechanical", any(feature = "std", feature = "libm")))] {
@@ -47,7 +47,7 @@ A loss is signed as a loss (positive for a decay, [Decibels](../levels/decibels.
 
 ## Power of a complex value
 
-For an IQ sample or a reflection coefficient the level is of |z|², and the square root is never needed: `db!(norm_sqr x, Floor)` (or another rounding) is the threshold on |z|².
+For an IQ sample or a reflection coefficient the level is of $|z|^2$, and the square root is never needed: `db!(norm_sqr x, Floor)` (or another rounding) is the threshold on $|z|^2$.
 
 $$
 |z| \le 10^{-15/20} \iff |z|^2 \le 10^{-15/10}
@@ -67,4 +67,4 @@ assert!(x.norm_sqr() >= BUSY);
 # }
 ```
 
-The firmware compares two integers: no root, no log, no float. The same `db!(norm_sqr ..)` threshold is how [A worked matching example](matching.md) tells a matched antenna from one to retune, on a reflectometer's Q15 Γ. See [IQ and mixing](iq.md) for a block's mean power the same way.
+The firmware compares two integers: no root, no log, no float. The same `db!(norm_sqr ..)` threshold is how [A worked matching example](matching.md) tells a matched antenna from one to retune, on a reflectometer's Q15 $\Gamma$. See [IQ and mixing](iq.md) for a block's mean power the same way.

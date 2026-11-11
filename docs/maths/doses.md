@@ -4,13 +4,13 @@ level: advanced
 
 # Doses and weighting
 
-The gray and the sievert are both J/kg, and each measures more than one quantity. The SI gives the gray to absorbed dose and to kerma (SI Brochure, 9th ed., Table 4). The sievert carries three quantities that are defined differently and used for different things:
+The gray and the sievert are both [[J/kg]], and each measures more than one quantity. The SI gives the gray to absorbed dose and to kerma (SI Brochure, 9th ed., Table 4). The sievert carries three quantities that are defined differently and used for different things:
 
-- **Dose equivalent** H = Q·D at a point, with the quality factor Q a function of linear energy transfer (CIPM 2002, Recommendation 2). This is the SI's quantity. The operational quantities a monitor or a dosimeter reads, H*(10) and Hp(10), are dose equivalents at a stated depth.
-- **Equivalent dose** H_T = Σ w_R·D_T,R, the mean absorbed dose in a tissue weighted by a radiation weighting factor w_R (ICRP Publication 103, Eq. 4.2).
-- **Effective dose** E = Σ w_T·H_T, the tissue-weighted sum over the body of a Reference Person (ICRP Publication 103). Dose limits are written in it.
+- **Dose equivalent** $H = Q \cdot D$ at a point, with the quality factor $Q$ a function of linear energy transfer (CIPM 2002, Recommendation 2). This is the SI's quantity. The operational quantities a monitor or a dosimeter reads, $H^*(10)$ and $H_{\mathrm{p}}(10)$, are dose equivalents at a stated depth.
+- **Equivalent dose** $H_{\mathrm{T}} = \sum w_{\mathrm{R}} \cdot D_{\mathrm{T,R}}$, the mean absorbed dose in a tissue weighted by a radiation weighting factor $w_{\mathrm{R}}$ (ICRP Publication 103, Eq. 4.2).
+- **Effective dose** $E = \sum w_{\mathrm{T}} \cdot H_{\mathrm{T}}$, the tissue-weighted sum over the body of a Reference Person (ICRP Publication 103). Dose limits are written in it.
 
-A number in Sv that doesn't say which of these it is reads three ways. So `exact_units` gives each its own quantity ([Quantities](quantities.md)), all of them kinds:
+A number in [[Sv]] that doesn't say which of these it is reads three ways. So `exact_units` gives each its own quantity ([Quantities](quantities.md)), all of them kinds:
 
 ```mermaid
 graph TD
@@ -22,7 +22,7 @@ graph TD
   H --> E["EffectiveDose<br/>E"]
 ```
 
-Every box is a kind: none converts or adds to another. The ones under `DoseEquivalent` are kinds under it so that a sievert can measure them, as `Of<EffectiveDose, Sievert>` (`units::EffectiveDose`). A bare `Sievert` is the SI's dose equivalent H.
+Every box is a kind: none converts or adds to another. The ones under `DoseEquivalent` are kinds under it so that a sievert can measure them, as `Of<EffectiveDose, Sievert>` (`units::EffectiveDose`). A bare `Sievert` is the SI's dose equivalent $H$.
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::Milli, units::{EffectiveDose, EquivalentDose}};
@@ -32,7 +32,7 @@ let h = Fixed::<EquivalentDose, Milli, u32>::new(20);
 let _ = h.convert::<EffectiveDose, Milli, u32>();
 ```
 
-Each dose has a rate in the same shape: `AbsorbedDoseRate` (`GrayPerSecond`), `DoseEquivalentRate` (`SievertPerHour`) with `AmbientDoseEquivalentRate10` and the personal rates under it, `KermaRate`, `EquivalentDoseRate`, `EffectiveDoseRate`. A survey meter's µSv/h is `Fixed<Of<AmbientDoseEquivalentRate10, SievertPerHour>, Micro, u32>`. Gy/s does not convert to Sv/h.
+Each dose has a rate in the same shape: `AbsorbedDoseRate` (`GrayPerSecond`), `DoseEquivalentRate` (`SievertPerHour`) with `AmbientDoseEquivalentRate10` and the personal rates under it, `KermaRate`, `EquivalentDoseRate`, `EffectiveDoseRate`. A survey meter's [[µSv/h]] is `Fixed<Of<AmbientDoseEquivalentRate10, SievertPerHour>, Micro, u32>`. [[Gy/s]] does not convert to [[Sv/h]].
 
 ## From a gray to a sievert: a weighting
 
@@ -62,7 +62,7 @@ The sets carry the tables as printed:
 
 A weight a set doesn't give is a compile error: ICRP 60 has no `PROTONS_AND_CHARGED_PIONS`. The edition is named at the call, not carried in the type: an equivalent dose by ICRP 60 and one by ICRP 103 are the same quantity, as dose records add them in practice. Code that must keep editions apart declares a kind of its own under `EquivalentDose` with `quantity!`.
 
-The step is exact or `None`. An integer weight that overflows the storage is `None`, and so is a fractional one whose product isn't a whole number of the storage's step; `equivalent_dose_rounded` names a [rounding](rounding.md) instead. ICRP 103's neutron weight is e^(−ln²(E)/6) and has no exact value, so it is a float edge: `Icrp103::neutrons_f64` (feature `libm`) gives a `WeightF64`, and `equivalent_dose_f64` multiplies into an `f64`.
+The step is exact or `None`. An integer weight that overflows the storage is `None`, and so is a fractional one whose product isn't a whole number of the storage's step; `equivalent_dose_rounded` names a [rounding](rounding.md) instead. ICRP 103's neutron weight is $e^{-\ln^2(E)/6}$ and has no exact value, so it is a float edge: `Icrp103::neutrons_f64` (feature `libm`) gives a `WeightF64`, and `equivalent_dose_f64` multiplies into an `f64`.
 
 A kerma takes no weighting until it is named an absorbed dose, the named step `as_quantity::<AbsorbedDose>()` that charged-particle equilibrium justifies:
 
@@ -75,7 +75,7 @@ let _: Option<Fixed<EquivalentDose, Micro, u32>> = k.equivalent_dose(Icrp103::PH
 
 ## The dose equivalent: H = Q·D
 
-The SI's dose equivalent weights by the quality factor Q(L) of the charged particles' linear energy transfer L in water, defined by ICRP 60 and kept by ICRP 103 (Eq. B.4.2): 1 below 10 keV/µm, 0.32·L − 2.2 up to 100 keV/µm, 300/√L above. `Icrp60::q_of_let` takes an L in `KiloElectronVoltPerMicrometer` (a `LinearEnergyTransfer`, not a force) and gives Q exactly where it is a fraction: always up to 100 keV/µm, above where √L is rational. Elsewhere it is `None`, and `q_of_let_f64` is the float edge.
+The SI's dose equivalent weights by the quality factor $Q(L)$ of the charged particles' linear energy transfer $L$ in water, defined by ICRP 60 and kept by ICRP 103 (Eq. B.4.2): 1 below 10 [[keV/µm]], $0.32 \cdot L - 2.2$ up to 100 [[keV/µm]], $300/\sqrt{L}$ above. `Icrp60::q_of_let` takes an $L$ in `KiloElectronVoltPerMicrometer` (a `LinearEnergyTransfer`, not a force) and gives $Q$ exactly where it is a fraction: always up to 100 [[keV/µm]], above where $\sqrt{L}$ is rational. Elsewhere it is `None`, and `q_of_let_f64` is the float edge.
 
 ```rust
 use exact_units::{Fixed, prefix::{Micro, One}, radiation::Icrp60, quantities::AmbientDoseEquivalent10};
@@ -89,13 +89,13 @@ let ambient: Fixed<Of<AmbientDoseEquivalent10, Sievert>, Micro, u32> = h.as_quan
 assert_eq!(ambient.get(), 6900);
 ```
 
-A Q from a measured spectrum is a `Weight` of the caller's, `Weight::new(num, den, of, source, year)`, with its source said.
+A $Q$ from a measured spectrum is a `Weight` of the caller's, `Weight::new(num, den, of, source, year)`, with its source said.
 
 ## Effective dose: E = Σ w_T·H_T
 
-The effective dose weights the equivalent doses of the organs and tissues of a Reference Person by the tissue weighting factors w_T of ICRP 103's Table 3 (the French edition's Tableau 4.2, again as Tableau B.2). `Icrp103::TISSUES` carries them, and `Icrp103Tissues` holds one value per tissue, so no tissue can be left out of the sum:
+The effective dose weights the equivalent doses of the organs and tissues of a Reference Person by the tissue weighting factors $w_{\mathrm{T}}$ of ICRP 103's Table 3 (the French edition's Tableau 4.2, again as Tableau B.2). `Icrp103::TISSUES` carries them, and `Icrp103Tissues` holds one value per tissue, so no tissue can be left out of the sum:
 
-| Tissue | w_T |
+| Tissue | $w_{\mathrm{T}}$ |
 |---|---|
 | Red bone marrow, colon, lung, stomach, breast, remainder tissues | 0.12 each |
 | Gonads | 0.08 |
@@ -113,9 +113,16 @@ let e: Fixed<EffectiveDose, Micro, u32> = Icrp103::effective_dose(&h).unwrap();
 assert_eq!(e.to_string(), "2120 µSv");
 ```
 
-`effective_dose` takes the sex-averaged H_T. `effective_dose_by_sex(&male, &female)` is Eq. 4.5 itself, E = Σ w_T·(H_T^M + H_T^F)/2, with nothing rounded between the two. The remainder field is the arithmetic mean of the 13 remainder tissues of each sex (Eq. 4.6), as ICRP's dose coefficient tables give it; ICRP 60's splitting rule for the remainder is gone, so E is a plain sum.
+`effective_dose` takes the sex-averaged $H_{\mathrm{T}}$. `effective_dose_by_sex(&male, &female)` is Eq. 4.5
+itself, $E = \sum w_{\mathrm{T}} \cdot (H_{\mathrm{T}}^{\mathrm{M}} + H_{\mathrm{T}}^{\mathrm{F}})/2$, with nothing
+rounded between the two. The remainder field is the arithmetic mean of the 13 remainder tissues of each sex
+(Eq. 4.6), as ICRP's dose coefficient tables give it; ICRP 60's splitting rule for the remainder is gone, so $E$
+is a plain sum.
 
-The w_T are hundredths, so a sum is often no whole number of the storage's step. The step is exact or `None`, as the weightings are, and `effective_dose_rounded` rounds once, at the end. A float storage is exact or `None` too: 0.04 · 0.5 mSv is no `f64`. Equivalent dose rates give an effective dose rate the same way. An absorbed dose is refused: it takes its w_R first.
+The $w_{\mathrm{T}}$ are hundredths, so a sum is often no whole number of the storage's step. The step is exact
+or `None`, as the weightings are, and `effective_dose_rounded` rounds once, at the end. A float storage is exact
+or `None` too: $0.04 \cdot 0.5\ \unit{mSv}$ is no `f64`. Equivalent dose rates give an effective dose rate the
+same way. An absorbed dose is refused: it takes its $w_{\mathrm{R}}$ first.
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::Micro, radiation::{Icrp103, Icrp103Tissues}, units::{EffectiveDose, Gray}};
@@ -159,5 +166,5 @@ let _: Option<Fixed<Of<PersonalDoseEquivalent10, Sievert>, Micro, u32>> = rate.d
 
 - **Rate arithmetic keeps no kind.** `rate * t` and `dose / t` are plain products; only `dose_over` and `rate_over` keep the pair. A quantity that declares its rate, so the operators keep it too, is an idea (UNIT-16).
 - **The remainder's mean is the caller's.** Eq. 4.6's mean of 13 tissues per sex goes into the `remainder` field as a value; there is no step from the 13 tissues.
-- **ICRU Report 95's operational quantities** (2020: H*, Hp from conversion coefficients to E, no depth) are not here, nor H′(0.07, Ω), H′(3, Ω) and Hp(3) of ICRU 51.
+- **ICRU Report 95's operational quantities** (2020: $H^*$, $H_{\mathrm{p}}$ from conversion coefficients to $E$, no depth) are not here, nor $H'(0.07, \Omega)$, $H'(3, \Omega)$ and $H_{\mathrm{p}}(3)$ of ICRU 51.
 - **Older and national quantities** are the user's to declare: ICRP 26's effective dose equivalent, and the US NRC's TEDE, deep-dose and shallow-dose equivalents (10 CFR 20), which use ICRP 26/30 weights.

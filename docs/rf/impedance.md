@@ -15,7 +15,7 @@ let y: Admittance<Milli, i32> = Complex::new(12_000, -16_000); // 12 − 16j mS
 
 ## Shorts, opens and the extended plane
 
-A short and an open are ordinary loads, not errors. Their admittance or impedance is infinite, so Z, Y and Γ live on the extended complex plane: the complex numbers plus one point ∞, which has no direction. `Extended<T>` is that plane, `Extended::Finite(value)` or `Extended::Infinity`.
+A short and an open are ordinary loads, not errors. Their admittance or impedance is infinite, so Z, Y and $\Gamma$ live on the extended complex plane: the complex numbers plus one point ∞, which has no direction. `Extended<T>` is that plane, `Extended::Finite(value)` or `Extended::Infinity`.
 
 The Smith chart draws this plane. Its center is the match, Z = Z₀ and Γ = 0 ([Reflection](reflection.md)). Its rim is |Γ| = 1, the purely reactive loads. The left end of the real axis is the short, Z = 0 and Γ = −1. The right end is the open, Z = ∞ and Γ = 1, one point however the load got there. Inside the rim are the passive loads. A negative resistance, an oscillator's or a tunnel diode's, lies outside, and Z = −Z₀ goes to Γ = ∞, the point at infinity of the Γ plane.
 
@@ -48,7 +48,7 @@ assert_eq!(open.to_admittance::<One>(), Extended::Finite(Complex::<_, _, f64>::b
 
 No step squares a part, so a finite input whose square would overflow or underflow the float still gives its value. A value past the float, such as 1 / Z of the smallest `f64`, is a finite value with an infinite part: the float's overflow, not the point ∞.
 
-A factor between the scales of Z and Y that the float can't hold is a compile error: 1 qΩ in qS is 10⁶⁰, past `f32`.
+A factor between the scales of Z and Y that the float can't hold is a compile error: 1 [[qΩ]] in [[qS]] is $10^{60}$, past `f32`.
 
 ```rust,compile_fail
 use exact_units::{Admittance, Impedance, prefix::Quecto};

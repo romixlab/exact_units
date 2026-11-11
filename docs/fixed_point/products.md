@@ -12,7 +12,8 @@ $$
 (a \cdot P_1) \cdot (b \cdot P_2) = (a \cdot b) \cdot (P_1 \cdot P_2)
 $$
 
-So Q15 · Q15 is a value in steps of $2^{-30}$, and mV · mA one in steps of $10^{-6}$. One integer multiply at run time, the scale exact as a type (`Product<P1, P2>`).
+So Q15 · Q15 is a value in steps of $2^{-30}$, and [[mV·mA]] one in steps of $10^{-6}$. One integer multiply at run
+time, the scale exact as a type (`Product<P1, P2>`).
 
 ```rust
 use exact_units::{Fixed, prefix::Pow2, units::Ratio};
@@ -64,7 +65,8 @@ assert_eq!(q.map(|q| q.get()), Some(i16::MAX)); // 1 − 2⁻¹⁵, not −1
 
 ## Power in watts
 
-The same works for physical units. mV · mA is µW; 48 V · 50 A of it doesn't fit an `i32`, so round into mW:
+The same works for physical units. [[mV·mA]] is [[µW]]; 48 [[V]] · 50 [[A]] of it doesn't fit an `i32`, so round
+into [[mW]]:
 
 ```rust
 use exact_units::{Fixed, Rounding, prefix::Milli, units::{Ampere, Volt, Watt}};

@@ -8,7 +8,7 @@ A `Fixed` has its scale in the type. The compiler works out every conversion fac
 
 - A video stream states its own clock tick: num_units_in_tick ÷ time_scale in H.264 E.2.1 and H.265 E.3.1, num_units_in_display_tick ÷ time_scale in AV1 6.4.3, and a timescale per track in MP4 (15360 is common).
 - A JPEG file carries a quantization table: 64 steps, each a whole number from 1 to 65 535 (T.81 B.2.4.1).
-- H.264's HRD states a bit rate as (bit_rate_value_minus1 + 1) · 2^(6 + bit_rate_scale) bit/s (E.2.2, eq. E-81).
+- H.264's HRD states a bit rate as (bit_rate_value_minus1 + 1) · 2^(6 + bit_rate_scale) [[bit/s]] (E.2.2, eq. E-81).
 
 The unit is still known when the firmware is built: ticks are seconds, a rate is bits per second. `Scaled<U, T>` is such a number. `U` is the unit, in the type. `T` is a primitive integer. The scale is a `RunScale`, a value stored beside the number. `Ticks<T>` is `Scaled<Second, T>`.
 
@@ -54,7 +54,7 @@ The constructors take the forms streams use:
 - `pow2(e)` takes a power of two, such as an HRD rate.
 - `new(num, den, e)` takes a mantissa at a power of two, such as T.800's step size 2^(Rb − εb) · (1 + μb/2¹¹) (eq. E-3), down to 2⁻⁴² and beyond.
 - `from_u64(num, den)` takes wider parts and refuses a fraction whose odd parts pass `u32` after it is reduced.
-- `of::<P>()` and `of_magnitude(&m)` turn a compile-time scale into a run-time one. They give `None` for π/180 or 10⁻¹⁵, which have no such form.
+- `of::<P>()` and `of_magnitude(&m)` turn a compile-time scale into a run-time one. They give `None` for $\pi/180$ or 10⁻¹⁵, which have no such form.
 
 A value without a form is refused when the scale is built. It is never rounded.
 
@@ -97,7 +97,7 @@ The arithmetic is the crate's integer kernel, the same one `Fixed::from_prefix` 
 
 ## Comparing and adding
 
-Two `Scaled` values compare by their exact value, whatever their scales. Three ticks of 1/25 s equal six of 1/50 s. `same_repr` asks whether they are the same number at the same scale.
+Two `Scaled` values compare by their exact value, whatever their scales. Three ticks of 1/25 [[s]] equal six of 1/50 [[s]]. `same_repr` asks whether they are the same number at the same scale.
 
 ```rust
 use exact_units::{RunScale, Ticks};
@@ -128,7 +128,7 @@ assert_eq!(sum.get(), 6006 + 3003);
 
 `Point<O, Scaled<U, T>>` is a position on a clock whose tick is known at run time, such as a stream's presentation time. The origin must be `Linear`. Its number is read with `coord()` and `steps()`, because a `Fixed` point already has `get()` and `raw()`.
 
-RTP's timestamp is 32 bits at a clock rate the session states (RFC 3550 5.1): 90 kHz for video, 48 kHz for most audio. It wraps every 2³² ticks, a period that is a number of ticks, not a compile-time number of seconds. So the timestamp is a `Linear` point known modulo 2³², with named methods that wrap:
+RTP's timestamp is 32 bits at a clock rate the session states (RFC 3550 5.1): 90 [[kHz]] for video, 48 [[kHz]] for most audio. It wraps every 2³² ticks, a period that is a number of ticks, not a compile-time number of seconds. So the timestamp is a `Linear` point known modulo 2³², with named methods that wrap:
 
 - `wrapping_add` and `wrapping_sub` move the counter around its circle.
 - `wrapping_diff` is the short way round, signed, with a half turn negative.
@@ -168,11 +168,11 @@ Where the set of time bases is known when the firmware is built, a `Fixed` per b
 
 | Image | Cortex-M4F | Cortex-M0+ |
 |---|---|---|
-| `Fixed` at 1001/60000 s, a compile-time scale | 88 B | 176 B |
+| `Fixed` at 1001/60000 [[s]], a compile-time scale | 88 B | 176 B |
 | `Ticks<u32>`, the base read at run time | 4320 B | 5028 B |
 | `Ticks<u64>` | 4248 B | 5056 B |
 
-The run-time images hold the kernel's limbs, the core's `u64` division and `memcpy`. The test fails above 6 KiB, and where an image links a soft-float or 128-bit routine.
+The run-time images hold the kernel's limbs, the core's `u64` division and `memcpy`. The test fails above 6 [[KiB]], and where an image links a soft-float or 128-bit routine.
 
 ## On the wire and in serde
 

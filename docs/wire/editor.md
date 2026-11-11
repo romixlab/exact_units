@@ -4,7 +4,7 @@ level: advanced
 
 # In your editor
 
-A WireWeaver API names its types in Rust: `Fixed<Volt, Milli, i16>`. That is exact, but it is not what you think while you read a trait. You think "millivolts, 16 bits, up to 32.767 V".
+A WireWeaver API names its types in Rust: `Fixed<Volt, Milli, i16>`. That is exact, but it is not what you think while you read a trait. You think "millivolts, 16 bits, up to 32.767 [[V]]".
 
 [`ww_lsp`](https://github.com/romixlab/ww_lsp) is a language server that writes that for you. It runs beside rust-analyzer and shows the exact_units type of each API item as an inlay hint, with the details on hover.
 
@@ -31,7 +31,7 @@ A hint reads: unit with its prefix, storage, and the range in the unit.
 
 - `mV · i16 · ±32.767 V`: millivolts in an `i16`. The range is all of `i16`, so it is symmetric.
 - `mA · u16 · 0..5 A`: the `Range<0, 5000>` bound shows as the range.
-- `Q15 · −1..1`: a scale of 2⁻ⁿ on an integer is named as a Q format.
+- `Q15 · −1..1`: a scale of $2^{-n}$ on an integer is named as a Q format.
 - `UQ24.8 W` and `Q3.12 A`: the same for other widths.
 - `°C`: a `Point` shows its origin's symbol.
 

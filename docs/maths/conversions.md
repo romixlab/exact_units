@@ -69,7 +69,7 @@ let uv: Fixed<Volt, Micro, i32> = Rail::bounded(1250).into();
 assert_eq!(uv.get(), 1_250_000);
 ```
 
-Without the range, a `Fixed<Volt, Milli, i16>` reaches 32 767 mV, and the `From` exists only when the target fits that too.
+Without the range, a `Fixed<Volt, Milli, i16>` reaches 32 767 [[mV]], and the `From` exists only when the target fits that too.
 
 ## `convert`: to another unit
 
@@ -84,7 +84,7 @@ assert_eq!(k.convert::<Bit, One, u32>(), Some(Fixed::new(32_768)));
 
 ## Floats
 
-A float storage converts by the same rule as an integer one: `to` and `convert` give the value only where it is a float exactly, and `None` otherwise, past the float's range included (never infinity). Most decimal steps are no float: 1 mV is 0.001 V, and 0.001 has no `f64`. The rounding forms take any value into a float: the exact value, worked out from the float's bits and the factor, rounded once by the `Rounding` you name. A factor with π, ln 2 or ln 10 in it has no exact result, so `to` and `convert` across it don't compile; the rounding forms take it as its 64-bit fixed point, as between integers:
+A float storage converts by the same rule as an integer one: `to` and `convert` give the value only where it is a float exactly, and `None` otherwise, past the float's range included (never infinity). Most decimal steps are no float: 1 [[mV]] is 0.001 [[V]], and 0.001 has no `f64`. The rounding forms take any value into a float: the exact value, worked out from the float's bits and the factor, rounded once by the `Rounding` you name. A factor with π, ln 2 or ln 10 in it has no exact result, so `to` and `convert` across it don't compile; the rounding forms take it as its 64-bit fixed point, as between integers:
 
 ```rust
 use exact_units::{Fixed, Rounding, prefix::{Milli, One}, units::{Degree, Radian, Volt}};

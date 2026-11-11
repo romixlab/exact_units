@@ -6,10 +6,10 @@ level: basic
 
 ## Two kinds of numbers
 
-"It is 25 °C" and "it got 5 °C warmer" are different things.
+"It is 25 [[°C]]" and "it got 5 [[°C]] warmer" are different things.
 
-- 25 °C is a **point**: a reading on a scale that starts somewhere.
-- 5 K is an **amount**: a difference, a step, a vector.
+- 25 [[°C]] is a **point**: a reading on a scale that starts somewhere.
+- 5 [[K]] is an **amount**: a difference, a step, a vector.
 
 A `Fixed` is an amount. A `Point<O, Fixed<..>>` is a point, measured from an origin `O`.
 
@@ -31,17 +31,17 @@ assert_eq!(water.to::<Celsius, Centi, i16>(), Some(DegC::from_raw(10_000)));
 assert_eq!(DegC::from_raw(2500).to_string(), "25 °C");
 ```
 
-- The unit of every temperature scale is `Kelvin`. °F counts steps of $5/9$ K.
-- The origin carries the offset: 0 °C is 273.15 K, 0 °F is $45967/180$ K.
+- The unit of every temperature scale is `Kelvin`. [[°F]] counts steps of $5/9\,\unit{K}$.
+- The origin carries the offset: 0 [[°C]] is 273.15 [[K]], 0 [[°F]] is $45967/180\,\unit{K}$.
 - On the wire a `DegC` is its `i16`. The origin is only in the type.
 
-Where $5/9$ K and $45967/180$ K come from: water freezes at 32 °F and boils at 212 °F, 100 K apart, so 180 °F
-steps span 100 K and one °F step is $100/180 = 5/9$ K. 0 °F sits 32 of those steps below freezing (273.15 K),
-so its offset is $273.15 - 32 \cdot 5/9 = 5463/20 - 160/9 = 45967/180$ K — not $273.15 \cdot 5/9$, which would
-scale the freezing point itself rather than shift it by 32 steps. As a decimal that's 255.372222… K, repeating,
-so the crate keeps the exact fraction; a cross-check from the other end agrees: absolute zero is −459.67 °F,
-and $459.67 \cdot 5/9 = 45967/180$. A stored float (255.37222…) would round every conversion through 0 °F; the
-fraction doesn't.
+Where $5/9\,\unit{K}$ and $45967/180\,\unit{K}$ come from: water freezes at 32 [[°F]] and boils at 212 [[°F]], 100
+[[K]] apart, so 180 [[°F]] steps span 100 [[K]] and one [[°F]] step is $100/180 = 5/9\,\unit{K}$. 0 [[°F]] sits 32 of
+those steps below freezing (273.15 [[K]]), so its offset is $273.15 - 32 \cdot 5/9 = 5463/20 - 160/9 =
+45967/180\,\unit{K}$ — not $273.15 \cdot 5/9$, which would scale the freezing point itself rather than shift it by
+32 steps. As a decimal that's 255.372222… [[K]], repeating, so the crate keeps the exact fraction; a cross-check
+from the other end agrees: absolute zero is −459.67 [[°F]], and $459.67 \cdot 5/9 = 45967/180$. A stored float
+(255.37222…) would round every conversion through 0 [[°F]]; the fraction doesn't.
 
 ## The algebra
 
@@ -76,7 +76,8 @@ let _ = DegC::from_raw(2000) + DegC::from_raw(2000);
 
 ## A hysteresis is an amount
 
-A thermostat's setpoint is a point, its hysteresis an amount. 1 °F of hysteresis is $5/9$ K, not −17.2 °C:
+A thermostat's setpoint is a point, its hysteresis an amount. 1 [[°F]] of hysteresis is $5/9\,\unit{K}$, not −17.2
+[[°C]]:
 
 ```rust
 use exact_units::{Fixed, Point, origins::Celsius, prefix::{Centi, Rational}, units::Kelvin};
@@ -129,7 +130,7 @@ assert!(q!(98 degF) < body && body != q!(98 degF));
 
 Nothing is rounded: a literal between two stored values is above the one and below the other. A literal past the storage's range is a constant answer.
 
-A reading is not an amount, so a point literal doesn't compare with a `Fixed`, and a plain `q!(300 K)` doesn't compare with a `Point`. Gauge and absolute pressure don't compare, as they don't convert. Points that wrap (an `Angle<..>`) take `==` only: the literal is taken into the period first, so `q!(370 deg @ Angle<Degree>)` is the point at 10°, and `<` doesn't compile, as a heading has no order.
+A reading is not an amount, so a point literal doesn't compare with a `Fixed`, and a plain `q!(300 K)` doesn't compare with a `Point`. Gauge and absolute pressure don't compare, as they don't convert. Points that wrap (an `Angle<..>`) take `==` only: the literal is taken into the period first, so `q!(370 deg @ Angle<Degree>)` is the point at 10[[°]], and `<` doesn't compile, as a heading has no order.
 
 ### A range of points
 
@@ -171,22 +172,22 @@ let _ = t.is_in(q!(68.01 degF ..= 77 degF)); // 20.00555.. °C: Inside or Outsid
 
 | Origin | Unit | Offset | Notes |
 |---|---|---|---|
-| `AbsoluteZero` | K | 0 | thermodynamic temperature |
-| `Celsius` | K | 273.15 | SI Brochure 2.3.4 |
-| `Rankine` | K | 0 | shown in steps of 5/9 K |
-| `Fahrenheit` | K | 45967/180 | shown in steps of 5/9 K (NIST SP 811 B.8) |
-| `Vacuum` | Pa | 0 | absolute pressure |
-| `Gauge` | Pa | 0 from ambient | converts only with the ambient pressure, see [Register formulas](registers.md#pressure-against-the-ambient) |
-| `AboveStandardAtmosphere` | Pa | 101325 | gauge with the reference stated |
-| `Angle<Turn>` | rev | 0 | wraps every turn, see [Angles as points](wrapping.md) |
-| `Angle<Degree>` | ° | 0 | wraps every 360° |
-| `Angle<Radian>` | rad | 0 | wraps every 2π (float storages only) |
-| `UnixEpoch` | s | 0 on `PosixScale` | 1970-01-01 00:00:00 UTC, POSIX time (feature `time`), aliased as `UnixSecs`/`UnixMillis`/`UnixMicros`/`UnixNanos` |
-| `NtpEpoch` | s | −2 208 988 800 on `PosixScale` | 1900-01-01 00:00:00 UTC, aliased as `NtpSecs` |
-| `TaiEpoch1958` | s | 0 on `TaiScale` | 1958-01-01 00:00:00 TAI, aliased as `TaiSecs` .. `TaiNanos` |
-| `GpsEpoch` | s | 694 656 019 on `TaiScale` | 1980-01-06 00:00:19 TAI, aliased as `GpsSecs` .. `GpsNanos` |
-| `PtpEpoch` | s | 378 691 200 on `TaiScale` | 1970-01-01 00:00:00 TAI, aliased as `PtpNanos` |
-| `DeviceBoot` | s | 0 on `DeviceMonotonic` | a device's boot, known only at run time, aliased as `DeviceMillis` .. `DeviceNanos` |
+| `AbsoluteZero` | [[K]] | 0 | thermodynamic temperature |
+| `Celsius` | [[K]] | 273.15 | SI Brochure 2.3.4 |
+| `Rankine` | [[K]] | 0 | shown in steps of 5/9 [[K]] |
+| `Fahrenheit` | [[K]] | 45967/180 | shown in steps of 5/9 [[K]] (NIST SP 811 B.8) |
+| `Vacuum` | [[Pa]] | 0 | absolute pressure |
+| `Gauge` | [[Pa]] | 0 from ambient | converts only with the ambient pressure, see [Register formulas](registers.md#pressure-against-the-ambient) |
+| `AboveStandardAtmosphere` | [[Pa]] | 101325 | gauge with the reference stated |
+| `Angle<Turn>` | [[rev]] | 0 | wraps every turn, see [Angles as points](wrapping.md) |
+| `Angle<Degree>` | [[°]] | 0 | wraps every 360[[°]] |
+| `Angle<Radian>` | [[rad]] | 0 | wraps every 2π (float storages only) |
+| `UnixEpoch` | [[s]] | 0 on `PosixScale` | 1970-01-01 00:00:00 UTC, POSIX time (feature `time`), aliased as `UnixSecs`/`UnixMillis`/`UnixMicros`/`UnixNanos` |
+| `NtpEpoch` | [[s]] | −2 208 988 800 on `PosixScale` | 1900-01-01 00:00:00 UTC, aliased as `NtpSecs` |
+| `TaiEpoch1958` | [[s]] | 0 on `TaiScale` | 1958-01-01 00:00:00 TAI, aliased as `TaiSecs` .. `TaiNanos` |
+| `GpsEpoch` | [[s]] | 694 656 019 on `TaiScale` | 1980-01-06 00:00:19 TAI, aliased as `GpsSecs` .. `GpsNanos` |
+| `PtpEpoch` | [[s]] | 378 691 200 on `TaiScale` | 1970-01-01 00:00:00 TAI, aliased as `PtpNanos` |
+| `DeviceBoot` | [[s]] | 0 on `DeviceMonotonic` | a device's boot, known only at run time, aliased as `DeviceMillis` .. `DeviceNanos` |
 
 The time origins and how their scales convert: [Time scales](time.md).
 

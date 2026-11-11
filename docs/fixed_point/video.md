@@ -9,7 +9,8 @@ A digital video component is two steps away from the light it stands for. A *tra
 - `codec::video::Narrow8`, `NarrowChroma8`, `Narrow10`, `NarrowChroma10`, `Narrow12` and `NarrowChroma12` are the narrow-range quantizers of ITU-R BT.709 and BT.2100, as [codecs](codecs.md) whose `Linear` is E′; `Full10`, `FullChroma10`, `Full12` and `FullChroma12` are the full-range ones.
 - `codec::video::Pq` is the PQ curve of BT.2100 (first published as SMPTE ST 2084): exact constants, and the curve itself as a float edge that says so in its name.
 - `codec::video::Bt709` is BT.709's inverse OETF, the scene light a signal means: exact at E′ = 0 and 1, a float edge everywhere else.
-- `codec::matrix::Bt601`, `Bt709Matrix` and `Bt2020` are the Y′C′BC′R colour matrices, exact rationals from K_R and K_B alone.
+- `codec::matrix::Bt601`, `Bt709Matrix` and `Bt2020` are the Y′C′BC′R colour matrices, exact rationals from
+  $K_{\mathrm{R}}$ and $K_{\mathrm{B}}$ alone.
 
 ## Narrow range
 
@@ -156,22 +157,30 @@ PQ, the perceptual quantizer of high-dynamic-range video, maps E′ to a display
 
 `Y = (max(E′^(1/m₂) − c₁, 0) / (c₂ − c₃·E′^(1/m₂)))^(1/m₁)`
 
-with m₁ = 2610/16384, m₂ = 2523/4096 × 128, c₁ = 3424/4096, c₂ = 2413/4096 × 32 and c₃ = 2392/4096 × 32.
+with $m_1 = 2610/16384$, $m_2 = 2523/4096 \times 128$, $c_1 = 3424/4096$, $c_2 = 2413/4096 \times 32$ and
+$c_3 = 2392/4096 \times 32$.
 
 What is exact:
 
 - **The constants.** Each is an exact rational, `Pq::M1` to `Pq::C3` as `Fraction`s, and `Pq::DEF` is the curve as data, one `CurveForm::RationalPower` segment. All five are dyadic, so an `f64` holds each exactly too.
-- **White.** c₁ = c₃ − c₂ + 1 exactly (checked at compile time), so E′ = 1 is exactly 10 000 cd/m², and 10 000 cd/m² exactly E′ = 1.
-- **Black, one way.** E′ = 0 is 0 cd/m². The other way, 0 cd/m² is E′ = c₁^m₂, about 7.3·10⁻⁷: the EOTF's `max(.., 0)` takes every E′ up to that to black, a flat stretch of the standard's own shape. On 10 bits it is under a thousandth of a code, so code 64 is black both ways.
+- **White.** $c_1 = c_3 - c_2 + 1$ exactly (checked at compile time), so E′ = 1 is exactly 10 000 cd/[[m²]], and
+  10 000 cd/[[m²]] exactly E′ = 1.
+- **Black, one way.** E′ = 0 is 0 cd/[[m²]]. The other way, 0 cd/[[m²]] is $E' = c_1^{m_2}$, about $7.3 \cdot
+  10^{-7}$: the EOTF's `max(.., 0)` takes every E′ up to that to black, a flat stretch of the standard's own
+  shape. On 10 bits it is under a thousandth of a code, so code 64 is black both ways.
 - **The code.** A 10-bit PQ code is `Narrow10`'s (or a full-range quantizer's), exact.
 
-What isn't: every other luminance. E′^(1/m₂), with 1/m₂ = 32/2523, is rational only where E′ is the 2523rd power of a rational, and a narrow-range code's E′ = (D − 64)/876 is that only for D = 64 and D = 940. Every other code means an irrational luminance. No exact `Linear` exists for PQ, so PQ is no `Codec`: `formula` would have to give the nearest value as if it were the value.
+What isn't: every other luminance. $E'^{1/m_2}$, with $1/m_2 = 32/2523$, is rational only where E′ is the 2523rd
+power of a rational, and a narrow-range code's $E' = (D - 64)/876$ is that only for D = 64 and D = 940. Every
+other code means an irrational luminance. No exact `Linear` exists for PQ, so PQ is no `Codec`: `formula` would
+have to give the nearest value as if it were the value.
 
 The curve is a float edge instead, named so, with the `libm` feature (core has no `pow`; with `libm`, every target computes the same bits):
 
 - `Pq::eotf_f64(e)` and `Pq::inverse_eotf_f64(y)`, on 0..=1, `None` outside it.
-- `Pq::to_nits_f64(code)`, a 10-bit narrow-range code to cd/m², `None` for footroom and headroom, which PQ gives no luminance.
-- `Pq::from_nits_f64(nits, rounding)`, cd/m² to the code, by a named rounding of the quantizer's 876·E′.
+- `Pq::to_nits_f64(code)`, a 10-bit narrow-range code to cd/[[m²]], `None` for footroom and headroom, which PQ
+  gives no luminance.
+- `Pq::from_nits_f64(nits, rounding)`, cd/[[m²]] to the code, by a named rounding of the quantizer's $876 \cdot E'$.
 
 ```rust
 use exact_units::codec::{Coded, video::{Narrow10, Pq}};
@@ -225,7 +234,7 @@ What it costs, against the certified `f64` edge (`from_light_f64`):
 | | Float-free certified | `f64` edge |
 |---|---|---|
 | Flash on a Cortex-M4F, one PQ encode, `opt-level = "s"`, LTO | 62 920 B | 59 900 B |
-| Time per PQ encode on an x86-64 desktop | about 0.4 ms | about 9 µs |
+| Time per PQ encode on an x86-64 desktop | about 0.4 [[ms]] | about 9 [[µs]] |
 | Needs | integers | `libm`, `f64` (in software on an M4F) |
 
 `tests/curve_size.rs` measures the flash. Most of either image is the exact path and `Fraction`'s 128-bit arithmetic, which both carry. The time goes to the roots: a PQ light takes a 2523rd and a 1305th root, each a bisection whose steps are powers of 128-bit numbers. The float-free edge is for a light given exactly once (a setting, a metadata field, a test vector), not for a stream of pixels.
@@ -234,21 +243,24 @@ What it costs, against the certified `f64` edge (`from_light_f64`):
 
 HLG, hybrid log-gamma, is the scene-referred curve of high-dynamic-range video (BT.2100-3 Table 5, first ARIB STD-B67). Its OETF takes a relative scene light E, 0 to 1, to the signal E′:
 
-- E′ = √(3E) for E up to 1/12;
-- E′ = a·ln(12E − b) + c above, with a = 0.17883277, b = 1 − 4a and c = 0.5 − a·ln(4a).
+- $E' = \sqrt{3E}$ for E up to 1/12;
+- $E' = a \cdot \ln(12E - b) + c$ above, with $a = 0.17883277$, $b = 1 - 4a$ and $c = 0.5 - a \cdot \ln(4a)$.
 
 `Hlg::DEF` is its inverse, signal to light, as every curve in the crate is written:
 
-- E = E′²/3 for E′ up to ½, a `CurveForm::Power`;
-- E = (exp((E′ − c)/a) + b)/12 above, a `CurveForm::Exp`.
+- $E = E'^2/3$ for E′ up to ½, a `CurveForm::Power`;
+- $E = (\exp((E' - c)/a) + b)/12$ above, a `CurveForm::Exp`.
 
-c is transcendental, and not a `Magnitude` either, whose symbols are π, ln 2 and ln 10. It needn't be one. Since exp(−c/a) = 4a·exp(−½/a), the upper half is (a/3)·e^((E′ − ½)/a) + b/12, and every parameter is an exact `Fraction`: a/3, 1/a, ½ and b/12. c is absorbed into the exponent's shift.
+c is transcendental, and not a `Magnitude` either, whose symbols are $\pi$, $\ln 2$ and $\ln 10$. It needn't be
+one. Since $\exp(-c/a) = 4a \cdot \exp(-\frac{1}{2a})$, the upper half is $(a/3) \cdot e^{(E' - 1/2)/a} + b/12$,
+and every parameter is an exact `Fraction`: a/3, 1/a, ½ and b/12. c is absorbed into the exponent's shift.
 
 What is exact:
 
-- **The lower half, both ways.** E′²/3 is rational at every rational E′. A 10-bit narrow-range code D from 64 to 502 (E′ = ½) decodes to (D − 64)²/(3·876²) exactly.
-- **Its encode too.** E′ = √(3E) is irrational for almost every light, so no exact E′ exists to round. The exact encode doesn't need one: it compares the light with the exact lights of codes and of half-codes, which are rational, and finds the code by every `Rounding` in both `Domain`s.
-- **The joint.** E′ = ½ is E = 1/12 by both halves: a/3 + b/12 = 1/12 because b = 1 − 4a. The crate checks it on `Hlg::DEF`'s forms at compile time.
+- **The lower half, both ways.** $E'^2/3$ is rational at every rational E′. A 10-bit narrow-range code D from 64
+  to 502 (E′ = ½) decodes to $(D - 64)^2/(3 \cdot 876^2)$ exactly.
+- **Its encode too.** $E' = \sqrt{3E}$ is irrational for almost every light, so no exact E′ exists to round. The exact encode doesn't need one: it compares the light with the exact lights of codes and of half-codes, which are rational, and finds the code by every `Rounding` in both `Domain`s.
+- **The joint.** E′ = ½ is E = 1/12 by both halves: $a/3 + b/12 = 1/12$ because $b = 1 - 4a$. The crate checks it on `Hlg::DEF`'s forms at compile time.
 - **The constants.** `Hlg::A` and `Hlg::B` are the standard's decimals, exact.
 
 What isn't: the upper half, above E′ = ½. `exp` of a non-zero rational is irrational, so every code from 503 to 940 means an irrational light. `light_exact` and `decode_exact` answer `None` there, and `from_light_exact` answers `EncodeError::NotExact` for a light above 1/12. The float edge is the way, with the `libm` feature:
@@ -288,17 +300,17 @@ With a rounded to 8 decimals, the curve's ends don't quite meet 0..=1: E′ = 1 
 
 The two standards write the same curve two ways. BT.2100-3 normalises E to 0..1 and writes b and c as formulas of a. ARIB STD-B67 1.0 (Table 2) normalises E to reference white, so its E is BT.2100's 12E and runs to 12, and it prints the constants as digits:
 
-- its lower half is E′ = r·√E with r = 0.5, which is √(3E) of BT.2100's E;
-- its b = 0.28466892 is 1 − 4a exactly;
-- its c = 0.55991073 is 0.5 − a·ln(4a) rounded to 8 decimals: the formula gives 0.559910729…, just under it.
+- its lower half is $E' = r \cdot \sqrt{E}$ with $r = 0.5$, which is $\sqrt{3E}$ of BT.2100's E;
+- its $b = 0.28466892$ is $1 - 4a$ exactly;
+- its $c = 0.55991073$ is $0.5 - a \cdot \ln(4a)$ rounded to 8 decimals: the formula gives 0.559910729…, just under it.
 
-The crate follows BT.2100's formulas. `tests/props/curve.rs` checks that ARIB's digits are these formulas, and that ARIB's OETF, with its rounded c, is within 5·10⁻⁹ of the crate's for every E from 0 to 12 in steps of 0.01.
+The crate follows BT.2100's formulas. `tests/props/curve.rs` checks that ARIB's digits are these formulas, and that ARIB's OETF, with its rounded c, is within $5 \cdot 10^{-9}$ of the crate's for every E from 0 to 12 in steps of 0.01.
 
 ### What the tests check
 
 `tests/props/curve.rs`:
 
-- every code 64..=502, its exact light against (D − 64)²/(3·876²), and back to the code by every rounding in both domains;
+- every code 64..=502, its exact light against $(D - 64)^2/(3 \cdot 876^2)$, and back to the code by every rounding in both domains;
 - every tie between them, in the signal and in the light, against a scan of every code;
 - the joint at E′ = ½, from both forms;
 - every code 503..=940 by the `f64` edge, against the standard's formula in std's `f64`, back to its code;
@@ -313,7 +325,7 @@ HLG's light is relative scene light. A display turns it into display light by th
 
 ITU-R BT.709-6 Part 2 item 1.2 defines the OETF, the scene light E a camera turns into the signal V′: `V′ = 4.5E` below E = 0.018, `V′ = 1.099·E^0.45 − 0.099` at and above it. `Bt709` is its inverse, written as the crate's curves are, signal to light: `E = V′/4.5` below V′ = 0.081, `E = ((V′ + 0.099)/1.099)^(20/9)` at and above it. 0.081 is the decode direction's own breakpoint; the commonly quoted light-side one, 0.018, doesn't correspond to it exactly (`1.099·0.018^0.45 − 0.099 ≈ 0.081248`, a sixth decimal past 0.081), the standard's own rounding of two independently printed numbers — the same gap sRGB's two breakpoints have.
 
-The power segment is `CurveForm::Power` with the divisor inside the base, `scale = 1000/1099` and `shift = 99/1099` (so `scale·V′ + shift = (V′ + 0.099)/1.099`, both exact): a `gain` outside the power would have to be 1.099^(−20/9), irrational, and a `Fraction` cannot hold that.
+The power segment is `CurveForm::Power` with the divisor inside the base, `scale = 1000/1099` and `shift = 99/1099` (so `scale·V′ + shift = (V′ + 0.099)/1.099`, both exact): a `gain` outside the power would have to be $1.099^{-20/9}$, irrational, and a `Fraction` cannot hold that.
 
 Exact at both ends: V′ = 0 gives E = 0; V′ = 1 gives E = 1, since `((1 + 0.099)/1.099)^(20/9) = 1`. Everywhere else V′ is almost never a rational's 9th power, so `Bt709::KIND` is `CurveKind::Float`, like PQ.
 
@@ -332,7 +344,15 @@ assert_eq!(white.light_exact().map(|e| e.get()), Some(Fraction::ONE));
 
 ## The Y′C′BC′R matrices
 
-ITU-R BT.601, BT.709 and BT.2020 share one shape for turning R′G′B′ into Y′C′BC′R, only K_R and K_B differing: `Y′ = K_R·R′ + K_G·G′ + K_B·B′` with K_G = 1 − K_R − K_B, `C′B = (B′ − Y′)/(2(1 − K_B))`, `C′R = (R′ − Y′)/(2(1 − K_R))`, and the inverse `R′ = Y′ + 2(1 − K_R)·C′R`, `B′ = Y′ + 2(1 − K_B)·C′B`, `G′ = (Y′ − K_R·R′ − K_B·B′)/K_G`. K_R and K_B are exact decimals (BT.709: 0.2126 and 0.0722; BT.601: 0.299 and 0.114; BT.2020: 0.2627 and 0.0593), so `codec::matrix::MatrixDef` stores only those two and derives the rest: every step of `encode` and `decode` is exact `Fraction` arithmetic, no rounding needed, since R′G′B′ and Y′C′BC′R are both unquantized. A client that wants a quantized code rounds separately, by a named `Rounding`, into whichever quantizer it targets; the matrix is not a `Codec` layer, since it mixes three components (a quantizer and a `Curve` each act on one signal alone).
+ITU-R BT.601, BT.709 and BT.2020 share one shape for turning R′G′B′ into Y′C′BC′R, only $K_{\mathrm{R}}$ and
+$K_{\mathrm{B}}$ differing: `Y′ = K_R·R′ + K_G·G′ + K_B·B′` with $K_{\mathrm{G}} = 1 - K_{\mathrm{R}} -
+K_{\mathrm{B}}$, `C′B = (B′ − Y′)/(2(1 − K_B))`, `C′R = (R′ − Y′)/(2(1 − K_R))`, and the inverse `R′ = Y′ + 2(1 −
+K_R)·C′R`, `B′ = Y′ + 2(1 − K_B)·C′B`, `G′ = (Y′ − K_R·R′ − K_B·B′)/K_G`. $K_{\mathrm{R}}$ and $K_{\mathrm{B}}$ are
+exact decimals (BT.709: 0.2126 and 0.0722; BT.601: 0.299 and 0.114; BT.2020: 0.2627 and 0.0593), so
+`codec::matrix::MatrixDef` stores only those two and derives the rest: every step of `encode` and `decode` is exact
+`Fraction` arithmetic, no rounding needed, since R′G′B′ and Y′C′BC′R are both unquantized. A client that wants a
+quantized code rounds separately, by a named `Rounding`, into whichever quantizer it targets; the matrix is not a
+`Codec` layer, since it mixes three components (a quantizer and a `Curve` each act on one signal alone).
 
 ```rust
 use exact_units::codec::matrix::Bt709Matrix;
@@ -347,7 +367,11 @@ assert_eq!((y, cb, cr), (Fraction::ONE, Fraction::ZERO, Fraction::ZERO));
 
 Not in the crate yet; what each would be exact in:
 
-- **sRGB** (IEC 61966-2-1). 12.92·L below a break and 1.055·L^(1/2.4) − 0.055 above it, all exact decimals, the same shape as BT.709's: `CurveForm::Power` with the divisor inside, `scale = 1000/1055`, `shift = 55/1055`. The standard prints two breakpoints, 0.0031308 for encoding and 0.04045 for decoding, and they aren't quite the same point either. Waiting on IEC 61966-2-1 in the library before landing, so the breakpoint-gap test (no 8-, 10-, 12- or 16-bit code differs between them) can cite it.
+- **sRGB** (IEC 61966-2-1). $12.92 \cdot L$ below a break and $1.055 \cdot L^{1/2.4} - 0.055$ above it, all exact
+  decimals, the same shape as BT.709's: `CurveForm::Power` with the divisor inside, `scale = 1000/1055`,
+  `shift = 55/1055`. The standard prints two breakpoints, 0.0031308 for encoding and 0.04045 for decoding, and
+  they aren't quite the same point either. Waiting on IEC 61966-2-1 in the library before landing, so the
+  breakpoint-gap test (no 8-, 10-, 12- or 16-bit code differs between them) can cite it.
 
 ## Limits of the codec design
 

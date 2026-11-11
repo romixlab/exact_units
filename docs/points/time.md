@@ -6,8 +6,9 @@ level: advanced
 
 A timestamp is a point: a moment against an epoch. Which epoch matters less than which **time scale** the epoch sits on, because scales count seconds differently:
 
-- **TAI** counts every SI second. GPS time is TAI − 19 s, and PTP counts TAI from 1970.
-- **POSIX time** (`time_t`, `CLOCK_REALTIME`, NTP) counts UTC with every day 86 400 s. A leap second isn't counted, so POSIX time and TAI drift apart by one second at each leap second: 10 s in 1972, 37 s since 2017.
+- **TAI** counts every SI second. GPS time is TAI − 19 [[s]], and PTP counts TAI from 1970.
+- **POSIX time** (`time_t`, `CLOCK_REALTIME`, NTP) counts UTC with every day 86 400 [[s]]. A leap second isn't
+  counted, so POSIX time and TAI drift apart by one second at each leap second: 10 [[s]] in 1972, 37 [[s]] since 2017.
 - **A device's monotonic clock** counts from its boot. Each device and each boot has its own zero, known only at run time.
 
 Each scale is a `Reference`, and its epochs are origins on it. Points convert exactly within one scale. Between scales they convert only by an explicit step at run time.

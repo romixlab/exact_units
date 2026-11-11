@@ -4,7 +4,7 @@ level: advanced
 
 # Power
 
-Complex power (ISO 80000-6): `S = V · I*` of RMS voltage and current phasors, as `Complex<VoltAmpere, ..>`. `active` reads its real part in `Watt` (active power, `P`), `reactive` its imaginary part in `Var` (reactive power, `Q`), `apparent` `|S|` in VA (apparent power, `S`), and `power_factor` `P / S` as a plain `Ratio` (the power factor, λ).
+Complex power (ISO 80000-6): `S = V · I*` of RMS voltage and current phasors, as `Complex<VoltAmpere, ..>`. `active` reads its real part in `Watt` (active power, `P`), `reactive` its imaginary part in `Var` (reactive power, `Q`), `apparent` `|S|` in [[VA]] (apparent power, `S`), and `power_factor` `P / S` as a plain `Ratio` (the power factor, $\lambda$).
 
 `S = V · I*` assumes RMS phasors, as IEC 60050 does; a peak-phasor convention takes half of this.
 
@@ -23,7 +23,7 @@ assert!(s.power_factor().unwrap().is_in(q!(86.60254... %))); // cos 30°
 # }
 ```
 
-`VA` and `var` share the watt's dimension (kg·m²·s⁻³) under their own kind, so each is a quantity of its own: a reactive power never converts to a plain watt, nor an apparent one.
+`VA` and `var` share the watt's dimension ([[kg·m²·s⁻³]]) under their own kind, so each is a quantity of its own: a reactive power never converts to a plain watt, nor an apparent one.
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::One, units::{Var, Watt}};
@@ -55,11 +55,13 @@ assert_eq!(s.apparent(), None);
 
 ## Where there is no value
 
-The power factor λ = P / |S| has inputs where no value exists, on the plane or off it: 0 / 0 and ∞ / ∞. There it returns `Err(Undefined)`, which says which case it is and why, so a log line is useful. `None` stays for a value that exists but doesn't fit, as everywhere else in the crate.
+The power factor $\lambda = P / |S|$ has inputs where no value exists, on the plane or off it: $0/0$ and
+$\infty/\infty$. There it returns `Err(Undefined)`, which says which case it is and why, so a log line is useful.
+`None` stays for a value that exists but doesn't fit, as everywhere else in the crate.
 
 | Call | `Err` | Where |
 |---|---|---|
-| `s.power_factor()` | `NoApparentPower` | S = 0: P / \|S\| is 0 / 0 |
+| `s.power_factor()` | `NoApparentPower` | $S = 0$: $P/\lvert S \rvert$ is $0/0$ |
 | `s.power_factor()` | `InfinitePower` | P and Q both infinite |
 
 A power factor with one infinite part is ±1 or 0. A finite S whose square would pass the float is scaled by a power of two first, so it still gives its value.

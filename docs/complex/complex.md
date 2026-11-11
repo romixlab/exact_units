@@ -64,4 +64,6 @@ $|z|$ is in the unsigned twin of `T`: $|-32768 - 32768j|$ is 46341, which no `i1
 
 ## RF
 
-An impedance or an admittance (`Complex<Ohm, ..>`, `Complex<Siemens, ..>`), the reflection coefficient Γ and the extended Smith-chart plane, complex power S/P/Q and the power factor, and IQ samples and mixing now have their own part: see [Impedance, admittance and the Smith chart's plane](../rf/impedance.md).
+An impedance or an admittance (`Complex<Ohm, ..>`, `Complex<Siemens, ..>`), the reflection coefficient $\Gamma$ and
+the extended Smith-chart plane, complex power S/P/Q and the power factor, and IQ samples and mixing now have
+their own part: see [Impedance, admittance and the Smith chart's plane](../rf/impedance.md).

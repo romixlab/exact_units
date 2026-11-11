@@ -43,7 +43,7 @@ assert_eq!(pad_loss.as_gain(), pad_gain);
 [`Metres100`, `Feet100` and `Kilometre`](decibels.md#neper) are lengths of their own so that a rate prints as its
 datasheet does, and `Fixed::over` turns a rate into the loss across a run of cable. It multiplies in `f64` and
 rounds the product once by the `Rounding` you pass, as `times_into` does. A single-mode fibre's spec sheet,
-0.18 dB/km at 1550 nm, over an 80 km span:
+0.18 dB/[[km]] at 1550 [[nm]], over an 80 [[km]] span:
 
 ```rust
 # #[cfg(all(feature = "levels", feature = "mechanical"))] {
@@ -61,9 +61,9 @@ agreeing to the last digit — see [Decibels](decibels.md#neper).
 
 ## Damping per time
 
-[Damping](damping.md) carries the ISO 80000-3 table in full: δ, Λ, ζ, Q and the time constant, with dB/s ramps
+[Damping](damping.md) carries the ISO 80000-3 table in full: δ, Λ, ζ, Q and the time constant, with dB/[[s]] ramps
 and every refusal. Here is the short chain that gets used the most, δ and ω₀ to ζ and Q, for a loop that rings at
-1000 rad/s and settles by 50 Np/s:
+1000 [[rad/s]] and settles by 50 Np/[[s]]:
 
 ```rust
 # #[cfg(all(feature = "levels", feature = "time", feature = "angle"))] {
@@ -79,15 +79,15 @@ assert_eq!(q.get(), 10);
 # }
 ```
 
-δ is Np/s, ω₀ is rad/s, and `damping_ratio` only compiles for that pair: a damping
-coefficient divided by a frequency in Hz would lose a factor of 2π, so the types ask for the angular one.
+δ is Np/[[s]], ω₀ is [[rad/s]], and `damping_ratio` only compiles for that pair: a damping
+coefficient divided by a frequency in [[Hz]] would lose a factor of 2π, so the types ask for the angular one.
 
 ## Frequency-scaled attenuation: ultrasound
 
-Medical ultrasound attenuates more at higher frequencies: α(f) = α₀·f, with α₀ in dB per `CentimetreMegahertz`
-(soft tissue ≈ 0.5). `α₀ · f` is a product (`times_into`) whose unit — cm·MHz divided by hertz — is already a
-length by the product table's own dimension rule, so one `convert` lands it in dB/m, and `over` a depth gives the
-one-way loss:
+Medical ultrasound attenuates more at higher frequencies: $\alpha(f) = \alpha_0 \cdot f$, with α₀ in dB per
+`CentimetreMegahertz` (soft tissue ≈ 0.5). `α₀ · f` is a product (`times_into`) whose unit — [[cm·MHz]] divided by
+hertz — is already a length by the product table's own dimension rule, so one `convert` lands it in dB/[[m]], and
+`over` a depth gives the one-way loss:
 
 ```rust
 # #[cfg(all(feature = "levels", feature = "mechanical", feature = "time"))] {
@@ -117,9 +117,9 @@ clinical trade-off between penetration depth and resolution. Computed by <code>t
 crate's own <code>times_into</code>, <code>convert</code> and <code>over</code>.</figcaption>
 </figure>
 
-A power law α₀·fʸ with y ≠ 1 (some tissues, some frequency ranges) is worked out in floats by the caller; only the
-linear case is a type here. And the frequency has to be a frequency, not an angular velocity — cm·MHz divided by
-rad/s isn't a length:
+A power law $\alpha_0 \cdot f^y$ with y ≠ 1 (some tissues, some frequency ranges) is worked out in floats by the
+caller; only the linear case is a type here. And the frequency has to be a frequency, not an angular velocity —
+[[cm·MHz]] divided by [[rad/s]] isn't a length:
 
 ```rust,compile_fail
 # #[cfg(not(all(feature = "levels", feature = "mechanical", feature = "angle")))] compile_error!("needs levels, mechanical, angle");
@@ -131,12 +131,12 @@ let product = alpha0.times_into::<AngularVelocity, One, _, One, i32>(omega, Roun
 let _: Option<Fixed<Per<Loss<Decibel>, Meter>, One, i32>> = product.convert();
 ```
 
-## Beer-Lambert: absorbance, optical depth and μ = 2α
+## Beer-Lambert: absorbance, optical depth and $\mu = 2\alpha$
 
-[Decibels](decibels.md#absorbance-and-optical-depth) has the full cuvette example, ε·l·c to an `Absorbance` and on
-to a transmittance. The one identity worth isolating here is the factor of 2 between the natural attenuation
-coefficient of a beam's power, μ, and the α of a loss per length in nepers: μ is defined without the level's own
-½, so the conversion doubles it, exactly, every time:
+[Decibels](decibels.md#absorbance-and-optical-depth) has the full cuvette example, $\varepsilon \cdot l \cdot c$ to
+an `Absorbance` and on to a transmittance. The one identity worth isolating here is the factor of 2 between the
+natural attenuation coefficient of a beam's power, $\mu$, and the $\alpha$ of a loss per length in nepers: $\mu$
+is defined without the level's own ½, so the conversion doubles it, exactly, every time:
 
 ```rust
 # #[cfg(all(feature = "levels", feature = "mechanical"))] {
@@ -155,12 +155,12 @@ $$
 \mu = 2\alpha \qquad \tau = \ln 10 \cdot A
 $$
 
-Absorbance (A, decadic) and optical depth (τ, natural) are the same Beer-Lambert loss on two exact scales of the
-loss base, so the factor of ln 10 between them is a `convert_rounded`, never a float someone has to remember.
+Absorbance (A, decadic) and optical depth ($\tau$, natural) are the same Beer-Lambert loss on two exact scales of
+the loss base, so the factor of ln 10 between them is a `convert_rounded`, never a float someone has to remember.
 
-## Why Np/s, rad/s and Hz are kept apart
+## Why Np/[[s]], [[rad/s]] and [[Hz]] are kept apart
 
-All three are s⁻¹ in the SI. Here they are three different dimensions, for the same reason the radian is its own
+All three are [[s⁻¹]] in the SI. Here they are three different dimensions, for the same reason the radian is its own
 dimension and not folded into "dimensionless": a hertz, an angular velocity and a damping coefficient answer
 different questions, and conflating them is the easiest way to lose a factor of 2π or a sign. `Dim::strip` is the
 explicit bridge: it drops one named base, the radian for the first pair, the neper of a loss for levels:
@@ -185,7 +185,7 @@ use exact_units::{Fixed, prefix::One, units::{Hertz, Neper, Per, Second}};
 let _ = Fixed::<Per<Neper, Second>, One, f32>::bounded(3.0).convert::<Hertz, One, f32>();
 ```
 
-and neither does a cable's attenuation become a wavenumber, however much it looks like m⁻¹ in SI:
+and neither does a cable's attenuation become a wavenumber, however much it looks like [[m⁻¹]] in SI:
 
 ```rust,compile_fail
 # #[cfg(not(all(feature = "levels", feature = "mechanical")))] compile_error!("needs levels, mechanical");
@@ -194,7 +194,8 @@ use exact_units::{Fixed, prefix::One, units::{Meter, Neper, Per, Wavenumber}};
 let _ = Fixed::<Per<Neper, Meter>, One, f32>::bounded(0.02).convert::<Wavenumber, One, f32>();
 ```
 
-!!! warning "dBm/Hz is not a rate"
-    dBm/Hz and dBc/Hz are levels of a spectral density (10·lg of a power per hertz against 1 mW/Hz), not a level
-    per frequency: `Per<Decibel, Hertz>` is the wrong type for them, as the [Damping](damping.md#ramps-in-dbs)
-    page's warning says. They belong with the referenced levels (dBm, dBFS), not with the rates on this page.
+!!! warning "dBm/[[Hz]] is not a rate"
+    dBm/[[Hz]] and dBc/[[Hz]] are levels of a spectral density (10·lg of a power per hertz against 1 [[mW/Hz]]),
+    not a level per frequency: `Per<Decibel, Hertz>` is the wrong type for them, as the
+    [Damping](damping.md#ramps-in-dbs) page's warning says. They belong with the referenced levels (dBm, dBFS),
+    not with the rates on this page.

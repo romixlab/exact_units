@@ -4,7 +4,7 @@ level: basic
 
 # Recipes: photography
 
-Photographic exposure turns the usual roles around. In audio, a voltage is the exact quantity and its level in dB the rounded edge. In exposure, the level is exact: a camera's settings are whole and third stops, and a stop is a factor of 2 in light. The linear values behind them, f/4.5 or 1/160 s, are irrational. This page works through exposure with that in mind and says, for each step, what is exact, what is a convention the caller names, and what is a float edge. The example [`18_photo_exposure`](examples.md) does all of it in one program.
+Photographic exposure turns the usual roles around. In audio, a voltage is the exact quantity and its level in dB the rounded edge. In exposure, the level is exact: a camera's settings are whole and third stops, and a stop is a factor of 2 in light. The linear values behind them, f/4.5 or 1/160 [[s]], are irrational. This page works through exposure with that in mind and says, for each step, what is exact, what is a convention the caller names, and what is a float edge. The example [`18_photo_exposure`](examples.md) does all of it in one program.
 
 The source is Exif 3.1, CIPA DC-008-2026, which is free from CIPA. Its Annex C defines the APEX values, and clauses 4.6.6.7.7 to 4.6.6.7.16 define the tags that record them. ISO 2720 (meter calibration) and ISO 12232 (ISO speed) are paid and were not read for this page: what this page says from them is marked unverified.
 
@@ -21,7 +21,7 @@ The source is Exif 3.1, CIPA DC-008-2026, which is free from CIPA. Its Annex C d
 
 ## A stop is a level
 
-`units::Stop` is a level unit of (ln 2)/2 Np, as `Bel` is (ln 10)/2 Np. For a ratio of powers it is log2 of the ratio. Illuminance (lx), luminance (cd/m²) and exposure (lx·s) are power quantities, so their ratios go into stops and dB like a ratio of watts does. A stop is 3.0103 dB.
+`units::Stop` is a level unit of $(\ln 2)/2$ Np, as `Bel` is $(\ln 10)/2$ Np. For a ratio of powers it is log2 of the ratio. Illuminance ([[lx]]), luminance (cd/[[m²]]) and exposure ([[lx·s]]) are power quantities, so their ratios go into stops and dB like a ratio of watts does. A stop is 3.0103 dB.
 
 ```rust
 use exact_units::{Fixed, Rounding, prefix::{One, Rational}};
@@ -39,7 +39,7 @@ let bright = Fixed::<Per<Lux, Lux>, One, u32>::new(1024);
 assert_eq!(bright.to_level::<Stop, One, f64>(Rounding::NearestEven).unwrap().get(), 10.0);
 ```
 
-For a root-power ratio such as V/V, a stop is 2·log2 of the ratio, as a decibel is 20·lg. A ratio of lengths has no level form. An f-number is one, so `to_level` refuses it at compile time: Av = 2·log2 N is a definition of APEX, not the level of N.
+For a root-power ratio such as [[V/V]], a stop is 2·log2 of the ratio, as a decibel is 20·lg. A ratio of lengths has no level form. An f-number is one, so `to_level` refuses it at compile time: Av = 2·log2 N is a definition of APEX, not the level of N.
 
 A stop and an octave are two units. The octave of a frequency interval (LVL-1 plans it) is log2 of a frequency ratio, and a frequency is neither a power nor a root-power quantity. A stop of light is log2 of a power ratio. Making them one unit would let a frequency ratio convert to dB, which it must not.
 
@@ -62,7 +62,7 @@ BrightnessValue marks "unknown" with a numerator of `FFFFFFFF.H` (4.6.6.7.15). A
 
 ## f-numbers and times
 
-The f-number is N = √2^Av. For a whole stop it is a `Magnitude` half power of 2, exact: Av 7 is 8√2, the lens's "f/11". The exposure time is t = 2^−Tv seconds, exact for a whole stop: Tv 7 is 1/128 s. A third stop's values are 2^(1/6) and 2^(1/3) per step. They are irrational and no `Magnitude` at all, since `Magnitude` holds half powers only. `f_number` and `exposure_time` refuse them, and `f_number_f64` and `exposure_time_f64` are their float edge.
+The f-number is N = √2^Av. For a whole stop it is a `Magnitude` half power of 2, exact: Av 7 is 8√2, the lens's "f/11". The exposure time is t = 2^−Tv seconds, exact for a whole stop: Tv 7 is 1/128 [[s]]. A third stop's values are 2^(1/6) and 2^(1/3) per step. They are irrational and no `Magnitude` at all, since `Magnitude` holds half powers only. `f_number` and `exposure_time` refuse them, and `f_number_f64` and `exposure_time_f64` are their float edge.
 
 ```rust
 use exact_units::exposure::{Apex, exposure_time, exposure_time_f64, f_number, f_number_f64};
@@ -79,7 +79,7 @@ assert!((exposure_time_f64(Apex::new(44)) - 0.0062).abs() < 1e-4); // Tv 7⅓, m
 
 ## Labels against values
 
-A lens and a dial are marked with labels, not values. Exif's Table 55 lists them for whole stops: "11" for Av 7 (8√2 ≈ 11.31), "1/125" for Tv 7 (1/128 s), "30" for Tv −5 (32 s). Exif's own sample file shows the gap: its ExposureTime is 1/60 s, the label, beside ShutterSpeedValue 6, which is 1/64 s.
+A lens and a dial are marked with labels, not values. Exif's Table 55 lists them for whole stops: "11" for Av 7 (8√2 ≈ 11.31), "1/125" for Tv 7 (1/128 [[s]]), "30" for Tv −5 (32 [[s]]). Exif's own sample file shows the gap: its ExposureTime is 1/60 [[s]], the label, beside ShutterSpeedValue 6, which is 1/64 [[s]].
 
 `ApertureLabel` and `ShutterLabel` are codecs from a label's position in Table 55 to its exact APEX value. Decoding is exact. Encoding a value between two labels needs a rounding, and the caller names it.
 
@@ -127,7 +127,7 @@ A camera may mark three different measurements with the same number: standard ou
 
 ## The meter: K and C have no default
 
-A reflected-light meter solves N²/t = L·S/K, an incident-light meter N²/t = E·S/C. ISO 2720 sets K and C. Values often cited are K = 12.5 or 14 cd·s/m² and C = 250 (flat receptor) or 320 (dome) lx·s; ISO 2720 is paid, so these are unverified here. The crate picks none. The caller writes the one their meter uses, and with it the equation is exact for whole stops:
+A reflected-light meter solves N²/t = L·S/K, an incident-light meter N²/t = E·S/C. ISO 2720 sets K and C. Values often cited are K = 12.5 or 14 cd·[[s]]/[[m²]] and C = 250 (flat receptor) or 320 (dome) [[lx·s]]; ISO 2720 is paid, so these are unverified here. The crate picks none. The caller writes the one their meter uses, and with it the equation is exact for whole stops:
 
 ```rust
 use exact_units::{Exact, Fraction};
@@ -143,7 +143,7 @@ let l: Exact<Nit> = k
 assert_eq!(l, Exact::int(128)); // 128 cd/m²
 ```
 
-With K = 14 the same settings meter 143.36 cd/m². Annex C writes Bv = log2(B/(N·K)) with N and K "constant", and Sv = log2(S/3.125) fixes N at 1/3.125. Bv is then 5 for either K: the APEX value doesn't change with K, the luminance it stands for does. Annex C gives B in cd/cm², while K is usually quoted for cd/m².
+With K = 14 the same settings meter 143.36 cd/[[m²]]. Annex C writes Bv = log2(B/(N·K)) with N and K "constant", and Sv = log2(S/3.125) fixes N at 1/3.125. Bv is then 5 for either K: the APEX value doesn't change with K, the luminance it stands for does. Annex C gives B in cd/[[cm²]], while K is usually quoted for cd/[[m²]].
 
 ## EV against LV
 

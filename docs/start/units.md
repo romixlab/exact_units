@@ -14,18 +14,18 @@ The markers come in groups, one cargo feature each. A firmware turns on only the
 |---|---|
 | `time` | `Second`, `Minute`, `Hour`, `Day`, `Week`, `Hertz`, `HertzPerSecond`, `Baud` |
 | `electrical` | `Ampere`, `Volt`, `Ohm`, `Farad`, `Siemens`, `Henry`, `Coulomb`, `Watt`, `VoltAmpere`, `Var`, `Weber`, `Tesla` |
-| `fields` | `ElectricFieldStrength` (V/m), `MagneticFieldStrength` (A/m), `CurrentDensity` (A/m²), `ChargeDensity` (C/m³), `ElectricDisplacement` (C/m²), `Permittivity` (F/m), `Permeability` (H/m), `Resistivity` (Ω·m), `Conductivity` (S/m) |
-| `mechanical` | `Meter`, `Gram`, `Newton`, `Pascal`, `Joule`, `Torque`, `Litre`, `Speed`, `Acceleration`, ...; `Area`, `Volume`, `Density`, `Momentum`, `MomentOfInertia`, `DynamicViscosity` (Pa·s), `KinematicViscosity` (m²/s), `EnergyDensity` (J/m³), ... |
+| `fields` | `ElectricFieldStrength` ([[V/m]]), `MagneticFieldStrength` ([[A/m]]), `CurrentDensity` ([[A/m²]]), `ChargeDensity` ([[C/m³]]), `ElectricDisplacement` ([[C/m²]]), `Permittivity` ([[F/m]]), `Permeability` ([[H/m]]), `Resistivity` ([[Ω·m]]), `Conductivity` ([[S/m]]) |
+| `mechanical` | `Meter`, `Gram`, `Newton`, `Pascal`, `Joule`, `Torque`, `Litre`, `Speed`, `Acceleration`, ...; `Area`, `Volume`, `Density`, `Momentum`, `MomentOfInertia`, `DynamicViscosity` ([[Pa·s]]), `KinematicViscosity` ([[m²/s]]), `EnergyDensity` ([[J/m³]]), ... |
 | `angle` | `Radian`, `Degree`, `Turn`, `Steradian`, `AngularVelocity`, `AngularAcceleration` |
-| `thermal` | `Kelvin` (°C and °F are origins of points, `origins::Celsius`), `HeatFluxDensity` (W/m²), `HeatCapacity` and `Entropy` (J/K), `SpecificHeatCapacity`, `ThermalConductivity`, `ThermalConductance` (W/K), `ThermalResistance` (K/W), `HeatTransferCoefficient` |
-| `chemical` | `Mole`, `Katal`, `MolarConcentration` (mol/m³), `MolePerLitre`, `Molality`, `MolarMass`, `GramPerMole`, `MolarEnergy`, `MolarHeatCapacity` |
-| `photometric` | `Candela`, `Lumen`, `Lux`, `Nit` (cd/m²), `LuminousEfficacy` (lm/W) |
-| `radiometric` | `Irradiance` (W/m²), `RadiantIntensity` (W/sr), `Radiance` (W/(m²·sr)) |
-| `radiation` | `Becquerel`, `Gray`, `Sievert`, `ElectronVolt`, `Exposure` (C/kg), `GrayPerSecond` (Gy/s), `SievertPerHour` |
+| `thermal` | `Kelvin` ([[°C]] and [[°F]] are origins of points, `origins::Celsius`), `HeatFluxDensity` ([[W/m²]]), `HeatCapacity` and `Entropy` ([[J/K]]), `SpecificHeatCapacity`, `ThermalConductivity`, `ThermalConductance` ([[W/K]]), `ThermalResistance` ([[K/W]]), `HeatTransferCoefficient` |
+| `chemical` | `Mole`, `Katal`, `MolarConcentration` ([[mol/m³]]), `MolePerLitre`, `Molality`, `MolarMass`, `GramPerMole`, `MolarEnergy`, `MolarHeatCapacity` |
+| `photometric` | `Candela`, `Lumen`, `Lux`, `Nit` (cd/[[m²]]), `LuminousEfficacy` ([[lm/W]]) |
+| `radiometric` | `Irradiance` ([[W/m²]]), `RadiantIntensity` ([[W/sr]]), `Radiance` ([[W]]/([[m²]]·[[sr]])) |
+| `radiation` | `Becquerel`, `Gray`, `Sievert`, `ElectronVolt`, `Exposure` ([[C/kg]]), `GrayPerSecond` ([[Gy/s]]), `SievertPerHour` |
 | `dimensionless` | `Ratio`: duty, probability, scale |
 | `information` | `Bit`, `Nibble`, `Byte`, `Halfword`, `Word`, `Doubleword` |
 | `counting` | `Item`, `Sample`, `Frame`, `Packet`, `Line`, `Row`, `Record`, `Entry`, `Cycle`, `Block`, `Sector`, `Chunk`, `Char`, `Code` |
-| `customary` | inch, pound, psi, gallon and the rest: [Customary units](../customary.md) |
+| `customary` | inch, pound, [[psi]], gallon and the rest: [Customary units](../customary.md) |
 
 `quantities` turns on every group but `customary`. `std` turns on `quantities`.
 
@@ -51,7 +51,7 @@ assert_eq!(noise.to_string(), "12 nV/√Hz");
 Every unit has a dimension: the powers of the base quantities it is made of. A volt is
 
 $$
-\mathrm{V} = \mathrm{kg} \cdot \mathrm{m}^{2} \cdot \mathrm{s}^{-3} \cdot \mathrm{A}^{-1}
+\unit{V} = \unit{kg} \cdot \unit{m}^{2} \cdot \unit{s}^{-3} \cdot \unit{A}^{-1}
 $$
 
 Two units convert only when their dimensions are equal. Besides the seven SI bases, `exact_units` has more:
@@ -63,7 +63,7 @@ graph LR
   D --> RT["a square root<br/>√Hz"]
 ```
 
-A distinguished base is a dimension the SI counts as one (rad = 1, Np = 1), named by the crate and marker that
+A distinguished base is a dimension the SI counts as one ([[rad]] = 1, Np = 1), named by the crate and marker that
 declare it: this crate's `Radian`, `Neper`, `NeperLoss` and `Bit`, and a crate's own count (`Sample`, a sensor's
 `Pixel`). There is no limit on how many a dimension carries at once.
 
@@ -71,7 +71,7 @@ declare it: this crate's `Radian`, `Neper`, `NeperLoss` and `Bit`, and a crate's
 
 In SI an angle is a plain number. Here it is a dimension of its own, so two classic mix-ups don't compile.
 
-A torque is N·m per radian, not an energy:
+A torque is [[N·m]] per radian, not an energy:
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::One, units::{Joule, Torque}};
@@ -79,7 +79,7 @@ use exact_units::{Fixed, prefix::One, units::{Joule, Torque}};
 let _ = Fixed::<Torque, One, i32>::new(5).convert::<Joule, One, i32>();
 ```
 
-50 Hz is not 50 rad/s:
+50 [[Hz]] is not 50 [[rad/s]]:
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::One, units::{AngularVelocity, Hertz}};
@@ -105,5 +105,5 @@ An API declares a distinguished base of its own too, with a `base` line:
 ## Quantities
 
 A unit measures a [quantity](../maths/quantities.md), not just a dimension: a height and a width are both lengths,
-but don't convert into each other; a resistance (Ω) and a transimpedance (V/A), a voltage gain (V/V) and a duty
+but don't convert into each other; a resistance ([[Ω]]) and a transimpedance ([[V/A]]), a voltage gain ([[V/V]]) and a duty
 cycle share a dimension and still mean different things, so they don't convert into each other either.

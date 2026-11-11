@@ -4,7 +4,7 @@ level: basic
 
 # Bounds
 
-A timeout of 0 ms, a duty of 120 %, a channel number of 9 on a 4-channel board: each fits its integer and is still wrong. The bounds parameter `B` says which values are allowed.
+A timeout of 0 [[ms]], a duty of 120 %, a channel number of 9 on a 4-channel board: each fits its integer and is still wrong. The bounds parameter `B` says which values are allowed.
 
 ## A range in the type
 

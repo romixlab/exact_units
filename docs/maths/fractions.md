@@ -4,7 +4,7 @@ level: basic
 
 # Exact fractions
 
-A `Fixed` has its scale in the type: a whole number of µs, of 2⁻¹⁵, of 1/65535. Some values have no such scale. An STM32H7 PLL makes ref·(N + FRACN/8192)/(M·P): 519.999755859375 MHz for one setting, 80/3 MHz for a divider of 3. A planner that works these out on a host needs the value itself, exactly.
+A `Fixed` has its scale in the type: a whole number of [[µs]], of 2⁻¹⁵, of 1/65535. Some values have no such scale. An STM32H7 PLL makes ref·(N + FRACN/8192)/(M·P): 519.999755859375 [[MHz]] for one setting, 80/3 [[MHz]] for a divider of 3. A planner that works these out on a host needs the value itself, exactly.
 
 `Exact<U>` is that value: the unit `U` in the type, the number a `Fraction` chosen at run time. A `Fraction` is a sign, a numerator and a denominator of `u128`, and a power of ten: `±num/den · 10^exp`. There is no scale and no storage to pick ([Range](#range) says what it holds).
 
@@ -23,7 +23,7 @@ assert_eq!(Exact::<Hertz>::new(80_000_000, 3).to_string(), "26.(6) MHz");
 ## Making one
 
 - `Exact::new(num, den)` and `Exact::int(n)` are a value of `U` itself.
-- `Exact::new_in::<P>(num, den)` is `num/den` steps of a scale: `new_in::<Mega>(1375, 10)` is 137.5 MHz.
+- `Exact::new_in::<P>(num, den)` is `num/den` steps of a scale: `new_in::<Mega>(1375, 10)` is 137.5 [[MHz]].
 - `from_scaled(x, magnitude)` and `from_prefix(x, prefix)` take a scale known at run time.
 - `from_fixed(f)` is a `Fixed`'s exact value.
 - `"24 MHz".parse()` reads text (see [Reading](#reading)).
@@ -65,7 +65,7 @@ assert_eq!((f * t).unwrap().convert::<Ratio>(), Some(Exact::int(48)));
 assert_eq!(f.recip::<Second>().unwrap().to_string(), "20.8(3) µs");
 ```
 
-A quotient of one unit, Hz/Hz or V/V, is a ratio of that quantity and not a plain `Ratio`, as for `Fixed`. `as_ratio()` is the named step, and `as_gain::<U>()` the one back:
+A quotient of one unit, [[Hz/Hz]] or [[V/V]], is a ratio of that quantity and not a plain `Ratio`, as for `Fixed`. `as_ratio()` is the named step, and `as_gain::<U>()` the one back:
 
 ```rust
 use exact_units::{Exact, prefix::Mega, units::Hertz};
@@ -102,7 +102,7 @@ let m = q.to_system::<Natural>().convert::<NaturalElectronVolt>().unwrap();
 assert_eq!(m.get(), q.get());
 ```
 
-A plain s⁻¹ doesn't `convert` to Bq, and an absorbed dose is no dose equivalent by any step:
+A plain [[s⁻¹]] doesn't `convert` to [[Bq]], and an absorbed dose is no dose equivalent by any step:
 
 ```rust,compile_fail
 use exact_units::{Exact, quantities::DoseEquivalent, units::Gray};
@@ -114,7 +114,7 @@ Multiply and divide refuse exactly the results no form of which fits ([Range](#r
 
 ## Range
 
-A `Fraction` holds 38 significant digits in each of the numerator and the denominator, times `10^±2³¹`. The power of ten is kept apart from the digits, so atomic scales cost nothing: the α energy of ²²⁶Ra as a mass is 8.68·10⁻³⁰ kg, a 59-bit numerator over a 56-bit denominator times 10⁻³⁰, where its plain lowest terms need a 155-bit denominator.
+A `Fraction` holds 38 significant digits in each of the numerator and the denominator, times `10^±2³¹`. The power of ten is kept apart from the digits, so atomic scales cost nothing: the $\alpha$ energy of $^{226}\mathrm{Ra}$ as a mass is $8.68 \times 10^{-30}\ \unit{kg}$, a 59-bit numerator over a 56-bit denominator times $10^{-30}$, where its plain lowest terms need a 155-bit denominator.
 
 ```rust
 # #[cfg(all(feature = "radiation", feature = "mechanical"))] {
@@ -131,7 +131,7 @@ assert_eq!((tiny.mantissa(), tiny.exp10(), tiny.denom()), ((1, 1), -50, None));
 # }
 ```
 
-Every value whose plain lowest terms fit `u128`s is a `Fraction`, as are many more. The form is canonical, so one value has one form and `==` compares forms: the exponent is the value's power of 5, moved only as far as the mantissa needs to fit. The mantissa then carries 2s (one bit each) but no 5s where it can help it: `0.2` is `2·10⁻¹`, `24 MHz` is `24·10⁶` Hz. `mantissa()` and `exp10()` give the parts, `from_parts_exp10` makes one from them. `numer()` and `denom()` are the plain lowest terms, `None` where they are past `u128`.
+Every value whose plain lowest terms fit `u128`s is a `Fraction`, as are many more. The form is canonical, so one value has one form and `==` compares forms: the exponent is the value's power of 5, moved only as far as the mantissa needs to fit. The mantissa then carries 2s (one bit each) but no 5s where it can help it: `0.2` is `2·10⁻¹`, `24 MHz` is `24·10⁶` [[Hz]]. `mantissa()` and `exp10()` give the parts, `from_parts_exp10` makes one from them. `numer()` and `denom()` are the plain lowest terms, `None` where they are past `u128`.
 
 What doesn't fit is a value whose significant digits pass 38 in the numerator or the denominator: a chain of four or more measured constants of 9 to 11 digits each multiplied together. Such a chain is refused, `None`.
 

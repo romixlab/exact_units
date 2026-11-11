@@ -6,7 +6,7 @@ level: basic
 
 "Exact" in `exact_units` is a promise with seven parts. Each is a rule you can test the crate against, and each has an example below that runs as a test. In short: nothing is hidden, everything that loses information is written down, and the safe way is the short way.
 
-1. **Every scale is exact.** A scale is an exact fraction times powers of exact symbols ($\pi$, $\ln 2$, $\ln 10$, and the measured $\mu_0$, $G$ and $m_u$), never a float.
+1. **Every scale is exact.** A scale is an exact fraction times powers of exact symbols ($\pi$, $\ln 2$, $\ln 10$, and the measured $\mu_0$, $G$ and $m_{\mathrm{u}}$), never a float.
 2. **Exact, or refused.** A conversion, a literal or a parse gives the exact value, or it refuses: `None`, an error, or a compile error where the compiler can tell.
 3. **Every lossy step is named.** Rounding, saturating, wrapping, truncating and going to a float each happen only in a call or a type that names its policy.
 4. **Measured constants stay symbols.** A constant of nature that is measured is never a number baked into a scale. A number for it appears only at an explicit edge that says where it comes from.
@@ -16,7 +16,7 @@ level: basic
 
 ## 1. Every scale is exact
 
-A scale is a [`Magnitude`](../nomicon/magnitude.md): a product of powers of primes, $\pi$, $\ln 2$ and $\ln 10$, and of the measured constants $\mu_0$, $G$ and $m_u$ (rule 4). It has no float in it, so every reader, on every target, gets the same value. Two scales are equal however they are spelled, and $\pi$ stays $\pi$:
+A scale is a [`Magnitude`](../nomicon/magnitude.md): a product of powers of primes, $\pi$, $\ln 2$ and $\ln 10$, and of the measured constants $\mu_0$, $G$ and $m_{\mathrm{u}}$ (rule 4). It has no float in it, so every reader, on every target, gets the same value. Two scales are equal however they are spelled, and $\pi$ stays $\pi$:
 
 ```rust
 use exact_units::{FixedScale, Magnitude, prefix::{Milli, Pow10, Rational}};
@@ -30,7 +30,7 @@ assert_eq!(degree.to_ratio(), None);
 assert_eq!(degree.mul(Magnitude::ratio(180, 1)), Magnitude::PI); // back to π, exactly
 ```
 
-An origin's offset is exact the same way: 0 °C is $273.15$ K as the fraction $27315/100$, not as the float nearest to it.
+An origin's offset is exact the same way: 0 [[°C]] is $273.15\,\unit{K}$ as the fraction $27315/100$, not as the float nearest to it.
 
 ## 2. Exact, or refused
 
@@ -44,7 +44,7 @@ assert_eq!(t.to::<Milli, u16>(), None);                        // 1.5 ms: refuse
 assert_eq!((t * 2).to::<Milli, u16>(), Some(Fixed::new(3)));   // 3 ms
 ```
 
-A float storage is no way around it. `to` into an `f32` or `f64` gives the value only where it is a float exactly, and `None` past the float's range, never infinity. 0.0015 s has no float, so the rounding is named:
+A float storage is no way around it. `to` into an `f32` or `f64` gives the value only where it is a float exactly, and `None` past the float's range, never infinity. 0.0015 [[s]] has no float, so the rounding is named:
 
 ```rust
 use exact_units::{Fixed, Micros, Rounding, prefix::One, units::Second};
@@ -166,11 +166,11 @@ assert_eq!(
 
 ## 4. Measured constants stay symbols
 
-Since the SI of 2019, the speed of light $c$, Planck's constant $h$, the elementary charge $e$ and the Boltzmann constant $k_B$ have exact values by definition. A unit built on them is exact: the electronvolt is $1.602176634 \cdot 10^{-19}$ J, a fraction.
+Since the SI of 2019, the speed of light $c$, Planck's constant $h$, the elementary charge $e$ and the Boltzmann constant $k_{\mathrm{B}}$ have exact values by definition. A unit built on them is exact: the electronvolt is $1.602176634 \cdot 10^{-19}\,\unit{J}$, a fraction.
 
-Other constants are measured: the magnetic constant $\mu_0$, the gravitational constant $G$, the atomic mass constant $m_u$, the electron mass. Their best values change with each CODATA release. Baking one into a scale as a number would make the crate wrong a little, silently, and differently from release to release. So a measured constant stays a symbol, as $\pi$ does, and a number for it appears only at an explicit step that names its source and edition.
+Other constants are measured: the magnetic constant $\mu_0$, the gravitational constant $G$, the atomic mass constant $m_{\mathrm{u}}$, the electron mass. Their best values change with each CODATA release. Baking one into a scale as a number would make the crate wrong a little, silently, and differently from release to release. So a measured constant stays a symbol, as $\pi$ does, and a number for it appears only at an explicit step that names its source and edition.
 
-A unit that is fixed by a measured property (a calorie at 15 °C, an inch of mercury at 32 °F) says so. Its scale is the value a named source prints, and its provenance carries that source:
+A unit that is fixed by a measured property (a calorie at 15 [[°C]], an inch of mercury at 32 [[°F]]) says so. Its scale is the value a named source prints, and its provenance carries that source:
 
 ```rust
 use exact_units::{Provenance, Unit, UnitExpr};
@@ -187,7 +187,7 @@ assert_eq!(def.provenance, Provenance::Conventional { source: "NIST SP 811", yea
 
 A client reading the unit off the wire sees the same provenance, so it knows this scale is a convention and not a definition.
 
-The measured constants a scale keeps are symbols of `Magnitude`: $\mu_0$ (`Magnitude::MU0`), $G$ (`Magnitude::G`) and $m_u$ (`Magnitude::M_U`, the dalton in kg). The electric constant $\varepsilon_0 = 1/(\mu_0 c^2)$, the impedance of free space $Z_0 = \mu_0 c$ and the fine-structure constant $\alpha = \mu_0 e^2 c / (2h)$ are exact expressions over $\mu_0$. An oersted is $10^{-4}/\mu_0$ A/m, exactly. A conversion through it needs a value for $\mu_0$, so it names a set: CODATA 2018 or 2022, or the old convention $\mu_0 = 4\pi \cdot 10^{-7}$ as `Ampere1948`. There is no default and no "latest".
+The measured constants a scale keeps are symbols of `Magnitude`: $\mu_0$ (`Magnitude::MU0`), $G$ (`Magnitude::G`) and $m_{\mathrm{u}}$ (`Magnitude::M_U`, the dalton in [[kg]]). The electric constant $\varepsilon_0 = 1/(\mu_0 c^2)$, the impedance of free space $Z_0 = \mu_0 c$ and the fine-structure constant $\alpha = \mu_0 e^2 c / (2h)$ are exact expressions over $\mu_0$. An oersted is $10^{-4}/\mu_0\,\unit{A/m}$, exactly. A conversion through it needs a value for $\mu_0$, so it names a set: CODATA 2018 or 2022, or the old convention $\mu_0 = 4\pi \cdot 10^{-7}$ as `Ampere1948`. There is no default and no "latest".
 
 ```rust
 use exact_units::{Fixed, Magnitude, Rounding, prefix::{Micro, Milli}, units::{Ampere, Meter, Per}};
@@ -239,7 +239,7 @@ assert_eq!(a, Some(Fixed::new(79_577_472))); // 1000/(4π) A/m, to the µA/m
 
 ## 5. Conventions are opt-ins
 
-Where there is more than one sensible answer, the crate gives each its own name and makes you pick. An ADC step is $V_{ref}/2^N$ in one convention and $V_{ref}/(2^N - 1)$ in another; they are two markers:
+Where there is more than one sensible answer, the crate gives each its own name and makes you pick. An ADC step is $V_{\mathrm{ref}}/2^N$ in one convention and $V_{\mathrm{ref}}/(2^N - 1)$ in another; they are two markers:
 
 ```rust
 use exact_units::{FixedScale, Magnitude, prefix::{FullScale, FullScaleMax, One}};
@@ -334,7 +334,7 @@ These places break a rule above. Each is known and tracked, and until it is fixe
 
 - **A `Point` of a float storage converts through `f64`.** `Point::to` between origins (°C to °F in an `f32`) works `(x · num + offset) / den` in `f64`, so it rounds twice, and a modulo origin reduces a float in `f64` too. `Fixed`'s own `to` and `convert` are exact for floats.
 - **A product into a float storage rounds in `f64`.** `times_into` and `per_into` with a float on either side multiply in `f64` and scale the product there; the `Rounding` they take is not applied to a float result.
-- **Integer `/` truncates**, as the storage's own `/` does: 3 V / 2 A is 1 V/A. `per_into` and `times_into` name a rounding.
+- **Integer `/` truncates**, as the storage's own `/` does: 3 [[V]] / 2 [[A]] is 1 [[V/A]]. `per_into` and `times_into` name a rounding.
 - **`+` without bounds is the storage's own `+`**: a panic on overflow in a debug build, a wrap in a release build. Bounds `Saturating`, `Wrapping` or `checked_add` say what you mean.
 - **`to_rounded` across $\pi$, $\ln 2$ or $\ln 10$** works with a 64-bit approximation of the factor, so within $|x| \cdot 2^{-64}$ of a rounding step it can be one step off.
 - **`Exact` and `Fraction` on `u128` are checked by drawn inputs, not proved.** That every operation is exact or refused only where no form of the result fits, that `to_f64` is the nearest float and that every printed form reads back are properties drawn against `BigRational` and fuzzed. The same arithmetic code is walked on `u8` with an `i8` exponent, and its pieces (the 256-bit multiply, the 512-bit steps, the division, the gcd, a 5 by its inverse) are Kani proofs on `u8` limbs, but no proof or walk covers the `u128` operations themselves.

@@ -6,7 +6,7 @@ level: basic
 
 ## A number without its unit
 
-A firmware has a debounce timeout. The config says `20`. Is that 20 ms or 20 µs?
+A firmware has a debounce timeout. The config says `20`. Is that 20 [[ms]] or 20 [[µs]]?
 
 ```rust
 fn arm_timer(timeout_us: u32) -> u32 {
@@ -18,7 +18,7 @@ let ticks = arm_timer(debounce_ms); // compiles, and fires 1000 times too early
 assert_eq!(ticks, 20);
 ```
 
-The name says µs. Nothing checks it.
+The name says [[µs]]. Nothing checks it.
 
 ## The unit in the type
 
@@ -69,7 +69,7 @@ $$
 x = n \cdot \text{scale} \quad \text{in the unit}
 $$
 
-so a `Micros<u32>` holding 1500 is $1500 \cdot 10^{-6}\,\text{s}$.
+so a `Micros<u32>` holding 1500 is $1500 \cdot 10^{-6}\,\unit{s}$.
 
 ## Zero cost
 
@@ -104,9 +104,9 @@ assert_eq!((t * 2).to::<Milli, u32>(), Some(Fixed::new(3))); // 3 ms
 
 Most unit crates get volts times amperes right. Firmware breaks on the rest, and the rest is what this crate is about:
 
-- **Points**: 25 °C is a point, 5 K is an amount. [Points](../points/points.md)
+- **Points**: 25 [[°C]] is a point, 5 [[K]] is an amount. [Points](../points/points.md)
 - **Angles that wrap**: a phase of 0.9 turn plus 0.2 turn is 0.1 turn. [Binary angles](../fixed_point/bam.md)
-- **Quantities**: a voltage gain V/V is not a duty cycle, though both are plain numbers; a height is not a width,
+- **Quantities**: a voltage gain [[V/V]] is not a duty cycle, though both are plain numbers; a height is not a width,
   though both are lengths. [Quantities](../maths/quantities.md)
 - **Levels**: a threshold of −3 dB is an integer compare. [Decibels](../levels/decibels.md)
 - **Counted things**: samples, packets and bytes don't mix. [Units and dimensions](units.md)

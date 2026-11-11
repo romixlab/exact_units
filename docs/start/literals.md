@@ -17,7 +17,7 @@ Three ways to write a number with its unit, each for a different place:
 
 ## `fixed!`
 
-A constant in Q15 or in steps of 3.3 V / 4096 is a number nobody wants to work out by hand. `fixed!` writes it as the decimal it means:
+A constant in Q15 or in steps of 3.3 [[V]] / 4096 is a number nobody wants to work out by hand. `fixed!` writes it as the decimal it means:
 
 ```rust
 use exact_units::{Fixed, Q15, fixed, prefix::{Milli, Pow2}, units::{Ratio, Volt}};
@@ -33,9 +33,9 @@ assert_eq!(BUSY.get(), 107_374_182);  // 0.1 · 2³⁰ = 107374182.4, to the nea
 
 ### What it does
 
-- The literal is in the unit `U` of the type it goes into: `fixed!(3.3)` of a `Fixed<Volt, Milli, u16>` is 3.3 V.
+- The literal is in the unit `U` of the type it goes into: `fixed!(3.3)` of a `Fixed<Volt, Milli, u16>` is 3.3 [[V]].
 - The stored value is worked out at compile time from the exact fraction. Nothing runs at run time.
-- A literal that is a stored value is that value: 0.5 in Q15, 3.3 V in mV.
+- A literal that is a stored value is that value: 0.5 in Q15, 3.3 [[V]] in [[mV]].
 - A literal that isn't one doesn't compile, unless the call names a rounding: `fixed!(0.1, NearestEven)`, or `Floor`, `Ceil`, `Truncate`, `NearestAway`. Nothing is rounded without its name in the source.
 - An exponent works: `fixed!(2.5e-3)`.
 
@@ -172,7 +172,7 @@ whether it lands exactly on a step. Nothing about the literal's value is worked 
 ### Inexact literals, compared exactly
 
 A literal between two steps is never rounded to the nearer one. A timeout in whole milliseconds compared with
-1500 µs (1.5 ms) is exactly what it would be compared with the whole millisecond below it:
+1500 [[µs]] (1.5 [[ms]]) is exactly what it would be compared with the whole millisecond below it:
 
 ```rust
 use exact_units::{Millis, q};
@@ -304,7 +304,7 @@ assert!(room == q!(68 degF)); // 68 °F is exactly 20 °C
 
 ### Levels
 
-`dB` or `Np` alone after the number is a level of a gain, and compares with a linear gain whose kind picks the form: 20·lg for a V/V, 10·lg for a W/W. The gain 10^(x/20) is folded exactly at compile time, so `gain < q!(-3 dB)` is one compare; `==` compiles only where a stored value is the gain. [Decibels](../levels/decibels.md#q) has the details and the refusals.
+`dB` or `Np` alone after the number is a level of a gain, and compares with a linear gain whose kind picks the form: $20 \cdot \lg$ for a [[V/V]], $10 \cdot \lg$ for a [[W/W]]. The gain $10^{x/20}$ is folded exactly at compile time, so `gain < q!(-3 dB)` is one compare; `==` compiles only where a stored value is the gain. [Decibels](../levels/decibels.md#q) has the details and the refusals.
 
 ```rust
 # #[cfg(feature = "electrical")] {
@@ -318,7 +318,7 @@ assert!(Fixed::<Per<Volt, Volt>, Milli, u16>::new(1000) == q!(0 dB));
 
 ### Against an `Exact`
 
-An [`Exact`](../maths/fractions.md) compares with a `q!` literal exactly too, at run time: the literal is a fraction of the `Exact`'s unit, worked out at compile time, and the compare is one of two fractions. A literal whose unit converts only by a factor with π (degrees against radians) doesn't compile, as an `Exact` is a fraction and that literal isn't one. A level has no compare with an `Exact`: 10^(x/20) is no fraction.
+An [`Exact`](../maths/fractions.md) compares with a `q!` literal exactly too, at run time: the literal is a fraction of the `Exact`'s unit, worked out at compile time, and the compare is one of two fractions. A literal whose unit converts only by a factor with π (degrees against radians) doesn't compile, as an `Exact` is a fraction and that literal isn't one. A level has no compare with an `Exact`: $10^{x/20}$ is no fraction.
 
 ```rust
 # #[cfg(feature = "time")] {
@@ -460,7 +460,7 @@ An amount that isn't a whole number of steps needs `, Inside` or `, Outside`, as
 
 ### Known leading digits
 
-A result such as a return loss is often a long decimal, 20·lg 3 = 9.54242509.. dB, and an example that spells out all its digits is hard to read. A decimal followed by `...` is the range of the values whose decimal starts with those digits:
+A result such as a return loss is often a long decimal, $20 \cdot \lg 3 = 9.54242509\ldots$ dB, and an example that spells out all its digits is hard to read. A decimal followed by `...` is the range of the values whose decimal starts with those digits:
 
 ```rust
 # #[cfg(feature = "electrical")] {

@@ -10,7 +10,8 @@ $$
 T = \frac{\text{raw}}{256} + 25\ ^\circ\text{C}
 $$
 
-That is a point against an origin 25 K above 0 °C, in steps of $1/256$ K. Declare the origin once, and the raw register value is the field's type.
+That is a point against an origin 25 [[K]] above 0 [[°C]], in steps of $1/256\,\unit{K}$. Declare the origin once,
+and the raw register value is the field's type.
 
 ```rust
 use exact_units::{Fixed, Offset, Point, origin, origins::Celsius, prefix::{Centi, Rational}, units::Kelvin};
@@ -26,8 +27,8 @@ assert_eq!(Lsm::from_raw(128).to_string(), "25.5 °C");
 assert_eq!(Lsm::from_raw(64).to::<Celsius, Centi, i16>().map(|p| p.raw()), Some(2525));
 ```
 
-- `above: Celsius` takes the unit, the reference and the display of °C and adds the offset.
-- The conversion to 0.01 °C is $\text{raw} \cdot 100 / 256 + 2500$, by constants, checked to be whole.
+- `above: Celsius` takes the unit, the reference and the display of [[°C]] and adds the offset.
+- The conversion to 0.01 [[°C]] is $\text{raw} \cdot 100 / 256 + 2500$, by constants, checked to be whole.
 - On the wire it is the register's `i16`, nothing else.
 
 ## Bus formulas

@@ -5,8 +5,8 @@ level: advanced
 # Systems of units
 
 SI is the default, but not the only system a [`Dim`](../nomicon/magnitude.md) can count in. With the `systems`
-feature (in `quantities`), `exact_units::systems` adds two more: `Natural` (ħ = c = 1, particle physics' units,
-below) and `Gaussian` (cm, g, s, the units of classical electromagnetism before SI, below too). Every unit this
+feature (in `quantities`), `exact_units::systems` adds two more: `Natural` ($\hbar = c = 1$, particle physics' units,
+below) and `Gaussian` ([[cm]], [[g]], [[s]], the units of classical electromagnetism before SI, below too). Every unit this
 crate ships but these two is SI's.
 
 A dimension belongs to one system, read off `Dim::system()`. Two systems' values never add, convert or compare: a
@@ -51,19 +51,19 @@ A value crosses by one of two ways, and a row always wins over the rule:
 Where neither gives an answer, crossing is a compile error that names the reason: see [What never
 crosses](#what-never-crosses-and-why) below.
 
-## Natural units: ħ = c = 1
+## Natural units: $\hbar = c = 1$
 
-`systems::Natural`'s bases are eV, A, K, mol, cd: mass, energy, momentum and inverse length, which SI keeps apart,
-are all eV¹. The ampere, kelvin, mole and candela stay bases of their own, so an electromagnetic unit still needs
-one. Since the 2019 SI redefinition ħ (= h/2π), c and e are exact, so every entry of Natural's rule is an exact
+`systems::Natural`'s bases are [[eV]], [[A]], [[K]], [[mol]], cd: mass, energy, momentum and inverse length, which SI keeps apart,
+are all [[eV¹]]. The ampere, kelvin, mole and candela stay bases of their own, so an electromagnetic unit still needs
+one. Since the 2019 SI redefinition $\hbar$ (= $h/2\pi$), $c$ and $e$ are exact, so every entry of Natural's rule is an exact
 `Magnitude`, π included, and no set of constants is ever needed to cross into or out of it:
 
-- 1 s = (e/ħ) eV⁻¹
-- 1 m = (e/(ħc)) eV⁻¹
-- 1 kg = (c²/e) eV
+- $1\ \unit{s} = (e/\hbar)\ \unit{eV}^{-1}$
+- $1\ \unit{m} = (e/(\hbar c))\ \unit{eV}^{-1}$
+- $1\ \unit{kg} = (c^2/e)\ \unit{eV}$
 
 Natural's only unit is `natural::NaturalElectronVolt` (symbol `eV`, prefixes decimal): not
-[`units::ElectronVolt`](../units/declare.md), SI's fixed 1.602176634·10⁻¹⁹ J, but the coherent unit of Natural
+[`units::ElectronVolt`](../units/declare.md), SI's fixed $1.602176634 \times 10^{-19}\ \unit{J}$, but the coherent unit of Natural
 itself, which stands for a mass, an energy, a momentum or an inverse length depending on what the far side names:
 
 ```rust
@@ -81,11 +81,11 @@ assert!((back.get() - 1.0).abs() < 1e-12);
 # }
 ```
 
-**A frequency never crosses, even in Natural.** E = hf and E = ħω differ by a factor of 2π, so `Hertz`, and any
-other anonymous s⁻¹, is listed in Natural's `no_rule` and refuses the rule outright; `Frequency`, [`Activity` and
-`SymbolRate`](quantities.md) (Becquerel's and Baud's kinds) are refused with it, as they are s⁻¹ too. An angular
-frequency keeps its own radian instead of losing it by accident: rad/s crosses to rad·eV by ħ, exactly, and only an
-explicit [`strip`](../levels/rates.md) turns that into a plain eV.
+**A frequency never crosses, even in Natural.** $E = hf$ and $E = \hbar\omega$ differ by a factor of $2\pi$, so `Hertz`, and any
+other anonymous [[s⁻¹]], is listed in Natural's `no_rule` and refuses the rule outright; `Frequency`, [`Activity` and
+`SymbolRate`](quantities.md) (Becquerel's and Baud's kinds) are refused with it, as they are [[s⁻¹]] too. An angular
+frequency keeps its own radian instead of losing it by accident: [[rad/s]] crosses to [[rad·eV]] by $\hbar$, exactly, and only an
+explicit [`strip`](../levels/rates.md) turns that into a plain [[eV]].
 
 ```rust
 # #[cfg(feature = "systems")] {
@@ -107,25 +107,25 @@ let f = Fixed::<Hertz, One, i32>::new(50);
 let _ = f.to_system::<Natural>().convert::<NaturalElectronVolt, One, i32>();
 ```
 
-**Dimension one is wider here.** E·L, m·L and an action (ħ itself, J·s) are all dimension one in Natural, so the
+**Dimension one is wider here.** $E \cdot L$, $m \cdot L$ and an action ($\hbar$ itself, $\unit{J} \cdot \unit{s}$) are all dimension one in Natural, so the
 quantity rule "a dimension-one factor keeps the other side's quantity" ([Quantities](quantities.md#products-are-derived-except-what-cancels-or-scales))
 fires on more products than it does in SI. This names nothing by accident: no quantity of
 [`quantities`](quantities.md) has a Natural dimension, so every quantity Natural products ever get is either
-`Derived` of eV or a `RatioOf` it — never a kind SI never declared.
+`Derived` of [[eV]] or a `RatioOf` it — never a kind SI never declared.
 
-## Gaussian units: cm, g, s
+## Gaussian units: [[cm]], [[g]], [[s]]
 
-`systems::Gaussian`'s bases are g, cm, s (plus K, mol, cd): the centimetre-gram-second system, with no current of
+`systems::Gaussian`'s bases are [[g]], [[cm]], [[s]] (plus [[K]], [[mol]], cd): the centimetre-gram-second system, with no current of
 its own. Its electric quantities follow the electrostatic system of units (ESU) and its magnetic quantities the
 electromagnetic one (EMU), and that choice is what makes Gaussian the one system this crate can't build from a
 projection matrix alone.
 
-E, D, P (electric field, displacement, polarization) and B, H, M (flux density, field strength, magnetization) all
-come out to the *same* Gaussian dimension, g¹ᐟ²·cm⁻¹ᐟ²·s⁻¹, though their SI dimensions differ (D and P are C/m²,
-H and M are A/m). And within one pair, the two quantities differ by exactly 4π (rationalisation) even though they
-share both a Gaussian and an SI dimension — no function of the dimension can tell D from P, or H from M. So
+$E$, $D$, $P$ (electric field, displacement, polarization) and $B$, $H$, $M$ (flux density, field strength, magnetization) all
+come out to the *same* Gaussian dimension, $\unit{g}^{1/2} \cdot \unit{cm}^{-1/2} \cdot \unit{s}^{-1}$, though their SI dimensions differ ($D$ and $P$ are [[C/m²]],
+$H$ and $M$ are [[A/m]]). And within one pair, the two quantities differ by exactly $4\pi$ (rationalisation) even though they
+share both a Gaussian and an SI dimension — no function of the dimension can tell $D$ from $P$, or $H$ from $M$. So
 Gaussian's crossing can't be a formula over exponents: it is a table, one row per quantity
-(`system::BridgeDef`), after Jackson's B_G = B·√(4π/μ₀) and q_G = q/√(4πε₀). Every row is written over
+(`system::BridgeDef`), after Jackson's $B_{\mathrm{G}} = B \cdot \sqrt{4\pi/\mu_0}$ and $q_{\mathrm{G}} = q/\sqrt{4\pi\varepsilon_0}$. Every row is written over
 
 ```text
 S = √(μ₀/(4π·10⁻⁷))
@@ -153,7 +153,7 @@ This crate's units name six of those rows: `gaussian::{Statcoulomb, Statampere, 
 Maxwell}` (charge, current, potential, B and H, and flux); D, P, M, resistance, inductance and capacitance have a
 row and a quantity but no unit marker yet, as nothing has needed one. The mechanical units — `Erg`, `Dyne`, `Gal`,
 `GaussianSecond`, `GaussianCentimeter`, `GaussianGram` — need no row at all: a dimension with no electromagnetic
-quantity in it crosses by the rule, 1 m = 100 cm and 1 kg = 1000 g, as plain and exact as Natural's.
+quantity in it crosses by the rule, 1 [[m]] = 100 [[cm]] and 1 [[kg]] = 1000 [[g]], as plain and exact as Natural's.
 
 ```rust
 # #[cfg(feature = "systems")] {
@@ -208,9 +208,9 @@ use exact_units::systems::gaussian::{Gauss, Oersted};
 let _ = Fixed::<Gauss, One, i32>::new(1) + Fixed::<Oersted, One, i32>::new(1).convert::<Gauss, One, i32>().unwrap();
 ```
 
-**A product of rows doesn't take the rule either**, so an unnamed E×H never crosses by itself, in either
-direction: Gaussian's Poynting vector is (c/4π)·E×H, not SI's E×H, so letting the rule silently cross a product
-would be silently wrong. Convert the product to a named unit within its own system first (`Watt`, since P = V·I
+**A product of rows doesn't take the rule either**, so an unnamed $E \times H$ never crosses by itself, in either
+direction: Gaussian's Poynting vector is $(c/4\pi) \cdot E \times H$, not SI's $E \times H$, so letting the rule silently cross a product
+would be silently wrong. Convert the product to a named unit within its own system first (`Watt`, since $P = V \cdot I$
 holds the same way in both systems), or name the quantity on the far side explicitly.
 
 ```rust,compile_fail
@@ -233,16 +233,16 @@ Where neither a row nor the rule applies, crossing is a compile error, and the e
 - **An SI base the system has no image of.** Gaussian has no current: a dimension with the ampere in it, and no
   row for its quantity, stops the rule (`Unmapped`).
 - **A quantity the system's rule refuses by name.** Natural's `no_rule` lists `Frequency`, `Activity` and
-  `SymbolRate`, so even a mechanical-looking s⁻¹ with no electromagnetic base in it still refuses (`NoRule`).
+  `SymbolRate`, so even a mechanical-looking [[s⁻¹]] with no electromagnetic base in it still refuses (`NoRule`).
 - **A kind the rule can't name.** The rule only ever lands on a dimension's open root (`Derived`); a value whose
   quantity is a kind of its own, on either side, needs a row or an explicit step first (`Kind`).
 - **A product of units that cross only by rows.** Named leaves that are themselves rows (Gaussian's B, H, ..) make
   the whole product refuse the rule, so it crosses only once a leaf is converted within its system or the whole is
   named (`ProductOfRows`).
 
-**Distinguished bases pass every bridge untouched.** rad, Np, bit and a crate's own counted base
+**Distinguished bases pass every bridge untouched.** [[rad]], Np, [[bit]] and a crate's own counted base
 ([Distinguished bases](../units/declare.md#distinguished-bases-from-other-crates)) are the same in every system,
-so a torque in J/rad crosses into Gaussian with its radian intact, at the ordinary mechanical factor:
+so a torque in [[J/rad]] crosses into Gaussian with its radian intact, at the ordinary mechanical factor:
 
 ```rust
 # #[cfg(feature = "systems")] {

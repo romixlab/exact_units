@@ -70,7 +70,7 @@ assert_eq!(UNITS.parse::<Speed>("36 km/h").unwrap(), Exact::int(10));
 assert_eq!(UNITS.parse::<Rpm>("1.5 krpm").unwrap(), Exact::int(1500));
 ```
 
-`parse::<U>` gives an `Exact<U>`, the exact value. `Exact::to` then gives a `Fixed`, or `None` where the value isn't a whole number of steps: 4.7 kΩ is 4700 Ω but not a whole number of kΩ.
+`parse::<U>` gives an `Exact<U>`, the exact value. `Exact::to` then gives a `Fixed`, or `None` where the value isn't a whole number of steps: 4.7 [[kΩ]] is 4700 [[Ω]] but not a whole number of [[kΩ]].
 
 The reader goes in this order:
 
@@ -98,7 +98,7 @@ assert_eq!(r.parse::<Byte>("5 B").unwrap(), Exact::int(5));
 assert!(r.parse_unit("B", Some(Byte::DIM)).is_ok());
 ```
 
-Readings of the same value are one reading: `km` is a kilometre and kilo metre, and they are equal. A named unit goes only into a quantity of its own kind, so `V/A` is no `Ohm`. A unit whose factor isn't exact in the target is refused too: rpm to rad/s needs π.
+Readings of the same value are one reading: `km` is a kilometre and kilo metre, and they are equal. A named unit goes only into a quantity of its own kind, so `V/A` is no `Ohm`. A unit whose factor isn't exact in the target is refused too: rpm to [[rad/s]] needs π.
 
 ## Writing in a notation
 

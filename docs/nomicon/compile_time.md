@@ -27,8 +27,8 @@ flowchart TD
 Each box above the last is a `const` evaluated once per pair of types. The run time keeps:
 
 - nothing, when $f = 1$ (`Milli` to `Pow10<-3>`);
-- a multiply by a constant, when $f$ is whole (ms to µs);
-- a division by a constant and a remainder check, when $f = 1/n$ (µs to ms);
+- a multiply by a constant, when $f$ is whole ([[ms]] to [[µs]]);
+- a division by a constant and a remainder check, when $f = 1/n$ ([[µs]] to [[ms]]);
 - a multiply, a division and a check otherwise.
 
 A division by a constant compiles to a multiply by its inverse on most targets.

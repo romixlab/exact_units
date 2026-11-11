@@ -5,8 +5,8 @@ level: advanced
 # Quantities
 
 A height and a width are both lengths, in metres, and adding one to the other is still meaningful (a diagonal's
-square). A resistance (Ω) and a transimpedance (V/A) share a dimension too, yet adding them is a bug. A frequency
-(Hz) and a radioactive activity (Bq) share a dimension, s⁻¹, and have nothing else in common at all.
+square). A resistance ([[Ω]]) and a transimpedance ([[V/A]]) share a dimension too, yet adding them is a bug. A frequency
+([[Hz]]) and a radioactive activity ([[Bq]]) share a dimension, [[s⁻¹]], and have nothing else in common at all.
 
 ISO 80000 calls this a **quantity**, and `exact_units` puts it in the type, next to the dimension:
 `Fixed<Of<Height, Meter>, Milli, u16>` is a height, not a plain length, and `Ohm` is a resistance, not a bare V/A.
@@ -31,11 +31,11 @@ graph TD
   scale too.
 - **Down is a named step.** `Fixed::as_quantity::<Q>()` takes a value to a descendant (length to height, a derived
   `kg·m²/s²` to a kinetic energy) or back across a kind's edge (frequency to activity).
-- **Siblings and other kinds are refused.** Width doesn't convert to height, nor a kinetic energy to a work, nor Ω
-  to V/A: neither `convert` nor `up` crosses them, and the compiler says so wherever it can tell.
+- **Siblings and other kinds are refused.** Width doesn't convert to height, nor a kinetic energy to a work, nor [[Ω]]
+  to [[V/A]]: neither `convert` nor `up` crosses them, and the compiler says so wherever it can tell.
 - **A sum is the nearest common ancestor.** Height plus width is a length.
 - **A product or quotient is its dimension's open root**, named by a step, except that a quotient of one
-  dimension is a ratio of it (V/V is a voltage gain, not a plain number) and a dimension-one factor keeps the
+  dimension is a ratio of it ([[V/V]] is a voltage gain, not a plain number) and a dimension-one factor keeps the
   other side's quantity (a gain times a resistance is still a resistance).
 
 The rules follow ISO 80000-1's quantities and kinds as the C++ library mp-units implements them, without its
@@ -104,7 +104,7 @@ let _ = e.as_quantity::<Work>();
 
 ## A kind's implicit step is refused, its named step is not
 
-`Ohm` is a resistance, a kind of its own; `Per<Volt, Ampere>` is a plain V/A, a transimpedance. Both have the same
+`Ohm` is a resistance, a kind of its own; `Per<Volt, Ampere>` is a plain [[V/A]], a transimpedance. Both have the same
 dimension, so an amplifier's transimpedance is easy to mistake for a resistor, which is exactly why `convert`
 refuses the implicit step between them:
 
@@ -132,7 +132,7 @@ let out: Fixed<Volt, One, f32> = (tia * photo).convert().unwrap();
 assert!((out.get() - 0.3).abs() < 1e-6);
 ```
 
-A frequency and an activity are the sharpest case: both s⁻¹, with no ancestor relation at all, so the named step
+A frequency and an activity are the sharpest case: both [[s⁻¹]], with no ancestor relation at all, so the named step
 crosses between them in either direction while the implicit one never does.
 
 ```rust
@@ -188,7 +188,7 @@ let _ = <Common<KineticEnergy, Height>>::DEF; // a kinetic energy and a height s
 
 A product or quotient is its dimension's open root (`Derived`) unless one side is dimension-one and itself a
 ratio or a derived value, in which case it keeps the *other* side's quantity: a gain times a resistance is still
-a resistance, not a bare derived Ω·(V/V).
+a resistance, not a bare derived [[Ω]]·([[V/V]]).
 
 ```rust
 use exact_units::{Fixed, prefix::{Milli, One}, units::{Ohm, Per, Volt}};
@@ -199,8 +199,8 @@ let scaled: Fixed<Ohm, Milli, i32> = (gain * r).convert().unwrap(); // still a r
 assert_eq!(scaled.get(), 200_000);
 ```
 
-A quotient of one dimension is the special case `RatioOf` that dimension rather than a plain number: V/V is a
-voltage gain, A/A a current gain, and the two don't mix even though both cancel to dimension one.
+A quotient of one dimension is the special case `RatioOf` that dimension rather than a plain number: [[V/V]] is a
+voltage gain, [[A/A]] a current gain, and the two don't mix even though both cancel to dimension one.
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::One, units::{Ampere, Per, Volt}};
@@ -219,13 +219,13 @@ let _ = gain.convert::<Ratio, One, f32>();
 ## Some dimensions have no open root at all
 
 A unit whose line names no quantity measures its dimension's open root — except where a dimension has none.
-C/m² is the SI dimension of three quantities at once: the displacement field D, the polarization P and the
-surface density of charge σ; A/m is the dimension of the magnetizing field H, the magnetization M and a linear
+[[C/m²]] is the SI dimension of three quantities at once: the displacement field D, the polarization P and the
+surface density of charge $\sigma$; [[A/m]] is the dimension of the magnetizing field H, the magnetization M and a linear
 current density. None of the three is the dimension's "default" meaning, because [Gaussian units](systems.md)
 count two of each trio 4π apart (D and P, H and M) even though SI's own numbers for them agree: picking one as
 open would let the other cross silently wrong. So this crate declares `ElectricFluxDensity` (D),
 `ElectricPolarization` (P, a kind under D) and `SurfaceChargeDensity`, and `MagnetizingField` (H),
-`Magnetization` (M, a kind under H) and `LinearCurrentDensity`, every one a kind, and `Derived` of C/m² or A/m is
+`Magnetization` (M, a kind under H) and `LinearCurrentDensity`, every one a kind, and `Derived` of [[C/m²]] or [[A/m]] is
 none of them.
 
 The unit lines `ElectricDisplacement` and `MagneticFieldStrength` still name their quantity (`quantity
@@ -260,7 +260,7 @@ let _ = Fixed::<Per<Ampere, Meter>, One, f32>::bounded(500.0).convert::<Magnetic
 | `Per<Ampere, Volt>` | `as_conductance()` | `Siemens` |
 | `Per<Joule, Volume>` | `as_energy_density()` | `EnergyDensity`, not a `Pascal` |
 | `EnergyDensity` | `as_joule_per_volume()` | `Per<Joule, Volume>` |
-| `HeatCapacity` | `as_entropy()` | `Entropy`, not plain J/K |
+| `HeatCapacity` | `as_entropy()` | `Entropy`, not plain [[J/K]] |
 | `Entropy` | `as_heat_capacity()` | `HeatCapacity` |
 | a plane angle `A` | `as_phase()` | `Phase<A>` |
 | `Phase<A>` | `as_plane_angle()` | `A` |
@@ -274,6 +274,6 @@ length or retry rate joins this tree too: see [`quantity!`](../units/declare.md#
 
 ## Why it matters for levels
 
-A gain's level in dB depends on its quantity: 20·lg for a ratio of a root-power dimension (V/V, A/A, Pa/Pa),
-10·lg for a ratio of a power dimension (W/W). A plain `Ratio` has no level at all, so 0.5 duty can't become −3 dB
+A gain's level in dB depends on its quantity: $20 \cdot \lg$ for a ratio of a root-power dimension ([[V/V]], [[A/A]], [[Pa/Pa]]),
+$10 \cdot \lg$ for a ratio of a power dimension ([[W/W]]). A plain `Ratio` has no level at all, so 0.5 duty can't become −3 dB
 by accident. See [Decibels](../levels/decibels.md).

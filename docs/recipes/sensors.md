@@ -8,7 +8,7 @@ Short answers to common firmware tasks. Each block compiles and runs as written.
 
 ## An ADC code in millivolts
 
-A 12-bit ADC over 3.3 V: one step is $3.3\ \mathrm{V} / 4096$. Name the step as the scale, and round once into mV:
+A 12-bit ADC over 3.3 [[V]]: one step is $3.3\ \unit{V} / 4096$. Name the step as the scale, and round once into [[mV]]:
 
 ```rust
 use exact_units::{Fixed, Rounding, prefix::{FullScale, Milli, Rational}, units::Volt};

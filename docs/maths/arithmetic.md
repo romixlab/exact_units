@@ -41,7 +41,7 @@ A type can carry its policy instead, so `+` itself saturates or wraps: [Overflow
 
 ## Different scales don't mix
 
-mV and V are different types. Adding them is a compile error, not a silent factor of 1000:
+[[mV]] and [[V]] are different types. Adding them is a compile error, not a silent factor of 1000:
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::{Milli, One}, units::Volt};
@@ -77,7 +77,7 @@ assert_eq!(p.to_string(), "825000 µ(V·A)");
 assert_eq!(p.convert::<Watt, Micro, i32>(), Some(Fixed::new(825_000)));
 ```
 
-`convert` moves to a unit of the same dimension: V·A to W, V/Ω to A. A quotient works the same way, and the classic slip of a factor 1000 becomes a type error:
+`convert` moves to a unit of the same dimension: [[V·A]] to [[W]], [[V/Ω]] to [[A]]. A quotient works the same way, and the classic slip of a factor 1000 becomes a type error:
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::Milli, units::{Ampere, Ohm, Volt}};

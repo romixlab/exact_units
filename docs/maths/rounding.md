@@ -59,7 +59,7 @@ Every mode rounds the true quotient once. For integer storages there is no float
 
 A factor with $\pi$, $\ln 2$ or a root in it is allowed here, unlike in `to`. It is multiplied as a 64-bit fixed point within $2^{-64}$ of the true factor, so the result is the correctly rounded one except within $|x| \cdot 2^{-64}$ of a rounding step.
 
-Thousandths of a degree to µrad is such a factor, $\pi / 180\,000 \cdot 10^{6}$:
+Thousandths of a degree to [[µrad]] is such a factor, $\pi / 180\,000 \cdot 10^{6}$:
 
 ```rust
 use exact_units::{Fixed, Rounding, prefix::Micro, units::Radian};

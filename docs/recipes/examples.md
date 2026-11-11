@@ -14,22 +14,22 @@ cargo run --example 01_timer --no-default-features --features time
 
 | # | Example | Features | The story |
 |---|---|---|---|
-| 1 | [`01_timer`][ex01] | `time` | a debounce timeout set in ms and armed in µs |
-| 2 | [`02_thermostat`][ex02] | `thermal` | °C and °F setpoints; 1 °F of hysteresis is not −17.2 °C |
+| 1 | [`01_timer`][ex01] | `time` | a debounce timeout set in [[ms]] and armed in [[µs]] |
+| 2 | [`02_thermostat`][ex02] | `thermal` | [[°C]] and [[°F]] setpoints; 1 [[°F]] of hysteresis is not −17.2 [[°C]] |
 | 3 | [`03_battery`][ex03] | `electrical,dimensionless,time` | bounded readings, a broken wire's 65535 refused, a counter that saturates |
-| 4 | [`04_motor_power`][ex04] | `electrical` | phase current through a shunt; mV/mΩ is A, mV·mA is µW |
-| 5 | [`05_light_sensor`][ex05] | `electrical,dimensionless` | kinds: a V/V gain is not a PWM duty, a TIA's V/A is not a resistor |
+| 4 | [`04_motor_power`][ex04] | `electrical` | phase current through a shunt; [[mV/mΩ]] is [[A]], [[mV·mA]] is [[µW]] |
+| 5 | [`05_light_sensor`][ex05] | `electrical,dimensionless` | kinds: a [[V/V]] gain is not a PWM duty, a TIA's [[V/A]] is not a resistor |
 | 6 | [`06_audio_limiter`][ex06] | `electrical,libm` | a limiter threshold in dBFS, worked out at compile time |
 | 7 | [`07_tone_generator`][ex07] | `dimensionless,angle` | a phase that wraps (`Bam16`) and a mix that saturates (`Q15`) |
 | 8 | [`08_data_logger`][ex08] | `counting,time` | channels from 1, ring slots from 0, packet numbers that wrap |
-| 9 | [`09_capture_buffer`][ex09] | `counting,time,information` | samples, bytes and cycles as dimensions; KiB is not kB |
-| 10 | [`10_adc_noise`][ex10] | `electrical,time` | an amplifier's nV/√Hz over a bandwidth |
-| 11 | [`11_us_customer`][ex11] | `customary` | setpoints in psi and gallons, US or imperial named |
+| 9 | [`09_capture_buffer`][ex09] | `counting,time,information` | samples, bytes and cycles as dimensions; [[KiB]] is not [[kB]] |
+| 10 | [`10_adc_noise`][ex10] | `electrical,time` | an amplifier's [[nV]]/√[[Hz]] over a bandwidth |
+| 11 | [`11_us_customer`][ex11] | `customary` | setpoints in [[psi]] and gallons, US or imperial named |
 | 12 | [`12_wire`][ex12] | `shrink_wrap,time,electrical` | a reading sent to a PC tool, the same bytes as plain integers |
 | 13 | [`13_impedance_match`][ex13] | `electrical,angle,dimensionless,libm` | an antenna's Γ, VSWR and return loss; a dB limit as an integer compare |
 | 14 | [`14_iq_downconvert`][ex14] | `angle,dimensionless,electrical` | Q15 IQ samples mixed down by an NCO on a Cortex-M0 |
-| 15 | [`15_nuclear`][ex15] | `radiation,systems,time,chemical,dimensionless,mechanical` | AME2020 masses to binding energies and Q-values, a gram of radium in Bq, Gy against Sv ([Nuclear physics](nuclear.md)) |
-| 16 | [`16_video_time`][ex16] | `time` | H.264 time bases, RTP's wrapping 90 kHz clock, the 48 kHz cadence, drop-frame time codes against true time ([Video time](video_time.md)) |
+| 15 | [`15_nuclear`][ex15] | `radiation,systems,time,chemical,dimensionless,mechanical` | AME2020 masses to binding energies and Q-values, a gram of radium in [[Bq]], [[Gy]] against [[Sv]] ([Nuclear physics](nuclear.md)) |
+| 16 | [`16_video_time`][ex16] | `time` | H.264 time bases, RTP's wrapping 90 [[kHz]] clock, the 48 [[kHz]] cadence, drop-frame time codes against true time ([Video time](video_time.md)) |
 | 17 | [`17_image_codecs`][ex17] | `dimensionless,customary,q` | the roundings, lossless transforms, scales and printed constants of JPEG, JPEG 2000, H.264, H.265, H.273 and AV1 ([Image and video codecs](image_codecs.md)) |
 | 18 | [`18_photo_exposure`][ex18] | `levels,photometric,time,libm` | Exif's APEX values as exact stops, Table 55's labels against their values, the meter's K and C named ([Photography](photography.md)) |
 

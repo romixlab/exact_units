@@ -68,7 +68,9 @@ assert_eq!(p.get(), 251); // 10^(−6/10)
 
 ## `q!`: a level compared without a constant { #q }
 
-`db!(-3, NearestEven)` rounds the gain to the nearest stored value: a constant has to be one. A compare doesn't. `q!(-3 dB)` keeps the level exact and folds it in the compare itself: `gain < q!(-3 dB)` is `gain <= 707` for a V/V in steps of 1 mV/V, since 10^(−3/20) is 707.94.. mV/V, and no stored value is equal to it.
+`db!(-3, NearestEven)` rounds the gain to the nearest stored value: a constant has to be one. A compare doesn't.
+`q!(-3 dB)` keeps the level exact and folds it in the compare itself: `gain < q!(-3 dB)` is `gain <= 707` for a
+[[V/V]] in steps of 1 [[mV/V]], since $10^{-3/20}$ is 707.94.. [[mV/V]], and no stored value is equal to it.
 
 ```rust
 use exact_units::{Fixed, db, q, prefix::Milli, units::{Per, Volt, Watt}};
@@ -86,9 +88,11 @@ let p = Fixed::<Per<Watt, Watt>, Milli, u16>::new(501);
 assert!(p < q!(-3 dB)); // 10^(−3/10) = 0.50118..: the kind picks 10·lg
 ```
 
-- The kind picks the form, as for `db!`: `dB` reads one way against a V/V or a W/W. Against a plain `Ratio` it doesn't compile.
+- The kind picks the form, as for `db!`: `dB` reads one way against a [[V/V]] or a [[W/W]]. Against a plain
+  `Ratio` it doesn't compile.
 - No rounding: the gain's floor in steps comes from the same interval arithmetic as `db!`, at compile time. A level too close to a step to tell is a compile error, never a guess.
-- `==` compiles only where a stored value is the gain: `q!(0 dB)`, `q!(20 dB)` of a V/V in mV/V. `gain == q!(-3 dB)` is a compile error, as no number of mV/V is 10^(−3/20).
+- `==` compiles only where a stored value is the gain: `q!(0 dB)`, `q!(20 dB)` of a [[V/V]] in [[mV/V]]. `gain ==
+  q!(-3 dB)` is a compile error, as no number of [[mV/V]] is $10^{-3/20}$.
 - It costs one compare: `tests/q_asm.rs` checks that `gain < q!(-3 dB)` builds to the same instructions as `gain.get() <= 707` on a Cortex-M0, and on a Cortex-M4F to one `vcmp.f32` against the largest `f32` below the gain for an `f32` V/V.
 - A value stored as a level (`Fixed<Decibel>`, `Loss<Decibel>`) doesn't take `q!(x dB)`: there a level of gain and one of loss differ in sign, so it asks for the unit, `q!(-3 Decibel)` or `q!(3 Loss<Decibel>)`.
 
@@ -117,7 +121,8 @@ assert!(Fixed::<Loss<Decibel>, Centi, i16>::new(301) > q!(3 Loss<Decibel>));
 
 A gain checked against a band is a range of two levels, `gain.is_in(q!(-3 dB ..= 3 dB, Inside))`, as for an amount ([Ranges and tolerances](../start/literals.md#ranges-and-tolerances)). Each end is folded to the gain's steps at compile time as one `q!(-3 dB)` is, and the gain grows with the level, so the check is two compares. `q!(20 dB +- 1 dB)` is 19 dB ..= 21 dB: a tolerance of a level is a level.
 
-The gain of a level that isn't a whole number of decades is no fraction, so it is never a stored value: 10^(−3/20) lies between 707 and 708 mV/V. Such an end doesn't compile until the literal says which way it moves, `, Inside` (the gains within the real band) or `, Outside` (the fewest stored values that cover it), and the error names the stored values around it. An end of whole decades on a step needs neither word.
+The gain of a level that isn't a whole number of decades is no fraction, so it is never a stored value: $10^{-3/20}$
+lies between 707 and 708 [[mV/V]]. Such an end doesn't compile until the literal says which way it moves, `, Inside` (the gains within the real band) or `, Outside` (the fewest stored values that cover it), and the error names the stored values around it. An end of whole decades on a step needs neither word.
 
 ```rust
 use exact_units::{Fixed, q, prefix::{Milli, One}, units::{Per, Volt}};
@@ -184,7 +189,11 @@ $$
 <figcaption>Line theory works in nepers because they fall out of the wave equation: V(x) = V<sub>0</sub>·e<sup>−γx</sup> with γ = α + jβ, so the amplitude is V<sub>0</sub>·e<sup>−αx</sup>. With α in Np/m, αx is the level in Np, no conversion factor needed. A datasheet's dB per 100 ft is typed as written, <code>Per&lt;Loss&lt;Decibel&gt;, Feet100&gt;</code>, and <code>convert</code>s to α in Np/m exactly. The cable is a Belden 8259 RG-58: nominally 5.4 dB/100 ft at 100 MHz, velocity 66 %. Computed by <code>tools/book_plots</code> with the crate's <code>convert</code>, <code>over</code>, <code>to_db</code> and <code>from_db_const</code>.</figcaption>
 </figure>
 
-`exact_units` takes a neper level the way it takes a dB level, and the kind picks the form: `ln(x)` Np for a ratio of root-power quantities (V/V), `½·ln(x)` Np for a ratio of powers (W/W). At compile time `np!` gives the stored value a named rounding picks for $e^{L}$ (or $e^{2L}$ for powers), worked out in integers like `db!`, with no float at run time. Only 0 Np has a gain that is a stored value, 1: every other is irrational, so `np!` names its rounding:
+`exact_units` takes a neper level the way it takes a dB level, and the kind picks the form: `ln(x)` Np for a ratio
+of root-power quantities ([[V/V]]), `½·ln(x)` Np for a ratio of powers ([[W/W]]). At compile time `np!` gives the
+stored value a named rounding picks for $e^{L}$ (or $e^{2L}$ for powers), worked out in integers like `db!`, with
+no float at run time. Only 0 Np has a gain that is a stored value, 1: every other is irrational, so `np!` names
+its rounding:
 
 ```rust
 use exact_units::{Fixed, np, prefix::Micro, units::{Per, Volt, Watt}};
@@ -221,7 +230,8 @@ With feature `levels` (in `quantities`), a level is a number of its own unit, no
 
 - `Neper` and `Decibel` are levels signed as a gain: a decay is negative. 1 dB is exactly (ln 10)/20 Np.
 - `Loss<Neper>` and `Loss<Decibel>` are the same levels signed as a loss: a decay is positive, as a datasheet writes it.
-- The neper has a base dimension of its own, like the radian. So a level doesn't mix with a `Ratio`, and dB/m doesn't convert to m⁻¹.
+- The neper has a base dimension of its own, like the radian. So a level doesn't mix with a `Ratio`, and dB/[[m]]
+  doesn't convert to [[m⁻¹]].
 - A loss sits on a second base. A loss and a gain don't convert into each other; `as_gain` and `as_loss` negate.
 - A level has no 10·lg or 20·lg in it. The kind of the gain picks the form at the edge: `to_level` and `to_gain`.
 - A logarithm is no exact number. `to_level` works it in `f64` and rounds it once by the `Rounding` you pass.
@@ -259,10 +269,12 @@ let _ = Fixed::<Loss<Decibel>, One, f32>::bounded(3.0).convert::<Decibel, One, f
 
 Beer-Lambert is written on the transmitted power ratio T, without the ½ of a level. Both of its numbers are exact scales of the loss base:
 
-- `Absorbance` is A = −lg T. It's the loss in bels of power, so 1 AU is 10 dB, and it has no gain sign.
-- `OpticalDepth` is τ = −ln T, which is 2 × the loss in Np. So τ = ln 10 · A by conversion.
-- `LinearAttenuation`, `Per<OpticalDepth, Meter>`, is the coefficient μ of a beam's power. The α of `Per<Loss<Neper>, Meter>` is half of it, and `convert` does the halving.
-- `MolarAbsorptivity` is ε, the L/(mol·cm) of tables, printed AU/(M·cm). `ε·l·c` converts to an `Absorbance`.
+- `Absorbance` is $A = -\lg T$. It's the loss in bels of power, so 1 [[AU]] is 10 dB, and it has no gain sign.
+- `OpticalDepth` is $\tau = -\ln T$, which is 2 × the loss in Np. So $\tau = \ln 10 \cdot A$ by conversion.
+- `LinearAttenuation`, `Per<OpticalDepth, Meter>`, is the coefficient $\mu$ of a beam's power. The $\alpha$ of
+  `Per<Loss<Neper>, Meter>` is half of it, and `convert` does the halving.
+- `MolarAbsorptivity` is $\varepsilon$, the L/(mol·cm) of tables, printed [[AU]]/(M·cm). `ε·l·c` converts to an
+  `Absorbance`.
 
 ```rust
 use exact_units::{Fixed, Rounding, prefix::{Micro, Milli, One}, q};
@@ -292,11 +304,12 @@ let mu = fibre.convert_rounded::<LinearAttenuation, Micro, f64>(Rounding::Neares
 assert!((mu.get() / alpha.get() - 2.0).abs() < 1e-12);
 ```
 
-The types close the two classic bugs. A lost factor 2 between μ and α can't happen by conversion, and a transmittance is a ratio of powers, so a plain `Ratio` has no absorbance.
+The types close the two classic bugs. A lost factor 2 between $\mu$ and $\alpha$ can't happen by conversion, and a
+transmittance is a ratio of powers, so a plain `Ratio` has no absorbance.
 
-The absorbance of a field ratio is that of the power ratio it stands for: `Per<Volt, Volt>` of 0.1 is 2 AU.
+The absorbance of a field ratio is that of the power ratio it stands for: `Per<Volt, Volt>` of 0.1 is 2 [[AU]].
 
 More on thresholds and dBFS: [Thresholds](thresholds.md); a reflection coefficient's or an IQ sample's level
 is the same kind of threshold, in [Levels, dBm and cable loss](../rf/levels.md#power-of-a-complex-value). A
 rate of a level over a length, a time or a frequency — attenuation per metre, damping per second, medical
-ultrasound's dB/(cm·MHz) — is [Levels per length, time and frequency](rates.md).
+ultrasound's dB/([[cm·MHz]]) — is [Levels per length, time and frequency](rates.md).

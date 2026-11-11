@@ -76,9 +76,9 @@ Three scales in these standards have one shape: an integer mantissa times 2 to a
 
 - JPEG 2000's step size Δb = 2^(Rb − εb)·(1 + μb/2¹¹) (T.800 E.1.1.1, eq. E-3), with εb in 5 bits and μb in 11 (Table A.30).
 - H.265's dequantization scale, levelScale[qP % 6] << (qP / 6) with levelScale = {40, 45, 51, 57, 64, 72} (8.6.3, eq. 8-309); H.264's is the same with its v tables (8.5.9, eq. 8-315 and 8-318; 8.5.12.1, eq. 8-336).
-- The HRD's BitRate = (bit_rate_value_minus1 + 1)·2^(6 + bit_rate_scale) bit/s and CpbSize = (cpb_size_value_minus1 + 1)·2^(4 + cpb_size_scale) bit (H.264 E.2.2, eq. E-81 and E-82; H.265 E.3.3, eq. E-87 and E-88).
+- The HRD's BitRate = (bit_rate_value_minus1 + 1)·2^(6 + bit_rate_scale) [[bit/s]] and CpbSize = (cpb_size_value_minus1 + 1)·2^(4 + cpb_size_scale) [[bit]] (H.264 E.2.2, eq. E-81 and E-82; H.265 E.3.3, eq. E-87 and E-88).
 
-Each is a codec of `CodecShape::MantissaExponent`: the code splits into an exponent and a mantissa, and the value is `(mantissa + offset) · 2^(zero + step · exponent)`, exact. `J2kStepSize` decodes T.800's 16-bit code to Δb / 2^Rb, `HevcLevelScale` H.265's qP to its scale, and `HrdBitRate` and `HrdCpbSize` the HRD's two fields, packed as `scale << 32 | value_minus1`, to bit/s and bit. Encoding goes back: a value between two codes takes the one a named rounding picks, and a value that several codes give takes the lowest.
+Each is a codec of `CodecShape::MantissaExponent`: the code splits into an exponent and a mantissa, and the value is `(mantissa + offset) · 2^(zero + step · exponent)`, exact. `J2kStepSize` decodes T.800's 16-bit code to Δb / 2^Rb, `HevcLevelScale` H.265's qP to its scale, and `HrdBitRate` and `HrdCpbSize` the HRD's two fields, packed as `scale << 32 | value_minus1`, to [[bit/s]] and [[bit]]. Encoding goes back: a value between two codes takes the one a named rounding picks, and a value that several codes give takes the lowest.
 
 ```rust
 use exact_units::{Exact, Rounding, codec::{Codec, HevcLevelScale, HrdBitRate, J2kStepSize}, units::Ratio};
@@ -103,20 +103,20 @@ H.264's NOTE 2 in 8.5.8 says the scale "doubles for every increment of 6 in QPY"
 
 ## Irrational constants
 
-JPEG 2000's irreversible 9/7 wavelet lifts by α, β, γ, δ and K (T.800 Table F.4). Tables F.5 to F.7 give their closed forms, built from √15 and two cube roots, and print each "including approximations up to 15 decimal points" (F.3.8.2.1). These are algebraic numbers, not a [Magnitude](../nomicon/magnitude.md), so a 9/7 transform is a float edge by necessity.
+JPEG 2000's irreversible 9/7 wavelet lifts by $\alpha$, $\beta$, $\gamma$, $\delta$ and K (T.800 Table F.4). Tables F.5 to F.7 give their closed forms, built from $\sqrt{15}$ and two cube roots, and print each "including approximations up to 15 decimal points" (F.3.8.2.1). These are algebraic numbers, not a [Magnitude](../nomicon/magnitude.md), so a 9/7 transform is a float edge by necessity.
 
 The property computes every one of the 19 parameters as an interval of exact rationals, about 10⁻²² wide, and rounds both ends to 15 decimals. 17 are the printed digits, in the 08/2002 edition. Two round differently from the exact value, one off in the 15th decimal, unchanged in the 06/2019 edition (the current edition, 07/2024, is not freely available and was not checked):
 
-- r₀ (Table F.6) is printed 1.449 513 704 087 943; it is 1.449 513 704 087 942 3….
-- γ (Table F.4) is printed 0.882 911 075 530 934; it is 0.882 911 075 530 932 9….
+- $r_0$ (Table F.6) is printed 1.449 513 704 087 943; it is 1.449 513 704 087 942 3….
+- $\gamma$ (Table F.4) is printed 0.882 911 075 530 934; it is 0.882 911 075 530 932 9….
 
-AV1's inverse DCT rotates by Cos128_Lookup (7.13.2), whose note says it "implements the expression 4096 * cos( angle * pi / 128 ) rounded to the nearest integer". The tie is unnamed again, but it never matters: the property bounds each of the 65 cosines with π between two 50-digit decimals and a Taylor series, and every entry is the nearest integer by `NearestEven` and `NearestAway` alike.
+AV1's inverse DCT rotates by Cos128_Lookup (7.13.2), whose note says it "implements the expression 4096 * cos( angle * pi / 128 ) rounded to the nearest integer". The tie is unnamed again, but it never matters: the property bounds each of the 65 cosines with $\pi$ between two 50-digit decimals and a Taylor series, and every entry is the nearest integer by `NearestEven` and `NearestAway` alike.
 
 ## Tables and matrices
 
 H.264's sample aspect ratio indicator (Table E-1, H.265 Table E.1 the same) has 16 ratios from 1:1 to 160:99. All are whole numbers of 1/198, so the indicator is a [codec](../fixed_point/codecs.md) with `CodecShape::Table` and `Linear = Fixed<Ratio, Rational<1, 198>, u16>`. Code 0 (Unspecified), 17 to 254 (Reserved) and 255 (Extended_SAR) are spare codes, and a [niche](../maths/niches.md) enum names 0 and 255. Extended_SAR means "the ratio follows in two fields of their own", which no codec can decode from the byte alone.
 
-JFIF's and JPEG 2000's Y′CbCr matrices come from BT.601's K_R = 0.299 and K_B = 0.114. Every entry is then a rational: Cb divides by 2(1 − K_B) = 1.772 and Cr by 2(1 − K_R) = 1.402 (T.871 clause 7). The property builds both matrices exactly, checks that each undoes the other, and rounds the entries to the printed places:
+JFIF's and JPEG 2000's Y′CbCr matrices come from BT.601's $K_{\mathrm{R}} = 0.299$ and $K_{\mathrm{B}} = 0.114$. Every entry is then a rational: Cb divides by $2(1 - K_{\mathrm{B}}) = 1.772$ and Cr by $2(1 - K_{\mathrm{R}}) = 1.402$ (T.871 clause 7). The property builds both matrices exactly, checks that each undoes the other, and rounds the entries to the printed places:
 
 - JFIF's four-decimal entries (0.1687, 0.3313, 0.4187, 0.0813, 0.3441, 0.7141) are all right.
 - T.800's 08/2002 edition's G-10 prints 0,16875, which rounds differently from the exact K_R/K_B value, 0.16874: one off in the last place. The 06/2019 edition prints it the same.

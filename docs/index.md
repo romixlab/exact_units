@@ -24,7 +24,7 @@ assert_eq!(size_of::<Micros<u32>>(), 4);       // the same bytes as the u32
 
 ## What it is for
 
-- Firmware and device APIs that keep numbers as integers: µs timers, mV readings, Q15 samples, binary angles.
+- Firmware and device APIs that keep numbers as integers: [[µs]] timers, [[mV]] readings, Q15 samples, binary angles.
 - Conversions that are exact or refused, never rounded through a float.
 - The cases other unit crates leave out: temperatures as points, angles that wrap, levels in dB, counted things.
 

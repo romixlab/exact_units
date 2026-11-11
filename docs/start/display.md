@@ -44,9 +44,9 @@ assert_eq!(format!("{q:#}"), "0.79998779296875"); // 0.8 isn't a binary fraction
 
 ## Prefixes on powers
 
-The SI Brochure (9th ed., §3) gives a prefix to its symbol, and the power applies to the prefixed unit: mm³ is (10⁻³ m)³, so 10⁻⁹ m³. A scale of 10⁻³ on m³/s is therefore not `mm³/s`, it is `dm³/s`.
+The SI Brochure (9th ed., §3) gives a prefix to its symbol, and the power applies to the prefixed unit: [[mm³]] is (10⁻³ [[m]])³, so 10⁻⁹ [[m³]]. A scale of 10⁻³ on [[m³/s]] is therefore not `mm³/s`, it is `dm³/s`.
 
-`{}` writes a scale the way people write it, where that is exact. A power of ten moves inside when the exponent is a multiple of the power and the prefix is one used with it: d, c, m, µ and n on m² and m³, k on m² (`km²`). A volume and a volume flow in the markers `Volume` and `VolumetricFlow` are written in litres: 10⁻³ m³ is `L`, 10⁻⁶ m³ is `mL`, 10⁻⁹ m³ is `µL`. Spell the unit another way and the spelling stays: `Per<Volume, Second>` is in `dm³/s`.
+`{}` writes a scale the way people write it, where that is exact. A power of ten moves inside when the exponent is a multiple of the power and the prefix is one used with it: d, c, m, µ and n on [[m²]] and [[m³]], k on [[m²]] (`km²`). A volume and a volume flow in the markers `Volume` and `VolumetricFlow` are written in litres: 10⁻³ [[m³]] is `L`, 10⁻⁶ [[m³]] is `mL`, 10⁻⁹ [[m³]] is `µL`. Spell the unit another way and the spelling stays: `Per<Volume, Second>` is in `dm³/s`.
 
 ```rust
 use exact_units::{Fixed, prefix::{Mega, Micro, Milli, Nano, Pow10}, units::{Area, Per, Second, Volume, VolumetricFlow}};
@@ -60,7 +60,7 @@ assert_eq!(Fixed::<Per<Volume, Second>, Milli, u8>::new(5).to_string(), "5 dm³/
 assert_eq!(Fixed::<Per<Volume, Second>, Nano, u8>::new(5).to_string(), "5 mm³/s");
 ```
 
-Anything else keeps the prefix on the whole unit, in parentheses: 10⁻³ on m² has no prefix that is its square root, and nobody reads `dam³` or `hm²`. A scale with no prefix of its own stays after the number. These are unchanged for every other unit with a power, such as `ft³`, and for V².
+Anything else keeps the prefix on the whole unit, in parentheses: 10⁻³ on [[m²]] has no prefix that is its square root, and nobody reads `dam³` or `hm²`. A scale with no prefix of its own stays after the number. These are unchanged for every other unit with a power, such as `ft³`, and for [[V²]].
 
 ```rust
 use exact_units::{Fixed, prefix::{Hecto, Kilo, Milli, Pow10}, units::{Area, Volume}};
@@ -76,7 +76,7 @@ assert_eq!(Fixed::<Area, Pow10<4>, u8>::new(5).to_string(), "5·10⁴ m²");
 A scale on a quotient has two sides to go to. The default is the numerator, the SI practice: `mV/m`, `MV/s`, `nV/√Hz`, and `Per<Volt, Meter>` writes the same as the marker `ElectricFieldStrength`. Some units are written another way, and `{}` follows them in this order. The first that fits decides.
 
 1. The markers `Density` and `MolarConcentration` are per litre, from 10⁻¹² to 10³ in steps of 10³. A unit spelled another way keeps its metres, as `Per<Volume, Second>` does: `Per<Gram, Volume>` in `Micro` is the `µg/m³` of air quality.
-2. `dB` and `Np` take no prefix on a quotient. It goes into the denominator: k, c, m, µ and n on the metre, k, M and G on the hertz, m, µ and n on the second. Otherwise the scale stays on the whole unit, as `c(dB/m)`: 100 m has no prefix.
+2. `dB` and `Np` take no prefix on a quotient. It goes into the denominator: k, c, m, µ and n on the metre, k, M and G on the hertz, m, µ and n on the second. Otherwise the scale stays on the whole unit, as `c(dB/m)`: 100 [[m]] has no prefix.
 3. Over `m` and `m²`, the denominator is `cm` or `cm²` where that leaves a prefix in steps of 10³ on the numerator: `µS/cm`, `kV/cm`, `mW/cm²`.
 4. 10⁶ over `m²` is `mm²`: `A/mm²`.
 5. Otherwise the numerator takes the prefix, and `g` stands for `kg` from the gram down: `g/m²`, `mg/s`.
@@ -102,7 +102,7 @@ A scale on a quotient has two sides to go to. The default is the numerator, the 
 | `MassFlow` | 10³ | `k(kg/s)` | none |
 | `Momentum` | 10⁻³ | `m(kg·m/s)` | none |
 
-A unit with a compound numerator, a ratio on top or a numerator that isn't SI (ft, min, °) keeps its form, and so does a unit known by name only. So does a denominator of its own: `Kilometre`, `Metres100` and `Feet100` print as they are, and `{:#}` and `with_unit` write them with their datasheet's spelling, since those write a value in the bare symbol.
+A unit with a compound numerator, a ratio on top or a numerator that isn't SI (ft, min, [[°]]) keeps its form, and so does a unit known by name only. So does a denominator of its own: `Kilometre`, `Metres100` and `Feet100` print as they are, and `{:#}` and `with_unit` write them with their datasheet's spelling, since those write a value in the bare symbol.
 
 ```rust
 use exact_units::{Fixed, prefix::{Centi, Micro, Milli, Pow10}, units::{Conductivity, Decibel, Density, ElectricFieldStrength, Gram, Meter, Per, Volt, Volume}};
