@@ -400,7 +400,7 @@ crate::unit! {
     /// field as e^(−τ/2), so 1 Np of loss is 2 of depth. τ = ln 10 · A of an [Absorbance], a conversion by name for
     /// integers.
     #[cfg(feature = "levels")]
-    pub struct OpticalDepth = "τ" (long "optical depth" plural "optical depth", ascii "tau"), base(NeperLoss), Exact(1 / 2);
+    pub struct OpticalDepth = "τ" (ascii "tau"), base(NeperLoss), Exact(1 / 2);
 
 
 
@@ -662,7 +662,7 @@ crate::unit! {
     /// # }
     /// ```
     #[cfg(feature = "dimensionless")]
-    pub struct Ratio = "" (long "ratio"), [];
+    pub struct Ratio = "", [];
 
     /// The number ln 2 as a unit, dimensionless: `Exact<Ln2>::int(3)` is exactly 3·ln 2. A decay constant λ = ln 2/T½ is
     /// an `Exact<Times<Ln2, Per<Ratio, Second>>>` holding 1/T½, so ln 2 stays exact in the type and `ln 2 · a + b` (two

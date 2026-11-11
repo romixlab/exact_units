@@ -730,9 +730,9 @@ fn docs_page(page: &str, g: &Generated) -> String {
     out
 }
 
-/// The quantity a unit measures, as the book's tooltips name it: its line's `quantity`, else its dimension's open
-/// root (`Derived(L)` is a length), else "dimensionless" for dimension one, else the name of the dimension's one
-/// coherent unit with a compound symbol (`units::Area`, m², "area"); `None` where none of these is.
+/// The quantity a unit measures, as the source names it: its line's `quantity`, else its dimension's open root
+/// (`Derived(L)` is a length), else the name of the dimension's one coherent unit with a compound symbol, which the
+/// crate names after its quantity (`units::Area`, m², "area"); `None` where the source names none.
 fn quantity_name(def: &exact_units::UnitDef<'_>) -> Option<String> {
     use exact_units::QuantityRef;
     if let Some(q) = def.quantity {
@@ -747,15 +747,12 @@ fn quantity_name(def: &exact_units::UnitDef<'_>) -> Option<String> {
     {
         return Some(root.name().to_string());
     }
-    if def.dim.is_one() {
-        return Some("dimensionless".to_owned());
-    }
-    // a coherent unit with a compound symbol is named after its quantity (`Area`, m²; `Jerk`, m/s³)
     let mut coherent = units::ALL.iter().filter_map(|e| match e {
         UnitExpr::Named(u)
             if u.dim.same(def.dim)
                 && u.quantity.is_none()
                 && u.scale == Magnitude::ONE
+                && !u.names.symbol.is_empty()
                 && !atomic(u.names.symbol) =>
         {
             Some(exact_units::quantity::QuantityName(u.id.name).to_string())
@@ -768,10 +765,72 @@ fn quantity_name(def: &exact_units::UnitDef<'_>) -> Option<String> {
     }
 }
 
-/// A marker's entry of `unit_info.json`: its long name, plural and quantity, `null` where it has none.
-fn info_entry(long: &str, plural: &str, quantity: Option<&str>) -> serde_json::Value {
-    let text = |s: &str| (!s.is_empty()).then(|| s.to_owned());
-    serde_json::json!({ "long": text(long), "plural": text(plural), "quantity": quantity })
+/// `[text](link)` and `[Marker]` as their text, backticks dropped: rustdoc as plain text for a tooltip.
+fn plain(doc: &str) -> String {
+    let mut out = String::new();
+    let mut rest = doc;
+    while let Some(i) = rest.find('[') {
+        out.push_str(&rest[..i]);
+        let after = &rest[i + 1..];
+        let Some(j) = after.find(']') else {
+            out.push_str(&rest[i..]);
+            rest = "";
+            break;
+        };
+        out.push_str(&after[..j]);
+        rest = &after[j + 1..];
+        if let Some(link) = rest.strip_prefix('(')
+            && let Some(k) = link.find(')')
+        {
+            rest = &link[k + 1..];
+        }
+    }
+    out.push_str(rest);
+    out.replace('`', "")
+}
+
+/// The first sentence of a doc comment: up to the first `. ` before a capital, or all of its first paragraph.
+fn first_sentence(doc: &str) -> String {
+    let para = doc
+        .split("\n\n")
+        .next()
+        .unwrap_or_default()
+        .replace('\n', " ");
+    let text = plain(para.trim());
+    let mut cut = text.len();
+    for (i, _) in text.match_indices(". ") {
+        if text[i + 2..].starts_with(|c: char| c.is_uppercase()) {
+            cut = i + 1;
+            break;
+        }
+    }
+    text[..cut].to_owned()
+}
+
+/// The doc comment of each `pub struct` of `file`, by the struct's name: its `///` lines, a blank `///` a paragraph
+/// break.
+fn struct_docs(file: &str) -> BTreeMap<String, String> {
+    let src = std::fs::read_to_string(root().join(file)).unwrap();
+    let mut doc: Vec<&str> = Vec::new();
+    let mut out = BTreeMap::new();
+    for l in src.lines().map(str::trim) {
+        if let Some(d) = l.strip_prefix("///") {
+            doc.push(d.strip_prefix(' ').unwrap_or(d));
+        } else if l.starts_with("#[") {
+        } else if let Some(rest) = l.strip_prefix("pub struct ") {
+            let name: String = rest
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .collect();
+            if !doc.is_empty() {
+                out.insert(name, doc.join("\n"));
+            }
+            doc.clear();
+        } else {
+            doc.clear();
+        }
+    }
+    out
 }
 
 /// The origins of `src/point/origins.rs`, each with the unit its `origin!` line names: `(origin, unit)`.
@@ -794,36 +853,103 @@ fn origin_units() -> Vec<(String, String)> {
     out
 }
 
-/// `docs_ext/eu_docs_ext/unit_info.json`, what the book's `[[symbol]]` and `\unit{}` tooltips show: every unit marker
-/// of the catalogue (the `unit!` lines), origin and level with its long name, plural and quantity, and every prefix
-/// of [exact_units::Prefix::ALL] with its name, kind and power of ten.
+/// The exact factor to the coherent SI unit as text, `null` for 1: a fraction where it is one (`127/5000`,
+/// `1602176634e-28`), else as a [Magnitude] writes it (`π/180`, `m_u`).
+fn scale_text(m: Magnitude) -> serde_json::Value {
+    if m == Magnitude::ONE {
+        return serde_json::Value::Null;
+    }
+    let s = match exact_units::Fraction::from_magnitude(&m) {
+        Some(f) => f.to_string(),
+        None => m.to_string().trim_start_matches('·').to_owned(),
+    };
+    serde_json::Value::from(s)
+}
+
+/// Empty text as `null`.
+fn text(s: &str) -> serde_json::Value {
+    if s.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::Value::from(s)
+    }
+}
+
+/// A unit's entry of `unit_info.json`, all of it what its line and its rustdoc say: the symbol, the long name and
+/// plural, the quantity, the dimension in SI (`kg·m²·s⁻²`), the exact scale to the coherent SI unit, the first
+/// sentence of its docs, and the other markers of its quantity (of its dimension where it names none).
+fn unit_entry(
+    def: &exact_units::UnitDef<'_>,
+    docs: &BTreeMap<String, String>,
+    catalogue: &[&exact_units::UnitDef<'static>],
+) -> serde_json::Value {
+    let quantity = quantity_name(def);
+    let related: Vec<&str> = catalogue
+        .iter()
+        .filter(|o| {
+            o.id != def.id
+                && o.dim.same(def.dim)
+                && (quantity.is_none() || quantity_name(o) == quantity)
+        })
+        .map(|o| o.id.name)
+        .collect();
+    let dim = if def.dim.is_one() {
+        String::new()
+    } else {
+        def.dim.to_string()
+    };
+    serde_json::json!({
+        "symbol": text(def.names.symbol),
+        "long": text(def.names.long),
+        "plural": text(def.names.plural),
+        "quantity": quantity,
+        "dim": text(&dim),
+        "scale": scale_text(def.scale),
+        "description": docs.get(def.id.name).map(|d| first_sentence(d)),
+        "related": related,
+    })
+}
+
+/// `docs_ext/eu_docs_ext/unit_info.json`, what the book's `[[symbol]]` and `\unit{}` tooltips show, read from the
+/// source alone: every unit marker of the catalogue (the `unit!` lines) as [unit_entry] has it, every origin and
+/// level with its name, quantity and docs, and every prefix of [exact_units::Prefix::ALL] with its name, kind and
+/// power of ten. Where the source says nothing, the entry has `null`, never a value written here.
 fn unit_info_json() -> String {
     let unit_of = |name: &str| match units::by_name(name) {
         Some(UnitExpr::Named(def)) => *def,
         _ => panic!("{name} is no named unit"),
     };
+    let mut docs = struct_docs("src/units.rs");
+    docs.extend(struct_docs("src/units/customary.rs"));
+    let catalogue: Vec<&exact_units::UnitDef<'static>> = units::ALL
+        .iter()
+        .chain(units::CUSTOMARY)
+        .map(|e| match e {
+            UnitExpr::Named(def) => *def,
+            e => panic!("{e:?} in the catalogue"),
+        })
+        .collect();
     let mut unit_map = serde_json::Map::new();
-    for e in units::ALL.iter().chain(units::CUSTOMARY) {
-        let UnitExpr::Named(def) = e else {
-            panic!("{e:?} in the catalogue")
-        };
-        unit_map.insert(
-            def.id.name.to_owned(),
-            info_entry(
-                def.names.long,
-                def.names.plural,
-                quantity_name(def).as_deref(),
-            ),
-        );
+    for def in &catalogue {
+        unit_map.insert(def.id.name.to_owned(), unit_entry(def, &docs, &catalogue));
     }
     // an origin is named after its marker, as a quantity is (`Celsius` "celsius"), and measures its unit's quantity
+    let origin_docs = struct_docs("src/point/origins.rs");
     let mut origin_map = serde_json::Map::new();
     for (origin, unit) in origin_units() {
         let name = exact_units::quantity::QuantityName(&origin).to_string();
-        let quantity = quantity_name(unit_of(&unit));
-        origin_map.insert(origin, info_entry(&name, "", quantity.as_deref()));
+        origin_map.insert(
+            origin.clone(),
+            serde_json::json!({
+                "long": name,
+                "unit": unit,
+                "quantity": quantity_name(unit_of(&unit)),
+                "description": origin_docs.get(&origin).map(|d| first_sentence(d)),
+            }),
+        );
     }
-    // a level of a gain is named as the unit of its symbol (`dB` the decibel)
+    // a level is named as the unit of its symbol (`dB` the decibel)
+    let level_docs = struct_docs("src/literal/level.rs");
     let mut level_map = serde_json::Map::new();
     for (symbol, marker) in LEVEL_SYMBOLS {
         let def = units::ALL
@@ -835,7 +961,12 @@ fn unit_info_json() -> String {
             .unwrap_or_else(|| panic!("no unit of the level symbol {symbol}"));
         level_map.insert(
             (*marker).to_owned(),
-            info_entry(def.names.long, def.names.plural, Some("gain level")),
+            serde_json::json!({
+                "long": text(def.names.long),
+                "plural": text(def.names.plural),
+                "unit": def.id.name,
+                "description": level_docs.get(*marker).map(|d| first_sentence(d)),
+            }),
         );
     }
     let mut prefix_map = serde_json::Map::new();
@@ -854,7 +985,7 @@ fn unit_info_json() -> String {
         );
     }
     let info = serde_json::json!({
-        "_generated": "by tests/q_symbols.rs from the unit! and origin! lines and src/si_prefix.rs: run `just q-symbols`, don't edit it by hand",
+        "_generated": "by tests/q_symbols.rs from the unit! and origin! lines, their rustdoc and src/si_prefix.rs: run `just q-symbols`, don't edit it by hand",
         "units": unit_map,
         "origins": origin_map,
         "levels": level_map,
@@ -865,13 +996,11 @@ fn unit_info_json() -> String {
     out
 }
 
-/// Every marker `q!`'s table reads, every origin and level has a long name and a quantity in `unit_info.json`, so
-/// no tooltip of the book is left without one; a unit that is a base of its own (a counted thing, a level) has no
-/// quantity.
+/// Every marker `q!`'s table reads, every origin and level has an entry in `unit_info.json`, so the book's markup
+/// finds each one it can resolve.
 #[test]
-fn every_table_marker_has_a_name_and_quantity() {
+fn every_table_marker_has_an_entry() {
     let info: serde_json::Value = serde_json::from_str(&unit_info_json()).unwrap();
-    let mut missing = Vec::new();
     let markers = table::UNITS
         .iter()
         .map(|e| ("units", e.marker.trim_start_matches("units::")))
@@ -885,36 +1014,30 @@ fn every_table_marker_has_a_name_and_quantity() {
                 .iter()
                 .map(|l| ("levels", l.marker.trim_start_matches("literal::"))),
         );
-    // a counted thing (`Item`) or a level (`Stop`, Np) is its own base: no quantity names it
-    let own_base = |kind: &str, marker: &str| {
-        kind == "units"
-            && units::by_name(marker)
-                .and_then(UnitExpr::def)
-                .is_some_and(|d| {
-                    !d.dim.has_true_exps()
-                        && [
-                            d.id,
-                            exact_units::MarkerId::NEPER,
-                            exact_units::MarkerId::NEPER_LOSS,
-                        ]
-                        .iter()
-                        .any(|b| !d.dim.exp_of(*b).is_zero())
-                })
-    };
-    for (kind, marker) in markers {
-        let entry = &info[kind][marker];
-        if !entry["long"].is_string() || !(entry["quantity"].is_string() || own_base(kind, marker))
-        {
-            missing.push(format!("{kind}::{marker}: {entry}"));
-        }
-    }
+    let mut missing: Vec<String> = markers
+        .filter(|(kind, marker)| !info[kind][marker].is_object())
+        .map(|(kind, marker)| format!("{kind}::{marker}"))
+        .collect();
     missing.sort();
     missing.dedup();
     assert!(
         missing.is_empty(),
-        "markers of q!'s table without a long name or quantity:\n{}",
-        missing.join("\n")
+        "markers of q!'s table without an entry: {missing:?}"
     );
+}
+
+/// The tooltip text is the source's: a description is its marker's first doc sentence, links and backticks dropped.
+#[test]
+fn descriptions_are_the_first_doc_sentence() {
+    assert_eq!(
+        first_sentence(
+            "Radioactivity in becquerels, Bq (s⁻¹), an [Activity](crate::quantities::Activity): not a frequency in [Hertz].\n\nMore."
+        ),
+        "Radioactivity in becquerels, Bq (s⁻¹), an Activity: not a frequency in Hertz."
+    );
+    assert_eq!(first_sentence("Inch: 1/36 yd.\n\n- 1959"), "Inch: 1/36 yd.");
+    assert_eq!(first_sentence("A b. C d."), "A b.");
+    assert_eq!(first_sentence("`Fixed` in 2.5 s"), "Fixed in 2.5 s");
 }
 
 /// The committed table, page and tooltip data are the generator's: `Q_SYMBOLS=update` (`just q-symbols`) writes

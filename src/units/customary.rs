@@ -29,7 +29,7 @@ crate::unit! {
     /// - 1959 yard and pound (24 FR 5348): 1 yd = 0.9144 m exactly
     /// - UK WMA 1985: Sch. 1 Pt VI (supplementary and other units)
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Inch = "in" (long "inch" plural "inches"), [m 1], Exact(127 / 1, pow10 -4, pow2 1);
+    pub struct Inch = "in", [m 1], Exact(127 / 1, pow10 -4, pow2 1);
 
     /// Foot (international): 1/3 yd = 0.3048 m.
     ///
@@ -44,7 +44,7 @@ crate::unit! {
     /// - 1959 yard and pound (24 FR 5348): 1 yd = 0.9144 m exactly
     /// - UK WMA 1985: Sch. 1 Pt VI (supplementary and other units)
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Yard = "yd" (long "yard"), [m 1], Exact(1143 / 1, pow10 -4, pow2 3);
+    pub struct Yard = "yd", [m 1], Exact(1143 / 1, pow10 -4, pow2 3);
 
     /// Mile (international, statute): 5280 ft = 1760 yd.
     ///
@@ -58,17 +58,17 @@ crate::unit! {
     ///
     /// - NIST HB 44 App. C: §4 Units of length, thickness measurement: 1 mil = 0.001 in
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Thou = "thou" (long "thou" plural "thou"), [m 1], Exact(127 / 1, pow10 -7, pow2 1);
+    pub struct Thou = "thou", [m 1], Exact(127 / 1, pow10 -7, pow2 1);
 
     /// Microinch: 10⁻⁶ in.
     ///
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Microinch = "µin" (long "microinch" plural "microinches"), [m 1], Exact(127 / 1, pow10 -10, pow2 1);
+    pub struct Microinch = "µin", [m 1], Exact(127 / 1, pow10 -10, pow2 1);
 
     /// Hand: 4 in (custom, bracketed in HB 44).
     ///
     /// - NIST HB 44 App. C: §5 Tables of equivalents, Units of length
-    pub struct Hand = "hh" (long "hand"), [m 1], Exact(127 / 1, pow10 -4, pow2 3);
+    pub struct Hand = "hh", [m 1], Exact(127 / 1, pow10 -4, pow2 3);
 
     /// Link (Gunter's, international foot): 0.66 ft.
     ///
@@ -257,13 +257,13 @@ crate::unit! {
     /// Rood: 1210 yd².
     ///
     /// - UK WMA 1985: Sch. 1 Pt VI (supplementary and other units)
-    pub struct Rood = "ro" (long "rood"), [m 2], Exact(158080329 / 1, pow10 -7, pow2 6);
+    pub struct Rood = "ro", [m 2], Exact(158080329 / 1, pow10 -7, pow2 6);
 
     /// Circular mil: area of a circle 1 mil across, π/4 mil².
     ///
     /// - Unsourced: π/4 mil² not stated in the fetched texts; SP 811 B.8 prints the matching value
     /// - NIST SP 811: B.8 row of this unit
-    pub struct CircularMil = "cmil" (long "circular mil"), [m 2], Exact(16129 / 1, pow10 -14, pi 1);
+    pub struct CircularMil = "cmil", [m 2], Exact(16129 / 1, pow10 -14, pi 1);
 
     /// Cubic inch: in³.
     ///
@@ -525,7 +525,7 @@ crate::unit! {
     /// - NIST HB 44 App. C: §2 Avoirdupois units of mass
     /// - UK WMA 1985: Sch. 1 Pt VI (supplementary and other units)
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Grain = "gr" (long "grain"), [kg 1], Exact(6479891 / 1, pow10 -11);
+    pub struct Grain = "gr", [kg 1], Exact(6479891 / 1, pow10 -11);
 
     /// Dram (avoirdupois): 1/16 oz = 27 11/32 gr.
     ///
@@ -552,7 +552,7 @@ crate::unit! {
     ///
     /// - UK WMA 1985: Sch. 1 Pt VI (supplementary and other units)
     /// - NIST HB 44 App. C: §3 Notes on British units of measurement
-    pub struct Stone = "st" (long "stone"), [kg 1], Exact(317514659 / 1, pow10 -8, pow2 1);
+    pub struct Stone = "st", [kg 1], Exact(317514659 / 1, pow10 -8, pow2 1);
 
     /// Quarter (British, 28 lb): 28 lb.
     ///
@@ -563,7 +563,7 @@ crate::unit! {
     /// Cental: 100 lb.
     ///
     /// - UK WMA 1985: Sch. 1 Pt VI (supplementary and other units)
-    pub struct Cental = "ctl" (long "cental"), [kg 1], Exact(45359237 / 1, pow10 -6);
+    pub struct Cental = "ctl", [kg 1], Exact(45359237 / 1, pow10 -6);
 
     /// Hundredweight (short, net): 100 lb.
     ///
@@ -582,7 +582,7 @@ crate::unit! {
     ///
     /// - NIST HB 44 App. C: §2 Avoirdupois units of mass
     /// - NIST SP 811: B.8 row of this unit
-    pub struct TonShort = "tn" (long "short ton" plural "short tons"), [kg 1], Exact(45359237 / 1, pow10 -5, pow2 1);
+    pub struct TonShort = "tn", [kg 1], Exact(45359237 / 1, pow10 -5, pow2 1);
 
     /// Ton (long, gross): 2240 lb.
     ///
@@ -607,7 +607,7 @@ crate::unit! {
     /// - NIST HB 44 App. C: §2 Troy units of mass
     /// - UK WMA 1985: Sch. 1 Pt VI (supplementary and other units)
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Pennyweight = "dwt" (long "pennyweight"), [kg 1], Exact(19439673 / 1, pow10 -11, pow2 3);
+    pub struct Pennyweight = "dwt", [kg 1], Exact(19439673 / 1, pow10 -11, pow2 3);
 
     /// Ounce (troy): 480 gr = 0.031 103 476 8 kg.
     ///
@@ -651,7 +651,7 @@ crate::unit! {
     ///
     /// - Unsourced: lbf·s²/ft not stated in the fetched texts; SP 811 B.8 prints the matching value
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Slug = "slug" (long "slug"), [kg 1], Exact(8896443230521 / 381, pow10 -8, pow2 -4);
+    pub struct Slug = "slug", [kg 1], Exact(8896443230521 / 381, pow10 -8, pow2 -4);
 
     /// Pound-force: lb · g_n.
     ///
@@ -659,51 +659,51 @@ crate::unit! {
     /// - 3rd CGPM (1901): g_n = 980.665 cm/s²
     /// - NIST SP 811: B.8 footnote 23: 4.448 221 615 260 5 E+00 exactly with g_n
     /// - NIST SP 811: B.8 row of this unit
-    pub struct PoundForce = "lbf" (long "pound-force" plural "pounds-force"), [s -2, m 1, kg 1], Exact(8896443230521 / 1, pow10 -12, pow2 -1);
+    pub struct PoundForce = "lbf", [s -2, m 1, kg 1], Exact(8896443230521 / 1, pow10 -12, pow2 -1);
 
     /// Ounce-force (avoirdupois): oz · g_n.
     ///
     /// - NIST HB 44 App. C: §2 Avoirdupois units of mass
     /// - 3rd CGPM (1901): g_n = 980.665 cm/s²
     /// - NIST SP 811: B.8 row of this unit
-    pub struct OunceForce = "ozf" (long "ounce-force" plural "ounces-force"), [s -2, m 1, kg 1], Exact(8896443230521 / 1, pow10 -12, pow2 -5);
+    pub struct OunceForce = "ozf", [s -2, m 1, kg 1], Exact(8896443230521 / 1, pow10 -12, pow2 -5);
 
     /// Kip (1000 lbf): 1000 lbf.
     ///
     /// - NIST SP 811: B.8 row label: kip (1 kip = 1000 lbf)
-    pub struct Kip = "kip" (long "kip"), [s -2, m 1, kg 1], Exact(8896443230521 / 1, pow10 -9, pow2 -1);
+    pub struct Kip = "kip", [s -2, m 1, kg 1], Exact(8896443230521 / 1, pow10 -9, pow2 -1);
 
     /// Ton-force (short, 2000 lbf): 2000 lbf.
     ///
     /// - NIST SP 811: B.8 row label: ton-force (2000 lbf)
-    pub struct TonForceShort = "tnf" (long "short ton-force" plural "short tons-force"), [s -2, m 1, kg 1], Exact(8896443230521 / 1, pow10 -9);
+    pub struct TonForceShort = "tnf", [s -2, m 1, kg 1], Exact(8896443230521 / 1, pow10 -9);
 
     /// Poundal: lb·ft/s².
     ///
     /// - Unsourced: lb·ft/s² not stated in the fetched texts; SP 811 B.8 prints the matching value
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Poundal = "pdl" (long "poundal"), [s -2, m 1, kg 1], Exact(17281869297 / 1, pow10 -12, pow2 3);
+    pub struct Poundal = "pdl", [s -2, m 1, kg 1], Exact(17281869297 / 1, pow10 -12, pow2 3);
 
     /// Kilogram-force (kilopond): kg · g_n.
     ///
     /// - 3rd CGPM (1901): g_n = 980.665 cm/s²
     /// - NIST SP 811: B.8 row of this unit
-    pub struct KilogramForce = "kgf" (long "kilogram-force" plural "kilograms-force"), [s -2, m 1, kg 1], Exact(196133 / 1, pow10 -4, pow2 -1);
+    pub struct KilogramForce = "kgf", [s -2, m 1, kg 1], Exact(196133 / 1, pow10 -4, pow2 -1);
 
     /// Pound-force per square inch: lbf/in².
     ///
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Psi = "psi" (long "pound-force per square inch" plural "pounds-force per square inch"), [s -2, m -1, kg 1], Exact(8896443230521 / 16129, pow10 -4, pow2 -3);
+    pub struct Psi = "psi", [s -2, m -1, kg 1], Exact(8896443230521 / 16129, pow10 -4, pow2 -3);
 
     /// Kip per square inch: kip/in².
     ///
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Ksi = "ksi" (long "kip per square inch" plural "kips per square inch"), [s -2, m -1, kg 1], Exact(8896443230521 / 16129, pow10 -1, pow2 -3);
+    pub struct Ksi = "ksi", [s -2, m -1, kg 1], Exact(8896443230521 / 16129, pow10 -1, pow2 -3);
 
     /// Pound-force per square foot: lbf/ft².
     ///
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Psf = "psf" (long "pound-force per square foot" plural "pounds-force per square foot"), [s -2, m -1, kg 1], Exact(8896443230521 / 145161, pow10 -4, pow2 -7);
+    pub struct Psf = "psf", [s -2, m -1, kg 1], Exact(8896443230521 / 145161, pow10 -4, pow2 -7);
 
     /// Inch of mercury (conventional): 1 in · 13 595.1 kg/m³ · g_n.
     ///
@@ -736,7 +736,7 @@ crate::unit! {
     ///
     /// - 71/354/EEC: Ch. III 8.3: 1 torr = 101 325/760 Pa
     /// - NIST SP 811: B.8 row of this unit
-    pub struct Torr = "Torr" (long "torr" plural "torr"), [s -2, m -1, kg 1], Exact(4053 / 19, pow10 1, pow2 -4);
+    pub struct Torr = "Torr", [s -2, m -1, kg 1], Exact(4053 / 19, pow10 1, pow2 -4);
 
     /// Inch of mercury (32 °F): measured: mercury density at 32 °F. Measured, not defined: the value NIST SP 811 B.8 prints.
     ///
@@ -789,13 +789,13 @@ crate::unit! {
     /// Atmosphere (standard): 101 325 Pa.
     ///
     /// - NIST SP 811: B.8 row of this unit
-    pub struct AtmosphereStandard = "atm" (long "standard atmosphere"), [s -2, m -1, kg 1], Exact(4053 / 1, pow10 2, pow2 -2);
+    pub struct AtmosphereStandard = "atm", [s -2, m -1, kg 1], Exact(4053 / 1, pow10 2, pow2 -2);
 
     /// Atmosphere (technical, kgf/cm²): 1 kgf/cm².
     ///
     /// - NIST SP 811: B.8 footnote 8: 1 at = 1 kgf/cm²
     /// - NIST SP 811: B.8 row of this unit
-    pub struct AtmosphereTechnical = "at" (long "technical atmosphere"), [s -2, m -1, kg 1], Exact(196133 / 1, pow2 -1);
+    pub struct AtmosphereTechnical = "at", [s -2, m -1, kg 1], Exact(196133 / 1, pow2 -1);
 
     /// Foot pound-force: ft · lbf.
     ///
@@ -812,18 +812,18 @@ crate::unit! {
     ///
     /// - NIST SP 811: B.8 footnote 9: cal_IT = 4.1868 J (5th Int. Conf. Properties of Steam 1956), Btu_IT = 1.055 055 852 62 kJ exactly; cal_th = 4.184 J, Btu_th based on it
     /// - NIST SP 811: B.8 row of this unit
-    pub struct BtuIt = "Btu_IT" (long "IT British thermal unit"), [s -2, m 2, kg 1], Exact(52752792631 / 1, pow10 -8, pow2 1);
+    pub struct BtuIt = "Btu_IT", [s -2, m 2, kg 1], Exact(52752792631 / 1, pow10 -8, pow2 1);
 
     /// British thermal unit (thermochemical): cal_th/(g·°C) · lb · °F.
     ///
     /// - NIST SP 811: B.8 footnote 9: cal_IT = 4.1868 J (5th Int. Conf. Properties of Steam 1956), Btu_IT = 1.055 055 852 62 kJ exactly; cal_th = 4.184 J, Btu_th based on it
     /// - NIST SP 811: B.8 row of this unit
-    pub struct BtuTh = "Btu_th" (long "thermochemical British thermal unit"), [s -2, m 2, kg 1], Exact(23722880951 / 9, pow10 -7, pow2 2);
+    pub struct BtuTh = "Btu_th", [s -2, m 2, kg 1], Exact(23722880951 / 9, pow10 -7, pow2 2);
 
     /// British thermal unit (mean): measured. Measured, not defined: the value NIST SP 811 B.8 prints.
     ///
     /// - NIST SP 811: B.8 row of this unit
-    pub struct BtuMean = "Btu_mean" (long "mean British thermal unit"), [s -2, m 2, kg 1], Exact(105587 / 1, pow10 -2), conventional("NIST SP 811", 2008);
+    pub struct BtuMean = "Btu_mean", [s -2, m 2, kg 1], Exact(105587 / 1, pow10 -2), conventional("NIST SP 811", 2008);
 
     /// British thermal unit (39 °F): measured: water at 39 °F. Measured, not defined: the value NIST SP 811 B.8 prints.
     ///
@@ -844,18 +844,18 @@ crate::unit! {
     ///
     /// - NIST SP 811: B.8 footnote 9: cal_IT = 4.1868 J (5th Int. Conf. Properties of Steam 1956), Btu_IT = 1.055 055 852 62 kJ exactly; cal_th = 4.184 J, Btu_th based on it
     /// - NIST SP 811: B.8 row of this unit
-    pub struct CalorieIt = "cal_IT" (long "IT calorie"), [s -2, m 2, kg 1], Exact(10467 / 1, pow10 -4, pow2 2);
+    pub struct CalorieIt = "cal_IT", [s -2, m 2, kg 1], Exact(10467 / 1, pow10 -4, pow2 2);
 
     /// Calorie (thermochemical): 4.184 J.
     ///
     /// - NIST SP 811: B.8 footnote 9: cal_IT = 4.1868 J (5th Int. Conf. Properties of Steam 1956), Btu_IT = 1.055 055 852 62 kJ exactly; cal_th = 4.184 J, Btu_th based on it
     /// - NIST SP 811: B.8 row of this unit
-    pub struct CalorieTh = "cal_th" (long "thermochemical calorie"), [s -2, m 2, kg 1], Exact(523 / 1, pow10 -3, pow2 3);
+    pub struct CalorieTh = "cal_th", [s -2, m 2, kg 1], Exact(523 / 1, pow10 -3, pow2 3);
 
     /// Calorie (mean): measured. Measured, not defined: the value NIST SP 811 B.8 prints.
     ///
     /// - NIST SP 811: B.8 row of this unit
-    pub struct CalorieMean = "cal_mean" (long "mean calorie"), [s -2, m 2, kg 1], Exact(209501 / 1, pow10 -5, pow2 1), conventional("NIST SP 811", 2008);
+    pub struct CalorieMean = "cal_mean", [s -2, m 2, kg 1], Exact(209501 / 1, pow10 -5, pow2 1), conventional("NIST SP 811", 2008);
 
     /// Calorie (15 °C): measured: water at 15 °C. Measured, not defined: the value NIST SP 811 B.8 prints.
     ///
@@ -871,23 +871,23 @@ crate::unit! {
     ///
     /// - NIST SP 811: B.8 footnote 9: cal_IT = 4.1868 J (5th Int. Conf. Properties of Steam 1956), Btu_IT = 1.055 055 852 62 kJ exactly; cal_th = 4.184 J, Btu_th based on it
     /// - NIST SP 811: B.8 row of this unit
-    pub struct KilocalorieIt = "kcal_IT" (long "IT kilocalorie"), [s -2, m 2, kg 1], Exact(10467 / 1, pow10 -1, pow2 2);
+    pub struct KilocalorieIt = "kcal_IT", [s -2, m 2, kg 1], Exact(10467 / 1, pow10 -1, pow2 2);
 
     /// Kilocalorie (thermochemical): 1000 cal_th.
     ///
     /// - NIST SP 811: B.8 footnote 9: cal_IT = 4.1868 J (5th Int. Conf. Properties of Steam 1956), Btu_IT = 1.055 055 852 62 kJ exactly; cal_th = 4.184 J, Btu_th based on it
     /// - NIST SP 811: B.8 row of this unit
-    pub struct KilocalorieTh = "kcal_th" (long "thermochemical kilocalorie"), [s -2, m 2, kg 1], Exact(523 / 1, pow2 3);
+    pub struct KilocalorieTh = "kcal_th", [s -2, m 2, kg 1], Exact(523 / 1, pow2 3);
 
     /// Calorie (food, kilogram calorie IT): 1 kcal_IT.
     ///
     /// - NIST SP 811: B.8 footnote 11 and row calorie_IT, kilogram (nutrition)
-    pub struct CalorieFoodIt = "Cal_IT" (long "IT food calorie"), [s -2, m 2, kg 1], Exact(10467 / 1, pow10 -1, pow2 2);
+    pub struct CalorieFoodIt = "Cal_IT", [s -2, m 2, kg 1], Exact(10467 / 1, pow10 -1, pow2 2);
 
     /// Calorie (food, kilogram calorie thermochemical): 1 kcal_th.
     ///
     /// - NIST SP 811: B.8 footnote 11 and row calorie_th, kilogram (nutrition)
-    pub struct CalorieFoodTh = "Cal_th" (long "thermochemical food calorie"), [s -2, m 2, kg 1], Exact(523 / 1, pow2 3);
+    pub struct CalorieFoodTh = "Cal_th", [s -2, m 2, kg 1], Exact(523 / 1, pow2 3);
 
     /// Therm (EC): 105.506 MJ.
     ///
@@ -905,13 +905,13 @@ crate::unit! {
     /// Quad (10¹⁵ Btu_IT): 10¹⁵ Btu_IT.
     ///
     /// - NIST SP 811: B.8 row label: quad (10¹⁵ Btu_IT)
-    pub struct Quad = "quad" (long "quad"), [s -2, m 2, kg 1], Exact(52752792631 / 1, pow10 7, pow2 1);
+    pub struct Quad = "quad", [s -2, m 2, kg 1], Exact(52752792631 / 1, pow10 7, pow2 1);
 
     /// Ton of TNT (energy equivalent): 10⁹ cal_th = 4.184 GJ.
     ///
     /// - NIST SP 811: B.8 footnote 25: defined, not measured
     /// - NIST SP 811: B.8 row of this unit
-    pub struct TonOfTnt = "tTNT" (long "ton of TNT" plural "tons of TNT"), [s -2, m 2, kg 1], Exact(523 / 1, pow10 6, pow2 3);
+    pub struct TonOfTnt = "tTNT", [s -2, m 2, kg 1], Exact(523 / 1, pow10 6, pow2 3);
 
     /// Horsepower hour (mechanical): hp · 3600 s.
     ///
@@ -952,17 +952,17 @@ crate::unit! {
     /// Ton of refrigeration (12 000 Btu_IT/h): 12 000 Btu_IT/h.
     ///
     /// - NIST SP 811: B.8 row label: ton of refrigeration (12 000 Btu_IT/h)
-    pub struct TonOfRefrigeration = "TR" (long "ton of refrigeration" plural "tons of refrigeration"), [s -3, m 2, kg 1], Exact(52752792631 / 3, pow10 -7, pow2 1);
+    pub struct TonOfRefrigeration = "TR", [s -3, m 2, kg 1], Exact(52752792631 / 3, pow10 -7, pow2 1);
 
     /// Mile per hour: mi/h.
     ///
     /// - NIST SP 811: B.8 row of this unit
-    pub struct MilePerHour = "mph" (long "mile per hour" plural "miles per hour"), [s -1, m 1], Exact(1397 / 1, pow10 -5, pow2 5);
+    pub struct MilePerHour = "mph", [s -1, m 1], Exact(1397 / 1, pow10 -5, pow2 5);
 
     /// Knot: 1 nmi/h = 1852/3600 m/s.
     ///
     /// - SI Brochure 8: Table 8: 1 kn = (1852/3600) m/s
-    pub struct Knot = "kn" (long "knot"), [s -1, m 1], Exact(463 / 9, pow10 -2);
+    pub struct Knot = "kn", [s -1, m 1], Exact(463 / 9, pow10 -2);
 
     /// Foot per second: ft/s.
     ///
@@ -977,17 +977,17 @@ crate::unit! {
     /// Minute of arc: 1/60°.
     ///
     /// - SI Brochure 8: Table 6: 1° = (π/180) rad, 1′ = (1/60)°, 1″ = (1/60)′
-    pub struct Arcminute = "′" (long "arcminute"), [rad 1], Exact(1 / 27, pow10 -2, pow2 -2, pi 1);
+    pub struct Arcminute = "′", [rad 1], Exact(1 / 27, pow10 -2, pow2 -2, pi 1);
 
     /// Second of arc: 1/60′.
     ///
     /// - SI Brochure 8: Table 6: 1° = (π/180) rad, 1′ = (1/60)°, 1″ = (1/60)′
-    pub struct Arcsecond = "″" (long "arcsecond"), [rad 1], Exact(1 / 81, pow10 -3, pow2 -3, pi 1);
+    pub struct Arcsecond = "″", [rad 1], Exact(1 / 81, pow10 -3, pow2 -3, pi 1);
 
     /// Gon (grade): 0.9°.
     ///
     /// - NIST SP 811: B.8 rows gon: 9.0 E-01 degree (bold)
-    pub struct Gon = "gon" (long "gon"), [rad 1], Exact(1 / 1, pow10 -2, pow2 -1, pi 1);
+    pub struct Gon = "gon", [rad 1], Exact(1 / 1, pow10 -2, pow2 -1, pi 1);
 
     /// Mil (angle, NATO, 1/6400 turn): 0.056 25° = 1/6400 turn.
     ///
@@ -1002,5 +1002,5 @@ crate::unit! {
     /// Streck (angle, Swedish, 1/6300 turn): 1/6300 turn.
     ///
     /// - Unsourced: 1/6300 turn: no primary source fetched
-    pub struct StreckSwedish = "streck" (long "Swedish streck" plural "Swedish streck"), [rad 1], Exact(1 / 63, pow10 -2, pow2 1, pi 1);
+    pub struct StreckSwedish = "streck", [rad 1], Exact(1 / 63, pow10 -2, pow2 1, pi 1);
 }

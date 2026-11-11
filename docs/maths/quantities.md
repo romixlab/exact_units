@@ -216,14 +216,6 @@ let gain: Fixed<Per<Volt, Volt>, One, f32> = Fixed::bounded(4.0);
 let _ = gain.convert::<Ratio, One, f32>();
 ```
 
-## Open roots of the base units
-
-Every SI base unit's dimension has its open root (`Length`, `Time`, `Mass`, `ElectricCurrent`,
-`ThermodynamicTemperature`, `AmountOfSubstance`, `LuminousIntensity`), as do the common derived ones whose coherent
-unit has a one-word symbol (`Force` for N, `SolidAngle` for sr, `LuminousFlux`, `Illuminance`, `Luminance`,
-`CatalyticActivity`) and the bit's (`Information`). They change nothing a unit converts to: a line without a
-quantity already measures its dimension's quantity. They give that quantity a name, `Derived` of kg being a mass.
-
 ## Some dimensions have no open root at all
 
 A unit whose line names no quantity measures its dimension's open root — except where a dimension has none.

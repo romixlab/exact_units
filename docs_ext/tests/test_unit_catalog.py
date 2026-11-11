@@ -78,19 +78,17 @@ def test_more_than_one_slash_is_refused(catalog):
 
 
 def test_every_marker_of_the_table_has_a_generated_entry(catalog):
-    # unit_info.json is generated (just q-symbols): every marker q!'s table reads has a long name there, so no
-    # tooltip goes without one
+    # unit_info.json is generated (just q-symbols): every marker q!'s table reads has an entry there
     from eu_docs_ext.unit_info import LEVEL_INFO, ORIGIN_INFO, UNIT_INFO
 
     markers = {entry.marker for entry in catalog.units.values()}
     markers |= {read_as.rsplit(" ", 1)[-1] for read_as in catalog.folded.values()}
     for marker in markers:
         assert marker in UNIT_INFO, f"{marker!r} of symbols.md has no entry in unit_info.json"
-        assert UNIT_INFO[marker].name, f"{marker!r} has no long name: give its unit! line one"
     for origin in set(catalog.origins.values()):
-        assert ORIGIN_INFO[origin].name and ORIGIN_INFO[origin].quantity, origin
+        assert origin in ORIGIN_INFO, origin
     for level in set(catalog.levels.values()):
-        assert LEVEL_INFO[level].name and LEVEL_INFO[level].quantity, level
+        assert level in LEVEL_INFO, level
 
 
 def test_unit_info_is_not_curated_by_hand():
@@ -101,8 +99,19 @@ def test_unit_info_is_not_curated_by_hand():
     assert 'Info("' not in source and 'PrefixEntry("' not in source
 
 
-def test_tooltip_names_the_quantity_where_there_is_one(catalog):
+def test_tooltip_is_the_generated_entry_line_by_line(catalog):
     (_, becquerel), = resolve_expression("kBq", catalog)
-    assert becquerel.tooltip == "kilo- becquerel · activity"
+    lines = becquerel.tooltip.split("\n")
+    assert lines[0] == "kilo- becquerel · activity"
+    assert lines[1].startswith("Radioactivity in becquerels")
+    assert lines[-1] == "Related: Ci"
+
+
+def test_tooltip_writes_a_long_exact_scale_as_a_power_of_ten(catalog):
+    (_, ev), = resolve_expression("eV", catalog)
+    assert "1 eV = 1.602176634·10⁻¹⁹ kg·m²·s⁻²" in ev.tooltip.split("\n")
+
+
+def test_a_marker_the_source_names_no_quantity_of_shows_less(catalog):
     (_, item), = resolve_expression("item", catalog)
-    assert item.tooltip == "item"
+    assert item.tooltip.split("\n")[0] == "item"

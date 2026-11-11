@@ -105,22 +105,10 @@ const TREE: &[(&str, &[&str], &[&str])] = &[
     ("Inductance", &["D"], &[]),
     ("PlaneAngle", &["D"], &[]),
     ("PhaseAngle", &[], &["PlaneAngle"]),
-    ("Time", &["D"], &[]),
-    ("Mass", &["D"], &[]),
-    ("ThermodynamicTemperature", &["D"], &[]),
-    ("AmountOfSubstance", &["D"], &[]),
-    ("LuminousIntensity", &["D"], &[]),
-    ("Force", &["D"], &[]),
-    ("CatalyticActivity", &["D"], &[]),
-    ("SolidAngle", &["D"], &[]),
-    ("LuminousFlux", &["D"], &[]),
-    ("Illuminance", &["D"], &[]),
-    ("Luminance", &["D"], &[]),
-    ("Information", &["D"], &[]),
 ];
 
 /// The quantities as `const` data, in [TREE]'s order.
-const DEFS: [&QuantityDef<'static>; 72] = [
+const DEFS: [&QuantityDef<'static>; 60] = [
     Length::DEF,
     Height::DEF,
     Width::DEF,
@@ -181,23 +169,11 @@ const DEFS: [&QuantityDef<'static>; 72] = [
     quantities::Inductance::DEF,
     PlaneAngle::DEF,
     PhaseAngle::DEF,
-    quantities::Time::DEF,
-    quantities::Mass::DEF,
-    quantities::ThermodynamicTemperature::DEF,
-    quantities::AmountOfSubstance::DEF,
-    quantities::LuminousIntensity::DEF,
-    quantities::Force::DEF,
-    quantities::CatalyticActivity::DEF,
-    quantities::SolidAngle::DEF,
-    quantities::LuminousFlux::DEF,
-    quantities::Illuminance::DEF,
-    quantities::Luminance::DEF,
-    quantities::Information::DEF,
 ];
 
 /// The expressions walked: each quantity, then the derived quantity of each of their dimensions and of a velocity,
 /// then ratios of length and of energy.
-const EXPRS: [QuantityExpr<'static>; 94] = {
+const EXPRS: [QuantityExpr<'static>; 82] = {
     let dims: [Dim<'static>; 19] = [
         Length::DEF.dim,
         Energy::DEF.dim,
@@ -220,7 +196,7 @@ const EXPRS: [QuantityExpr<'static>; 94] = {
         AbsorbedDose::DEF.dim,
         Resistance::DEF.dim,
     ];
-    let mut out = [QuantityExpr::RatioOf(Dim::ONE); 94];
+    let mut out = [QuantityExpr::RatioOf(Dim::ONE); 82];
     let mut i = 0;
     while i < DEFS.len() {
         out[i] = QuantityExpr::Spec(QuantityRef::Def(DEFS[i]));

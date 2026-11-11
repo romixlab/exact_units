@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import functools
 import re
+from decimal import Decimal
 from dataclasses import dataclass
 from pathlib import Path
 
-from eu_docs_ext.unit_info import LEVEL_INFO, ORIGIN_INFO, PREFIX_INFO, UNIT_INFO
+from eu_docs_ext.unit_info import LEVEL_INFO, ORIGIN_INFO, PREFIX_INFO, UNIT_INFO, Info
 
 SYMBOLS_PAGE = Path(__file__).resolve().parents[2] / "docs" / "start" / "symbols.md"
 
@@ -128,19 +129,48 @@ def _split_exponent(token: str) -> tuple[str, str]:
     return token, ""
 
 
-def _tooltip(name: str, quantity: str | None) -> str:
-    return f"{name} · {quantity}" if quantity else name
+_SUPERSCRIPT_DIGITS = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
+_RELATED_SHOWN = 8
+
+
+def _scale_text(scale: str) -> str:
+    """A long exact decimal as mantissa times a power of ten (`1.602176634·10⁻¹⁹`), the same value; anything else
+    as the generator wrote it."""
+    if not re.fullmatch(r"\d+(\.\d+)?", scale) or len(scale) <= 12:
+        return scale
+    sign, digits, exp = Decimal(scale).normalize().as_tuple()
+    mantissa = "".join(map(str, digits))
+    power = exp + len(digits) - 1
+    if len(mantissa) > 1:
+        mantissa = f"{mantissa[0]}.{mantissa[1:]}"
+    return f"{mantissa}·10{str(power).translate(_SUPERSCRIPT_DIGITS)}"
+
+
+def _tooltip(info: Info, fallback: str, prefix_name: str | None = None) -> str:
+    """The tooltip of a marker, one fact a line, from its generated entry alone: its name and quantity, the first
+    sentence of its docs, its scale and dimension in SI, and the other markers of its quantity."""
+    name = info.name or info.symbol or fallback
+    if prefix_name:
+        name = f"{prefix_name}- {name}"
+    lines = [f"{name} · {info.quantity}" if info.quantity else name]
+    if info.description:
+        lines.append(info.description)
+    if info.scale and info.symbol:
+        lines.append(f"1 {info.symbol} = {_scale_text(info.scale)} {info.dim or ''}".rstrip())
+    elif info.dim and info.symbol and info.dim != info.symbol and info.dim != fallback:
+        lines.append(f"1 {info.symbol} = 1 {info.dim}")
+    if info.related:
+        shown = [UNIT_INFO[r].symbol or r if r in UNIT_INFO else r for r in info.related[:_RELATED_SHOWN]]
+        more = len(info.related) - len(shown)
+        lines.append("Related: " + ", ".join(shown) + (f" and {more} more" if more > 0 else ""))
+    return "\n".join(lines)
 
 
 def _unit_tooltip(marker: str, prefix_name: str | None) -> str:
     info = UNIT_INFO.get(marker)
-    if info is None or not info.name:
-        raise UnitSymbolError(
-            f"unit_catalog: no long name for marker {marker!r} in unit_info.json: give its unit! line a"
-            " `long \"..\"` and run `just q-symbols`"
-        )
-    name = f"{prefix_name}- {info.name}" if prefix_name else info.name
-    return _tooltip(name, info.quantity)
+    if info is None:
+        raise UnitSymbolError(f"unit_catalog: no entry for marker {marker!r} in unit_info.json: run `just q-symbols`")
+    return _tooltip(info, marker, prefix_name)
 
 
 def resolve_base(base: str, catalog: Catalog) -> Factor:
@@ -159,16 +189,16 @@ def resolve_base(base: str, catalog: Catalog) -> Factor:
     if base in catalog.origins:
         path_name = catalog.origins[base]
         info = ORIGIN_INFO.get(path_name)
-        if info is None or not info.name:
+        if info is None:
             raise UnitSymbolError(f"unit_catalog: no entry for origin {path_name!r} in unit_info.json")
-        return Factor(text=base, anchor=f"sym-{path_name}", tooltip=_tooltip(info.name, info.quantity))
+        return Factor(text=base, anchor=f"sym-{path_name}", tooltip=_tooltip(info, path_name))
 
     if base in catalog.levels:
         marker = catalog.levels[base]
         info = LEVEL_INFO.get(marker)
-        if info is None or not info.name:
+        if info is None:
             raise UnitSymbolError(f"unit_catalog: no entry for level {marker!r} in unit_info.json")
-        return Factor(text=base, anchor=f"sym-{base}", tooltip=_tooltip(info.name, info.quantity))
+        return Factor(text=base, anchor=f"sym-{base}", tooltip=_tooltip(info, marker))
 
     # A prefix on a symbol that takes it: "keV" = kilo `ElectronVolt`, "mcd" = milli `Candela` (never milli `Cord`,
     # as `Cord` takes no prefix: only one candidate ever matches).

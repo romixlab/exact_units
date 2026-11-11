@@ -26,10 +26,6 @@
 //! - [Pressure] and [EnergyDensity] (one dimension, two quantities); [Entropy], apart from J/K's own quantity.
 //! - Dimension one: [DampingRatio] and [QualityFactor].
 //! - Angles: [PlaneAngle] and [PhaseAngle], the angle of a phasor or of a motor's electrical rotation.
-//! - The open roots of the base units and of common derived ones, so that a unit's quantity has a name where its line
-//!   names none: [Time], [Mass], [ThermodynamicTemperature], [AmountOfSubstance], [LuminousIntensity], [Force],
-//!   [CatalyticActivity], [SolidAngle], [LuminousFlux], [Illuminance], [Luminance], [Information]. No `Area` or
-//!   `Volume`: the units [Area](crate::units::Area) and [Volume](crate::units::Volume) have those names.
 //!
 //! [ALL] lists them, the table [units::TABLE](crate::units::TABLE) resolves them by id.
 
@@ -194,29 +190,4 @@ crate::quantity! {
     /// Phase angle, φ: the argument of a phasor, an NCO's phase, a motor's electrical angle. Not a mechanical
     /// angle: the named steps `as_phase` and `as_plane_angle` cross.
     pub struct PhaseAngle: kind PlaneAngle;
-
-    /// Time, t (ISO 80000-3): the open root of s, [Second](crate::units::Second)'s and the hour's.
-    pub struct Time = [s 1];
-    /// Mass, m (ISO 80000-4): the open root of kg.
-    pub struct Mass = [kg 1];
-    /// Thermodynamic temperature, T (ISO 80000-5): the open root of K.
-    pub struct ThermodynamicTemperature = [k 1];
-    /// Amount of substance, n (ISO 80000-9): the open root of mol.
-    pub struct AmountOfSubstance = [mol 1];
-    /// Luminous intensity, I_v (ISO 80000-7): the open root of cd.
-    pub struct LuminousIntensity = [cd 1];
-    /// Force, F (ISO 80000-4): the open root of N.
-    pub struct Force = [kg 1, m 1, s -2];
-    /// Catalytic activity, z (ISO 80000-9): the open root of kat.
-    pub struct CatalyticActivity = [mol 1, s -1];
-    /// Solid angle, Ω (ISO 80000-3): the open root of sr.
-    pub struct SolidAngle = [rad 2];
-    /// Luminous flux, Φ_v (ISO 80000-7): the open root of lm, cd·sr.
-    pub struct LuminousFlux = [cd 1, rad 2];
-    /// Illuminance, E_v (ISO 80000-7): the open root of lx, lm/m².
-    pub struct Illuminance = [cd 1, rad 2, m -2];
-    /// Luminance, L_v (ISO 80000-7): the open root of cd/m², the nit's.
-    pub struct Luminance = [cd 1, m -2];
-    /// Information, in bits (ISO 80000-13): the open root of bit, the byte's and a word's.
-    pub struct Information = [bit 1];
 }
