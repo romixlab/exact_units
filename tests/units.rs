@@ -733,6 +733,7 @@ fn counted_markers_are_distinct() {
         Char: "char", Code: "code", Event: "event", Pulse: "pulse", Tick: "tick", Channel: "channel", Pin: "pin",
         Step: "step", Segment: "segment", Session: "session", Boot: "boot", Operation: "op", Argument: "arg",
         Filter: "filter", Fifo: "fifo", Buffer: "buffer", TimeQuantum: "tq", Scan: "scan", Month: "month",
+        Interface: "interface", Retry: "retry", Request: "request",
     );
     for (i, a) in all.iter().enumerate() {
         assert!(!a.is_one());

@@ -860,6 +860,19 @@ crate::unit! {
     /// A count of calendar months, month: 1 to 12 within a year (an index marker, as [Day] is for the day of the month); a month has no fixed length in seconds, so it has no scale to [Second].
     #[cfg(feature = "counting")]
     pub struct Month = "month" (long "month"), base;
+
+    /// A count of interfaces, interface: a device's controllers or ports of one bus (CAN, SPI, I2C, UART), `Index<Interface, u8>`
+    /// names the one a call is about.
+    #[cfg(feature = "counting")]
+    pub struct Interface = "interface" (long "interface"), base;
+
+    /// A count of retries, retry: how often one operation was repeated, a command resent while a card or bus is busy.
+    #[cfg(feature = "counting")]
+    pub struct Retry = "retry" (long "retry" plural "retries"), base;
+
+    /// A count of requests, request: calls outstanding at once, a window's in-flight limit.
+    #[cfg(feature = "counting")]
+    pub struct Request = "request" (long "request"), base;
 }
 
 // Compound

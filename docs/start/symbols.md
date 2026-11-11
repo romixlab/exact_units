@@ -114,6 +114,7 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `halfword` | `Halfword` | `information` | none |
 | `hh` | `Hand` | `customary` | none |
 | `in` | `Inch` | `customary` | none |
+| `interface` | `Interface` | `counting` | none |
 | `item` | `Item` | `counting` | none |
 | `kat` | `Katal` | `chemical` | SI |
 | `kcal_IT` | `KilocalorieIt` | `customary` | none |
@@ -150,6 +151,8 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `rad` | `Radian` | `angle` | SI |
 | `record` | `Record` | `counting` | none |
 | `rem` | `Rem` | `nuclear` | none |
+| `request` | `Request` | `counting` | none |
+| `retry` | `Retry` | `counting` | none |
 | `rev` | `Turn` | `angle` | none |
 | `ro` | `Rood` | `customary` | none |
 | `row` | `Row` | `counting` | none |

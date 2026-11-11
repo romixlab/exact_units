@@ -24,7 +24,7 @@ The markers come in groups, one cargo feature each. A firmware turns on only the
 | `radiation` | `Becquerel`, `Gray`, `Sievert`, `ElectronVolt`, `Exposure` ([[C/kg]]), `GrayPerSecond` ([[Gy/s]]), `SievertPerHour` |
 | `dimensionless` | `Ratio`: duty, probability, scale |
 | `information` | `Bit`, `Nibble`, `Byte`, `Halfword`, `Word`, `Doubleword`; with `time` the rates `BitPerSecond` (bit/s) and `BytePerSecond` (B/s) |
-| `counting` | `Item`, `Sample`, `Frame`, `Packet`, `Line`, `Row`, `Record`, `Entry`, `Cycle`, `Block`, `Sector`, `Chunk`, `Char`, `Code`, `Event`, `Pulse`, `Tick`, `Channel`, `Pin`, `Step`, `Segment`, `Session`, `Boot`, `Operation`, `Argument`, `Filter`, `Fifo`, `Buffer`, `TimeQuantum`, `Scan`, `Month` |
+| `counting` | `Item`, `Sample`, `Frame`, `Packet`, `Line`, `Row`, `Record`, `Entry`, `Cycle`, `Block`, `Sector`, `Chunk`, `Char`, `Code`, `Event`, `Pulse`, `Tick`, `Channel`, `Pin`, `Step`, `Segment`, `Session`, `Boot`, `Operation`, `Argument`, `Filter`, `Fifo`, `Buffer`, `TimeQuantum`, `Scan`, `Month`, `Interface`, `Retry`, `Request` |
 | `customary` | inch, pound, [[psi]], gallon and the rest: [Customary units](../customary.md) |
 
 `quantities` turns on every group but `customary`. `std` turns on `quantities`.

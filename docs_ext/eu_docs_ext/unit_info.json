@@ -4379,6 +4379,16 @@
       "scale": "249.08891",
       "symbol": "inH2O (conv)"
     },
+    "Interface": {
+      "description": "A count of interfaces, interface: a device's controllers or ports of one bus (CAN, SPI, I2C, UART), Index<Interface, u8> names the one a call is about.",
+      "dim": "Interface",
+      "long": "interface",
+      "plural": "interfaces",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "interface"
+    },
     "Irradiance": {
       "description": "Irradiance in watts per square meter, W/m² (kg·s⁻³, SI Brochure, 9th ed., table 6): sunlight on a solar panel, about 1000 W/m² at noon.",
       "dim": "kg·s⁻³",
@@ -7138,6 +7148,16 @@
       "scale": "0.01",
       "symbol": "rem"
     },
+    "Request": {
+      "description": "A count of requests, request: calls outstanding at once, a window's in-flight limit.",
+      "dim": "Request",
+      "long": "request",
+      "plural": "requests",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "request"
+    },
     "Resistivity": {
       "description": "Electrical resistivity in ohm meters, Ω·m (kg·m³·s⁻³·A⁻²): copper is about 17 nΩ·m.",
       "dim": "kg·m³·s⁻³·A⁻²",
@@ -7147,6 +7167,16 @@
       "related": [],
       "scale": null,
       "symbol": "Ω·m"
+    },
+    "Retry": {
+      "description": "A count of retries, retry: how often one operation was repeated, a command resent while a card or bus is busy.",
+      "dim": "Retry",
+      "long": "retry",
+      "plural": "retries",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "retry"
     },
     "RodInternational": {
       "description": "Rod, pole or perch (international foot): 16.5 ft.",
