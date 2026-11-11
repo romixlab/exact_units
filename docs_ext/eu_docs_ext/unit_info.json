@@ -516,6 +516,16 @@
       "scale": null,
       "symbol": "m²"
     },
+    "Argument": {
+      "description": "A count of arguments, arg: of a call or a command; Index<Argument, u8> names the one an error is about.",
+      "dim": "Argument",
+      "long": "argument",
+      "plural": "arguments",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "arg"
+    },
     "AtmosphereStandard": {
       "description": "Atmosphere (standard): 101 325 Pa.",
       "dim": "kg·m⁻¹·s⁻²",
@@ -1049,6 +1059,16 @@
       "scale": null,
       "symbol": "block"
     },
+    "Boot": {
+      "description": "A count of boots, boot: a device's starts, a boot counter.",
+      "dim": "Boot",
+      "long": "boot",
+      "plural": "boots",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "boot"
+    },
     "Btu39f": {
       "description": "British thermal unit (39 °F): measured: water at 39 °F.",
       "dim": "kg·m²·s⁻²",
@@ -1270,6 +1290,16 @@
       ],
       "scale": "1054.3502644(8)",
       "symbol": "Btu_th"
+    },
+    "Buffer": {
+      "description": "A count of buffers, buffer: a peripheral's dedicated message buffers, a pool's.",
+      "dim": "Buffer",
+      "long": "buffer",
+      "plural": "buffers",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "buffer"
     },
     "BushelImperial": {
       "description": "Bushel (imperial): 8 gal.",
@@ -1823,6 +1853,16 @@
       ],
       "scale": "79200/3937",
       "symbol": "ch (US survey)"
+    },
+    "Channel": {
+      "description": "A count of channels, channel: of an ADC, a DAC, a logic analyzer, a signal generator; Index<Channel, u8> is one of them.",
+      "dim": "Channel",
+      "long": "channel",
+      "plural": "channels",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "channel"
     },
     "Char": {
       "description": "A count of characters, char: of a UART line (an idle time in characters).",
@@ -2551,6 +2591,16 @@
       "scale": null,
       "symbol": "entry"
     },
+    "Event": {
+      "description": "A count of events, event: occurrences counted as such, errors, stalls, overruns, retries.",
+      "dim": "Event",
+      "long": "event",
+      "plural": "events",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "event"
+    },
     "Farad": {
       "description": "Capacitance in farads, F (kg⁻¹·m⁻²·s⁴·A², C/V).",
       "dim": "kg⁻¹·m⁻²·s⁴·A²",
@@ -2689,6 +2739,26 @@
       ],
       "scale": "30.48",
       "symbol": "100 ft"
+    },
+    "Fifo": {
+      "description": "A count of FIFOs, fifo: a peripheral's receive or transmit queues.",
+      "dim": "Fifo",
+      "long": "fifo",
+      "plural": "fifos",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "fifo"
+    },
+    "Filter": {
+      "description": "A count of filters, filter: a CAN controller's acceptance filters, a packet filter's rules.",
+      "dim": "Filter",
+      "long": "filter",
+      "plural": "filters",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "filter"
     },
     "FluidDrachmImperial": {
       "description": "Fluid drachm (imperial): 1/8 fl oz.",
@@ -4322,7 +4392,7 @@
       "symbol": "W/m²"
     },
     "Item": {
-      "description": "A count of things, item: a queue's length, a number of filters, channels, presses, repeats, steps.",
+      "description": "A count of things, item: a queue's length, presses, repeats, where no marker below names what is counted.",
       "dim": "Item",
       "long": "item",
       "plural": "items",
@@ -5740,6 +5810,16 @@
       "scale": null,
       "symbol": "Ω"
     },
+    "Operation": {
+      "description": "A count of operations, op: of a bus transaction (an I2C write then read is two), a batch.",
+      "dim": "Operation",
+      "long": "operation",
+      "plural": "operations",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "op"
+    },
     "OpticalDepth": {
       "description": "Optical depth τ = −ln T of a transmitted power ratio T, τ (½ NeperLoss, exactly): power falls as e^(−τ), its field as e^(−τ/2), so 1 Np of loss is 2 of depth. τ = ln 10 · A of an Absorbance, a conversion by name for integers.",
       "dim": "NeperLoss",
@@ -6193,6 +6273,16 @@
       ],
       "scale": "0.0042175176",
       "symbol": "pc (printer's)"
+    },
+    "Pin": {
+      "description": "A count of pins, pin: of a GPIO port or a chip; Index<Pin, u8> is one of them.",
+      "dim": "Pin",
+      "long": "pin",
+      "plural": "pins",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "pin"
     },
     "PintImperial": {
       "description": "Pint (imperial): 0.568 261 25 dm³.",
@@ -6650,6 +6740,16 @@
       ],
       "scale": "8896443230521/1290320000",
       "symbol": "psi"
+    },
+    "Pulse": {
+      "description": "A count of pulses, pulse: of an encoder, a flow meter, a pulse output.",
+      "dim": "Pulse",
+      "long": "pulse",
+      "plural": "pulses",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "pulse"
     },
     "Quad": {
       "description": "Quad (10¹⁵ Btu_IT): 10¹⁵ Btu_IT.",
@@ -7177,6 +7277,16 @@
       "scale": null,
       "symbol": "sample"
     },
+    "Scan": {
+      "description": "A count of scans, scan: one reading of every channel of a multi-channel converter, a sample of each.",
+      "dim": "Scan",
+      "long": "scan",
+      "plural": "scans",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "scan"
+    },
     "ScrupleApothecaries": {
       "description": "Scruple (apothecaries): 20 gr.",
       "dim": "kg",
@@ -7237,6 +7347,26 @@
       "related": [],
       "scale": null,
       "symbol": "sector"
+    },
+    "Segment": {
+      "description": "A count of segments, segment: of a ring buffer, a log, a file, a route.",
+      "dim": "Segment",
+      "long": "segment",
+      "plural": "segments",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "segment"
+    },
+    "Session": {
+      "description": "A count of sessions, session: of a recorder, a connection, a login.",
+      "dim": "Session",
+      "long": "session",
+      "plural": "sessions",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "session"
     },
     "Siemens": {
       "description": "Admittance, conductance or susceptance in siemens, S (kg⁻¹·m⁻²·s³·A², A/V).",
@@ -7452,6 +7582,16 @@
       ],
       "scale": "0.83612736",
       "symbol": "yd²"
+    },
+    "Step": {
+      "description": "A count of steps, step: of a plan, a procedure, an update; a stepper motor's steps.",
+      "dim": "Step",
+      "long": "step",
+      "plural": "steps",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "step"
     },
     "Steradian": {
       "description": "Solid angle in steradians, sr (rad²).",
@@ -7923,6 +8063,26 @@
       ],
       "scale": "0.0000254",
       "symbol": "thou"
+    },
+    "Tick": {
+      "description": "A count of ticks, tick: of a timer or an OS tick, time only with its rate (Per<Tick, Second>).",
+      "dim": "Tick",
+      "long": "tick",
+      "plural": "ticks",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "tick"
+    },
+    "TimeQuantum": {
+      "description": "A count of time quanta, tq: a CAN bit's segments, a bit time's unit, time only with the quantum's length (Per<Cycle, TimeQuantum> clock cycles each).",
+      "dim": "TimeQuantum",
+      "long": "time quantum",
+      "plural": "time quanta",
+      "quantity": null,
+      "related": [],
+      "scale": null,
+      "symbol": "tq"
     },
     "TonForceShort": {
       "description": "Ton-force (short, 2000 lbf): 2000 lbf.",
