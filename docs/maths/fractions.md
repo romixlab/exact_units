@@ -308,9 +308,50 @@ assert_eq!(q!(+- 50 mV).window(setpoint).to_string(), "3283 mV ..= 3383 mV");
 
 ## The number inside: `R`
 
-`Exact<U>` is short for `Exact<U, Fraction>`: the second parameter `R` is the number it holds, an `ExactNum`, and `Fraction` is its default. `Fraction` is the one there is today; an arbitrary-precision one, for exact work past 38 digits on a host, comes behind its own feature (NUM-41). Pick `Fraction`, by leaving `R` out, unless a value needs more than [Range](#range) holds.
+`Exact<U>` is short for `Exact<U, Fraction>`: the second parameter `R` is the number it holds, an `ExactNum`, and `Fraction` is its default. The other is `BigFraction`, behind the feature `bignum`: a sign and a numerator and a denominator of any size in lowest terms, on the pure-Rust `dashu` crates, `no_std` with `alloc`.
 
-The two differ in where they can go. The `const fn`s (`new`, `int`, `new_in`, `checked_add`, `get`, `as_quantity` and the rest) are on `Exact<U, Fraction>`, because a trait method can't be `const` on stable Rust. The operators, `{}`, parsing, serde, the order against a `Fixed`, `convert`, `recip`, `to` and the crossing of `to_system` are written once for every `R`, so code of one's own can be generic over it:
+| | `Fraction` | `BigFraction` |
+|---|---|---|
+| Holds | 38 significant digits in each of the numerator and the denominator (after the 2s and 5s), times `10^±2³¹` | Any rational |
+| Refuses | A result no form of which fits, and the one [window](#range) of sums | A division by zero; text with an exponent past `±10000` |
+| Size | 48 bytes, `Copy` | 48 bytes, the digits of a large value on the heap, `Clone` |
+| `const` | Its constructors and arithmetic | None: it allocates |
+| Where | Firmware and host, no alloc | A host, or a target with an allocator |
+| $H(300) = \sum_{k=1}^{300} 1/k$ | Refused: a 427-bit denominator | Exact |
+| $m_{\mathrm{e}} e^4/(8 \varepsilon_0^2 h^3 c)$ of CODATA's digits | Refused: past 38 digits | Exact |
+
+Pick `Fraction`, by leaving `R` out, unless a value needs more than [Range](#range) holds: a long exact sum, a chain of four or more measured constants, a series. `BigFraction` is the same API and never refuses for size, at the cost of an allocation per step and no `const`.
+
+```rust
+# #[cfg(all(feature = "bignum", feature = "dimensionless"))] {
+use exact_units::{BigExact, BigFraction, Exact, units::Ratio};
+
+type Big<U> = Exact<U, BigFraction>;
+// H(300): past what a Fraction holds, exact here
+let mut h = Big::<Ratio>::ZERO;
+for k in 1..=300 {
+    h = (&h + &Big::new(1, k)).unwrap();
+}
+assert!(h > Big::int(6) && h < Big::int(7));
+assert_eq!(h.clone().narrow(), None);
+// a Fraction's value widens always, and narrows back
+let third = Exact::<Ratio>::new(1, 3);
+assert_eq!(third.widen().narrow(), Some(third));
+# }
+```
+
+The API is one. The names, argument types and `Option` results of `Exact<U>`'s `const fn`s (`new`, `int`, `new_in`, `ZERO`, `get`, `checked_add`, `checked_scale`, `as_quantity`, `to_system`, `rounded`, `within` and the rest) are those of `Exact<U, BigFraction>`'s methods, which come from the trait `BigExact` (with it in scope). A trait, not a second inherent `impl`: `Exact::new(1, 3)` names no number, and two inherent `new`s would make it ambiguous in every crate of a build where any crate turns `bignum` on. The inherent ones stay `Fraction`'s, so `Exact::new` and `Exact::ZERO` infer as before; a big one is named by its type, `Exact::<Hertz, BigFraction>::new(1, 3)` or an alias. `tests/exact_api.rs` compiles one body of calls against both numbers, so a name one has and the other lacks fails the build.
+
+What differs:
+
+1. **`const`.** Only `Fraction`'s. A `const` item can't hold a `BigFraction` anyway.
+2. **`Copy`.** `Exact<U>` is `Copy`, `Exact<U, BigFraction>` only `Clone`. Methods take `self` by value on both, so reusing a big value after a call takes a `.clone()`, and the compiler says so ("value used after move"). The operators also take references, `(&a + &b)?`, so a long chain clones nothing.
+3. **`get()`.** It gives the number, a `Fraction` or a `BigFraction`. Their parts differ: `Fraction::numer()` is an `Option<u128>`, `BigFraction::numer()` a `dashu_int::UBig` (re-exported as `exact_units::dashu_int`).
+4. **Mixing.** No operator takes one of each: `widen()` (always) and `narrow()` (`None` where no `Fraction` holds the value) say where a value leaves 128 bits.
+
+The text is one grammar both ways: `{}` writes the decimal when it ends, the repetend when it repeats within 12 digits, else the fraction. A `BigFraction` writes a decimal of any length ($1/2^{127}$ as its 127 digits, where a `Fraction` writes the fraction), and reads any number of digits. An exponent is bounded, `±10000` (`BigFraction::MAX_TEXT_EXP`), so a short text can't ask for megabytes; a `Fraction` reads `1e10001`, a `BigFraction` refuses it by name. Serde's human-readable form is that text; its binary form is `(negative, numerator, denominator)`, each integer its little-endian bytes in lowest terms. There is no wire form: the wire's `Exact` is the `Fraction` one.
+
+Code generic over `R` sees `ExactNum`'s methods on the number (`checked_add`, `checked_mul`, `round`, `to_f64` and their kin, each taking it by reference) and the operators, `{}`, parsing, serde, the order against a `Fixed`, `convert`, `recip`, `to` and the crossing of `to_system`, which are written once for every `R`:
 
 ```rust
 use exact_units::{Exact, ExactNum, Fixed, prefix::One, units::Hertz};
@@ -324,8 +365,10 @@ assert!(m > Fixed::<Hertz, One, u8>::new(1));
 assert_eq!(m.to_string(), "1.5 Hz");
 ```
 
-Generic code sees `ExactNum`'s methods on the number (`checked_add`, `checked_mul`, `round`, `to_f64` and their kin, each taking it by reference) and the operators on `Exact`, not the `const fn`s. A type is still written `Exact<Hertz>` in error messages: rustc leaves a defaulted parameter out. One thing does need `R`: a constructor whose arguments don't say which number it is (`Exact::from_fixed(f)`, `Exact::ZERO`) is on `Exact<U, Fraction>`, so it infers with no annotation, as before.
+A type is still written `Exact<Hertz>` in error messages: rustc leaves a defaulted parameter out.
+
+Each claim here is a property against num-rational's `BigRational`, an implementation of its own (`tests/props/big_fraction.rs`, `tests/props/exact_text.rs`): every operation of values up to 384 bits, rounding by every mode, the nearest `f64`, the order against a `Fixed`, `widen` and `narrow` (refusing exactly where no `Fraction` holds the value), the harmonic numbers, chains of five constants, and text both ways.
 
 ## Cost
 
-An `Exact` is 48 bytes (the exponent sits in what was padding), and its arithmetic is `u128` multiplies and divisions with a gcd at each step, then the normalisation: the 2s and 5s stripped (a 5 by one multiply by its inverse modulo $2^{128}$, no division) and the exponent placed. That is fine on a host and slow on a microcontroller, where most `u128` operations are library calls. Firmware gets the results as `Fixed` constants. The type is `no_std` and needs no alloc, and nothing of it is linked unless it is used.
+An `Exact` is 48 bytes (the exponent sits in what was padding), and its arithmetic is `u128` multiplies and divisions with a gcd at each step, then the normalisation: the 2s and 5s stripped (a 5 by one multiply by its inverse modulo $2^{128}$, no division) and the exponent placed. That is fine on a host and slow on a microcontroller, where most `u128` operations are library calls. Firmware gets the results as `Fixed` constants. The type is `no_std` and needs no alloc, and nothing of it is linked unless it is used. A `BigFraction` allocates at each step; `bignum` adds dashu's four small dependencies and about 10 s to a clean build, only where it is on.
