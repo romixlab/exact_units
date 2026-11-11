@@ -187,7 +187,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   `fixed!(100 m/s)` (NUM-17), points (PT-5), `Exact` and levels (NUM-18) are in.
 - ✅ **NUM-10 Measured constants as exact symbols** · `foundations` — `Magnitude::MU0` and `Magnitude::G` beside π,
   ln 2 and ln 10 in `Symbols`, whole or half powers, cancelling exactly (`(T/μ₀)·μ₀` is T, μ₀·ε₀·c² is 1, S·S is
-  μ₀/(4π·10⁻⁷)); ε₀, Z₀ and α are exact expressions over μ₀ (`constants::EPSILON0`, `Z0`, `ALPHA`). A factor with μ₀
+  μ₀/(4π·10⁻⁷)); ε₀, Z₀ and α are exact expressions over μ₀ (`constants::EPSILON0`, `ETA0`, `ALPHA`). A factor with μ₀
   or G left has no value: `to_f64` and `fixed_point` refuse, and `to`, `convert` and `convert_rounded` over it don't
   compile, floats included. A number only at an explicit edge from a named set, `trait Constants` with
   `Measured { value, rel_u, source, year }`: `Codata2018`, `Codata2022`, no `Latest`, and the old 4π·10⁻⁷ only as

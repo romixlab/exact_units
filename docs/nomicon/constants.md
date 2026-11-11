@@ -27,17 +27,17 @@ baked in as a number would be wrong by an amount that moves. So all three stay s
 The symbols cancel exactly, and everything that follows from $\mu_0$ is an expression over it, not a second number:
 
 - the electric constant $\varepsilon_0 = 1/(\mu_0 c^2)$, `constants::EPSILON0`;
-- the impedance of free space $Z_0 = \mu_0 c$, `constants::Z0`;
+- the impedance of free space $\eta_0 = \mu_0 c$ (often written $Z_0$), `constants::ETA0`: not `Z0`, which names a line's [reference impedance](../rf/impedance.md#z0);
 - the fine-structure constant $\alpha = \mu_0 e^2 c / (2h)$, `constants::ALPHA`;
 - the molar mass constant $M_{\mathrm{u}} = N_{\mathrm{A}} m_{\mathrm{u}}$, `constants::MOLAR_MASS_CONSTANT`;
 - the energy of a dalton $m_{\mathrm{u}} c^2$, `constants::M_U_C2`, in [[J]].
 
 ```rust
 use exact_units::Magnitude;
-use exact_units::constants::{C, EPSILON0, Z0};
+use exact_units::constants::{C, EPSILON0, ETA0};
 
 assert_eq!(Magnitude::MU0.mul(EPSILON0).mul(C).mul(C), Magnitude::ONE);
-assert_eq!(Z0.div(C), Magnitude::MU0);
+assert_eq!(ETA0.div(C), Magnitude::MU0);
 // T/μ₀ times μ₀ is T
 let per_mu0 = Magnitude::pow10(-4).div(Magnitude::MU0);
 assert_eq!(per_mu0.mul(Magnitude::MU0), Magnitude::pow10(-4));

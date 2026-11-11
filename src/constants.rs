@@ -3,8 +3,8 @@
 //! Since the 2019 SI, c, h, e, k_B, N_A, Δν_Cs and K_cd are exact numbers: [C], [H], [E], [K_B] and [N_A] here are
 //! plain magnitudes. The magnetic constant μ₀, the Newtonian constant of gravitation G and the atomic mass constant
 //! m_u are measured: they stay symbols in a [Magnitude] ([Magnitude::MU0], [Magnitude::G], [Magnitude::M_U]), as π
-//! is, so a factor with them is exact and cancels exactly (`(T/μ₀)·μ₀` is `T`), and ε₀, Z₀ and α are expressions over
-//! μ₀ ([EPSILON0], [Z0], [ALPHA]), the molar mass constant M_u and the energy of a dalton expressions over m_u
+//! is, so a factor with them is exact and cancels exactly (`(T/μ₀)·μ₀` is `T`), and ε₀, η₀ and α are expressions over
+//! μ₀ ([EPSILON0], [ETA0], [ALPHA]), the molar mass constant M_u and the energy of a dalton expressions over m_u
 //! ([MOLAR_MASS_CONSTANT], [M_U_C2]), not numbers.
 //!
 //! A number for one appears only at an explicit edge: a [Constants] set named by the caller, a versioned edition
@@ -50,8 +50,9 @@ pub const N_A: Magnitude = Magnitude::ratio(602_214_076, 1).mul(Magnitude::pow10
 /// The electric constant ε₀ = 1/(μ₀c²) in F/m: exact, an expression over the symbol μ₀.
 pub const EPSILON0: Magnitude = Magnitude::MU0.mul(C).mul(C).recip();
 
-/// The impedance of free space Z₀ = μ₀c in Ω: exact, an expression over μ₀.
-pub const Z0: Magnitude = Magnitude::MU0.mul(C);
+/// The impedance of free space η₀ = μ₀c in Ω (often written Z₀): exact, an expression over μ₀. Named `ETA0`, not
+/// `Z0`: `exact_units::Z0` is a line's reference impedance, a different quantity.
+pub const ETA0: Magnitude = Magnitude::MU0.mul(C);
 
 /// The fine-structure constant α = μ₀e²c/(2h): exact, an expression over μ₀. A set's value of μ₀ gives that
 /// edition's α; 1/α is the reciprocal of the same expression, not a second number.
