@@ -117,19 +117,19 @@ A receiver that wants a count that doesn't wrap adds each signed step to a `u64`
 
 H.264 turns a time code into a time with clockTimestamp = ((hH·60 + mM)·60 + sS)·time_scale + nFrames·(num_units_in_tick·(1 + nuit_field_based_flag)) + tOffset (D.2.3, equation D-1). H.265 has the same in D.3.27 (equation D-26). The result is in ticks of time_scale. tOffset is what makes it the true time.
 
-At 30000/1001 frames/s a label counts 30 frames a second, and true time runs 1000/1001 as fast as the label. Drop-frame counting reduces the drift: counting_type 4 skips the labels ;00 and ;01 "when seconds_value is equal to 0 and minutes_value is not an integer multiple of 10" (H.264 Table D-3; H.265 Table D.11). H.265's NOTE 7 to Table D.11 calls it "NTSC drop-frame" and says it reduces the need for large tOffset; it does not remove it. The drift that remains is exact:
+At 30000/1001 frames/s a label counts 30 frames a second, and true time runs 1000/1001 as fast as the label. Drop-frame counting reduces the drift: counting_type 4 skips the labels `;00` and `;01` "when seconds_value is equal to 0 and minutes_value is not an integer multiple of 10" (H.264 Table D-3; H.265 Table D.11). H.265's NOTE 7 to Table D.11 calls it "NTSC drop-frame" and says it reduces the need for large tOffset; it does not remove it. The drift that remains is exact:
 
 1. Ten minutes of labels are 18 000 − 9 · 2 = 17 982 frames.
 2. 17 982 frames last 17 982 · 1001/30 000 [[s]] = 599.9994 [[s]].
 3. So every ten minutes of labels run 3/5000 [[s]], 36 ticks of 1/60 000 [[s]], ahead of true time.
 4. A day of labels runs 86.4 [[ms]] ahead.
 
-In ticks of 1/60 000 [[s]] the true time of frame n is 2002·n, so tOffset is a whole number of ticks for every label: −36 at 00:10:00;00, −216 at 01:00:00;00, and +3540 just before the first dropped label at 00:00:59;29.
+In ticks of 1/60 000 [[s]] the true time of frame n is 2002·n, so tOffset is a whole number of ticks for every label: −36 at `00:10:00;00`, −216 at `01:00:00;00`, and +3540 just before the first dropped label at `00:00:59;29`.
 
 The crate has no codec for such labels yet. The example writes one with integers (frame to label and back, refusing a label drop-frame counting skips) and checks it against a counter stepped label by label over a whole day.
 
 ## What the crate doesn't do yet
 
 - **`from_raw` doesn't reduce a modulo point.** `PtsTime::from_raw(1 << 33)` is not equal to `PtsTime::from_raw(0)`, although their difference is 0.
-- **No label codec.** A time code (hh:mm:ss;ff with drop-frame counting) and its exact drift against a time point are written by hand.
+- **No label codec.** A time code (`hh:mm:ss;ff` with drop-frame counting) and its exact drift against a time point are written by hand.
 - **No unwrapper for modulo points in this crate.** The typed one is `ww_si`'s, for device time. A counter at a run-time rate (RTP at the rate the session states) has a stateless step, `unwrap_near`, on a `Linear` point known modulo 2³² ([Run-time scales](../maths/run_time_scales.md#points-on-a-run-time-clock)).

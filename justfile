@@ -102,6 +102,7 @@ docs-build: docs-prep
     uv run zensical build --clean --strict
     uv run python -m eu_docs_ext.check_hidden_lines site
     uv run python -m eu_docs_ext.check_unit_macros site
+    uv run python -m eu_docs_ext.check_emoji site
 
 # Build the book, then query its search index with the site's own search worker (docs_ext/tests/test_search.py): a
 # query for a macro (`db!`, `q!`, `macro`) finds its own page first

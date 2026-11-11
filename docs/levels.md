@@ -36,3 +36,4 @@ In the navigation, each part lists its Basic pages first and groups the Advanced
 - Formulas are LaTeX between `$...$` (inline) or `$$...$$` (display), drawn by KaTeX.
 - A number's bit layout is a `bits` fence: one field per line with its kind (`sign`, `int`, `frac`, `quad`, `pad`), its bits and a label, then a `hex` line with the stored integer. The build fails when the bits don't make it.
 - Drawings are SVG files in `docs/figures`, inlined with `--8<--` so they follow the light and dark scheme. Plots are computed by the crate itself (`tools/book_plots`) when the site is built; they are not in git.
+- Text with colons that is no emoji (a time code `hh:mm:ss;ff`, `4:2:2`) goes in code style: in prose `:mm:` is drawn as a flag. `just docs-build` fails on any emoji or icon not on the list in `docs_ext/eu_docs_ext/check_emoji.py`.
