@@ -53,10 +53,19 @@ pub(crate) fn number(s: &str) -> Result<(Fraction, i32, &str), Kind> {
     if den.m == 0 {
         return Err(Kind::Zero);
     }
+    // the denominator's own power of ten (den.e, the trailing zeros Decimal::parse folds out of "1000") goes into
+    // q here, through the same clamp-into-the-mantissa Fraction::scaled always uses: kept apart and subtracted from
+    // dec.e instead, "1e-2147483648/1000" (den.e 3) would need an outer exponent past i32::MIN to read back exactly
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "den.e is an i32, negated as an i64: far inside its range"
+    )]
     let q = x
         .checked_div(Fraction::from_parts(false, den.m, 1).ok_or(Kind::Fit)?)
+        .ok_or(Kind::Fit)?
+        .scaled(0, -i64::from(den.e))
         .ok_or(Kind::Fit)?;
-    Ok((q, dec.e.saturating_sub(den.e), rest))
+    Ok((q, dec.e, rest))
 }
 
 /// `x · 2^pow2 · 10^pow10`, `None` exactly where that doesn't fit: the powers join the fraction's own before its
