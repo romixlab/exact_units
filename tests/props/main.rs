@@ -11,6 +11,8 @@
 )]
 
 mod arith;
+#[cfg(all(feature = "bignum", not(any(kani, fuzzing))))]
+mod big_fraction;
 #[cfg(feature = "information")]
 mod can_fd;
 #[cfg(feature = "dimensionless")]

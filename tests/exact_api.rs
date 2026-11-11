@@ -1,7 +1,7 @@
-//! One API over every number an [Exact] holds (NUM-40): the same body of calls compiled and checked against each
-//! `R`, so that a name one `Exact<U, R>` has and another lacks fails the build. `Fraction` is the one `R` today; an
-//! arbitrary-precision one joins the list at the bottom when it lands. The calls name `R` only where a type says
-//! which `Exact` it is (`E::<Hertz>::int`), as code written for `Exact<Hertz>` does.
+//! One API over every number an [Exact] holds (NUM-40, NUM-41): the same body of calls compiled and checked against
+//! each `R`, so that a name one `Exact<U, R>` has and another lacks fails the build. The `R`s are listed at the
+//! bottom: `Fraction`, and `BigFraction` with the feature `bignum` (its API through the trait `BigExact`). The calls
+//! name `R` only where a type says which `Exact` it is (`E::<Hertz>::int`), as code written for `Exact<Hertz>` does.
 #![expect(
     clippy::arithmetic_side_effects,
     reason = "Exact's operators are checked: each gives an Option, which the test unwraps"
@@ -11,6 +11,8 @@ use exact_units::prefix::{Kilo, Mega, One};
 use exact_units::quantities::{Activity, Height, Width};
 use exact_units::systems::Si;
 use exact_units::units::{Becquerel, Hertz, Meter, Of, Per, Ratio, Second, Volt};
+#[cfg(feature = "bignum")]
+use exact_units::{BigExact, BigFraction};
 use exact_units::{Exact, ExactNum, Fixed, FixedScale, Fraction, Prefix, Rounding, Tolerance};
 
 /// Code of one's own over any `R`: the operators, `Display`, parse, the order against a `Fixed` and `convert`, with
@@ -74,11 +76,11 @@ macro_rules! api {
                 );
                 let t = E::<Second>::int(3);
                 assert_eq!(
-                    a.clone().checked_times(t.clone()).map(Exact::get),
+                    a.clone().checked_times(t.clone()).map(E::get),
                     Some(num(1, 1))
                 );
                 assert_eq!(
-                    a.clone().checked_per(t.clone()).map(Exact::get),
+                    a.clone().checked_per(t.clone()).map(E::get),
                     Some(num(1, 9))
                 );
                 assert_eq!(a.clone() + b.clone(), Some(E::new(1, 2)));
@@ -88,12 +90,22 @@ macro_rules! api {
                 assert_eq!(a.clone() / 2, Some(b.clone()));
                 assert_eq!(a.clone() * num(1, 2), Some(b.clone()));
                 assert_eq!(b.clone() / num(1, 2), Some(a.clone()));
-                assert_eq!((a.clone() * t.clone()).map(Exact::get), Some(num(1, 1)));
-                assert_eq!((a.clone() / t).map(Exact::get), Some(num(1, 9)));
+                assert_eq!((a.clone() * t.clone()).map(E::get), Some(num(1, 1)));
+                assert_eq!((a.clone() / t).map(E::get), Some(num(1, 9)));
                 assert_eq!(a.clone() / 0, None);
                 assert!((-a.clone()).is_negative() && !a.clone().is_zero());
                 assert_eq!((-a.clone()).abs(), a);
                 assert!(b < a && E::<Hertz>::ZERO.is_zero());
+                // on references, so a large value isn't cloned for each step
+                assert_eq!(&a + &b, Some(E::new(1, 2)));
+                assert_eq!(&a - &b, Some(b.clone()));
+                assert_eq!(-&a, E::new(-1, 3));
+                assert_eq!(&a * 3, Some(E::int(1)));
+                assert_eq!(&a / 2, Some(b.clone()));
+                assert_eq!(&a * &num(1, 2), Some(b.clone()));
+                assert_eq!(&b / &num(1, 2), Some(a.clone()));
+                assert_eq!((&a * &E::<Second>::int(3)).map(E::get), Some(num(1, 1)));
+                assert_eq!((&a / &E::<Second>::int(3)).map(E::get), Some(num(1, 9)));
             }
 
             #[test]
@@ -109,7 +121,7 @@ macro_rules! api {
                 assert!(Fixed::<Hertz, One, u32>::new(5) == E::<Hertz>::int(5));
                 assert_eq!(
                     E::<Second>::int(60).convert::<exact_units::units::Minute>(),
-                    Some(Exact::int(1))
+                    Some(E::int(1))
                 );
                 let period: Option<E<Second>> = E::<Hertz>::int(1000).recip();
                 assert_eq!(period, Some(E::new(1, 1000)));
@@ -132,13 +144,13 @@ macro_rules! api {
             fn quantities_and_ratios() {
                 let rate = E::<Per<Ratio, Second>>::int(100);
                 let a = rate.as_quantity::<Activity>().convert::<Becquerel>();
-                assert_eq!(a, Some(Exact::int(100)));
+                assert_eq!(a, Some(E::int(100)));
                 let h = E::<Of<Height, Meter>>::new(12, 10);
                 let w = E::<Of<Width, Meter>>::new(3, 10);
                 let l: Option<E<Meter>> = h.up() + w.up();
-                assert_eq!(l, Some(Exact::new(3, 2)));
+                assert_eq!(l, Some(E::new(3, 2)));
                 let s = E::<Second>::int(2).to_system::<Si>().convert::<Second>();
-                assert_eq!(s, Some(Exact::int(2)));
+                assert_eq!(s, Some(E::int(2)));
                 let gain = (E::<Volt>::int(3) / E::<Volt>::int(2)).unwrap();
                 assert_eq!(gain.as_ratio(), E::<Ratio>::new(3, 2));
                 assert_eq!(
@@ -169,3 +181,5 @@ macro_rules! api {
 }
 
 api!(fraction, Fraction);
+#[cfg(feature = "bignum")]
+api!(big_fraction, BigFraction);

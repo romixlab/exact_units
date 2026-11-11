@@ -8,14 +8,14 @@ default:
 # PROPTEST_RNG_SEED fixes tests/props' draws: the same code gives the same result here and under `just mutants`;
 # `just props-hunt` draws from proptest's own random seed instead.
 test *flags:
-    CARGO_BUILD_WARNINGS=deny PROPTEST_RNG_SEED=0 cargo nextest run --features shrink_wrap,customary,nuclear,serde,leap_seconds,libm --no-fail-fast
+    CARGO_BUILD_WARNINGS=deny PROPTEST_RNG_SEED=0 cargo nextest run --features shrink_wrap,customary,nuclear,serde,leap_seconds,libm,bignum --no-fail-fast
     CARGO_BUILD_WARNINGS=deny PROPTEST_RNG_SEED=0 cargo nextest run --no-default-features --features std --no-fail-fast
-    CARGO_BUILD_WARNINGS=deny PROPTEST_RNG_SEED=0 cargo nextest run --no-default-features --features shrink_wrap,quantities,serde --no-fail-fast
+    CARGO_BUILD_WARNINGS=deny PROPTEST_RNG_SEED=0 cargo nextest run --no-default-features --features shrink_wrap,quantities,serde,bignum --no-fail-fast
     # every example built for real, with the features all of them require: a literal a const check refuses fails only
     # when its constant is instantiated, which `clippy --all-targets` never does
     CARGO_BUILD_WARNINGS=deny cargo build --examples --features shrink_wrap,customary,nuclear,serde,libm,leap_seconds
     # nextest does not run doctests; they include the book's pages (src/book.rs)
-    CARGO_BUILD_WARNINGS=deny cargo test --doc --features shrink_wrap,customary,nuclear,serde,leap_seconds,libm
+    CARGO_BUILD_WARNINGS=deny cargo test --doc --features shrink_wrap,customary,nuclear,serde,leap_seconds,libm,bignum
     # the book site's Markdown extensions (docs_ext: the `bits` fence, `rust,compile_fail` blocks)
     uv run --group dev pytest -q docs_ext
     # the book, strict as CI's docs job builds it: its plots run the crate (tools/book_plots), so a const assert or
@@ -79,6 +79,7 @@ check:
     cargo check --no-default-features --features=angle,dimensionless,counting,serde --target thumbv6m-none-eabi
     cargo check --no-default-features --features=q,mechanical,time --target thumbv6m-none-eabi
     cargo check --no-default-features --features=leap_seconds --target thumbv6m-none-eabi
+    cargo check --no-default-features --features=bignum --target thumbv6m-none-eabi
 
 # A library has nothing to put on PATH: builds it with the deploy profile, as a dependent's release build would
 install:
@@ -132,9 +133,9 @@ q-symbols:
 # Collect coverage for the feature sets `just test` uses (shared by cov and cov-html)
 _cov-collect:
     cargo llvm-cov clean --workspace
-    cargo llvm-cov nextest --no-report --features shrink_wrap,customary,nuclear,serde,leap_seconds
+    cargo llvm-cov nextest --no-report --features shrink_wrap,customary,nuclear,serde,leap_seconds,bignum
     cargo llvm-cov nextest --no-report --no-default-features --features std
-    cargo llvm-cov nextest --no-report --no-default-features --features shrink_wrap,quantities,serde
+    cargo llvm-cov nextest --no-report --no-default-features --features shrink_wrap,quantities,serde,bignum
 
 # Test coverage as CI computes it: lcov.info plus a summary printed
 cov: _cov-collect

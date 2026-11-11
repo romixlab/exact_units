@@ -776,6 +776,80 @@ fn exact_as_its_number() {
     }
 }
 
+/// A `BigFraction` and an `Exact` of one: the same text as a `Fraction` in JSON, `(neg, num, den)` as little-endian
+/// bytes in postcard; one past 128 bits both ways; a form not in lowest terms, with trailing zero bytes or a −0
+/// refused; `with_unit` the same as for a `Fraction`.
+#[cfg(feature = "bignum")]
+#[test]
+fn big_fraction_as_its_number() {
+    use exact_units::dashu_int::UBig;
+    use exact_units::units::Hertz;
+    use exact_units::{BigExact, BigFraction, Exact};
+    use serde::Serializer;
+
+    struct Bytes<'a>(&'a [u8]);
+    impl Serialize for Bytes<'_> {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            s.serialize_bytes(self.0)
+        }
+    }
+
+    round_trip(
+        &Exact::<Hertz, BigFraction>::new(1_000_000, 3),
+        r#""333333.(3)""#,
+        (false, Bytes(&[0x40, 0x42, 0x0f]), Bytes(&[3])),
+    );
+    round_trip(
+        &BigFraction::ZERO,
+        r#""0""#,
+        (false, Bytes(&[]), Bytes(&[1])),
+    );
+    round_trip(
+        &BigFraction::new(-7, 2),
+        r#""-3.5""#,
+        (true, Bytes(&[7]), Bytes(&[2])),
+    );
+    // 1/(2¹²⁸ + 1): its denominator is 17 bytes
+    let mut den = [0u8; 17];
+    den[0] = 1;
+    den[16] = 1;
+    let past = BigFraction::from_parts(false, 1u8.into(), UBig::from_le_bytes(&den)).unwrap();
+    round_trip(
+        &past,
+        r#""1/340282366920938463463374607431768211457""#,
+        (false, Bytes(&[1]), Bytes(&den)),
+    );
+    assert_eq!(
+        serde_json::from_str::<BigFraction>("-3").unwrap(),
+        BigFraction::int(-3)
+    );
+    assert!(json_err::<BigFraction>("0.1").starts_with("0.1 is a float, rounded when it was read"));
+    assert!(json_err::<BigFraction>(r#""1/0""#).starts_with(r#""1/0": a fraction over 0"#));
+    for parts in [
+        (false, Bytes(&[2]), Bytes(&[4])),
+        (true, Bytes(&[]), Bytes(&[1])),
+        (false, Bytes(&[]), Bytes(&[5])),
+        (false, Bytes(&[1]), Bytes(&[])),
+        (false, Bytes(&[1, 0]), Bytes(&[3])),
+        (false, Bytes(&[1]), Bytes(&[3, 0])),
+    ] {
+        // refused, whatever the message
+        let _ = postcard_err::<BigFraction, _>(parts);
+    }
+
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Pll {
+        #[serde(with = "exact_units::serde::with_unit")]
+        vco: Exact<Hertz, BigFraction>,
+    }
+    let p: Pll = serde_json::from_str(r#"{ "vco": "519.999755859375 MHz" }"#).unwrap();
+    assert_eq!(p.vco, Exact::<Hertz, BigFraction>::new(33_279_984_375, 64));
+    assert_eq!(
+        serde_json::to_string(&p).unwrap(),
+        r#"{"vco":"519.999755859375 MHz"}"#
+    );
+}
+
 /// `with_unit` on an `Exact`: written as `{}` with its prefix, read in every form, refused in another unit.
 #[test]
 fn with_unit_reads_an_exact_exactly() {
