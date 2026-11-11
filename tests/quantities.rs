@@ -110,8 +110,6 @@ const TREE: &[(&str, &[&str], &[&str])] = &[
     ("ThermodynamicTemperature", &["D"], &[]),
     ("AmountOfSubstance", &["D"], &[]),
     ("LuminousIntensity", &["D"], &[]),
-    ("Area", &["D"], &[]),
-    ("Volume", &["D"], &[]),
     ("Force", &["D"], &[]),
     ("CatalyticActivity", &["D"], &[]),
     ("SolidAngle", &["D"], &[]),
@@ -122,7 +120,7 @@ const TREE: &[(&str, &[&str], &[&str])] = &[
 ];
 
 /// The quantities as `const` data, in [TREE]'s order.
-const DEFS: [&QuantityDef<'static>; 74] = [
+const DEFS: [&QuantityDef<'static>; 72] = [
     Length::DEF,
     Height::DEF,
     Width::DEF,
@@ -188,8 +186,6 @@ const DEFS: [&QuantityDef<'static>; 74] = [
     quantities::ThermodynamicTemperature::DEF,
     quantities::AmountOfSubstance::DEF,
     quantities::LuminousIntensity::DEF,
-    quantities::Area::DEF,
-    quantities::Volume::DEF,
     quantities::Force::DEF,
     quantities::CatalyticActivity::DEF,
     quantities::SolidAngle::DEF,
@@ -201,7 +197,7 @@ const DEFS: [&QuantityDef<'static>; 74] = [
 
 /// The expressions walked: each quantity, then the derived quantity of each of their dimensions and of a velocity,
 /// then ratios of length and of energy.
-const EXPRS: [QuantityExpr<'static>; 96] = {
+const EXPRS: [QuantityExpr<'static>; 94] = {
     let dims: [Dim<'static>; 19] = [
         Length::DEF.dim,
         Energy::DEF.dim,
@@ -224,7 +220,7 @@ const EXPRS: [QuantityExpr<'static>; 96] = {
         AbsorbedDose::DEF.dim,
         Resistance::DEF.dim,
     ];
-    let mut out = [QuantityExpr::RatioOf(Dim::ONE); 96];
+    let mut out = [QuantityExpr::RatioOf(Dim::ONE); 94];
     let mut i = 0;
     while i < DEFS.len() {
         out[i] = QuantityExpr::Spec(QuantityRef::Def(DEFS[i]));

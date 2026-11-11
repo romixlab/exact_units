@@ -27,9 +27,9 @@
 //! - Dimension one: [DampingRatio] and [QualityFactor].
 //! - Angles: [PlaneAngle] and [PhaseAngle], the angle of a phasor or of a motor's electrical rotation.
 //! - The open roots of the base units and of common derived ones, so that a unit's quantity has a name where its line
-//!   names none: [Time], [Mass], [ThermodynamicTemperature], [AmountOfSubstance], [LuminousIntensity], [Area],
-//!   [Volume], [Force], [CatalyticActivity], [SolidAngle], [LuminousFlux], [Illuminance], [Luminance],
-//!   [Information].
+//!   names none: [Time], [Mass], [ThermodynamicTemperature], [AmountOfSubstance], [LuminousIntensity], [Force],
+//!   [CatalyticActivity], [SolidAngle], [LuminousFlux], [Illuminance], [Luminance], [Information]. No `Area` or
+//!   `Volume`: the units [Area](crate::units::Area) and [Volume](crate::units::Volume) have those names.
 //!
 //! [ALL] lists them, the table [units::TABLE](crate::units::TABLE) resolves them by id.
 
@@ -205,10 +205,6 @@ crate::quantity! {
     pub struct AmountOfSubstance = [mol 1];
     /// Luminous intensity, I_v (ISO 80000-7): the open root of cd.
     pub struct LuminousIntensity = [cd 1];
-    /// Area, A (ISO 80000-3): the open root of m², the barn's.
-    pub struct Area = [m 2];
-    /// Volume, V (ISO 80000-3): the open root of m³, the litre's.
-    pub struct Volume = [m 3];
     /// Force, F (ISO 80000-4): the open root of N.
     pub struct Force = [kg 1, m 1, s -2];
     /// Catalytic activity, z (ISO 80000-9): the open root of kat.
