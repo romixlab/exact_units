@@ -67,8 +67,14 @@ lint:
     cargo clippy --manifest-path tools/curve_size/Cargo.toml --target thumbv7em-none-eabihf --target-dir target -- -D warnings
     cargo clippy --manifest-path tools/scaled_size/Cargo.toml --target thumbv7em-none-eabihf --target-dir target -- -D warnings
 
+# The fuzz crate builds (not run), so a gap like tests/props using num-bigint where fuzz/ has no such dependency
+# can't rot again. Needs a nightly toolchain and cargo-fuzz (`rustup toolchain install nightly`, `cargo install cargo-fuzz`).
+[working-directory('fuzz')]
+fuzz-check:
+    cargo +nightly fuzz build
+
 # cargo check the feature sets a firmware and a host use: no unit group, defmt, a few groups, without and with the wire format, CORDIC on an M0, q! on an M0
-check:
+check: fuzz-check
     cargo check --all-features
     cargo check --no-default-features
     cargo check --no-default-features --features=defmt
