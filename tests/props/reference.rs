@@ -434,7 +434,7 @@ pub(crate) fn order_exp(
 /// `k · log2(r)` rounded by `md`, for `r >= 1`: a level in `1/k` stops of the power ratio `r`, in integers. `r^k`
 /// lies in `[2^m, 2^(m+1))` for the floor `m`; it is exact where `r^k` is `2^m`, and the nearest compares
 /// `r^(2k)` with `2^(2m+1)`, which an odd power of two never equals, so there is no tie.
-#[cfg(any(feature = "std", feature = "libm"))]
+#[cfg(all(any(feature = "std", feature = "libm"), not(any(kani, fuzzing))))]
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "BigUint arithmetic doesn't overflow; m is below 2^20"
@@ -1239,6 +1239,7 @@ pub(crate) mod codata {
 
 /// [round_div] in big integers, for `d > 0`: the reference of the run-time scales (NUM-42), whose products pass
 /// `i128` (a `u128` count times a `u32` part times 2¹²⁷).
+#[cfg(not(any(kani, fuzzing)))]
 pub(crate) fn round_div_big(
     p: &num_bigint::BigInt,
     d: &num_bigint::BigInt,
@@ -1392,6 +1393,7 @@ pub(crate) mod imaging {
 /// Closed intervals of exact rationals: a real number known only between two bounds (a root, π), and the bounds of
 /// what is computed from it, every operation exact. Where a value of the standards is irrational, its printed digits
 /// are checked against such an interval.
+#[cfg(not(any(kani, fuzzing)))]
 pub(crate) mod interval {
     use num_bigint::BigInt;
     use num_rational::BigRational;
@@ -1678,6 +1680,7 @@ pub(crate) mod rf {
 
     /// Whether `x / 10^9` is at most `10^(k/100)`, the power ratio of `k/10` dB: `x^100 <= 10^(k + 900)`, in big
     /// integers (and `x^100 < ..` for `strict`).
+    #[cfg(not(any(kani, fuzzing)))]
     pub(crate) fn below_pow10_centi(x: u64, k: i32, strict: bool) -> bool {
         use num_bigint::BigUint;
         let lhs = BigUint::from(x).pow(100);
