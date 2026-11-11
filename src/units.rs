@@ -945,6 +945,17 @@ pub type Phase<A> = Of<crate::quantities::PhaseAngle, A>;
 #[cfg(feature = "mechanical")]
 pub type EnergyDensity = Of<crate::quantities::EnergyDensity, Per<Joule, Volume>>;
 
+/// A data rate in bits per second, bit/s: a link's, a bus's or a codec's. Of its own dimension (bit·s⁻¹), so it never
+/// mixes with a symbol rate in [Baud] or a clock in [Hertz], and `convert`s exactly to and from [BytePerSecond].
+/// `Fixed<BitPerSecond, Mega, u32>` writes `Mbit/s`, `Mebi` writes `Mibit/s`.
+#[cfg(all(feature = "information", feature = "time"))]
+pub type BitPerSecond = Per<Bit, Second>;
+
+/// A data rate in bytes per second, B/s: a card's write speed, a stream's budget. `Fixed<BytePerSecond, Kibi, u32>`
+/// writes `KiB/s`, `Kilo` writes `kB/s`; one B/s is 8 [BitPerSecond].
+#[cfg(all(feature = "information", feature = "time"))]
+pub type BytePerSecond = Per<Byte, Second>;
+
 /// Absorbed dose rate in grays per second, Gy/s: the unit [GrayPerSecond] by the name of its quantity.
 #[cfg(feature = "radiation")]
 pub type AbsorbedDoseRate = GrayPerSecond;

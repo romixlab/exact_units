@@ -134,8 +134,9 @@ fn moved_of<U: Unit>(t: &str) -> Option<Prefix> {
         Some(rest) if write!(micro, "µ{rest}").is_ok() => micro.as_str(),
         _ => t,
     };
-    // every power a scale can have: 10⁻⁹ on V/√Hz is written nV/√Hz
-    (-63..=63i8).filter_map(Prefix::from_pow10).find(|p| {
+    // every power a scale can have: 10⁻⁹ on V/√Hz is written nV/√Hz; a binary prefix on a quotient, KiB/s
+    let binary = [Prefix::Kibi, Prefix::Mebi, Prefix::Gibi, Prefix::Tebi];
+    (-63..=63i8).filter_map(Prefix::from_pow10).chain(binary).find(|p| {
         moved(*p, &U::EXPR).is_some() && writes_as(PrefixText::<U>(*p, PhantomData), t)
             || inside(*p, &U::EXPR).is_some_and(|inner| {
                 t.strip_prefix(inner.symbol())

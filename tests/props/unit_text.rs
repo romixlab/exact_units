@@ -377,6 +377,32 @@ fn quotients() -> Vec<fn(i64)> {
         ElectricFieldStrength, "V", "m";
         CurrentDensity, "A", "m²";
         HeatFluxDensity, "W", "m²";
+        Per<units::Byte, Second>, "B", "s";
+        Per<units::Bit, Second>, "bit", "s";
+    }
+}
+
+/// Data rates: the byte takes a prefix on the numerator like any SI unit although it is 8 bit, and the binary
+/// prefixes go there too, where the bit and the byte take them.
+#[test]
+fn data_rates() {
+    use exact_units::prefix::{Gibi, Kibi, Mebi, Tebi};
+    use units::{Bit, Byte};
+
+    writes! {
+        Per<Byte, Second>, One, "5 B/s";
+        Per<Byte, Second>, Kilo, "5 kB/s";
+        Per<Byte, Second>, Mega, "5 MB/s";
+        Per<Byte, Second>, Kibi, "5 KiB/s";
+        Per<Byte, Second>, Mebi, "5 MiB/s";
+        Per<Byte, Second>, Gibi, "5 GiB/s";
+        Per<Bit, Second>, Kilo, "5 kbit/s";
+        Per<Bit, Second>, Giga, "5 Gbit/s";
+        Per<Bit, Second>, Mebi, "5 Mibit/s";
+        Per<Bit, Second>, Tebi, "5 Tibit/s";
+        Per<Byte, units::Sample>, Kibi, "5 KiB/sample";
+        // a binary prefix stays off a numerator that doesn't take it
+        Per<units::Volt, Second>, Kibi, "5 Ki(V/s)";
     }
 }
 

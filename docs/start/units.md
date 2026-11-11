@@ -23,7 +23,7 @@ The markers come in groups, one cargo feature each. A firmware turns on only the
 | `radiometric` | `Irradiance` ([[W/m²]]), `RadiantIntensity` ([[W/sr]]), `Radiance` ([[W]]/([[m²]]·[[sr]])) |
 | `radiation` | `Becquerel`, `Gray`, `Sievert`, `ElectronVolt`, `Exposure` ([[C/kg]]), `GrayPerSecond` ([[Gy/s]]), `SievertPerHour` |
 | `dimensionless` | `Ratio`: duty, probability, scale |
-| `information` | `Bit`, `Nibble`, `Byte`, `Halfword`, `Word`, `Doubleword` |
+| `information` | `Bit`, `Nibble`, `Byte`, `Halfword`, `Word`, `Doubleword`; with `time` the rates `BitPerSecond` (bit/s) and `BytePerSecond` (B/s) |
 | `counting` | `Item`, `Sample`, `Frame`, `Packet`, `Line`, `Row`, `Record`, `Entry`, `Cycle`, `Block`, `Sector`, `Chunk`, `Char`, `Code` |
 | `customary` | inch, pound, [[psi]], gallon and the rest: [Customary units](../customary.md) |
 

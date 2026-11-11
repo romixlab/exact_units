@@ -44,7 +44,7 @@
 use crate::unit::write_superscript;
 use crate::{BaseSource, Dim, Exp, MAX_TRUE_BASES};
 use crate::{Magnitude, MarkerId, UnitNames, UnitTable};
-use crate::{Prefix, UnitExpr};
+use crate::{Prefix, PrefixPolicy, UnitExpr};
 use core::fmt;
 
 /// Deepest nesting of a unit tree that is followed. A run-time unit comes from another device, so its depth is
@@ -712,6 +712,9 @@ pub(crate) struct Quotient<'a> {
     pub(crate) den: Option<&'a str>,
     /// Whether the numerator is an SI unit, so a prefix before it, or a kilogram's in place of its `k`, means what it says.
     pub(crate) takes_prefix: bool,
+    /// The prefixes the numerator takes, where it is a marker of its own: the byte's binary ones (`KiB/s`). `None` for
+    /// a marker named as a whole (`m/s`), which [takes_prefix](Self::takes_prefix) alone decides.
+    pub(crate) prefixes: Option<PrefixPolicy>,
     /// The marker of the whole quotient, for a tree `""`: `Density`.
     marker: &'a str,
 }
@@ -719,7 +722,7 @@ pub(crate) struct Quotient<'a> {
 /// [Quotient] of `unit`. `None` for what isn't one, or has a numerator with a power, a compound or nothing in it
 /// (`m²/s`, `N·m/s`, `/K`), and for a unit known by name only: nothing says what its `m` is.
 pub(crate) fn quotient<'t, E: Tree<'t>>(unit: &E) -> Option<Quotient<'t>> {
-    let (num, den, takes_prefix, marker) = match unit.node()? {
+    let (num, den, takes_prefix, prefixes, marker) = match unit.node()? {
         Node::Named {
             name,
             symbol,
@@ -728,11 +731,12 @@ pub(crate) fn quotient<'t, E: Tree<'t>>(unit: &E) -> Option<Quotient<'t>> {
             ..
         } => {
             let (num, den) = symbol.split_once('/')?;
-            (num, plain(den), true, name)
+            (num, plain(den), true, None, name)
         }
         Node::Div(a, b) => {
             let Node::Named {
                 symbol,
+                names,
                 dim: Some(_),
                 scale: Some(scale),
                 ..
@@ -743,8 +747,11 @@ pub(crate) fn quotient<'t, E: Tree<'t>>(unit: &E) -> Option<Quotient<'t>> {
             if matches!(b.node()?, Node::Named { dim: None, .. }) {
                 return None;
             }
-            let si = scale.as_pow10().is_some();
-            (symbol, den_symbol(&b), si, "")
+            // a power of ten of SI, or a unit that takes prefixes of its own at another scale: the byte, 8 bit
+            let prefixes = names.map(|n| n.prefixes);
+            let si = scale.as_pow10().is_some()
+                || prefixes.is_some_and(|p| !matches!(p, PrefixPolicy::None));
+            (symbol, den_symbol(&b), si, prefixes, "")
         }
         _ => return None,
     };
@@ -753,6 +760,7 @@ pub(crate) fn quotient<'t, E: Tree<'t>>(unit: &E) -> Option<Quotient<'t>> {
         num,
         den,
         takes_prefix: takes_prefix && (num == "kg" || prefix_binds(num)) && !is_level(num),
+        prefixes,
         marker,
     })
 }
@@ -825,12 +833,21 @@ fn engineering(a: i8) -> Option<&'static str> {
 /// 3. Over `m` and `m²`, `cm` or `cm²` where that leaves an engineering prefix on the numerator: `µS/cm`, `kV/cm`,
 ///    `mW/cm²`.
 /// 4. 10⁶ over `m²` is `mm²`: `A/mm²`.
-/// 5. The numerator takes the prefix: `mV/m`, `nV/√Hz`, and `g` stands for `kg` from `g/m²` down to `ng/s`.
+/// 5. The numerator takes the prefix: `mV/m`, `nV/√Hz`, `kB/s`, and `g` stands for `kg` from `g/m²` down to `ng/s`.
+/// 6. A binary prefix goes on a numerator that takes it, and only there: `KiB/s`, `Mibit/s`.
 ///
-/// `None` otherwise, for a binary prefix, and for a marker where rule 5 is what [write_unit] writes anyway.
+/// `None` otherwise, for a prefix the numerator doesn't take, and for a marker where rule 5 is what [write_unit]
+/// writes anyway.
 fn on_quotient<'t, E: Tree<'t>>(prefix: Prefix, unit: &E) -> Option<Moved<'t>> {
-    let k = prefix.pow10().filter(|k| *k != 0)?;
     let q = quotient(unit)?;
+    let numerator_takes = q.prefixes.is_none_or(|p| p.allows(prefix));
+    let Some(k) = prefix.pow10() else {
+        let binary = q.prefixes.is_some() && q.takes_prefix && q.marker.is_empty() && prefix.is_named();
+        return (binary && numerator_takes).then_some(Moved::Inside(prefix));
+    };
+    if k == 0 {
+        return None;
+    }
     if let Some(m) = per_litre(k, &q) {
         return Some(m);
     }
@@ -873,7 +890,8 @@ fn on_quotient<'t, E: Tree<'t>>(prefix: Prefix, unit: &E) -> Option<Moved<'t>> {
                 .map(|head| Moved::Quotient(head, num, "", den));
         }
     }
-    (q.marker.is_empty() && q.num != "kg" && prefix.is_named()).then_some(Moved::Inside(prefix))
+    (q.marker.is_empty() && q.num != "kg" && prefix.is_named() && numerator_takes)
+        .then_some(Moved::Inside(prefix))
 }
 
 /// `Density` and `MolarConcentration` per litre, 10⁻¹² up to 10³ on the marker in steps of 10³.

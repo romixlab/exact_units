@@ -692,3 +692,21 @@ fn nuclear_units() {
         Some(Fixed::new(31_557_600))
     );
 }
+
+/// bit/s and B/s are one dimension, exact to each other, and neither is a baud or a hertz.
+#[test]
+fn data_rates() {
+    use exact_units::prefix::{Kibi, Kilo, One};
+    use exact_units::Fixed;
+    use units::{BitPerSecond, BytePerSecond};
+
+    let bits = <BitPerSecond as Unit>::DIM;
+    assert!(bits.same(<BytePerSecond as Unit>::DIM));
+    assert!(!bits.same(<units::Baud as Unit>::DIM));
+    assert!(!bits.same(<units::Hertz as Unit>::DIM));
+    let card = Fixed::<BytePerSecond, Kibi, u32>::new(3);
+    assert_eq!(card.to_string(), "3 KiB/s");
+    let link: Fixed<BitPerSecond, One, u32> = card.convert().expect("3 KiB/s is 24576 bit/s");
+    assert_eq!(link.get(), 24_576);
+    assert_eq!(Fixed::<BitPerSecond, Kilo, u32>::new(100).to_string(), "100 kbit/s");
+}

@@ -1837,6 +1837,10 @@ pub(crate) fn write_prefix_unit<P: FixedScale>(
     if let Some(prefix) = prefix.filter(|p| p.is_named() || moved(*p, &unit).is_some()) {
         return write_unit(prefix, &unit, f);
     }
+    // a binary prefix on a quotient whose numerator takes it: KiB/s
+    if let Some(prefix) = Prefix::named_of(&P::SCALE).filter(|p| moved(*p, &unit).is_some()) {
+        return write_unit(prefix, &unit, f);
+    }
     if P::SYMBOL.is_empty() {
         // a factor without a prefix: after the number, then the unit
         write!(f, "{}", P::SCALE)?;
@@ -1948,7 +1952,8 @@ impl<U: Unit, P: FixedScale, T: Storage + defmt::Format, B: Bounds<T>> defmt::Fo
     for Fixed<U, P, T, B>
 {
     fn format(&self, f: defmt::Formatter<'_>) {
-        let prefix = P::SCALE.as_pow10().and_then(Prefix::from_pow10);
+        let prefix = Prefix::named_of(&P::SCALE)
+            .or_else(|| P::SCALE.as_pow10().and_then(Prefix::from_pow10));
         match (U::EXPR, prefix.and_then(|p| moved(p, &U::EXPR))) {
             (_, Some(crate::tree::Moved::Quotient(head, num, under, den))) => {
                 return defmt::write!(
