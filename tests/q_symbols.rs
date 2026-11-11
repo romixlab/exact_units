@@ -1247,6 +1247,8 @@ fn text_reader_agrees() {
                 Pennyweight, Poundal, PoundForce, Psf, Psi, Quad, Rad, Radian, Ratio, Record, Rem, Roentgen, Rood, Row, Sample, Second,
                 Sector, Siemens, Sievert, Slug, Steradian, Stone, Stop, StreckSwedish, Tesla, Thou, TonForceShort, Tonne,
                 TonOfRefrigeration, TonOfTnt, TonShort, Torr, Turn, Var, Volt, VoltAmpere, Watt, Weber, Week, Word, Yard,
+                Event, Pulse, Tick, Channel, Pin, Step, Segment, Session, Boot, Operation, Argument, Filter, Fifo, Buffer,
+                TimeQuantum, Scan,
             );
             match r {
                 Ok(()) => {}
