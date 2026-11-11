@@ -4,9 +4,9 @@ level: basic
 
 # Exact fractions
 
-A `Fixed` has its scale in the type: a whole number of [[µs]], of 2⁻¹⁵, of 1/65535. Some values have no such scale. An STM32H7 PLL makes ref·(N + FRACN/8192)/(M·P): 519.999755859375 [[MHz]] for one setting, 80/3 [[MHz]] for a divider of 3. A planner that works these out on a host needs the value itself, exactly.
+A `Fixed` has its scale in the type: a whole number of [[µs]], of $2^{-15}$, of $1/65535$. Some values have no such scale. An STM32H7 PLL makes $\mathrm{ref} \cdot (N + \mathrm{FRACN}/8192)/(M P)$: 519.999755859375 [[MHz]] for one setting, $80/3\,\unit{MHz}$ for a divider of 3. A planner that works these out on a host needs the value itself, exactly.
 
-`Exact<U>` is that value: the unit `U` in the type, the number a `Fraction` chosen at run time. A `Fraction` is a sign, a numerator and a denominator of `u128`, and a power of ten: `±num/den · 10^exp`. There is no scale and no storage to pick ([Range](#range) says what it holds).
+`Exact<U>` is that value: the unit `U` in the type, the number a `Fraction` chosen at run time. A `Fraction` is a sign, a numerator and a denominator of `u128`, and a power of ten: $\pm\mathrm{num}/\mathrm{den} \cdot 10^{\mathrm{exp}}$. There is no scale and no storage to pick ([Range](#range) says what it holds).
 
 ```rust
 use exact_units::{Exact, Fraction, prefix::Mega, units::Hertz};
@@ -114,7 +114,7 @@ Multiply and divide refuse exactly the results no form of which fits ([Range](#r
 
 ## Range
 
-A `Fraction` holds 38 significant digits in each of the numerator and the denominator, times `10^±2³¹`. The power of ten is kept apart from the digits, so atomic scales cost nothing: the $\alpha$ energy of $^{226}\mathrm{Ra}$ as a mass is $8.68 \times 10^{-30}\ \unit{kg}$, a 59-bit numerator over a 56-bit denominator times $10^{-30}$, where its plain lowest terms need a 155-bit denominator.
+A `Fraction` holds 38 significant digits in each of the numerator and the denominator, times `10^±2³¹`. The power of ten is kept apart from the digits, so atomic scales cost nothing: the $\alpha$ energy of $^{226}\mathrm{Ra}$ as a mass is $8.68 \cdot 10^{-30}\,\unit{kg}$, a 59-bit numerator over a 56-bit denominator times $10^{-30}$, where its plain lowest terms need a 155-bit denominator.
 
 ```rust
 # #[cfg(all(feature = "radiation", feature = "mechanical"))] {
@@ -154,7 +154,7 @@ assert_eq!(f.to_rounded::<One, u32>(Rounding::Floor), Some(Fixed::new(26_666_666
 assert!(f > Fixed::<Hertz, Kilo, u16>::new(26_666));
 ```
 
-The order is exact for every value of the `Fixed`: a float of any size, `1e300` or `1e-300`, and an integer whose product with its scale passes `u128`. ±∞ is past every `Exact`. A NaN has no order and equals nothing. A scale that isn't a fraction of `u128`s (π, a root, `Pow10<-40>`) doesn't compile, as for `to`: an `Exact` is a fraction, and a number of π steps never is one.
+The order is exact for every value of the `Fixed`: a float of any size, `1e300` or `1e-300`, and an integer whose product with its scale passes `u128`. $\pm\infty$ is past every `Exact`. A NaN has no order and equals nothing. A scale that isn't a fraction of `u128`s ($\pi$, a root, `Pow10<-40>`) doesn't compile, as for `to`: an `Exact` is a fraction, and a number of $\pi$ steps never is one.
 
 ```rust,compile_fail
 # #[cfg(feature = "angle")] {
@@ -172,7 +172,7 @@ let _ = a < b; // MilliDegree carries π: no fraction of u128s is its step
 # #[cfg(not(feature = "angle"))] compile_error!("the case needs angle");
 ```
 
-Instead: round through `f64`, as the error itself says — convert the `Fixed` into a float storage with a named rounding, which takes any factor including π ([Floats](conversions.md#floats)), and `Exact::to_f64()` the other side:
+Instead: round through `f64`, as the error itself says — convert the `Fixed` into a float storage with a named rounding, which takes any factor including $\pi$ ([Floats](conversions.md#floats)), and `Exact::to_f64()` the other side:
 
 ```rust
 # #[cfg(feature = "angle")] {
@@ -241,7 +241,7 @@ With the `serde` feature, a config field takes `#[serde(with = "exact_units::ser
 
 ## Relative error and tolerance
 
-`rel_error(target)` is `(achieved − target) / target` as an exact `Exact<Ratio>`, with its sign. `within(target, tolerance)` gives that error, or an `OffTarget` that names both values, the error and the tolerance. Both ends of the tolerance are in.
+`rel_error(target)` is $(\mathrm{achieved} - \mathrm{target})/\mathrm{target}$ as an exact `Exact<Ratio>`, with its sign. `within(target, tolerance)` gives that error, or an `OffTarget` that names both values, the error and the tolerance. Both ends of the tolerance are in.
 
 ```rust
 use exact_units::{Exact, Tolerance, prefix::Mega, units::Hertz};
@@ -263,7 +263,7 @@ A value equal to its target is within any tolerance, with an error of 0, also wh
 
 ### Between two `Fixed` values
 
-A `Fixed` of an integer storage has the same `within`, and `is_within`, its bool. Both values have the same scale, so the scale cancels: the error is that of the stored integers, exact for every value. `is_within` decides `q · |a − b| <= p · |b|` for a tolerance `p/q`. For a storage of up to 32 bits and a tolerance whose `p` and `q` fit 32 bits (`percent`, `ppm`, `ppb`), that is two 64-bit products. That is the form for firmware.
+A `Fixed` of an integer storage has the same `within`, and `is_within`, its bool. Both values have the same scale, so the scale cancels: the error is that of the stored integers, exact for every value. `is_within` decides $q \lvert a - b \rvert \le p \lvert b \rvert$ for a tolerance $p/q$. For a storage of up to 32 bits and a tolerance whose $p$ and $q$ fit 32 bits (`percent`, `ppm`, `ppb`), that is two 64-bit products. That is the form for firmware.
 
 ```rust
 use exact_units::{Hz, Tolerance};
@@ -279,7 +279,7 @@ assert_eq!(off.to_string(), "80000100 Hz is 1.25 ppm off 80000000 Hz, outside ±
 
 A control loop checks many readings against one setpoint. `target.window(tolerance, fit)` works the ends out once, exactly, and gives a `Window`: two values of the type. Each check is then two compares of the storage, with nothing wide left for run time. `contains` and `is_in` both check, in the order that reads best.
 
-The real ends `target · (1 ± t)` are rarely stored values, so the call names which stored values stand for them, a `Fit`. `Fit::Inside` moves the ends inward: the window holds the stored values within the tolerance and no others, so a value is in it exactly when `is_within` says so. `Fit::Outside` moves them outward: the smallest window of stored values that covers the real one. Both are cut to the type's range and bounds, and both hold the target.
+The real ends $\mathrm{target} \cdot (1 \pm t)$ are rarely stored values, so the call names which stored values stand for them, a `Fit`. `Fit::Inside` moves the ends inward: the window holds the stored values within the tolerance and no others, so a value is in it exactly when `is_within` says so. `Fit::Outside` moves them outward: the smallest window of stored values that covers the real one. Both are cut to the type's range and bounds, and both hold the target.
 
 ```rust
 use exact_units::{Fit, Fixed, Tolerance, prefix::Milli, units::Volt};
@@ -328,4 +328,4 @@ Generic code sees `ExactNum`'s methods on the number (`checked_add`, `checked_mu
 
 ## Cost
 
-An `Exact` is 48 bytes (the exponent sits in what was padding), and its arithmetic is `u128` multiplies and divisions with a gcd at each step, then the normalisation: the 2s and 5s stripped (a 5 by one multiply by its inverse modulo 2¹²⁸, no division) and the exponent placed. That is fine on a host and slow on a microcontroller, where most `u128` operations are library calls. Firmware gets the results as `Fixed` constants. The type is `no_std` and needs no alloc, and nothing of it is linked unless it is used.
+An `Exact` is 48 bytes (the exponent sits in what was padding), and its arithmetic is `u128` multiplies and divisions with a gcd at each step, then the normalisation: the 2s and 5s stripped (a 5 by one multiply by its inverse modulo $2^{128}$, no division) and the exponent placed. That is fine on a host and slow on a microcontroller, where most `u128` operations are library calls. Firmware gets the results as `Fixed` constants. The type is `no_std` and needs no alloc, and nothing of it is linked unless it is used.

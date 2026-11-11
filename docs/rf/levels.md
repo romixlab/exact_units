@@ -6,7 +6,7 @@ level: advanced
 
 dBm is a power level against a fixed reference, 1 [[mW]]: nothing new, a `Per<Watt, Watt>` power ratio of the
 measured power to that reference, the same idiom [dBFS](../levels/thresholds.md#dbfs) uses against full scale.
-The kind of a [[W/W]] ratio already picks 10·lg ([Decibels](../levels/decibels.md#the-kind-picks-the-formula)), so
+The kind of a [[W/W]] ratio already picks $10 \lg$ ([Decibels](../levels/decibels.md#the-kind-picks-the-formula)), so
 `to_db` gives dBm directly, as a `Fixed<Decibel, One, f64>`:
 
 ```rust

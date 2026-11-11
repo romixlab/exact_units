@@ -57,7 +57,7 @@ A bias adds up: a sum of $n$ rounded values is off by $n$ times it, while unbias
 
 Every mode rounds the true quotient once. For integer storages there is no float on the way.
 
-A factor with $\pi$, $\ln 2$ or a root in it is allowed here, unlike in `to`. It is multiplied as a 64-bit fixed point within $2^{-64}$ of the true factor, so the result is the correctly rounded one except within $|x| \cdot 2^{-64}$ of a rounding step.
+A factor with $\pi$, $\ln 2$ or a root in it is allowed here, unlike in `to`. It is multiplied as a 64-bit fixed point within $2^{-64}$ of the true factor, so the result is the correctly rounded one except within $\lvert x \rvert \cdot 2^{-64}$ of a rounding step.
 
 Thousandths of a degree to [[µrad]] is such a factor, $\pi / 180\,000 \cdot 10^{6}$:
 

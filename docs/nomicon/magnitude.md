@@ -58,7 +58,7 @@ Two things are refused: a compile error in a `const`, a `MagnitudeError` from th
 - More than `MAX_FACTORS` (16) primes other than 2 and 5.
 - An exponent outside $\pm 63\tfrac12$.
 
-The 171 imperial and US customary units take at most 7 such primes, and any product or quotient of two of them at most 10. The exact SI constants $h$, $c$, $e$ and $k_{\mathrm{B}}$ take 9 together, and $\mu_0$ and $G$ resolved by CODATA 2022 five more. Plain fractions of integers can't do this: [[psi²]] takes 87 bits, ([[lbf·s]])³ 130.
+The 171 imperial and US customary units take at most 7 such primes, and any product or quotient of two of them at most 10. The exact SI constants $h$, $c$, $e$ and $k_{\mathrm{B}}$ take 9 together, and $\mu_0$ and $G$ resolved by CODATA 2022 five more. Plain fractions of integers can't do this: [[psi²]] takes 87 bits, $(\unit{lbf·s})^3$ 130.
 
 ## π, ln 2 and ln 10
 
@@ -73,7 +73,7 @@ A root halves the exponents: $\sqrt{\unit{mHz}} = 10^{-3/2}\,\unit{Hz}^{1/2}$. T
 ## $\mu_0$, $G$ and $m_{\mathrm{u}}$, measured symbols
 
 The magnetic constant $\mu_0$, the gravitational constant $G$ and the atomic mass constant $m_{\mathrm{u}}$ (the
-dalton in [[kg]]) are symbols too, and cancel the same way: $(T/\mu_0)\cdot\mu_0$ is T. They differ from $\pi$ in
+dalton in [[kg]]) are symbols too, and cancel the same way: $(\unit{T}/\mu_0) \cdot \mu_0$ is [[T]]. They differ from $\pi$ in
 one thing: their value is measured, so a magnitude with $\mu_0$, $G$ or $m_{\mathrm{u}}$ left in it has no
 number. `to_f64` and `fixed_point` refuse it (a compile error in a `const`), `checked_to_f64` is `None`, and a
 conversion over such a factor doesn't compile. A named set gives the number: see [Measured constants](constants.md).

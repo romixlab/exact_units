@@ -9,7 +9,7 @@ square). A resistance ([[Ω]]) and a transimpedance ([[V/A]]) share a dimension 
 ([[Hz]]) and a radioactive activity ([[Bq]]) share a dimension, [[s⁻¹]], and have nothing else in common at all.
 
 ISO 80000 calls this a **quantity**, and `exact_units` puts it in the type, next to the dimension:
-`Fixed<Of<Height, Meter>, Milli, u16>` is a height, not a plain length, and `Ohm` is a resistance, not a bare V/A.
+`Fixed<Of<Height, Meter>, Milli, u16>` is a height, not a plain length, and `Ohm` is a resistance, not a bare [[V/A]].
 A unit whose declaration names no quantity of its own measures its dimension's *open root* instead (`Meter` is a
 [Length], `Joule` an [Energy]), so most code never writes `Of` at all.
 
@@ -188,7 +188,7 @@ let _ = <Common<KineticEnergy, Height>>::DEF; // a kinetic energy and a height s
 
 A product or quotient is its dimension's open root (`Derived`) unless one side is dimension-one and itself a
 ratio or a derived value, in which case it keeps the *other* side's quantity: a gain times a resistance is still
-a resistance, not a bare derived [[Ω]]·([[V/V]]).
+a resistance, not a bare derived $\unit{Ω} \cdot (\unit{V/V})$.
 
 ```rust
 use exact_units::{Fixed, prefix::{Milli, One}, units::{Ohm, Per, Volt}};
@@ -219,18 +219,18 @@ let _ = gain.convert::<Ratio, One, f32>();
 ## Some dimensions have no open root at all
 
 A unit whose line names no quantity measures its dimension's open root — except where a dimension has none.
-[[C/m²]] is the SI dimension of three quantities at once: the displacement field D, the polarization P and the
-surface density of charge $\sigma$; [[A/m]] is the dimension of the magnetizing field H, the magnetization M and a linear
+[[C/m²]] is the SI dimension of three quantities at once: the displacement field $D$, the polarization $P$ and the
+surface density of charge $\sigma$; [[A/m]] is the dimension of the magnetizing field $H$, the magnetization $M$ and a linear
 current density. None of the three is the dimension's "default" meaning, because [Gaussian units](systems.md)
-count two of each trio 4π apart (D and P, H and M) even though SI's own numbers for them agree: picking one as
-open would let the other cross silently wrong. So this crate declares `ElectricFluxDensity` (D),
-`ElectricPolarization` (P, a kind under D) and `SurfaceChargeDensity`, and `MagnetizingField` (H),
-`Magnetization` (M, a kind under H) and `LinearCurrentDensity`, every one a kind, and `Derived` of [[C/m²]] or [[A/m]] is
+count two of each trio $4\pi$ apart ($D$ and $P$, $H$ and $M$) even though SI's own numbers for them agree: picking one as
+open would let the other cross silently wrong. So this crate declares `ElectricFluxDensity` ($D$),
+`ElectricPolarization` ($P$, a kind under $D$) and `SurfaceChargeDensity`, and `MagnetizingField` ($H$),
+`Magnetization` ($M$, a kind under $H$) and `LinearCurrentDensity`, every one a kind, and `Derived` of [[C/m²]] or [[A/m]] is
 none of them.
 
 The unit lines `ElectricDisplacement` and `MagneticFieldStrength` still name their quantity (`quantity
-ElectricFluxDensity`, `quantity MagnetizingField`), so a value typed in one of them is already D or H. Building
-the dimension from scratch, `Per<Ampere, Meter>`, gives the plain derived quantity instead, and reaching H from it
+ElectricFluxDensity`, `quantity MagnetizingField`), so a value typed in one of them is already $D$ or $H$. Building
+the dimension from scratch, `Per<Ampere, Meter>`, gives the plain derived quantity instead, and reaching $H$ from it
 is the same named step as Ohm's:
 
 ```rust

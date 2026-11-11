@@ -23,16 +23,16 @@ cargo run --example 01_timer --no-default-features --features time
 | 7 | [`07_tone_generator`][ex07] | `dimensionless,angle` | a phase that wraps (`Bam16`) and a mix that saturates (`Q15`) |
 | 8 | [`08_data_logger`][ex08] | `counting,time` | channels from 1, ring slots from 0, packet numbers that wrap |
 | 9 | [`09_capture_buffer`][ex09] | `counting,time,information` | samples, bytes and cycles as dimensions; [[KiB]] is not [[kB]] |
-| 10 | [`10_adc_noise`][ex10] | `electrical,time` | an amplifier's [[nV]]/√[[Hz]] over a bandwidth |
+| 10 | [`10_adc_noise`][ex10] | `electrical,time` | an amplifier's $\unit{nV}/\sqrt{\unit{Hz}}$ over a bandwidth |
 | 11 | [`11_us_customer`][ex11] | `customary` | setpoints in [[psi]] and gallons, US or imperial named |
 | 12 | [`12_wire`][ex12] | `shrink_wrap,time,electrical` | a reading sent to a PC tool, the same bytes as plain integers |
-| 13 | [`13_impedance_match`][ex13] | `electrical,angle,dimensionless,libm` | an antenna's Γ, VSWR and return loss; a dB limit as an integer compare |
+| 13 | [`13_impedance_match`][ex13] | `electrical,angle,dimensionless,libm` | an antenna's $\Gamma$, VSWR and return loss; a dB limit as an integer compare |
 | 14 | [`14_iq_downconvert`][ex14] | `angle,dimensionless,electrical` | Q15 IQ samples mixed down by an NCO on a Cortex-M0 |
 | 15 | [`15_nuclear`][ex15] | `radiation,systems,time,chemical,dimensionless,mechanical` | AME2020 masses to binding energies and Q-values, a gram of radium in [[Bq]], [[Gy]] against [[Sv]] ([Nuclear physics](nuclear.md)) |
 | 16 | [`16_video_time`][ex16] | `time` | H.264 time bases, RTP's wrapping 90 [[kHz]] clock, the 48 [[kHz]] cadence, drop-frame time codes against true time ([Video time](video_time.md)) |
 | 17 | [`17_image_codecs`][ex17] | `dimensionless,customary,q` | the roundings, lossless transforms, scales and printed constants of JPEG, JPEG 2000, H.264, H.265, H.273 and AV1 ([Image and video codecs](image_codecs.md)) |
-| 18 | [`18_photo_exposure`][ex18] | `levels,photometric,time,libm` | Exif's APEX values as exact stops, Table 55's labels against their values, the meter's K and C named ([Photography](photography.md)) |
-| 19 | [`19_rf`][ex19] | `electrical,fields,mechanical,time,angle,levels,dimensionless,libm` | mismatch, link budget, Friis, fractional-N, two-ports, η₀, skin depth and phase noise, each exact or at a named edge ([RF recipes](rf/index.md)) |
+| 18 | [`18_photo_exposure`][ex18] | `levels,photometric,time,libm` | Exif's APEX values as exact stops, Table 55's labels against their values, the meter's $K$ and $C$ named ([Photography](photography.md)) |
+| 19 | [`19_rf`][ex19] | `electrical,fields,mechanical,time,angle,levels,dimensionless,libm` | mismatch, link budget, Friis, fractional-N, two-ports, $\eta_0$, skin depth and phase noise, each exact or at a named edge ([RF recipes](rf/index.md)) |
 
 The lines that don't compile are in the files too, each with the compiler's real message.
 

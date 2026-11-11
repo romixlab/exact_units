@@ -55,15 +55,15 @@ crosses](#what-never-crosses-and-why) below.
 
 `systems::Natural`'s bases are [[eV]], [[A]], [[K]], [[mol]], cd: mass, energy, momentum and inverse length, which SI keeps apart,
 are all [[eV¹]]. The ampere, kelvin, mole and candela stay bases of their own, so an electromagnetic unit still needs
-one. Since the 2019 SI redefinition $\hbar$ (= $h/2\pi$), $c$ and $e$ are exact, so every entry of Natural's rule is an exact
-`Magnitude`, π included, and no set of constants is ever needed to cross into or out of it:
+one. Since the 2019 SI redefinition $\hbar$ ($= h/2\pi$), $c$ and $e$ are exact, so every entry of Natural's rule is an exact
+`Magnitude`, $\pi$ included, and no set of constants is ever needed to cross into or out of it:
 
-- $1\ \unit{s} = (e/\hbar)\ \unit{eV}^{-1}$
-- $1\ \unit{m} = (e/(\hbar c))\ \unit{eV}^{-1}$
-- $1\ \unit{kg} = (c^2/e)\ \unit{eV}$
+- $1\,\unit{s} = (e/\hbar)\,\unit{eV}^{-1}$
+- $1\,\unit{m} = (e/(\hbar c))\,\unit{eV}^{-1}$
+- $1\,\unit{kg} = (c^2/e)\,\unit{eV}$
 
 Natural's only unit is `natural::NaturalElectronVolt` (symbol `eV`, prefixes decimal): not
-[`units::ElectronVolt`](../units/declare.md), SI's fixed $1.602176634 \times 10^{-19}\ \unit{J}$, but the coherent unit of Natural
+[`units::ElectronVolt`](../units/declare.md), SI's fixed $1.602176634 \cdot 10^{-19}\,\unit{J}$, but the coherent unit of Natural
 itself, which stands for a mass, an energy, a momentum or an inverse length depending on what the far side names:
 
 ```rust
@@ -136,24 +136,24 @@ exactly 1 under [`Ampere1948`](../nomicon/constants.md), where the customary tab
 
 | Quantity | 1 Gaussian unit | in SI |
 |---|---|---|
-| charge | 1 statC | 1/(10·c·S) C |
-| current | 1 statA | 1/(10·c·S) A |
-| potential | 1 statV | 10⁻⁶·c·S V |
-| electric field, E | 1 statV/cm | 10⁻⁴·c·S V/m |
-| displacement, D | 1 statV/cm | 10³/(4π·c·S) C/m² |
-| polarization, P | 1 statC/cm² | 10³/(c·S) C/m² |
-| flux density, B | 1 G | 10⁻⁴·S T |
-| field strength, H | 1 Oe | 10³/(4π·S) A/m, = (1 G)/μ₀ |
-| magnetization, M | 1 emu/cm³ | 10³/S A/m |
-| flux | 1 Mx | 10⁻⁸·S Wb |
-| resistance, inductance | 1 statΩ, 1 statH | 10⁻⁵·c²·S² Ω, H |
-| capacitance | 1 cm | 1/(10⁻⁵·c²·S²) F |
+| charge | 1 statC | $1/(10 c S)\,\unit{C}$ |
+| current | 1 statA | $1/(10 c S)\,\unit{A}$ |
+| potential | 1 statV | $10^{-6} c S\,\unit{V}$ |
+| electric field, $E$ | 1 statV/cm | $10^{-4} c S\,\unit{V/m}$ |
+| displacement, $D$ | 1 statV/cm | $10^3/(4\pi c S)\,\unit{C/m^2}$ |
+| polarization, $P$ | 1 statC/cm² | $10^3/(c S)\,\unit{C/m^2}$ |
+| flux density, $B$ | 1 G | $10^{-4} S\,\unit{T}$ |
+| field strength, $H$ | 1 Oe | $10^3/(4\pi S)\,\unit{A/m}$, $= (1\,\mathrm{G})/\mu_0$ |
+| magnetization, $M$ | 1 emu/cm³ | $10^3/S\,\unit{A/m}$ |
+| flux | 1 Mx | $10^{-8} S\,\unit{Wb}$ |
+| resistance, inductance | 1 statΩ, 1 statH | $10^{-5} c^2 S^2\,\unit{Ω}$, $\unit{H}$ |
+| capacitance | 1 cm | $1/(10^{-5} c^2 S^2)\,\unit{F}$ |
 
 This crate's units name six of those rows: `gaussian::{Statcoulomb, Statampere, Statvolt, Gauss, Oersted,
-Maxwell}` (charge, current, potential, B and H, and flux); D, P, M, resistance, inductance and capacitance have a
+Maxwell}` (charge, current, potential, $B$ and $H$, and flux); $D$, $P$, $M$, resistance, inductance and capacitance have a
 row and a quantity but no unit marker yet, as nothing has needed one. The mechanical units — `Erg`, `Dyne`, `Gal`,
 `GaussianSecond`, `GaussianCentimeter`, `GaussianGram` — need no row at all: a dimension with no electromagnetic
-quantity in it crosses by the rule, 1 [[m]] = 100 [[cm]] and 1 [[kg]] = 1000 [[g]], as plain and exact as Natural's.
+quantity in it crosses by the rule, $1\,\unit{m} = 100\,\unit{cm}$ and $1\,\unit{kg} = 1000\,\unit{g}$, as plain and exact as Natural's.
 
 ```rust
 # #[cfg(feature = "systems")] {
@@ -168,7 +168,7 @@ assert_eq!(f.to_system::<Gaussian>().convert::<Dyne, One, i64>(), Some(Fixed::ne
 # }
 ```
 
-A row's factor over `S` leaves μ₀ in the type: without a set `convert` has no number for it, and the conversion
+A row's factor over `S` leaves $\mu_0$ in the type: without a set `convert` has no number for it, and the conversion
 doesn't compile, floats included.
 
 ```rust,compile_fail
@@ -198,7 +198,7 @@ assert_eq!(a22, Some(Fixed::new(79_577_472)));
 # }
 ```
 
-**B and H are two kinds of the one dimension here**, as D/P and the pairs above are, so neither adds to the other
+**$B$ and $H$ are two kinds of the one dimension here**, as $D$/$P$ and the pairs above are, so neither adds to the other
 even where the numbers agree in vacuum:
 
 ```rust,compile_fail
@@ -236,7 +236,7 @@ Where neither a row nor the rule applies, crossing is a compile error, and the e
   `SymbolRate`, so even a mechanical-looking [[s⁻¹]] with no electromagnetic base in it still refuses (`NoRule`).
 - **A kind the rule can't name.** The rule only ever lands on a dimension's open root (`Derived`); a value whose
   quantity is a kind of its own, on either side, needs a row or an explicit step first (`Kind`).
-- **A product of units that cross only by rows.** Named leaves that are themselves rows (Gaussian's B, H, ..) make
+- **A product of units that cross only by rows.** Named leaves that are themselves rows (Gaussian's $B$, $H$, ..) make
   the whole product refuse the rule, so it crosses only once a leaf is converted within its system or the whole is
   named (`ProductOfRows`).
 

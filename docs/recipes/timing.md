@@ -19,7 +19,7 @@ assert_eq!(arm.get(), 250_000);
 
 ## Timer ticks of a 48 MHz clock
 
-One tick is $1 / 48\,000\,000\ \unit{s}$. Ticks to whole [[µs]], rounded down:
+One tick is $1 / 48\,000\,000\,\unit{s}$. Ticks to whole [[µs]], rounded down:
 
 ```rust
 use exact_units::{Fixed, Rounding, prefix::{Micro, Rational}, units::Second};

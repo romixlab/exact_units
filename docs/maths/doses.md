@@ -121,7 +121,7 @@ is a plain sum.
 
 The $w_{\mathrm{T}}$ are hundredths, so a sum is often no whole number of the storage's step. The step is exact
 or `None`, as the weightings are, and `effective_dose_rounded` rounds once, at the end. A float storage is exact
-or `None` too: $0.04 \cdot 0.5\ \unit{mSv}$ is no `f64`. Equivalent dose rates give an effective dose rate the
+or `None` too: $0.04 \cdot 0.5\,\unit{mSv}$ is no `f64`. Equivalent dose rates give an effective dose rate the
 same way. An absorbed dose is refused: it takes its $w_{\mathrm{R}}$ first.
 
 ```rust,compile_fail
@@ -133,7 +133,7 @@ let _: Option<Fixed<EffectiveDose, Micro, u32>> = Icrp103::effective_dose(&d);
 
 ## A rate and its dose
 
-A dose rate times a time is a plain product, `Derived`, and `as_quantity` could name it any quantity of that dimension. The named steps keep the pair: `rate.dose_over(t)` gives the dose of the rate's own kind, and `dose.rate_over(t)` the mean rate of the dose's kind. Ḣ*(10) over a time is an H*(10), never an Hp(10) or an effective dose. The pairs are each dose rate of the tree above with its dose: `AbsorbedDoseRate` and `AbsorbedDose`, `KermaRate` and `Kerma`, and so on for the dose equivalent, the three operational quantities, the equivalent dose and the effective dose.
+A dose rate times a time is a plain product, `Derived`, and `as_quantity` could name it any quantity of that dimension. The named steps keep the pair: `rate.dose_over(t)` gives the dose of the rate's own kind, and `dose.rate_over(t)` the mean rate of the dose's kind. $\dot{H}^*(10)$ over a time is an $H^*(10)$, never an $H_{\mathrm{p}}(10)$ or an effective dose. The pairs are each dose rate of the tree above with its dose: `AbsorbedDoseRate` and `AbsorbedDose`, `KermaRate` and `Kerma`, and so on for the dose equivalent, the three operational quantities, the equivalent dose and the effective dose.
 
 ```rust
 use exact_units::{Fixed, prefix::{Micro, Nano, One}};
@@ -150,7 +150,7 @@ let back: Fixed<Of<AmbientDoseEquivalentRate10, SievertPerHour>, Micro, u32> = h
 assert_eq!(back, rate);
 ```
 
-The result's unit, scale and storage are the caller's, usually given by the binding; the factor between the units (Sv/h times minutes into Sv) is worked out at compile time. The step is exact or `None` (a result that isn't a whole number of its step, a zero time, a value past the storage); `dose_over_rounded` and `rate_over_rounded` round once.
+The result's unit, scale and storage are the caller's, usually given by the binding; the factor between the units ([[Sv/h]] times minutes into [[Sv]]) is worked out at compile time. The step is exact or `None` (a result that isn't a whole number of its step, a zero time, a value past the storage); `dose_over_rounded` and `rate_over_rounded` round once.
 
 ```rust,compile_fail
 use exact_units::{Fixed, prefix::{Micro, One}};

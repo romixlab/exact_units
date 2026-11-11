@@ -15,19 +15,19 @@ let y: Admittance<Milli, i32> = Complex::new(12_000, -16_000); // 12 − 16j mS
 
 ## Shorts, opens and the extended plane
 
-A short and an open are ordinary loads, not errors. Their admittance or impedance is infinite, so Z, Y and $\Gamma$ live on the extended complex plane: the complex numbers plus one point ∞, which has no direction. `Extended<T>` is that plane, `Extended::Finite(value)` or `Extended::Infinity`.
+A short and an open are ordinary loads, not errors. Their admittance or impedance is infinite, so $Z$, $Y$ and $\Gamma$ live on the extended complex plane: the complex numbers plus one point $\infty$, which has no direction. `Extended<T>` is that plane, `Extended::Finite(value)` or `Extended::Infinity`.
 
-The Smith chart draws this plane. Its center is the match, Z = Z₀ and Γ = 0 ([Reflection](reflection.md)). Its rim is |Γ| = 1, the purely reactive loads. The left end of the real axis is the short, Z = 0 and Γ = −1. The right end is the open, Z = ∞ and Γ = 1, one point however the load got there. Inside the rim are the passive loads. A negative resistance, an oscillator's or a tunnel diode's, lies outside, and Z = −Z₀ goes to Γ = ∞, the point at infinity of the Γ plane.
+The Smith chart draws this plane. Its center is the match, $Z = Z_0$ and $\Gamma = 0$ ([Reflection](reflection.md)). Its rim is $|\Gamma| = 1$, the purely reactive loads. The left end of the real axis is the short, $Z = 0$ and $\Gamma = -1$. The right end is the open, $Z = \infty$ and $\Gamma = 1$, one point however the load got there. Inside the rim are the passive loads. A negative resistance, an oscillator's or a tunnel diode's, lies outside, and $Z = -Z_0$ goes to $\Gamma = \infty$, the point at infinity of the $\Gamma$ plane.
 
-Each of these has a value at every point of the extended plane, ∞ included, and none of them has an error:
+Each of these has a value at every point of the extended plane, $\infty$ included, and none of them has an error:
 
 | Call | Special points |
 |---|---|
-| `z.to_admittance()` | Z = 0 (a short) is `Admittance::SHORT`, Y = ∞; Z = ∞ (an open) is Y = 0 |
-| `y.to_impedance()` | Y = 0 (an open) is `Impedance::OPEN`, Z = ∞; Y = ∞ (a short) is Z = 0 |
-| `z.reflection(z0)` | Z = 0 is Γ = −1; Z = ∞ is Γ = 1; Z = −Z₀ is Γ = ∞ ([Reflection](reflection.md)) |
+| `z.to_admittance()` | $Z = 0$ (a short) is `Admittance::SHORT`, $Y = \infty$; $Z = \infty$ (an open) is $Y = 0$ |
+| `y.to_impedance()` | $Y = 0$ (an open) is `Impedance::OPEN`, $Z = \infty$; $Y = \infty$ (a short) is $Z = 0$ |
+| `z.reflection(z0)` | $Z = 0$ is $\Gamma = -1$; $Z = \infty$ is $\Gamma = 1$; $Z = -Z_0$ is $\Gamma = \infty$ ([Reflection](reflection.md)) |
 
-Each works on a plain value and on an `Extended` one, so a chain such as `z.to_admittance().to_impedance()` passes through ∞. A float part that is infinite counts as the point ∞. `is_short()` and `is_open()` name the two ends on an impedance or an admittance, plain or `Extended`.
+Each works on a plain value and on an `Extended` one, so a chain such as `z.to_admittance().to_impedance()` passes through $\infty$. A float part that is infinite counts as the point $\infty$. `is_short()` and `is_open()` name the two ends on an impedance or an admittance, plain or `Extended`.
 
 ```rust
 use exact_units::{Admittance, Complex, Extended, Impedance, prefix::One};
@@ -46,9 +46,9 @@ assert!(open.is_open());
 assert_eq!(open.to_admittance::<One>(), Extended::Finite(Complex::<_, _, f64>::bounded(0.0, 0.0)));
 ```
 
-No step squares a part, so a finite input whose square would overflow or underflow the float still gives its value. A value past the float, such as 1 / Z of the smallest `f64`, is a finite value with an infinite part: the float's overflow, not the point ∞.
+No step squares a part, so a finite input whose square would overflow or underflow the float still gives its value. A value past the float, such as $1/Z$ of the smallest `f64`, is a finite value with an infinite part: the float's overflow, not the point $\infty$.
 
-A factor between the scales of Z and Y that the float can't hold is a compile error: 1 [[qΩ]] in [[qS]] is $10^{60}$, past `f32`.
+A factor between the scales of $Z$ and $Y$ that the float can't hold is a compile error: 1 [[qΩ]] in [[qS]] is $10^{60}$, past `f32`.
 
 ```rust,compile_fail
 use exact_units::{Admittance, Impedance, prefix::Quecto};
@@ -66,7 +66,7 @@ let _: Admittance<Quecto, f64> = z.to_admittance().finite().unwrap();
 
 ## Z₀: a reference impedance { #z0 }
 
-A reflection coefficient is always taken against a reference, Z₀: a line's characteristic impedance, a port's, the center of a Smith chart. `Z0<P, F>` is finite and not 0 by its type: with Z₀ = 0 every load would have Γ = 1, and with Z₀ = ∞ every load Γ = −1. Floats only, as Γ is ([Reflection](reflection.md)).
+A reflection coefficient is always taken against a reference, $Z_0$: a line's characteristic impedance, a port's, the center of a Smith chart. `Z0<P, F>` is finite and not 0 by its type: with $Z_0 = 0$ every load would have $\Gamma = 1$, and with $Z_0 = \infty$ every load $\Gamma = -1$. Floats only, as $\Gamma$ is ([Reflection](reflection.md)).
 
 ```rust
 use exact_units::{Impedance, OutOfBounds, Z0, prefix::One};

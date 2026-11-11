@@ -51,9 +51,9 @@ Instructions in the ELF, plain / typed; `=` means identical code.
 | `Bam16 + Bam16` (wraps), `Q15 + Q15` (saturates) | = | = | = | = |
 | 0 to 3300 [[mV]] `i16` → [[dV]] `u8`, `into_rounded` | 23 / 27 | 26 / 36 | 17 / 17 | 25 / 27 |
 | 0 to 3300 [[mV]] `i16` → [[µV]] `i32`, `From` | 12 / 16 | 12 / 12 | 10 / 12 | 10 / 10 |
-| m° `i32` → [[µrad]] `i32` (π), `NearestEven`, checked | 94 / 94 | 96 / 96 | 50 / 46 | 51 / 48 |
+| m° `i32` → [[µrad]] `i32` ($\pi$), `NearestEven`, checked | 94 / 94 | 96 / 96 | 50 / 46 | 51 / 48 |
 
-Where the typed side is longer the arithmetic is the same: LLVM hoists the divide above the range check and picks selects where the hand version branches. The π row's hand version is the same correctly rounded 64-bit fixed point; the usual hand-written 32.32 approximation is shorter (13 instructions on M0) and not correctly rounded.
+Where the typed side is longer the arithmetic is the same: LLVM hoists the divide above the range check and picks selects where the hand version branches. The $\pi$ row's hand version is the same correctly rounded 64-bit fixed point; the usual hand-written 32.32 approximation is shorter (13 instructions on M0) and not correctly rounded.
 
 ## Points
 
@@ -77,7 +77,7 @@ Instructions retired on a Cortex-M3 (QEMU) over 64 values, measured on 29 Oct 20
 |---|---|---|---|---|
 | [[mV·mA]] in [[µW]], `i32` (`a * b`) | 652 | 652 | 270 | 270 |
 | [[mV·mA]] into [[mW]], nearest even, checked (`times_into`) | 6973 | 7188 | 6933 | 6869 |
-| Q15 · Q15 into Q15, floor, saturating | 975 | 975 | 698 | 698 |
+| $\mathrm{Q15} \cdot \mathrm{Q15}$ into Q15, floor, saturating | 975 | 975 | 698 | 698 |
 
 Most of the [[mW]] row is the 64-bit division (`__aeabi_ldivmod`) both sides call.
 

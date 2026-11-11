@@ -267,7 +267,7 @@ A temperature in °C, °F or °R is a point against its origin, and compares wit
 
 ## Levels
 
-`dB` and `Np` alone after the number are a level of a gain, `q!(-3 dB)`, and compare with a linear gain whose kind has a level form: a ratio of root-power quantities (V/V, A/A, Pa/Pa) reads 20·lg, one of powers (W/W) 10·lg, so the symbol reads one way there. The compare is exact: `gain < q!(-3 dB)` is one compare against the floor of 10^(−3/20) in the gain's steps, worked out at compile time.
+`dB` and `Np` alone after the number are a level of a gain, `q!(-3 dB)`, and compare with a linear gain whose kind has a level form: a ratio of root-power quantities ([[V/V]], [[A/A]], [[Pa/Pa]]) reads $20 \lg$, one of powers ([[W/W]]) $10 \lg$, so the symbol reads one way there. The compare is exact: `gain < q!(-3 dB)` is one compare against the floor of $10^{-3/20}$ in the gain's steps, worked out at compile time.
 
 ```rust
 use exact_units::{Fixed, q, prefix::Milli, units::{Per, Volt, Watt}};

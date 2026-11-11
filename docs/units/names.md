@@ -98,7 +98,7 @@ assert_eq!(r.parse::<Byte>("5 B").unwrap(), Exact::int(5));
 assert!(r.parse_unit("B", Some(Byte::DIM)).is_ok());
 ```
 
-Readings of the same value are one reading: `km` is a kilometre and kilo metre, and they are equal. A named unit goes only into a quantity of its own kind, so `V/A` is no `Ohm`. A unit whose factor isn't exact in the target is refused too: rpm to [[rad/s]] needs π.
+Readings of the same value are one reading: `km` is a kilometre and kilo metre, and they are equal. A named unit goes only into a quantity of its own kind, so `V/A` is no `Ohm`. A unit whose factor isn't exact in the target is refused too: rpm to [[rad/s]] needs $\pi$.
 
 ## Writing in a notation
 

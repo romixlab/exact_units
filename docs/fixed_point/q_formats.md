@@ -16,7 +16,7 @@ $$
 
 <figure class="eu-figure" markdown="0">
 --8<-- "figures/q15_range.svg"
-<figcaption>Q15 has 65536 steps of 2⁻¹⁵. −1 is one of them, 1 isn't.</figcaption>
+<figcaption>Q15 has 65536 steps of \(2^{-15}\). −1 is one of them, 1 isn't.</figcaption>
 </figure>
 
 In `exact_units` it is `Q15<U>`, a `Fixed<U, Pow2<-15>, i16, Saturating>`:
@@ -100,4 +100,4 @@ assert_eq!(x.get(), 0x0001_8000);
 
 ## Multiplying
 
-Q15 · Q15 is a Q30 number, $\frac{a}{2^{15}} \cdot \frac{b}{2^{15}} = \frac{ab}{2^{30}}$. Back into Q15 it must be rounded, and that step is named: [Products and requantization](products.md).
+$\mathrm{Q15} \cdot \mathrm{Q15}$ is a Q30 number, $\frac{a}{2^{15}} \cdot \frac{b}{2^{15}} = \frac{ab}{2^{30}}$. Back into Q15 it must be rounded, and that step is named: [Products and requantization](products.md).

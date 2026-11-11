@@ -13,7 +13,7 @@ $$
 
 <figure class="eu-figure" markdown="0">
 --8<-- "plots/db_scale.svg"
-<figcaption>One ruler, two ratios: −6 dB is half the voltage and a quarter of the power. The bars hang from full scale. A green bar ends at the noise floor of an ideal N-bit ADC, 10·lg(1.5·4<sup>N</sup>) ≈ 6.02·N + 1.76 dB under a full-scale sine; real converters stop above it. A purple bar ends at the smallest step of a stored value. Computed by <code>tools/book_plots</code> with the crate's <code>to_db</code> and <code>from_db_const</code>.</figcaption>
+<figcaption>One ruler, two ratios: −6 dB is half the voltage and a quarter of the power. The bars hang from full scale. A green bar ends at the noise floor of an ideal \(N\)-bit ADC, \(10 \lg(1.5 \cdot 4^N) \approx 6.02 N + 1.76\,\mathrm{dB}\) under a full-scale sine; real converters stop above it. A purple bar ends at the smallest step of a stored value. Computed by <code>tools/book_plots</code> with the crate's <code>to_db</code> and <code>from_db_const</code>.</figcaption>
 </figure>
 
 ## The kind picks the formula
@@ -93,7 +93,7 @@ assert!(p < q!(-3 dB)); // 10^(−3/10) = 0.50118..: the kind picks 10·lg
 - No rounding: the gain's floor in steps comes from the same interval arithmetic as `db!`, at compile time. A level too close to a step to tell is a compile error, never a guess.
 - `==` compiles only where a stored value is the gain: `q!(0 dB)`, `q!(20 dB)` of a [[V/V]] in [[mV/V]]. `gain ==
   q!(-3 dB)` is a compile error, as no number of [[mV/V]] is $10^{-3/20}$.
-- It costs one compare: `tests/q_asm.rs` checks that `gain < q!(-3 dB)` builds to the same instructions as `gain.get() <= 707` on a Cortex-M0, and on a Cortex-M4F to one `vcmp.f32` against the largest `f32` below the gain for an `f32` V/V.
+- It costs one compare: `tests/q_asm.rs` checks that `gain < q!(-3 dB)` builds to the same instructions as `gain.get() <= 707` on a Cortex-M0, and on a Cortex-M4F to one `vcmp.f32` against the largest `f32` below the gain for an `f32` [[V/V]].
 - A value stored as a level (`Fixed<Decibel>`, `Loss<Decibel>`) doesn't take `q!(x dB)`: there a level of gain and one of loss differ in sign, so it asks for the unit, `q!(-3 Decibel)` or `q!(3 Loss<Decibel>)`.
 
 ```rust,compile_fail
@@ -169,7 +169,7 @@ assert_eq!(level.get(), 251);
 
 ## Neper: `np!` { #neper }
 
-The neper is the natural-log twin of the bel. Like the dB, it gives one level for an amplitude and for the power that goes with it, so the power form carries a ½ (IEC 60027-3, ISO 80000-3):
+The neper is the natural-log twin of the bel. Like the dB, it gives one level for an amplitude and for the power that goes with it, so the power form carries a $\tfrac12$ (IEC 60027-3, ISO 80000-3):
 
 $$
 L_{\mathrm{Np}} = \ln\frac{A_1}{A_2} \quad \text{(amplitudes)} \qquad
@@ -186,7 +186,7 @@ $$
 
 <figure class="eu-figure" markdown="0">
 --8<-- "plots/neper_cable.svg"
-<figcaption>Line theory works in nepers because they fall out of the wave equation: V(x) = V<sub>0</sub>·e<sup>−γx</sup> with γ = α + jβ, so the amplitude is V<sub>0</sub>·e<sup>−αx</sup>. With α in Np/m, αx is the level in Np, no conversion factor needed. A datasheet's dB per 100 ft is typed as written, <code>Per&lt;Loss&lt;Decibel&gt;, Feet100&gt;</code>, and <code>convert</code>s to α in Np/m exactly. The cable is a Belden 8259 RG-58: nominally 5.4 dB/100 ft at 100 MHz, velocity 66 %. Computed by <code>tools/book_plots</code> with the crate's <code>convert</code>, <code>over</code>, <code>to_db</code> and <code>from_db_const</code>.</figcaption>
+<figcaption>Line theory works in nepers because they fall out of the wave equation: \(V(x) = V_0 e^{-\gamma x}\) with \(\gamma = \alpha + \mathrm{j}\beta\), so the amplitude is \(V_0 e^{-\alpha x}\). With \(\alpha\) in Np/m, \(\alpha x\) is the level in Np, no conversion factor needed. A datasheet's dB per 100 ft is typed as written, <code>Per&lt;Loss&lt;Decibel&gt;, Feet100&gt;</code>, and <code>convert</code>s to \(\alpha\) in Np/m exactly. The cable is a Belden 8259 RG-58: nominally 5.4 dB/100 ft at 100 MHz, velocity 66 %. Computed by <code>tools/book_plots</code> with the crate's <code>convert</code>, <code>over</code>, <code>to_db</code> and <code>from_db_const</code>.</figcaption>
 </figure>
 
 `exact_units` takes a neper level the way it takes a dB level, and the kind picks the form: `ln(x)` Np for a ratio
@@ -228,12 +228,12 @@ assert!(watts.to_db().unwrap().is_in(q!(-8.685889... Decibel)));
 
 With feature `levels` (in `quantities`), a level is a number of its own unit, not an `f64` beside a gain:
 
-- `Neper` and `Decibel` are levels signed as a gain: a decay is negative. 1 dB is exactly (ln 10)/20 Np.
+- `Neper` and `Decibel` are levels signed as a gain: a decay is negative. 1 dB is exactly $(\ln 10)/20\,\mathrm{Np}$.
 - `Loss<Neper>` and `Loss<Decibel>` are the same levels signed as a loss: a decay is positive, as a datasheet writes it.
 - The neper has a base dimension of its own, like the radian. So a level doesn't mix with a `Ratio`, and dB/[[m]]
   doesn't convert to [[m⁻¹]].
 - A loss sits on a second base. A loss and a gain don't convert into each other; `as_gain` and `as_loss` negate.
-- A level has no 10·lg or 20·lg in it. The kind of the gain picks the form at the edge: `to_level` and `to_gain`.
+- A level has no $10 \lg$ or $20 \lg$ in it. The kind of the gain picks the form at the edge: `to_level` and `to_gain`.
 - A logarithm is no exact number. `to_level` works it in `f64` and rounds it once by the `Rounding` you pass.
 
 ```rust
@@ -267,10 +267,10 @@ let _ = Fixed::<Loss<Decibel>, One, f32>::bounded(3.0).convert::<Decibel, One, f
 
 ## Absorbance and optical depth
 
-Beer-Lambert is written on the transmitted power ratio T, without the ½ of a level. Both of its numbers are exact scales of the loss base:
+Beer-Lambert is written on the transmitted power ratio $T$, without the $\tfrac12$ of a level. Both of its numbers are exact scales of the loss base:
 
 - `Absorbance` is $A = -\lg T$. It's the loss in bels of power, so 1 [[AU]] is 10 dB, and it has no gain sign.
-- `OpticalDepth` is $\tau = -\ln T$, which is 2 × the loss in Np. So $\tau = \ln 10 \cdot A$ by conversion.
+- `OpticalDepth` is $\tau = -\ln T$, which is 2 times the loss in Np. So $\tau = \ln 10 \cdot A$ by conversion.
 - `LinearAttenuation`, `Per<OpticalDepth, Meter>`, is the coefficient $\mu$ of a beam's power. The $\alpha$ of
   `Per<Loss<Neper>, Meter>` is half of it, and `convert` does the halving.
 - `MolarAbsorptivity` is $\varepsilon$, the L/(mol·cm) of tables, printed [[AU]]/(M·cm). `ε·l·c` converts to an

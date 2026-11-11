@@ -77,7 +77,7 @@ assert_eq!(e.refused, Some(Refused::out_of(RefusedNum::Int(6000), RefusedNum::In
 assert_eq!(e.to_string(), "6000 is out of 1..=5000");
 ```
 
-The numbers are the stored ones, without the unit or the type: the reader knows which type it read, and `Timeout::try_new(6000)` gives the full `6000 ms is out of 1..=5000 ms (Second, u16)`. A float's numbers are printed widened to `f64`. A `Fixed` or an index out of its bounds names the range (an open end is the storage's own), NaN breaks `NotNan`, ±∞ under `Finite` breaks `Finite`, an `IndexFrom1` of 0 breaks `NotZero`, and a `Niched` number that is neither a value nor a niche, or a `Coded` spare code, is a code that means `NoValue`.
+The numbers are the stored ones, without the unit or the type: the reader knows which type it read, and `Timeout::try_new(6000)` gives the full `6000 ms is out of 1..=5000 ms (Second, u16)`. A float's numbers are printed widened to `f64`. A `Fixed` or an index out of its bounds names the range (an open end is the storage's own), NaN breaks `NotNan`, $\pm\infty$ under `Finite` breaks `Finite`, an `IndexFrom1` of 0 breaks `NotZero`, and a `Niched` number that is neither a value nor a niche, or a `Coded` spare code, is a code that means `NoValue`.
 
 ## In a WireWeaver API
 

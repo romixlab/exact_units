@@ -4,7 +4,7 @@ level: advanced
 
 # Reflection, VSWR and return loss
 
-The reflection coefficient of a load Z against a reference Z₀ ([Impedance and admittance](impedance.md#z0)):
+The reflection coefficient of a load $Z$ against a reference $Z_0$ ([Impedance and admittance](impedance.md#z0)):
 
 $$
 \Gamma = \frac{Z - Z_0}{Z + Z_0}
@@ -13,9 +13,9 @@ $$
 - **$\Gamma$ is `Complex<Per<Volt, Volt>, One, F>`**, a ratio of root-power quantities: its `to_db` is
   $20 \cdot \lg|\Gamma|$, and `return_loss` is $-20 \cdot \lg|\Gamma|$, a `Fixed<Loss<Decibel>, One, F>` positive
   for a passive load.
-- **VSWR** is `(1 + |Γ|) / (1 − |Γ|)`, the ratio of the standing wave's largest voltage to its smallest, a
+- **VSWR** is $(1 + \lvert \Gamma \rvert)/(1 - \lvert \Gamma \rvert)$, the ratio of the standing wave's largest voltage to its smallest, a
   `Fixed<Per<Volt, Volt>, One, F>`; infinite at $|\Gamma| \ge 1$.
-- **Mismatch loss** is `1 − |Γ|²`, the share of the incident power the load takes, a `Fixed<Per<Watt, Watt>, One, F>`: its `to_db` is 10·lg, the loss as a negative level (−0.51 dB at VSWR 2).
+- **Mismatch loss** is $1 - \lvert \Gamma \rvert^2$, the share of the incident power the load takes, a `Fixed<Per<Watt, Watt>, One, F>`: its `to_db` is $10 \lg$, the loss as a negative level (−0.51 dB at VSWR 2).
 
 ```rust
 # #[cfg(all(feature = "electrical", any(feature = "std", feature = "libm")))] {
@@ -36,7 +36,7 @@ threshold without ever forming $\Gamma$ — see [Levels, dBm and cable loss](lev
 
 ## On the extended plane
 
-`reflection` and `to_admittance`/`to_impedance` ([Impedance and admittance](impedance.md#shorts-opens-and-the-extended-plane)) have a value for every load, the point at infinity included, and no error. Z = 0 (a short) is Γ = −1; Z = ∞ (an open) is Γ = 1; Z = −Z₀, a negative resistance an oscillator's or a tunnel diode's can reach, is Γ = ∞, where the denominator of the formula above is 0:
+`reflection` and `to_admittance`/`to_impedance` ([Impedance and admittance](impedance.md#shorts-opens-and-the-extended-plane)) have a value for every load, the point at infinity included, and no error. $Z = 0$ (a short) is $\Gamma = -1$; $Z = \infty$ (an open) is $\Gamma = 1$; $Z = -Z_0$, a negative resistance an oscillator's or a tunnel diode's can reach, is $\Gamma = \infty$, where the denominator of the formula above is 0:
 
 ```rust
 # #[cfg(feature = "electrical") ] {
@@ -52,9 +52,9 @@ assert_eq!(oscillator.reflection(z0), Extended::Infinity);
 # }
 ```
 
-`reflection` computes $\Gamma$ by Smith's division: no part of Z or Z₀ is squared, so a part past the square root
+`reflection` computes $\Gamma$ by Smith's division: no part of $Z$ or $Z_0$ is squared, so a part past the square root
 of the float's largest value still gives $\Gamma$, and the result is never NaN — the larger of the real and imaginary parts of the denominator is nonzero, and the quotient has its sign.
 
 ## Why no error, ever
 
-A mismatch this bad is still a load a tuner is adjusting toward, not a fault to report: an antenna swept across its band passes through shorts, opens and negative resistances on its way to the match, and a sweep that stops at the first ∞ never finds it. [A worked matching example](matching.md) sweeps one.
+A mismatch this bad is still a load a tuner is adjusting toward, not a fault to report: an antenna swept across its band passes through shorts, opens and negative resistances on its way to the match, and a sweep that stops at the first $\infty$ never finds it. [A worked matching example](matching.md) sweeps one.

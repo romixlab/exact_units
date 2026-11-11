@@ -27,7 +27,7 @@ assert!(y.im().is_in(q!(-4.403069... mS))); // the susceptance a shunt capacitor
 # }
 ```
 
-Nothing here can error: a short, an open, or Z = −Z₀ on the way to the match would still give a $\Gamma$, not a panic ([Why no error, ever](reflection.md#why-no-error-ever)).
+Nothing here can error: a short, an open, or $Z = -Z_0$ on the way to the match would still give a $\Gamma$, not a panic ([Why no error, ever](reflection.md#why-no-error-ever)).
 
 ## On the firmware, in Q15
 

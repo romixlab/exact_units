@@ -4,7 +4,7 @@ level: basic
 
 # Floats: NaN and infinity
 
-A `Fixed` stored as `f32` or `f64` is a float with a unit. Floats have two values that are not ordinary numbers: ±∞ and NaN ("not a number"). This page says which of them a float `Fixed` can hold, what arithmetic gives, how to compare a value that may be NaN, and what that costs on a microcontroller.
+A `Fixed` stored as `f32` or `f64` is a float with a unit. Floats have two values that are not ordinary numbers: $\pm\infty$ and NaN ("not a number"). This page says which of them a float `Fixed` can hold, what arithmetic gives, how to compare a value that may be NaN, and what that costs on a microcontroller.
 
 ## Why NaN is refused
 
@@ -47,7 +47,7 @@ const NAN: Fixed<Volt, One, f32> = Fixed::<Volt, One, f32>::bounded(f32::NAN); /
 
 ## Arithmetic gives a `MaybeNan`
 
-Arithmetic can make NaN from values that aren't: ∞ − ∞, 0 · ∞, 0 / 0. Checking every `+` would cost a compare and a branch each time, and an operator that panics is a crash path in firmware. So `+`, `-`, `*` and `/` of floats don't check. They give a `Fixed<_, _, f32, MaybeNan>`: the plain IEEE 754 result, which may be NaN, and says so in its type.
+Arithmetic can make NaN from values that aren't: $\infty - \infty$, $0 \cdot \infty$, $0/0$. Checking every `+` would cost a compare and a branch each time, and an operator that panics is a crash path in firmware. So `+`, `-`, `*` and `/` of floats don't check. They give a `Fixed<_, _, f32, MaybeNan>`: the plain IEEE 754 result, which may be NaN, and says so in its type.
 
 ```rust
 use exact_units::{Fixed, MaybeNan, prefix::One, units::Volt};
@@ -138,7 +138,7 @@ match (a + a).not_nan() {
 
 ## Infinity stays a value
 
-±∞ is a number of the float's range, and `Fixed<_, _, f32>` keeps it. Code relies on it: the VSWR of a total reflection is ∞, the return loss of a matched load is ∞ dB, and a conversion into a float storage that overflows gives ∞.
+$\pm\infty$ is a number of the float's range, and `Fixed<_, _, f32>` keeps it. Code relies on it: the VSWR of a total reflection is $\infty$, the return loss of a matched load is $\infty\,\mathrm{dB}$, and a conversion into a float storage that overflows gives $\infty$.
 
 ```rust
 use exact_units::{Fixed, prefix::One, units::Volt};
@@ -149,7 +149,7 @@ assert!(inf > V::bounded(f32::MAX));
 assert_eq!((inf + inf).not_nan(), Some(inf));
 ```
 
-A value that must stay a number says so with the bound `Finite`, which refuses ±∞ and NaN. Like every bounded type it has no operators: `try_new`, `bounded` and `checked_*`, which is `None` where the result isn't finite.
+A value that must stay a number says so with the bound `Finite`, which refuses $\pm\infty$ and NaN. Like every bounded type it has no operators: `try_new`, `bounded` and `checked_*`, which is `None` where the result isn't finite.
 
 ```rust
 use exact_units::{Finite, Fixed, prefix::One, units::Volt};
@@ -172,7 +172,7 @@ const INF: Fixed<Volt, One, f32, Finite> = Fixed::<Volt, One, f32, Finite>::boun
 
 ## Sorting and keys
 
-Without NaN a float is a total order, with −0 equal to +0. A NaN-free float `Fixed` has `Eq`, `Ord` and `Hash` (+0 and −0 hash the same), so it sorts, keys a `BTreeMap` or a `HashMap`, and `iter().max()` works. A `MaybeNan` has none of them.
+Without NaN a float is a total order, with $-0$ equal to $+0$. A NaN-free float `Fixed` has `Eq`, `Ord` and `Hash` ($+0$ and $-0$ hash the same), so it sorts, keys a `BTreeMap` or a `HashMap`, and `iter().max()` works. A `MaybeNan` has none of them.
 
 ```rust
 use exact_units::{Fixed, prefix::One, units::Volt};
@@ -218,7 +218,7 @@ The same 9 instructions. Only the condition differs: `gt` is false when the comp
 
 | You have | Holds | Arithmetic | Compare |
 |---|---|---|---|
-| `Fixed<_, _, f32>` (`Unbounded`) | every float but NaN, ±∞ included | `+ - * /` give a `MaybeNan`; `checked_*` | `<`, `==`, `Ord`, `Hash` |
+| `Fixed<_, _, f32>` (`Unbounded`) | every float but NaN, $\pm\infty$ included | `+ - * /` give a `MaybeNan`; `checked_*` | `<`, `==`, `Ord`, `Hash` |
 | `Fixed<_, _, f32, Finite>` | every finite float | `checked_*` only | `<`, `==`, `Ord`, `Hash` |
 | `Fixed<_, _, f32, RangeDec<..>>` | a decimal range | `checked_*` only | `<`, `==`, `Ord`, `Hash` |
 | `Fixed<_, _, f32, MaybeNan>` | every float, NaN included | `+ - * /` and `+=` | `gt_or` and its kin, or `not_nan` |

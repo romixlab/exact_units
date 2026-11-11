@@ -12,7 +12,7 @@ $$
 (a \cdot P_1) \cdot (b \cdot P_2) = (a \cdot b) \cdot (P_1 \cdot P_2)
 $$
 
-So Q15 · Q15 is a value in steps of $2^{-30}$, and [[mV·mA]] one in steps of $10^{-6}$. One integer multiply at run
+So $\mathrm{Q15} \cdot \mathrm{Q15}$ is a value in steps of $2^{-30}$, and [[mV·mA]] one in steps of $10^{-6}$. One integer multiply at run
 time, the scale exact as a type (`Product<P1, P2>`).
 
 ```rust
@@ -26,7 +26,7 @@ assert_eq!(format!("{p:#}"), "0.25");
 
 ## Back into a narrower scale
 
-Q15 · Q15 doesn't fit an `i16`. `times_into` multiplies in the wide type and rounds once into the scale and storage you name:
+$\mathrm{Q15} \cdot \mathrm{Q15}$ doesn't fit an `i16`. `times_into` multiplies in the wide type and rounds once into the scale and storage you name:
 
 $$
 q = \operatorname{round}\!\left(\frac{a \cdot b}{2^{15}}\right)
@@ -65,7 +65,7 @@ assert_eq!(q.map(|q| q.get()), Some(i16::MAX)); // 1 − 2⁻¹⁵, not −1
 
 ## Power in watts
 
-The same works for physical units. [[mV·mA]] is [[µW]]; 48 [[V]] · 50 [[A]] of it doesn't fit an `i32`, so round
+The same works for physical units. [[mV·mA]] is [[µW]]; $48\,\unit{V} \cdot 50\,\unit{A}$ of it doesn't fit an `i32`, so round
 into [[mW]]:
 
 ```rust

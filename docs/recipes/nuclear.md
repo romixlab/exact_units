@@ -45,7 +45,7 @@ A $\beta^-$ decay's Q-value is the difference of the two atomic mass excesses: t
 
 ## A mass in u is a ratio; its energy needs a named edition
 
-AME2020 also prints each atomic mass M in $\mu\mathrm{u}$. That number is a ratio, $M/m_{\mathrm{u}}$, because a mass spectrometer compares masses: in the crate it is an `Exact<Ratio>`. Turning it into an energy needs $m_{\mathrm{u}} \cdot c^2$, and $m_{\mathrm{u}}$, the dalton in [[kg]], is measured. So it is a symbol of `Magnitude`, as $\mu_0$ is: a unit can carry it in its scale (`m_u 1`), and a value in [[kg]] or [[eV]] comes only from a named [set of constants](../nomicon/constants.md), by `convert_with`. AME2020 used CODATA 2018's $m_{\mathrm{u}}$ (AME2020 I, Table A; CODATA 2018, Table XXXI: 1.660 539 066 60(50)·10⁻²⁷ kg). CODATA 2022 gives 1.660 539 068 92(52)·10⁻²⁷ kg (its Table XXXIII).
+AME2020 also prints each atomic mass $M$ in $\mu\mathrm{u}$. That number is a ratio, $M/m_{\mathrm{u}}$, because a mass spectrometer compares masses: in the crate it is an `Exact<Ratio>`. Turning it into an energy needs $m_{\mathrm{u}} \cdot c^2$, and $m_{\mathrm{u}}$, the dalton in [[kg]], is measured. So it is a symbol of `Magnitude`, as $\mu_0$ is: a unit can carry it in its scale (`m_u 1`), and a value in [[kg]] or [[eV]] comes only from a named [set of constants](../nomicon/constants.md), by `convert_with`. AME2020 used CODATA 2018's $m_{\mathrm{u}}$ (AME2020 I, Table A; CODATA 2018, Table XXXI: $1.660\,539\,066\,60(50) \cdot 10^{-27}\,\unit{kg}$). CODATA 2022 gives $1.660\,539\,068\,92(52) \cdot 10^{-27}\,\unit{kg}$ (its Table XXXIII).
 
 `Dalton` is the crate's own (feature `nuclear`, UNIT-14), its scale `m_u` alone. Without a set it has no value in grams, and that doesn't compile:
 
@@ -80,11 +80,11 @@ let moved = step.scaled(m).unwrap();
 assert!(moved > Exact::int(309) && moved < Exact::int(310));
 ```
 
-A mass table and its m_u belong to one edition: the generic `S` is where the code names it, and a table's own type can carry its edition as an associated `type Set: Constants`, so code that mixes two tables names both.
+A mass table and its $m_{\mathrm{u}}$ belong to one edition: the generic `S` is where the code names it, and a table's own type can carry its edition as an associated `type Set: Constants`, so code that mixes two tables names both.
 
 ## E = mc² with c = 1
 
-In `systems::Natural` $\hbar = c = 1$, and since the 2019 SI e and c are exact, so an energy in [[eV]] is a mass with no measured constant at all. SI's eV and Natural's eV¹ are the same number:
+In `systems::Natural` $\hbar = c = 1$, and since the 2019 SI $e$ and $c$ are exact, so an energy in [[eV]] is a mass with no measured constant at all. SI's eV and Natural's $\mathrm{eV}^1$ are the same number:
 
 ```rust
 use exact_units::{Exact, Rounding, prefix::{Kilo, Milli}};
@@ -106,14 +106,14 @@ assert!((m.to_f64() / 1000.0 / kg.get() - 1.0).abs() < 1e-15);
 assert_eq!(format!("{:e}", m.rounded(4, Rounding::NearestEven)), "8.6828e-27 g");
 ```
 
-The exact value is a `Fraction` with its power of ten apart from its digits ([Range](../maths/fractions.md#range)): as a plain fraction of `u128`s it would need a denominator near 10⁴⁷.
+The exact value is a `Fraction` with its power of ten apart from its digits ([Range](../maths/fractions.md#range)): as a plain fraction of `u128`s it would need a denominator near $10^{47}$.
 
 ## A gram of radium in becquerels
 
-The activity of N atoms with half-life $T_{1/2}$ is $A = \lambda \cdot N$, with $\lambda = \ln 2 / T_{1/2}$. Each piece has its own status:
+The activity of $N$ atoms with half-life $T_{1/2}$ is $A = \lambda \cdot N$, with $\lambda = \ln 2 / T_{1/2}$. Each piece has its own status:
 
-- $N = m/(A_{\mathrm{r}} \cdot m_{\mathrm{u}})$. The molar mass constant $M_{\mathrm{u}} = N_{\mathrm{A}} \cdot m_{\mathrm{u}}$ would put $N_{\mathrm{A}}$ in and take it out again: $N_{\mathrm{A}}$ is exact by the SI, and $M_{\mathrm{u}}$ is measured since 2019 with $m_{\mathrm{u}}$, 0.999 999 999 65(30) [[g/mol]] in CODATA 2018 and 1.000 000 001 05(31) [[g/mol]] in CODATA 2022, either side of the 1 [[g/mol]] it was before (`constants::MOLAR_MASS_CONSTANT` is $N_{\mathrm{A}} \cdot m_{\mathrm{u}}$, exactly). One atom of $^{226}\mathrm{Ra}$ in grams, $3.75 \times 10^{-22}\ \unit{g}$ to 21 digits, has a denominator near 10⁴², and is exact all the same: a `Fraction` keeps its power of ten apart from its digits ([Range](../maths/fractions.md#range)). So is the count N.
-- $T_{1/2}$ of $^{226}\mathrm{Ra}$ is 1600(7) y (NUBASE2020, Table I), in NUBASE2020's own year: 1 y = 365.2422 [[d]] (NUBASE2020, §2.3), the tropical year, not the Julian 365.25 [[d]] or the Gregorian calendar's 365.2425 [[d]]. The crate names it `TropicalYearNubase2020` (feature `nuclear`), with `conventional` naming where its value comes from; a bare "year" is refused, as rule 5 asks.
+- $N = m/(A_{\mathrm{r}} \cdot m_{\mathrm{u}})$. The molar mass constant $M_{\mathrm{u}} = N_{\mathrm{A}} \cdot m_{\mathrm{u}}$ would put $N_{\mathrm{A}}$ in and take it out again: $N_{\mathrm{A}}$ is exact by the SI, and $M_{\mathrm{u}}$ is measured since 2019 with $m_{\mathrm{u}}$, 0.999 999 999 65(30) [[g/mol]] in CODATA 2018 and 1.000 000 001 05(31) [[g/mol]] in CODATA 2022, either side of the 1 [[g/mol]] it was before (`constants::MOLAR_MASS_CONSTANT` is $N_{\mathrm{A}} \cdot m_{\mathrm{u}}$, exactly). One atom of $^{226}\mathrm{Ra}$ in grams, $3.75 \cdot 10^{-22}\,\unit{g}$ to 21 digits, has a denominator near $10^{42}$, and is exact all the same: a `Fraction` keeps its power of ten apart from its digits ([Range](../maths/fractions.md#range)). So is the count $N$.
+- $T_{1/2}$ of $^{226}\mathrm{Ra}$ is 1600(7) y (NUBASE2020, Table I), in NUBASE2020's own year: $1\,\mathrm{y} = 365.2422\,\unit{d}$ (NUBASE2020, §2.3), the tropical year, not the Julian 365.25 [[d]] or the Gregorian calendar's 365.2425 [[d]]. The crate names it `TropicalYearNubase2020` (feature `nuclear`), with `conventional` naming where its value comes from; a bare "year" is refused, as rule 5 asks.
 - $\ln 2$ is exact as a `Magnitude` symbol, but no run-time value carries a symbol, so $A = \ln 2 \cdot N/T_{1/2}$ is a float edge.
 - Decays per second are an activity only by the named step `as_quantity::<Activity>()`. A plain [[s⁻¹]] doesn't `convert` to [[Bq]].
 
@@ -148,7 +148,7 @@ assert!(ci.get() > 0.988 && ci.get() < 0.989);
 
 ## Cross sections and reaction rates
 
-A cross section in barns ($1\ \unit{b} = 10^{-28}\ \unit{m^2}$, SI Brochure, 9th ed., Table 8) times a fluence rate times a number of target nuclei is a rate, and it is exact. `Barn` is the crate's own (feature `nuclear`); the fluence rate isn't one of the crate's units yet (UNIT-13), so it is declared here:
+A cross section in barns ($1\,\unit{b} = 10^{-28}\,\unit{m^2}$, SI Brochure, 9th ed., Table 8) times a fluence rate times a number of target nuclei is a rate, and it is exact. `Barn` is the crate's own (feature `nuclear`); the fluence rate isn't one of the crate's units yet (UNIT-13), so it is declared here:
 
 ```rust
 use exact_units::{Exact, units::{Barn, Per, Ratio, Second}};
@@ -178,7 +178,7 @@ let d = Fixed::<Gray, Micro, u32>::new(2000);
 let h: Fixed<Sievert, Micro, u32> = d.convert().unwrap();
 ```
 
-What crosses is a weighting from a named set ([Doses and weighting](../maths/doses.md)). For an equivalent dose, $H_{\mathrm{T}} = \sum w_{\mathrm{R}} \cdot D_{\mathrm{T,R}}$ (ICRP Publication 103, 2007, Eq. 4.2), its Table 2 gives photons and electrons 1, protons 2, alpha particles 20, and neutrons a continuous function of their energy (Eq. 4.3, a float edge). These numbers are an edition, as CODATA's are: ICRP 60 (1991) gave protons 5. The CIPM's own dose equivalent is a third convention, $H = Q \cdot D$, with the quality factor Q a function of linear energy transfer (SI Brochure, 9th ed., §2.3.5); it is a bare `Sievert`'s quantity, and ICRP's equivalent dose is `units::EquivalentDose`.
+What crosses is a weighting from a named set ([Doses and weighting](../maths/doses.md)). For an equivalent dose, $H_{\mathrm{T}} = \sum w_{\mathrm{R}} \cdot D_{\mathrm{T,R}}$ (ICRP Publication 103, 2007, Eq. 4.2), its Table 2 gives photons and electrons 1, protons 2, alpha particles 20, and neutrons a continuous function of their energy (Eq. 4.3, a float edge). These numbers are an edition, as CODATA's are: ICRP 60 (1991) gave protons 5. The CIPM's own dose equivalent is a third convention, $H = Q \cdot D$, with the quality factor $Q$ a function of linear energy transfer (SI Brochure, 9th ed., §2.3.5); it is a bare `Sievert`'s quantity, and ICRP's equivalent dose is `units::EquivalentDose`.
 
 ```rust
 use exact_units::{Fixed, prefix::Micro, radiation::Icrp103, units::{EquivalentDose, Gray}};
@@ -191,9 +191,9 @@ assert_eq!(h.to_string(), "40000 µSv");
 
 ## The semi-empirical mass formula
 
-$B(A, Z) = a_{\mathrm{V}} \cdot A - a_{\mathrm{S}} \cdot A^{2/3} - a_{\mathrm{C}} \cdot Z(Z-1)/A^{1/3} - a_{\mathrm{A}} \cdot (A-2Z)^2/A + \delta \cdot a_{\mathrm{P}}/\sqrt{A}$. Its volume and asymmetry terms are rational in A and Z, so `Exact` gives them. The surface, Coulomb and pairing terms need $A^{1/3}$ and $\sqrt{A}$, which are irrational for every A that isn't a cube or a square. A `Magnitude` holds square roots of its own symbols, not cube roots of integers, so those three terms are a float edge by necessity.
+$B(A, Z) = a_{\mathrm{V}} \cdot A - a_{\mathrm{S}} \cdot A^{2/3} - a_{\mathrm{C}} \cdot Z(Z-1)/A^{1/3} - a_{\mathrm{A}} \cdot (A-2Z)^2/A + \delta \cdot a_{\mathrm{P}}/\sqrt{A}$. Its volume and asymmetry terms are rational in $A$ and $Z$, so `Exact` gives them. The surface, Coulomb and pairing terms need $A^{1/3}$ and $\sqrt{A}$, which are irrational for every $A$ that isn't a cube or a square. A `Magnitude` holds square roots of its own symbols, not cube roots of integers, so those three terms are a float edge by necessity.
 
-The coefficients are a fit, and every fit is a convention: which nuclides, which pairing term, which data. The example fits them to AME2020 itself and says so. A five-term formula then comes within about 30 [[keV]] per nucleon of the measured B/A around iron and uranium.
+The coefficients are a fit, and every fit is a convention: which nuclides, which pairing term, which data. The example fits them to AME2020 itself and says so. A five-term formula then comes within about 30 [[keV]] per nucleon of the measured $B/A$ around iron and uranium.
 
 ## What the crate doesn't do yet
 

@@ -57,7 +57,7 @@ The scale `P` says how big one step is. Every scale is an exact number, never a 
 | `Pow10<E>` | $10^{E}$ | `Pow10<-4>`: tenths of a millisecond in [[s]] |
 | `Pow2<E>` | $2^{E}$ | `Pow2<-15>`: the step of Q15 |
 | `Rational<N, D>` | $N / D$ | `Rational<1, 65535>`: one step of a 16-bit duty |
-| `FullScale<V, BITS>` | $V / 2^{BITS}$ | one step of an ADC |
+| `FullScale<V, BITS>` | $V / 2^{\mathrm{BITS}}$ | one step of an ADC |
 
 Names are only spelling: `Milli`, `Pow10<-3>` and `Rational<1, 1000>` are the same scale.
 

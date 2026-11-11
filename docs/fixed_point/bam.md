@@ -32,7 +32,7 @@ assert_eq!(format!("{:#}", Bam16::of(16384)), "0.25 rev");
 
 ## Compared with a literal
 
-`Bam16` stores turns, and `Degree` and `Turn` both carry π in their own scale against the radian
+`Bam16` stores turns, and `Degree` and `Turn` both carry $\pi$ in their own scale against the radian
 ([Literals](../start/literals.md#angles-pick-a-unit-that-carries)): converting between them cancels it, so
 `q!(180 deg)` against a `Bam16` is a plain rational compare, the same shape as any other `q!` against an
 integer storage — never the `π/2 is no f64` refusal a radian literal meets.
@@ -45,7 +45,7 @@ assert!(phase == q!(180 deg));
 assert!(phase == q!(0.5 rev));
 ```
 
-A radian literal has no such shortcut: `Radian`'s own scale carries no π, so it stays inexact against a
+A radian literal has no such shortcut: `Radian`'s own scale carries no $\pi$, so it stays inexact against a
 `Bam16` step unless rounded by name, or compared with `<`/`<=`.
 
 ## The quadrant is in the top bits

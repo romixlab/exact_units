@@ -4,9 +4,9 @@ level: advanced
 
 # Power
 
-Complex power (ISO 80000-6): `S = V · I*` of RMS voltage and current phasors, as `Complex<VoltAmpere, ..>`. `active` reads its real part in `Watt` (active power, `P`), `reactive` its imaginary part in `Var` (reactive power, `Q`), `apparent` `|S|` in [[VA]] (apparent power, `S`), and `power_factor` `P / S` as a plain `Ratio` (the power factor, $\lambda$).
+Complex power (ISO 80000-6): $S = V I^*$ of RMS voltage and current phasors, as `Complex<VoltAmpere, ..>`. `active` reads its real part in `Watt` (active power, $P$), `reactive` its imaginary part in `Var` (reactive power, $Q$), `apparent` $\lvert S \rvert$ in [[VA]] (apparent power, $S$), and `power_factor` $P/S$ as a plain `Ratio` (the power factor, $\lambda$).
 
-`S = V · I*` assumes RMS phasors, as IEC 60050 does; a peak-phasor convention takes half of this.
+$S = V I^*$ assumes RMS phasors, as IEC 60050 does; a peak-phasor convention takes half of this.
 
 ```rust
 # #[cfg(all(feature = "electrical", feature = "dimensionless"))] {
@@ -35,7 +35,7 @@ use exact_units::{Fixed, prefix::One, units::{VoltAmpere, Watt}};
 let _ = Fixed::<VoltAmpere, One, f64>::bounded(2300.0).convert::<Watt, One, f64>();
 ```
 
-`apparent` keeps `|S|` only where the correctly rounded square root of the exact `norm_sqr` fits the storage: always for a float, a Pythagorean triple for an integer one, `None` otherwise.
+`apparent` keeps $\lvert S \rvert$ only where the correctly rounded square root of the exact `norm_sqr` fits the storage: always for a float, a Pythagorean triple for an integer one, `None` otherwise.
 
 ```rust
 # #[cfg(all(feature = "electrical", feature = "dimensionless"))] {
@@ -62,9 +62,9 @@ $\infty/\infty$. There it returns `Err(Undefined)`, which says which case it is 
 | Call | `Err` | Where |
 |---|---|---|
 | `s.power_factor()` | `NoApparentPower` | $S = 0$: $P/\lvert S \rvert$ is $0/0$ |
-| `s.power_factor()` | `InfinitePower` | P and Q both infinite |
+| `s.power_factor()` | `InfinitePower` | $P$ and $Q$ both infinite |
 
-A power factor with one infinite part is ±1 or 0. A finite S whose square would pass the float is scaled by a power of two first, so it still gives its value.
+A power factor with one infinite part is $\pm 1$ or 0. A finite $S$ whose square would pass the float is scaled by a power of two first, so it still gives its value.
 
 ```rust
 # #[cfg(all(feature = "electrical", feature = "dimensionless"))] {

@@ -99,13 +99,13 @@ A pound of mass and a pound of force are different dimensions, and so different 
 
 | Marker       | Dimension | Definition                         |
 |--------------|-----------|------------------------------------|
-| `PoundAvdp`  | mass      | 0.453 592 37 kg (1959)             |
-| `PoundForce` | force     | lb · g_n = 4.448 221 615 260 5 N   |
-| `Kip`        | force     | 1000 lbf                           |
-| `Poundal`    | force     | lb · ft/s² = 0.138 254 954 376 N   |
-| `Slug`       | mass      | lbf · s²/ft = 14.593 902 937.. kg  |
+| `PoundAvdp`  | mass      | 0.453 592 37 [[kg]] (1959)         |
+| `PoundForce` | force     | $\mathrm{lb} \cdot g_{\mathrm{n}} = 4.448\,221\,615\,260\,5\,\unit{N}$ |
+| `Kip`        | force     | 1000 [[lbf]]                       |
+| `Poundal`    | force     | $\mathrm{lb} \cdot \mathrm{ft/s^2} = 0.138\,254\,954\,376\,\unit{N}$ |
+| `Slug`       | mass      | $\mathrm{lbf} \cdot \mathrm{s^2/ft} = 14.593\,902\,937\ldots\,\unit{kg}$ |
 
-`Fixed<PoundForce, ..>::convert::<PoundAvdp, ..>()` doesn't compile, and a dynamic client refuses the same. A slug is a mass of about 32.174 lb (g_n in ft/s²), not a pound.
+`Fixed<PoundForce, ..>::convert::<PoundAvdp, ..>()` doesn't compile, and a dynamic client refuses the same. A slug is a mass of about 32.174 lb ($g_{\mathrm{n}}$ in ft/s²), not a pound.
 
 ## Temperatures
 
@@ -118,9 +118,9 @@ Rational<5, 9>, T>`.
 A pressure in inches or millimetres of mercury or of water depends on the density of the liquid, which depends on its
 temperature. The markers say which one they are:
 
-- conventional, a defined density and g_n: `InchOfMercuryConventional` (13 595.1 [[kg/m³]], 71/354/EEC),
+- conventional, a defined density and $g_{\mathrm{n}}$: `InchOfMercuryConventional` (13 595.1 [[kg/m³]], 71/354/EEC),
   `MillimetreOfMercuryConventional` (133.322 387 415 [[Pa]]), `InchOfWaterConventional` (1000 [[kg/m³]]); and
-  `Torr`, 101 325/760 [[Pa]], and the EU's legal `MillimetreOfMercuryEu`, 133.322 [[Pa]];
+  `Torr`, $101\,325/760\,\unit{Pa}$, and the EU's legal `MillimetreOfMercuryEu`, 133.322 [[Pa]];
 - at a stated temperature, `InchOfMercury32f`, `InchOfWater39f`: measured.
 
 The same for Btu and calories: the International Table and thermochemical ones are defined, those at a temperature or

@@ -63,7 +63,7 @@ graph LR
   D --> RT["a square root<br/>√Hz"]
 ```
 
-A distinguished base is a dimension the SI counts as one ([[rad]] = 1, Np = 1), named by the crate and marker that
+A distinguished base is a dimension the SI counts as one ($\unit{rad} = 1$, $\mathrm{Np} = 1$), named by the crate and marker that
 declare it: this crate's `Radian`, `Neper`, `NeperLoss` and `Bit`, and a crate's own count (`Sample`, a sensor's
 `Pixel`). There is no limit on how many a dimension carries at once.
 

@@ -17,7 +17,7 @@ Three ways to write a number with its unit, each for a different place:
 
 ## `fixed!`
 
-A constant in Q15 or in steps of 3.3 [[V]] / 4096 is a number nobody wants to work out by hand. `fixed!` writes it as the decimal it means:
+A constant in Q15 or in steps of $3.3\,\unit{V} / 4096$ is a number nobody wants to work out by hand. `fixed!` writes it as the decimal it means:
 
 ```rust
 use exact_units::{Fixed, Q15, fixed, prefix::{Milli, Pow2}, units::{Ratio, Volt}};
@@ -63,7 +63,7 @@ assert_eq!(BUSY.get(), 107_374_183);
 ```
 
 - A float storage works the same way, with the two floats around the literal: `fixed!(0.1)` is no `f32`, and the error names 0.0999999940395355224609375 and 0.100000001490116119384765625.
-- A step whose value isn't a finite decimal (a scale of 1/3) is named by its stored value only: the call needs a rounding.
+- A step whose value isn't a finite decimal (a scale of $1/3$) is named by its stored value only: the call needs a rounding.
 - A tie is a choice too: 2.5 steps needs `NearestEven` (2), `NearestAway` (3) or `NearestCeil` (3; −2.5 steps is −2), named by the caller.
 - The error names all five, with none picked out: pick the one the value calls for. A threshold usually wants
   `Floor` or `Ceil`, the safe side, not a nearest one that can round either way.
@@ -85,7 +85,7 @@ use exact_units::{Fixed, fixed, prefix::Milli, units::Volt};
 const NEGATIVE: Fixed<Volt, Milli, u16> = fixed!(-0.5);
 ```
 
-A scale with π or a root in it has no decimal stored values, so `fixed!` refuses it too.
+A scale with $\pi$ or a root in it has no decimal stored values, so `fixed!` refuses it too.
 
 Instead: write the literal in a unit whose own scale carries the factor, so none is left to convert — for an
 angle, [pick a unit that carries π](#angles-pick-a-unit-that-carries) below:
@@ -99,7 +99,7 @@ assert_eq!(RIGHT_ANGLE.get(), 900); // 90.0°, exactly: no π anywhere
 # }
 ```
 
-A float storage refuses a literal past its range or below its normal numbers, with or without a rounding, rather than storing ±∞, a subnormal or 0:
+A float storage refuses a literal past its range or below its normal numbers, with or without a rounding, rather than storing $\pm\infty$, a subnormal or 0:
 
 ```rust,compile_fail
 use exact_units::{Fixed, fixed, prefix::One, units::Ratio};
@@ -123,7 +123,7 @@ const ZERO: Fixed<Ratio, One, f64> = fixed!(-0.0);
 
 ### A literal in another unit
 
-`fixed!(value in S)` takes the literal in another unit `S` of the same dimension and kind, through `Fixed::from_decimal_in`: a datasheet's dB into a storage of µNp, degrees into radians. A factor with π or ln 10 in it makes the value irrational, never a stored value, so such a call always names a rounding: `fixed!(90 in Degree, NearestEven)`. The error of one that doesn't names the stored values around it in the storage's own unit, to write as a plain `fixed!(1.570796)`.
+`fixed!(value in S)` takes the literal in another unit `S` of the same dimension and kind, through `Fixed::from_decimal_in`: a datasheet's dB into a storage of µNp, degrees into radians. A factor with $\pi$ or $\ln 10$ in it makes the value irrational, never a stored value, so such a call always names a rounding: `fixed!(90 in Degree, NearestEven)`. The error of one that doesn't names the stored values around it in the storage's own unit, to write as a plain `fixed!(1.570796)`.
 
 ```rust
 # #[cfg(feature = "angle")] {
@@ -239,7 +239,7 @@ assert!(nan.gt_or(q!(0.1 V), true) && !nan.lt_or(q!(0.1 V), false));
 
 `==` and `!=` follow the integer rule above with floats for steps: they compile only against a literal that is a
 float of the storage. Most decimals aren't, so `v == q!(0.1 V)` would be `false` for every `f32`; it is a compile
-error. So is a literal past the float's range, and any literal against a scale with π in it, whose stored values
+error. So is a literal past the float's range, and any literal against a scale with $\pi$ in it, whose stored values
 are never decimals. `<` and `<=` compile with all of them:
 
 ```rust,compile_fail
@@ -270,7 +270,7 @@ let _ = a == q!(90 deg); // π/2 is no f64
 ```
 
 `<` and `<=` compile here, as they do for every float above; so does `==` once the angle is stored in a unit
-whose own scale carries the π, which [Angles: pick a unit that carries π](#angles-pick-a-unit-that-carries)
+whose own scale carries the $\pi$, which [Angles: pick a unit that carries π](#angles-pick-a-unit-that-carries)
 below has in full:
 
 ```rust
@@ -283,7 +283,7 @@ assert!(a == q!(45 deg));
 ```
 
 What no compile error can catch are the run-time values: NaN compares false with every literal and orders with
-none, and ±∞ are past every literal.
+none, and $\pm\infty$ are past every literal.
 
 ### Points
 
@@ -318,7 +318,7 @@ assert!(Fixed::<Per<Volt, Volt>, Milli, u16>::new(1000) == q!(0 dB));
 
 ### Against an `Exact`
 
-An [`Exact`](../maths/fractions.md) compares with a `q!` literal exactly too, at run time: the literal is a fraction of the `Exact`'s unit, worked out at compile time, and the compare is one of two fractions. A literal whose unit converts only by a factor with π (degrees against radians) doesn't compile, as an `Exact` is a fraction and that literal isn't one. A level has no compare with an `Exact`: $10^{x/20}$ is no fraction.
+An [`Exact`](../maths/fractions.md) compares with a `q!` literal exactly too, at run time: the literal is a fraction of the `Exact`'s unit, worked out at compile time, and the compare is one of two fractions. A literal whose unit converts only by a factor with $\pi$ (degrees against radians) doesn't compile, as an `Exact` is a fraction and that literal isn't one. A level has no compare with an `Exact`: $10^{x/20}$ is no fraction.
 
 ```rust
 # #[cfg(feature = "time")] {
@@ -398,7 +398,7 @@ assert!(q!(4.9 V ..= 5.1 V).contains(&v));
 - **A tolerance is of the nominal.** `%`, `‰`, `ppm` and `ppb` are parts of the nominal's magnitude; any other amount is in the nominal's unit, up to a prefix (`50 mV` of `5 V`). The macro works the two ends out exactly, as decimals: `5 V +- 1 %` is `4.95 V ..= 5.05 V`.
 - **Two compares on the device.** Each end is folded at compile time to a stored value, so `v.is_in(q!(4.9 V ..= 5.1 V))` is `4900 <= t && t <= 5100`, the same instructions as the limits written by hand. An end past the storage's range drops its compare.
 
-An end that is a stored value is that value. An end that is no stored value doesn't compile, and the error names the stored values around it with their decimals: 4.9005 V lies between `4900 = 4.9 V` and `4901 = 4.901 V` of a storage in mV. The literal then says which way the end moves, as [rule 3](exact.md#3-every-lossy-step-is-named) asks of every lossy step:
+An end that is a stored value is that value. An end that is no stored value doesn't compile, and the error names the stored values around it with their decimals: 4.9005 [[V]] lies between `4900 = 4.9 V` and `4901 = 4.901 V` of a storage in mV. The literal then says which way the end moves, as [rule 3](exact.md#3-every-lossy-step-is-named) asks of every lossy step:
 
 ```rust
 # #[cfg(feature = "electrical")] {
@@ -422,7 +422,7 @@ let _ = Fixed::<Volt, Milli, i16>::new(4_900).is_in(q!(4.9005 V ..= 5.1 V)); // 
 
 A float storage works the same way, with the floats around an end that is no float of it. An `Exact` needs neither word: every decimal is a fraction of it, so its ends are always exact.
 
-A range no stored value is in, and one every value of the type is in, don't compile either: a check that can never pass or never fail is almost always a wrong unit or scale. A `u8` of mV ends at 255 mV, so every one of its values is in `0 V ..= 5 V`:
+A range no stored value is in, and one every value of the type is in, don't compile either: a check that can never pass or never fail is almost always a wrong unit or scale. A `u8` of mV ends at 255 [[mV]], so every one of its values is in `0 V ..= 5 V`:
 
 ```rust,compile_fail
 # #[cfg(feature = "electrical")] {
@@ -432,11 +432,11 @@ let _ = Fixed::<Volt, Milli, u8>::new(100).is_in(q!(0 V ..= 5 V)); // always tru
 # #[cfg(not(feature = "electrical"))] compile_error!("the case needs electrical");
 ```
 
-The macro refuses what reads two ways. `q!(5 % +- 1 %)` could be 1 % of 5 % or one percentage point, so it asks for the ends. A part of a point means nothing (1 % of 25 °C depends on the origin), nor does a part of a level. Write `q!(4 % ..= 6 %)` or `q!(25 degC +- 0.5)` instead.
+The macro refuses what reads two ways. `q!(5 % +- 1 %)` could be 1 % of 5 % or one percentage point, so it asks for the ends. A part of a point means nothing (1 % of 25 [[°C]] depends on the origin), nor does a part of a level. Write `q!(4 % ..= 6 %)` or `q!(25 degC +- 0.5)` instead.
 
 NaN is in no range. "Not in it" is the safe answer whichever way a check branches, so a float that may be NaN has `is_in` too, and it gives `false` for NaN.
 
-A range of points (`q!(20 degC ..= 25 degC)`, `q!(25 degC +- 0.5)`) checks a `Point`, and a range of levels (`q!(-3 dB ..= 3 dB, Inside)`, `q!(20 dB +- 1 dB, Inside)`) a linear gain, by the same rules: see [A range of points](../points/points.md#a-range-of-points) and [A range of levels](../levels/decibels.md#a-range-of-levels). An end at another origin (68.01 °F against steps of 0.01 °C) and the gain of a level that isn't whole decades are rarely stored values, so they need `Inside` or `Outside` more often than an amount does.
+A range of points (`q!(20 degC ..= 25 degC)`, `q!(25 degC +- 0.5)`) checks a `Point`, and a range of levels (`q!(-3 dB ..= 3 dB, Inside)`, `q!(20 dB +- 1 dB, Inside)`) a linear gain, by the same rules: see [A range of points](../points/points.md#a-range-of-points) and [A range of levels](../levels/decibels.md#a-range-of-levels). An end at another origin (68.01 [[°F]] against steps of 0.01 [[°C]]) and the gain of a level that isn't whole decades are rarely stored values, so they need `Inside` or `Outside` more often than an amount does.
 
 ### Tolerance literals
 
@@ -572,13 +572,13 @@ Which one to pick: `fixed!` where the value goes into a device's typed constant,
 
 ## Angles: pick a unit that carries π
 
-`Radian` is the angle dimension's own unit, with no π in its scale: a plane angle *is* a ratio of arc to
-radius. `Degree` (π/180 rad) and `Turn` (2π rad) are different units of the same dimension, each with π baked
+`Radian` is the angle dimension's own unit, with no $\pi$ in its scale: a plane angle *is* a ratio of arc to
+radius. `Degree` ($\pi/180\,\unit{rad}$) and `Turn` ($2\pi\,\unit{rad}$) are different units of the same dimension, each with $\pi$ baked
 into its own scale against the radian. Comparing or storing an angle in degrees or turns never has to multiply
-that π away: wherever both sides already carry it, it cancels.
+that $\pi$ away: wherever both sides already carry it, it cancels.
 
-- `q!(90 deg)` against a `Fixed<Degree, ..>` is a plain rational compare: no radian, and no π, in sight.
-- `q!(90 deg)` against a `Fixed<Turn, ..>` is the same: 90° is exactly ¼ turn, a plain fraction.
+- `q!(90 deg)` against a `Fixed<Degree, ..>` is a plain rational compare: no radian, and no $\pi$, in sight.
+- `q!(90 deg)` against a `Fixed<Turn, ..>` is the same: 90° is exactly $1/4$ turn, a plain fraction.
 - [`Bam16`](../fixed_point/bam.md) (`Fixed<Turn, Pow2<-16>, u16, Wrapping>`) is the extreme case: every degree,
   minute and turn fraction with a power-of-two denominator is some whole number of its 65536 steps, exactly.
 
@@ -592,7 +592,7 @@ assert!(phase == q!(0.25 rev));
 # }
 ```
 
-What never gets exact this way is a *radian* literal or storage: `Radian`'s own scale has no π to cancel
+What never gets exact this way is a *radian* literal or storage: `Radian`'s own scale has no $\pi$ to cancel
 against degrees or turns, so a value genuinely in radians (a sensor's raw output, an `f64` from `atan2`) stays
 inexact unless rounded by name — [a literal in another unit](#a-literal-in-another-unit) above — or compared
 with `<` and `<=`, which are always exact.
@@ -601,7 +601,7 @@ with `<` and `<=`, which are always exact.
 
 `fixed!` and `q!` are for a device: the literal is gone by the time anything runs, so a limit check costs the
 same one compare as a hand-written `const`. `speed < q!(100 m/s)` against a `Fixed<Speed, Centi, i16>` (steps of
-1 cm/s) builds, for `thumbv6m-none-eabi` (Cortex-M0), to the same instructions as `speed.get() <= 9_999` written
+1 [[cm/s]]) builds, for `thumbv6m-none-eabi` (Cortex-M0), to the same instructions as `speed.get() <= 9_999` written
 by hand — one sign-extend, one load, one compare, one branch:
 
 ```asm
@@ -621,7 +621,7 @@ by hand — one sign-extend, one load, one compare, one branch:
 ```
 
 `tests/q_asm.rs` builds exactly this comparison for that target on every `just test` and checks it instruction
-by instruction, also for the literal in km/h and an inexact literal (99.995 m/s): LLVM merges all three into the
+by instruction, also for the literal in km/h and an inexact literal (99.995 [[m/s]]): LLVM merges all three into the
 same body as the hand-written compare. A literal past the storage's range (`q!(1000 m/s)` here) has no compare
 left, a bare `movs r0, #1`.
 

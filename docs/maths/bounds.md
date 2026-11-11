@@ -39,11 +39,11 @@ assert_eq!(LONG.get(), 5000);
 | `RangeU64<MIN, MAX>` | the same for large unsigned values |
 | `RangeDec<MIN, MAX, EXP>` | decimal bounds for floats: `RangeDec<-5, 5, -1>` is $-0.5 \dots 0.5$ |
 | `OneOf<S>` | the values of a `ValueSet` `S`, with gaps between them: [A set of values](#a-set-of-values) |
-| `Finite` | every finite float: `f32` and `f64` without ±∞ and NaN |
+| `Finite` | every finite float: `f32` and `f64` without $\pm\infty$ and NaN |
 | `MaybeNan` | every float, NaN included: what float arithmetic gives |
 | `Saturating`, `Wrapping` | every value; they set what overflow does: [Overflow](overflow.md) |
 
-A float's NaN is never within bounds but `MaybeNan`'s. `Unbounded` keeps ±∞; a float that must stay a number says
+A float's NaN is never within bounds but `MaybeNan`'s. `Unbounded` keeps $\pm\infty$; a float that must stay a number says
 so with `Finite`, a bounded type like `RangeDec`, made with `try_new` or `bounded` and added with `checked_add`:
 
 ```rust

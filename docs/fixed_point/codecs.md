@@ -214,8 +214,8 @@ let _ = Niched::<Coded<MuLaw>, Null<0x7F>>::try_from_raw(3);
 ### The same mechanism for SFLOAT
 
 IEEE 11073-20601's SFLOAT (IO-3) is a 16-bit decimal float: a 4-bit exponent and a 12-bit mantissa. Five codes
-around `0x0800` are no number: +∞ (`0x07FE`), NaN (`0x07FF`), "not at this resolution" (`0x0800`), a reserved one
-(`0x0801`) and −∞ (`0x0802`). Its `DEF.spare` names them as one span, `0x07FE..=0x0802`, and a `niches!` enum gives
+around `0x0800` are no number: $+\infty$ (`0x07FE`), NaN (`0x07FF`), "not at this resolution" (`0x0800`), a reserved one
+(`0x0801`) and $-\infty$ (`0x0802`). Its `DEF.spare` names them as one span, `0x07FE..=0x0802`, and a `niches!` enum gives
 each its meaning, so `Niched<Coded<Sfloat>, SfloatSpecial>` reads a NaN as `Reading::Niche(Nan)`, never as the 2047
 its bits would spell. The `Codec` trait's own documentation carries this as a working doctest, with a placeholder
 `Linear`; IO-3 gives SFLOAT its exact value type and its own `CodecShape`.
@@ -239,24 +239,26 @@ assert_eq!(Pq::DEF.decode_exact(Fraction::new(1, 2)), None); // ...but two of th
 
 `Curve::DEF` is a `CurveDef`: which function of its standard this is (`Referred::Scene`, an inverse OETF, or
 `Referred::Display`, an EOTF — the two differ, BT.709's inverse OETF is not BT.1886's EOTF), the light's unit and
-scale (`Nit` and 10 000 for PQ, so a form's `y = 1` is 10 000 cd/m²), the signal's domain (`low..=high`) and the
+scale (`Nit` and 10 000 for PQ, so a form's `y = 1` is 10 000 cd/[[m²]]), the signal's domain (`low..=high`) and the
 pieces (`segments`, ascending by `Segment::from`). `CurveKind` is a curve-wide summary (`Exact` where every segment's
 form is exact on every rational, else `Float`, computed from the forms by a `const fn`); exactness is really a
 per-value question, and `CurveDef::decode_exact` is the one true answer to it: `Some` exactly where the light is a
 rational that fits a `Fraction`, `None` everywhere else, never a near value standing in for the true one.
 
 A `Segment`'s `CurveForm` is written in the decode direction, signal to light, every parameter an exact `Fraction`
-(an exponent too, never a `Magnitude`: π or ln 2 mean nothing as an exponent):
+(an exponent too, never a `Magnitude`: $\pi$ or $\ln 2$ mean nothing as an exponent):
 
-- `Affine { gain, offset }`: `y = gain·x + offset`, exact on every rational (a toe like sRGB's or BT.709's).
-- `Power { gain, scale, shift, exponent, offset }`: `y = gain·max(scale·x + shift, 0)^exponent + offset`, exact
-  where `scale·x + shift` is a rational's `q`-th power, the exponent being `p/q`. The base carries its own `scale`
-  so a divisor inside the power stays rational: BT.709's `((V + 0.099)/1.099)^(20/9)` is `scale` 1/1.099, `shift`
-  0.099/1.099 (a `gain` outside the power would be 1.099^(−20/9), irrational).
-- `Exp { gain, base, scale, shift, offset }`: `y = gain·base^(scale·(x − shift)) + offset`, exact for Euler's `e`
+- `Affine { gain, offset }`: $y = \mathrm{gain} \cdot x + \mathrm{offset}$, exact on every rational (a toe like sRGB's or BT.709's).
+- `Power { gain, scale, shift, exponent, offset }`:
+  $y = \mathrm{gain} \cdot \max(\mathrm{scale} \cdot x + \mathrm{shift}, 0)^{\mathrm{exponent}} + \mathrm{offset}$, exact
+  where $\mathrm{scale} \cdot x + \mathrm{shift}$ is a rational's $q$-th power, the exponent being $p/q$. The base carries its own `scale`
+  so a divisor inside the power stays rational: BT.709's $((V + 0.099)/1.099)^{20/9}$ is `scale` $1/1.099$, `shift`
+  $0.099/1.099$ (a `gain` outside the power would be $1.099^{-20/9}$, irrational).
+- `Exp { gain, base, scale, shift, offset }`: $y = \mathrm{gain} \cdot \mathrm{base}^{\mathrm{scale} \cdot (x - \mathrm{shift})} + \mathrm{offset}$, exact for Euler's $e$
   only where the exponent is 0, for a rational base where the power is rational.
-- `RationalPower { m1, m2, c1, c2, c3 }`: PQ's own shape, `y = (max(x^(1/m2) − c1, 0)/(c2 − c3·x^(1/m2)))^(1/m1)`,
-  exact where the two nested roots are rational — for PQ that is `x = 0` and `x = 1` alone.
+- `RationalPower { m1, m2, c1, c2, c3 }`: PQ's own shape,
+  $y = (\max(x^{1/m_2} - c_1, 0)/(c_2 - c_3 x^{1/m_2}))^{1/m_1}$,
+  exact where the two nested roots are rational — for PQ that is $x = 0$ and $x = 1$ alone.
 
 The data path is the same algorithm from the data alone: `CurveDef::decode_exact`, `encode_exact`,
 `encode_certified`, `decode_interval` (float-free, [next](#certified-without-floats-from_light_certified-by-integer-intervals)),
@@ -342,8 +344,8 @@ assert_eq!(
 Where the exact path can't decide, the *light* is still rational — it's the curve's irrational decode that stands
 between it and a comparison, not the light itself — so deciding doesn't have to mean rounding to `f64`.
 `from_light_certified` (`CurveDef::encode_certified`) compares `light` against an *interval* instead: binary
-fractions with up to 128-bit mantissas, `lo ≤ y ≤ hi`, proven to hold the curve's true (possibly irrational) light
-because every step of the evaluation — powers, roots, `e^x` — is rounded outward (`CurveForm::decode_interval`,
+fractions with up to 128-bit mantissas, $\mathrm{lo} \le y \le \mathrm{hi}$, proven to hold the curve's true (possibly irrational) light
+because every step of the evaluation — powers, roots, $e^x$ — is rounded outward (`CurveForm::decode_interval`,
 `CurveDef::decode_interval`, the `Enclosure` they give: `compare` against an exact `Fraction`, `contains`, `to_f64`
 rounded outward). No `libm`, no FPU, the same answer on every target:
 
@@ -366,14 +368,14 @@ assert_eq!(Code::from_light_certified(mid, Rounding::NearestAway, Domain::Signal
 
 The search tries 64 bits of root precision first, then 128 only where that isn't enough, and almost always
 decides: `EncodeError::NearTie` only where `light` lies within the interval's width of a tie or a code's own
-light, 2⁻¹¹⁶ of it relative at worst on PQ's 10-bit codes — far inside the `f64` edge's 2⁻³⁰ margin, next. The
+light, $2^{-116}$ of it relative at worst on PQ's 10-bit codes — far inside the `f64` edge's $2^{-30}$ margin, next. The
 interval engine is the crate's own (`src/interval.rs`), shared with the literals and levels, not a dependency.
 
 ## The float edge, certified too: `from_light_f64`, within a margin
 
 Where floats are the easier way there (feature `libm`), `light_f64`/`from_light_f64` are a second certified path,
 not a convenience: the light is taken as exact, and the code is the true one for it, computed in `f64` with the
-curve's own error bound (`F64_MARGIN`, 2⁻³⁰ of a code: well above every curve's real `pow`/`exp` error here, and
+curve's own error bound (`F64_MARGIN`, $2^{-30}$ of a code: well above every curve's real `pow`/`exp` error here, and
 tested against the exact path wherever both answer).
 
 ```rust
@@ -389,7 +391,7 @@ assert_eq!(Code::from_light_f64(mid_f64, Rounding::NearestAway, Domain::Signal).
 
 Within that margin of a tie or a code boundary, `from_light_f64` refuses rather than guess:
 `EncodeError::NearTie { below, above }` names both candidates, for a caller who picks one by name. PQ is flat near
-black (every E′ up to c₁^m₂ decodes to 0 cd/m²), so the two codes right above black share almost the same light,
+black (every $E'$ up to $c_1^{m_2}$ decodes to 0 cd/[[m²]]), so the two codes right above black share almost the same light,
 and a light exactly between them is such a tie:
 
 ```rust

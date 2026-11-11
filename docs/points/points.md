@@ -64,7 +64,7 @@ assert_eq!(warm.to_string(), "25 °C");
 assert_eq!(warm - room, Fixed::new(500));       // an amount: 5 K
 ```
 
-Twice 20 °C is not 40 °C, and the type knows it:
+Twice 20 [[°C]] is not 40 [[°C]], and the type knows it:
 
 ```rust,compile_fail
 use exact_units::{Fixed, Point, origins::Celsius, prefix::Centi, units::Kelvin};
@@ -148,8 +148,8 @@ assert!(room.is_in(q!(293.15 K @ AbsoluteZero ..= 298.15 K @ AbsoluteZero)));
 assert!(!room.is_in(q!(18 degC .. 21.5 degC)));          // `..`: the upper end out
 ```
 
-- **A tolerance is an amount in the point's own step.** `q!(25 degC +- 0.5)` and `q!(25 degC +- 0.5 degC)` are 24.5 °C ..= 25.5 °C. A tolerance in another unit (`+- 0.5 K`) and a part of a point (`+- 1 %`, of 25 °C or of 298.15 K?) don't compile: write the ends.
-- **An end at another origin is rarely a stored value.** 68.01 °F is 20.00555.. °C, between `2000 = 20 K @ Celsius` and `2001 = 20.01 K @ Celsius`. As for an amount, that doesn't compile until the literal says which way the end moves, `, Inside` or `, Outside`, and the error names the stored values around it in the point's own frame, ready to paste.
+- **A tolerance is an amount in the point's own step.** `q!(25 degC +- 0.5)` and `q!(25 degC +- 0.5 degC)` are 24.5 °C ..= 25.5 °C. A tolerance in another unit (`+- 0.5 K`) and a part of a point (`+- 1 %`, of 25 [[°C]] or of 298.15 [[K]]?) don't compile: write the ends.
+- **An end at another origin is rarely a stored value.** 68.01 [[°F]] is 20.00555.. [[°C]], between `2000 = 20 K @ Celsius` and `2001 = 20.01 K @ Celsius`. As for an amount, that doesn't compile until the literal says which way the end moves, `, Inside` or `, Outside`, and the error names the stored values around it in the point's own frame, ready to paste.
 - A range every stored value is in, and one none is in, don't compile. Points that wrap have no order, so no range of them compiles.
 
 ```rust
@@ -174,14 +174,14 @@ let _ = t.is_in(q!(68.01 degF ..= 77 degF)); // 20.00555.. °C: Inside or Outsid
 |---|---|---|---|
 | `AbsoluteZero` | [[K]] | 0 | thermodynamic temperature |
 | `Celsius` | [[K]] | 273.15 | SI Brochure 2.3.4 |
-| `Rankine` | [[K]] | 0 | shown in steps of 5/9 [[K]] |
-| `Fahrenheit` | [[K]] | 45967/180 | shown in steps of 5/9 [[K]] (NIST SP 811 B.8) |
+| `Rankine` | [[K]] | 0 | shown in steps of $5/9\,\unit{K}$ |
+| `Fahrenheit` | [[K]] | $45967/180$ | shown in steps of $5/9\,\unit{K}$ (NIST SP 811 B.8) |
 | `Vacuum` | [[Pa]] | 0 | absolute pressure |
 | `Gauge` | [[Pa]] | 0 from ambient | converts only with the ambient pressure, see [Register formulas](registers.md#pressure-against-the-ambient) |
 | `AboveStandardAtmosphere` | [[Pa]] | 101325 | gauge with the reference stated |
 | `Angle<Turn>` | [[rev]] | 0 | wraps every turn, see [Angles as points](wrapping.md) |
 | `Angle<Degree>` | [[°]] | 0 | wraps every 360[[°]] |
-| `Angle<Radian>` | [[rad]] | 0 | wraps every 2π (float storages only) |
+| `Angle<Radian>` | [[rad]] | 0 | wraps every $2\pi$ (float storages only) |
 | `UnixEpoch` | [[s]] | 0 on `PosixScale` | 1970-01-01 00:00:00 UTC, POSIX time (feature `time`), aliased as `UnixSecs`/`UnixMillis`/`UnixMicros`/`UnixNanos` |
 | `NtpEpoch` | [[s]] | −2 208 988 800 on `PosixScale` | 1900-01-01 00:00:00 UTC, aliased as `NtpSecs` |
 | `TaiEpoch1958` | [[s]] | 0 on `TaiScale` | 1958-01-01 00:00:00 TAI, aliased as `TaiSecs` .. `TaiNanos` |

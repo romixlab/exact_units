@@ -13,8 +13,8 @@ Three constants the crate keeps in scales are measured instead:
 - the magnetic constant $\mu_0$, which the 1948 ampere fixed at $4\pi \cdot 10^{-7}\,\unit{N}/\unit{A}^{2}$ and
   the 2019 SI set free;
 - the gravitational constant $G$;
-- the atomic mass constant $m_{\mathrm{u}}$, one twelfth of the mass of a ¹²C atom: the dalton (unified atomic
-  mass unit) in [[kg]], which until 2019 the mole tied to the kilogram.
+- the atomic mass constant $m_{\mathrm{u}}$, one twelfth of the mass of a $^{12}\mathrm{C}$ atom: the dalton (unified
+  atomic mass unit) in [[kg]], which until 2019 the mole tied to the kilogram.
 
 Their best values move with each CODATA edition. $\mu_0/(4\pi \cdot 10^{-7}) - 1$ is $+5.4 \cdot 10^{-10}$ in
 CODATA 2018 and $-1.3 \cdot 10^{-10}$ in CODATA 2022: it changed sign. The molar mass constant
@@ -60,7 +60,7 @@ assert!(s.checked_sqrt().is_err());
 
 A set is a type that implements `Constants`. It gives each measured constant as `Measured`: the value exactly as printed, its standard uncertainty relative to that value, and the source with its year.
 
-| Set | $\mu_0$ ([[N/A²]]) | $G$ (m³/(kg·s²)) | $m_{\mathrm{u}}$ ([[kg]]) |
+| Set | $\mu_0$ ([[N/A²]]) | $G$ ($\unit{m^3}/(\unit{kg·s^2})$) | $m_{\mathrm{u}}$ ([[kg]]) |
 |---|---|---|---|
 | `Codata2018` | $1.25663706212(19) \cdot 10^{-6}$ | $6.67430(15) \cdot 10^{-11}$ | $1.66053906660(50) \cdot 10^{-27}$ |
 | `Codata2022` | $1.25663706127(20) \cdot 10^{-6}$ | $6.67430(15) \cdot 10^{-11}$ | $1.66053906892(52) \cdot 10^{-27}$ |
