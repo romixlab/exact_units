@@ -1,0 +1,1761 @@
+{
+  "_generated": "by tests/q_symbols.rs from the unit! and origin! lines and src/si_prefix.rs: run `just q-symbols`, don't edit it by hand",
+  "levels": {
+    "Db": {
+      "long": "decibel",
+      "plural": "decibels",
+      "quantity": "gain level"
+    },
+    "Np": {
+      "long": "neper",
+      "plural": "nepers",
+      "quantity": "gain level"
+    }
+  },
+  "origins": {
+    "AboveStandardAtmosphere": {
+      "long": "above standard atmosphere",
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "AbsoluteZero": {
+      "long": "absolute zero",
+      "plural": null,
+      "quantity": "thermodynamic temperature"
+    },
+    "Celsius": {
+      "long": "celsius",
+      "plural": null,
+      "quantity": "thermodynamic temperature"
+    },
+    "DeviceBoot": {
+      "long": "device boot",
+      "plural": null,
+      "quantity": "time"
+    },
+    "Fahrenheit": {
+      "long": "fahrenheit",
+      "plural": null,
+      "quantity": "thermodynamic temperature"
+    },
+    "Gauge": {
+      "long": "gauge",
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "GpsEpoch": {
+      "long": "gps epoch",
+      "plural": null,
+      "quantity": "time"
+    },
+    "NtpEpoch": {
+      "long": "ntp epoch",
+      "plural": null,
+      "quantity": "time"
+    },
+    "PtpEpoch": {
+      "long": "ptp epoch",
+      "plural": null,
+      "quantity": "time"
+    },
+    "Rankine": {
+      "long": "rankine",
+      "plural": null,
+      "quantity": "thermodynamic temperature"
+    },
+    "TaiEpoch1958": {
+      "long": "tai epoch 1958",
+      "plural": null,
+      "quantity": "time"
+    },
+    "UnixEpoch": {
+      "long": "unix epoch",
+      "plural": null,
+      "quantity": "time"
+    },
+    "Vacuum": {
+      "long": "vacuum",
+      "plural": null,
+      "quantity": "pressure"
+    }
+  },
+  "prefixes": {
+    "E": {
+      "exp": 18,
+      "kind": "si",
+      "name": "exa"
+    },
+    "G": {
+      "exp": 9,
+      "kind": "si",
+      "name": "giga"
+    },
+    "Gi": {
+      "exp": null,
+      "kind": "binary",
+      "name": "gibi"
+    },
+    "Ki": {
+      "exp": null,
+      "kind": "binary",
+      "name": "kibi"
+    },
+    "M": {
+      "exp": 6,
+      "kind": "si",
+      "name": "mega"
+    },
+    "Mi": {
+      "exp": null,
+      "kind": "binary",
+      "name": "mebi"
+    },
+    "P": {
+      "exp": 15,
+      "kind": "si",
+      "name": "peta"
+    },
+    "Q": {
+      "exp": 30,
+      "kind": "si",
+      "name": "quetta"
+    },
+    "R": {
+      "exp": 27,
+      "kind": "si",
+      "name": "ronna"
+    },
+    "T": {
+      "exp": 12,
+      "kind": "si",
+      "name": "tera"
+    },
+    "Ti": {
+      "exp": null,
+      "kind": "binary",
+      "name": "tebi"
+    },
+    "Y": {
+      "exp": 24,
+      "kind": "si",
+      "name": "yotta"
+    },
+    "Z": {
+      "exp": 21,
+      "kind": "si",
+      "name": "zetta"
+    },
+    "a": {
+      "exp": -18,
+      "kind": "si",
+      "name": "atto"
+    },
+    "c": {
+      "exp": -2,
+      "kind": "si",
+      "name": "centi"
+    },
+    "d": {
+      "exp": -1,
+      "kind": "si",
+      "name": "deci"
+    },
+    "da": {
+      "exp": 1,
+      "kind": "si",
+      "name": "deca"
+    },
+    "f": {
+      "exp": -15,
+      "kind": "si",
+      "name": "femto"
+    },
+    "h": {
+      "exp": 2,
+      "kind": "si",
+      "name": "hecto"
+    },
+    "k": {
+      "exp": 3,
+      "kind": "si",
+      "name": "kilo"
+    },
+    "m": {
+      "exp": -3,
+      "kind": "si",
+      "name": "milli"
+    },
+    "n": {
+      "exp": -9,
+      "kind": "si",
+      "name": "nano"
+    },
+    "p": {
+      "exp": -12,
+      "kind": "si",
+      "name": "pico"
+    },
+    "q": {
+      "exp": -30,
+      "kind": "si",
+      "name": "quecto"
+    },
+    "r": {
+      "exp": -27,
+      "kind": "si",
+      "name": "ronto"
+    },
+    "y": {
+      "exp": -24,
+      "kind": "si",
+      "name": "yocto"
+    },
+    "z": {
+      "exp": -21,
+      "kind": "si",
+      "name": "zepto"
+    },
+    "µ": {
+      "exp": -6,
+      "kind": "si",
+      "name": "micro"
+    }
+  },
+  "units": {
+    "Absorbance": {
+      "long": "absorbance unit",
+      "plural": "absorbance units",
+      "quantity": null
+    },
+    "Acceleration": {
+      "long": "metre per second squared",
+      "plural": "metres per second squared",
+      "quantity": "acceleration"
+    },
+    "AcreFootInternational": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "AcreFootUsSurvey": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "AcreInternational": {
+      "long": null,
+      "plural": null,
+      "quantity": "area"
+    },
+    "AcreUsSurvey": {
+      "long": null,
+      "plural": null,
+      "quantity": "area"
+    },
+    "Ampere": {
+      "long": "ampere",
+      "plural": "amperes",
+      "quantity": "electric current"
+    },
+    "AngularAcceleration": {
+      "long": "radian per second squared",
+      "plural": "radians per second squared",
+      "quantity": "angular acceleration"
+    },
+    "AngularMomentum": {
+      "long": null,
+      "plural": null,
+      "quantity": "angular momentum"
+    },
+    "AngularVelocity": {
+      "long": "radian per second",
+      "plural": "radians per second",
+      "quantity": "angular velocity"
+    },
+    "Arcminute": {
+      "long": "arcminute",
+      "plural": "arcminutes",
+      "quantity": "plane angle"
+    },
+    "Arcsecond": {
+      "long": "arcsecond",
+      "plural": "arcseconds",
+      "quantity": "plane angle"
+    },
+    "Area": {
+      "long": "square metre",
+      "plural": "square metres",
+      "quantity": "area"
+    },
+    "AtmosphereStandard": {
+      "long": "standard atmosphere",
+      "plural": "standard atmospheres",
+      "quantity": "pressure"
+    },
+    "AtmosphereTechnical": {
+      "long": "technical atmosphere",
+      "plural": "technical atmospheres",
+      "quantity": "pressure"
+    },
+    "Barn": {
+      "long": "barn",
+      "plural": "barns",
+      "quantity": "area"
+    },
+    "BarrelCistern": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "BarrelCranberry": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "BarrelDry": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "BarrelFermentedLiquor": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "BarrelLiquidState": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "BarrelPetroleum": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "BarrelProofSpirits": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "Baud": {
+      "long": "baud",
+      "plural": "baud",
+      "quantity": "symbol rate"
+    },
+    "Becquerel": {
+      "long": "becquerel",
+      "plural": "becquerels",
+      "quantity": "activity"
+    },
+    "Bel": {
+      "long": "bel",
+      "plural": "bels",
+      "quantity": null
+    },
+    "Bit": {
+      "long": "bit",
+      "plural": "bits",
+      "quantity": "information"
+    },
+    "Block": {
+      "long": "block",
+      "plural": "blocks",
+      "quantity": null
+    },
+    "Btu39f": {
+      "long": null,
+      "plural": null,
+      "quantity": "energy"
+    },
+    "Btu59f": {
+      "long": null,
+      "plural": null,
+      "quantity": "energy"
+    },
+    "Btu60f": {
+      "long": null,
+      "plural": null,
+      "quantity": "energy"
+    },
+    "BtuIt": {
+      "long": "IT British thermal unit",
+      "plural": "IT British thermal units",
+      "quantity": "energy"
+    },
+    "BtuItPerHour": {
+      "long": null,
+      "plural": null,
+      "quantity": "power"
+    },
+    "BtuMean": {
+      "long": "mean British thermal unit",
+      "plural": "mean British thermal units",
+      "quantity": "energy"
+    },
+    "BtuTh": {
+      "long": "thermochemical British thermal unit",
+      "plural": "thermochemical British thermal units",
+      "quantity": "energy"
+    },
+    "BushelImperial": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "BushelUs": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "Byte": {
+      "long": "byte",
+      "plural": "bytes",
+      "quantity": "information"
+    },
+    "CableUs": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "Calorie15c": {
+      "long": null,
+      "plural": null,
+      "quantity": "energy"
+    },
+    "Calorie20c": {
+      "long": null,
+      "plural": null,
+      "quantity": "energy"
+    },
+    "CalorieFoodIt": {
+      "long": "IT food calorie",
+      "plural": "IT food calories",
+      "quantity": "energy"
+    },
+    "CalorieFoodTh": {
+      "long": "thermochemical food calorie",
+      "plural": "thermochemical food calories",
+      "quantity": "energy"
+    },
+    "CalorieIt": {
+      "long": "IT calorie",
+      "plural": "IT calories",
+      "quantity": "energy"
+    },
+    "CalorieMean": {
+      "long": "mean calorie",
+      "plural": "mean calories",
+      "quantity": "energy"
+    },
+    "CalorieTh": {
+      "long": "thermochemical calorie",
+      "plural": "thermochemical calories",
+      "quantity": "energy"
+    },
+    "Candela": {
+      "long": "candela",
+      "plural": "candelas",
+      "quantity": "luminous intensity"
+    },
+    "Cental": {
+      "long": "cental",
+      "plural": "centals",
+      "quantity": "mass"
+    },
+    "CentimetreMegahertz": {
+      "long": null,
+      "plural": null,
+      "quantity": "speed"
+    },
+    "ChainInternational": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "ChainUsSurvey": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "Char": {
+      "long": "char",
+      "plural": "chars",
+      "quantity": null
+    },
+    "ChargeDensity": {
+      "long": "coulomb per cubic metre",
+      "plural": "coulombs per cubic metre",
+      "quantity": "charge density"
+    },
+    "Chunk": {
+      "long": "chunk",
+      "plural": "chunks",
+      "quantity": null
+    },
+    "CircularMil": {
+      "long": "circular mil",
+      "plural": "circular mils",
+      "quantity": "area"
+    },
+    "Code": {
+      "long": "code",
+      "plural": "codes",
+      "quantity": null
+    },
+    "Conductivity": {
+      "long": "siemens per metre",
+      "plural": "siemens per metre",
+      "quantity": "conductivity"
+    },
+    "Cord": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "Coulomb": {
+      "long": "coulomb",
+      "plural": "coulombs",
+      "quantity": "electric charge"
+    },
+    "CoulombPerKilogram": {
+      "long": "coulomb per kilogram",
+      "plural": "coulombs per kilogram",
+      "quantity": "exposure"
+    },
+    "CubicFoot": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "CubicInch": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "CubicYard": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "CupFda": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "CupUs": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "Curie": {
+      "long": "curie",
+      "plural": "curies",
+      "quantity": "activity"
+    },
+    "CurrentDensity": {
+      "long": "ampere per square metre",
+      "plural": "amperes per square metre",
+      "quantity": "current density"
+    },
+    "Cycle": {
+      "long": "cycle",
+      "plural": "cycles",
+      "quantity": null
+    },
+    "Dalton": {
+      "long": "dalton",
+      "plural": "daltons",
+      "quantity": "mass"
+    },
+    "Day": {
+      "long": "day",
+      "plural": "days",
+      "quantity": "time"
+    },
+    "Decibel": {
+      "long": "decibel",
+      "plural": "decibels",
+      "quantity": null
+    },
+    "DecibelLoss": {
+      "long": "decibel",
+      "plural": "decibels",
+      "quantity": null
+    },
+    "Degree": {
+      "long": "degree",
+      "plural": "degrees",
+      "quantity": "plane angle"
+    },
+    "Density": {
+      "long": "kilogram per cubic metre",
+      "plural": "kilograms per cubic metre",
+      "quantity": "density"
+    },
+    "Doubleword": {
+      "long": "doubleword",
+      "plural": "doublewords",
+      "quantity": "information"
+    },
+    "DramApothecaries": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "DramAvdp": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "DynamicViscosity": {
+      "long": "pascal second",
+      "plural": "pascal seconds",
+      "quantity": "dynamic viscosity"
+    },
+    "ElectricDisplacement": {
+      "long": "coulomb per square metre",
+      "plural": "coulombs per square metre",
+      "quantity": "electric flux density"
+    },
+    "ElectricFieldStrength": {
+      "long": "volt per metre",
+      "plural": "volts per metre",
+      "quantity": "electric field"
+    },
+    "ElectronVolt": {
+      "long": "electronvolt",
+      "plural": "electronvolts",
+      "quantity": "energy"
+    },
+    "Entry": {
+      "long": "entry",
+      "plural": "entries",
+      "quantity": null
+    },
+    "Farad": {
+      "long": "farad",
+      "plural": "farads",
+      "quantity": "capacitance"
+    },
+    "FathomInternational": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "FathomUsSurvey": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "Feet100": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "FluidDrachmImperial": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "FluidDramUs": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "FluidOunceFda": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "FluidOunceImperial": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "FluidOunceUs": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "FluidScrupleImperial": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "FootInternational": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "FootOfMercuryConventional": {
+      "long": null,
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "FootOfWater39f": {
+      "long": null,
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "FootOfWaterConventional": {
+      "long": null,
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "FootPerSecond": {
+      "long": null,
+      "plural": null,
+      "quantity": "speed"
+    },
+    "FootPerSecondSquared": {
+      "long": null,
+      "plural": null,
+      "quantity": "acceleration"
+    },
+    "FootPoundForce": {
+      "long": null,
+      "plural": null,
+      "quantity": "energy"
+    },
+    "FootPoundal": {
+      "long": null,
+      "plural": null,
+      "quantity": "energy"
+    },
+    "FootUsSurvey": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "Frame": {
+      "long": "frame",
+      "plural": "frames",
+      "quantity": null
+    },
+    "FurlongInternational": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "FurlongUsSurvey": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "GallonImperial": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "GallonUs": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "GillImperial": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "GillUs": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "Gon": {
+      "long": "gon",
+      "plural": "gons",
+      "quantity": "plane angle"
+    },
+    "Grain": {
+      "long": "grain",
+      "plural": "grains",
+      "quantity": "mass"
+    },
+    "Gram": {
+      "long": "gram",
+      "plural": "grams",
+      "quantity": "mass"
+    },
+    "GramPerCubicCentimeter": {
+      "long": "gram per cubic centimetre",
+      "plural": "grams per cubic centimetre",
+      "quantity": "density"
+    },
+    "GramPerMole": {
+      "long": "gram per mole",
+      "plural": "grams per mole",
+      "quantity": "molar mass"
+    },
+    "Gray": {
+      "long": "gray",
+      "plural": "grays",
+      "quantity": "absorbed dose"
+    },
+    "GrayPerSecond": {
+      "long": "gray per second",
+      "plural": "grays per second",
+      "quantity": "absorbed dose rate"
+    },
+    "GregorianYear": {
+      "long": "year (Gregorian)",
+      "plural": "years (Gregorian)",
+      "quantity": "time"
+    },
+    "Halfword": {
+      "long": "halfword",
+      "plural": "halfwords",
+      "quantity": "information"
+    },
+    "Hand": {
+      "long": "hand",
+      "plural": "hands",
+      "quantity": "length"
+    },
+    "HeatCapacity": {
+      "long": "joule per kelvin",
+      "plural": "joules per kelvin",
+      "quantity": "heat capacity"
+    },
+    "HeatFluxDensity": {
+      "long": "watt per square metre",
+      "plural": "watts per square metre",
+      "quantity": null
+    },
+    "HeatTransferCoefficient": {
+      "long": null,
+      "plural": null,
+      "quantity": "heat transfer coefficient"
+    },
+    "Henry": {
+      "long": "henry",
+      "plural": "henries",
+      "quantity": "inductance"
+    },
+    "Hertz": {
+      "long": "hertz",
+      "plural": "hertz",
+      "quantity": "frequency"
+    },
+    "HertzPerSecond": {
+      "long": "hertz per second",
+      "plural": "hertz per second",
+      "quantity": "hertz per second"
+    },
+    "HorsepowerBoiler": {
+      "long": null,
+      "plural": null,
+      "quantity": "power"
+    },
+    "HorsepowerElectric": {
+      "long": null,
+      "plural": null,
+      "quantity": "power"
+    },
+    "HorsepowerHour": {
+      "long": null,
+      "plural": null,
+      "quantity": "energy"
+    },
+    "HorsepowerMechanical": {
+      "long": null,
+      "plural": null,
+      "quantity": "power"
+    },
+    "HorsepowerMetric": {
+      "long": null,
+      "plural": null,
+      "quantity": "power"
+    },
+    "HorsepowerWater": {
+      "long": null,
+      "plural": null,
+      "quantity": "power"
+    },
+    "Hour": {
+      "long": "hour",
+      "plural": "hours",
+      "quantity": "time"
+    },
+    "HundredweightLong": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "HundredweightShort": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "Inch": {
+      "long": "inch",
+      "plural": "inches",
+      "quantity": "length"
+    },
+    "InchOfMercury32f": {
+      "long": null,
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "InchOfMercury60f": {
+      "long": null,
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "InchOfMercuryConventional": {
+      "long": null,
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "InchOfWater39f": {
+      "long": null,
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "InchOfWater60f": {
+      "long": null,
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "InchOfWaterConventional": {
+      "long": null,
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "Irradiance": {
+      "long": "watt per square metre",
+      "plural": "watts per square metre",
+      "quantity": null
+    },
+    "Item": {
+      "long": "item",
+      "plural": "items",
+      "quantity": null
+    },
+    "Jerk": {
+      "long": null,
+      "plural": null,
+      "quantity": "jerk"
+    },
+    "Joule": {
+      "long": "joule",
+      "plural": "joules",
+      "quantity": "energy"
+    },
+    "JulianYear": {
+      "long": "year (Julian)",
+      "plural": "years (Julian)",
+      "quantity": "time"
+    },
+    "Katal": {
+      "long": "katal",
+      "plural": "katals",
+      "quantity": "catalytic activity"
+    },
+    "Kelvin": {
+      "long": "kelvin",
+      "plural": "kelvins",
+      "quantity": "thermodynamic temperature"
+    },
+    "KiloElectronVoltPerMicrometer": {
+      "long": "kiloelectronvolt per micrometre",
+      "plural": "kiloelectronvolts per micrometre",
+      "quantity": "linear energy transfer"
+    },
+    "KilocalorieIt": {
+      "long": "IT kilocalorie",
+      "plural": "IT kilocalories",
+      "quantity": "energy"
+    },
+    "KilocalorieTh": {
+      "long": "thermochemical kilocalorie",
+      "plural": "thermochemical kilocalories",
+      "quantity": "energy"
+    },
+    "KilogramForce": {
+      "long": "kilogram-force",
+      "plural": "kilograms-force",
+      "quantity": "force"
+    },
+    "Kilometre": {
+      "long": "kilometre",
+      "plural": "kilometres",
+      "quantity": "length"
+    },
+    "KinematicViscosity": {
+      "long": "square metre per second",
+      "plural": "square metres per second",
+      "quantity": "kinematic viscosity"
+    },
+    "Kip": {
+      "long": "kip",
+      "plural": "kips",
+      "quantity": "force"
+    },
+    "Knot": {
+      "long": "knot",
+      "plural": "knots",
+      "quantity": "speed"
+    },
+    "Ksi": {
+      "long": "kip per square inch",
+      "plural": "kips per square inch",
+      "quantity": "pressure"
+    },
+    "LeagueInternational": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "LeagueUsSurvey": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "Line": {
+      "long": "line",
+      "plural": "lines",
+      "quantity": null
+    },
+    "LinkInternational": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "LinkUsSurvey": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "Litre": {
+      "long": "litre",
+      "plural": "litres",
+      "quantity": "volume"
+    },
+    "Ln10": {
+      "long": null,
+      "plural": null,
+      "quantity": "dimensionless"
+    },
+    "Ln2": {
+      "long": null,
+      "plural": null,
+      "quantity": "dimensionless"
+    },
+    "Lumen": {
+      "long": "lumen",
+      "plural": "lumens",
+      "quantity": "luminous flux"
+    },
+    "LuminousEfficacy": {
+      "long": "lumen per watt",
+      "plural": "lumens per watt",
+      "quantity": "luminous efficacy"
+    },
+    "Lux": {
+      "long": "lux",
+      "plural": "lux",
+      "quantity": "illuminance"
+    },
+    "MagneticFieldStrength": {
+      "long": "ampere per metre",
+      "plural": "amperes per metre",
+      "quantity": "magnetizing field"
+    },
+    "MassFlow": {
+      "long": "kilogram per second",
+      "plural": "kilograms per second",
+      "quantity": "mass flow"
+    },
+    "Meter": {
+      "long": "metre",
+      "plural": "metres",
+      "quantity": "length"
+    },
+    "Metres100": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "Microinch": {
+      "long": "microinch",
+      "plural": "microinches",
+      "quantity": "length"
+    },
+    "MilNato": {
+      "long": null,
+      "plural": null,
+      "quantity": "plane angle"
+    },
+    "MilWarsawPact": {
+      "long": null,
+      "plural": null,
+      "quantity": "plane angle"
+    },
+    "MileInternational": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "MilePerHour": {
+      "long": "mile per hour",
+      "plural": "miles per hour",
+      "quantity": "speed"
+    },
+    "MileUsSurvey": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "MillimetreOfMercuryConventional": {
+      "long": null,
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "MillimetreOfMercuryEu": {
+      "long": null,
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "MillimetreOfWaterConventional": {
+      "long": null,
+      "plural": null,
+      "quantity": "pressure"
+    },
+    "MinimImperial": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "MinimUs": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "Minute": {
+      "long": "minute",
+      "plural": "minutes",
+      "quantity": "time"
+    },
+    "Molality": {
+      "long": "mole per kilogram",
+      "plural": "moles per kilogram",
+      "quantity": "molality"
+    },
+    "MolarCentimeter": {
+      "long": null,
+      "plural": null,
+      "quantity": null
+    },
+    "MolarConcentration": {
+      "long": "mole per cubic metre",
+      "plural": "moles per cubic metre",
+      "quantity": "molar concentration"
+    },
+    "MolarEnergy": {
+      "long": "joule per mole",
+      "plural": "joules per mole",
+      "quantity": "molar energy"
+    },
+    "MolarHeatCapacity": {
+      "long": null,
+      "plural": null,
+      "quantity": "molar heat capacity"
+    },
+    "MolarMass": {
+      "long": "kilogram per mole",
+      "plural": "kilograms per mole",
+      "quantity": "molar mass"
+    },
+    "Mole": {
+      "long": "mole",
+      "plural": "moles",
+      "quantity": "amount of substance"
+    },
+    "MolePerLitre": {
+      "long": "mole per litre",
+      "plural": "moles per litre",
+      "quantity": "molar concentration"
+    },
+    "MomentOfInertia": {
+      "long": null,
+      "plural": null,
+      "quantity": "moment of inertia"
+    },
+    "Momentum": {
+      "long": null,
+      "plural": null,
+      "quantity": "momentum"
+    },
+    "NauticalMileInternational": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "NauticalMileUkAdmiralty": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "NauticalMileUsPre1954": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "Neper": {
+      "long": "neper",
+      "plural": "nepers",
+      "quantity": null
+    },
+    "NeperLoss": {
+      "long": "neper",
+      "plural": "nepers",
+      "quantity": null
+    },
+    "Newton": {
+      "long": "newton",
+      "plural": "newtons",
+      "quantity": "force"
+    },
+    "Nibble": {
+      "long": "nibble",
+      "plural": "nibbles",
+      "quantity": "information"
+    },
+    "Nit": {
+      "long": "nit",
+      "plural": "nits",
+      "quantity": "luminance"
+    },
+    "Ohm": {
+      "long": "ohm",
+      "plural": "ohms",
+      "quantity": "resistance"
+    },
+    "OpticalDepth": {
+      "long": "optical depth",
+      "plural": "optical depth",
+      "quantity": null
+    },
+    "OunceApothecaries": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "OunceAvdp": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "OunceFda": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "OunceForce": {
+      "long": "ounce-force",
+      "plural": "ounces-force",
+      "quantity": "force"
+    },
+    "OunceTroy": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "Packet": {
+      "long": "packet",
+      "plural": "packets",
+      "quantity": null
+    },
+    "Pascal": {
+      "long": "pascal",
+      "plural": "pascals",
+      "quantity": "pressure"
+    },
+    "PeckImperial": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "PeckUs": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "Pennyweight": {
+      "long": "pennyweight",
+      "plural": "pennyweights",
+      "quantity": "mass"
+    },
+    "Permeability": {
+      "long": "henry per metre",
+      "plural": "henries per metre",
+      "quantity": "permeability"
+    },
+    "Permittivity": {
+      "long": "farad per metre",
+      "plural": "farads per metre",
+      "quantity": "permittivity"
+    },
+    "PicaDtp": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "PicaPrinters": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "PintImperial": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "PintUsDry": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "PintUsLiquid": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "PointDtp": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "PointPrinters": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "PoundApothecaries": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "PoundAvdp": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "PoundForce": {
+      "long": "pound-force",
+      "plural": "pounds-force",
+      "quantity": "force"
+    },
+    "PoundTroy": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "Poundal": {
+      "long": "poundal",
+      "plural": "poundals",
+      "quantity": "force"
+    },
+    "PowerDensity": {
+      "long": "watt per cubic metre",
+      "plural": "watts per cubic metre",
+      "quantity": "power density"
+    },
+    "Psf": {
+      "long": "pound-force per square foot",
+      "plural": "pounds-force per square foot",
+      "quantity": "pressure"
+    },
+    "Psi": {
+      "long": "pound-force per square inch",
+      "plural": "pounds-force per square inch",
+      "quantity": "pressure"
+    },
+    "Quad": {
+      "long": "quad",
+      "plural": "quads",
+      "quantity": "energy"
+    },
+    "QuartImperial": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "QuartUsDry": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "QuartUsLiquid": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "QuarterImperialVolume": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "QuarterMass": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "Rad": {
+      "long": "rad",
+      "plural": "rads",
+      "quantity": "absorbed dose"
+    },
+    "Radian": {
+      "long": "radian",
+      "plural": "radians",
+      "quantity": "plane angle"
+    },
+    "Radiance": {
+      "long": null,
+      "plural": null,
+      "quantity": "radiance"
+    },
+    "RadiantIntensity": {
+      "long": "watt per steradian",
+      "plural": "watts per steradian",
+      "quantity": "radiant intensity"
+    },
+    "Ratio": {
+      "long": "ratio",
+      "plural": "ratios",
+      "quantity": "dimensionless"
+    },
+    "Record": {
+      "long": "record",
+      "plural": "records",
+      "quantity": null
+    },
+    "Rem": {
+      "long": "rem",
+      "plural": "rems",
+      "quantity": "dose equivalent"
+    },
+    "Resistivity": {
+      "long": "ohm metre",
+      "plural": "ohm metres",
+      "quantity": "resistivity"
+    },
+    "RodInternational": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "RodUsSurvey": {
+      "long": null,
+      "plural": null,
+      "quantity": "length"
+    },
+    "Roentgen": {
+      "long": "roentgen",
+      "plural": "roentgens",
+      "quantity": "exposure"
+    },
+    "Rood": {
+      "long": "rood",
+      "plural": "roods",
+      "quantity": "area"
+    },
+    "Row": {
+      "long": "row",
+      "plural": "rows",
+      "quantity": null
+    },
+    "Sample": {
+      "long": "sample",
+      "plural": "samples",
+      "quantity": null
+    },
+    "ScrupleApothecaries": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "Second": {
+      "long": "second",
+      "plural": "seconds",
+      "quantity": "time"
+    },
+    "Sector": {
+      "long": "sector",
+      "plural": "sectors",
+      "quantity": null
+    },
+    "Siemens": {
+      "long": "siemens",
+      "plural": "siemens",
+      "quantity": "conductance"
+    },
+    "Sievert": {
+      "long": "sievert",
+      "plural": "sieverts",
+      "quantity": "dose equivalent"
+    },
+    "SievertPerHour": {
+      "long": "sievert per hour",
+      "plural": "sieverts per hour",
+      "quantity": "dose equivalent rate"
+    },
+    "Slug": {
+      "long": "slug",
+      "plural": "slugs",
+      "quantity": "mass"
+    },
+    "Snap": {
+      "long": null,
+      "plural": null,
+      "quantity": "snap"
+    },
+    "SpecificHeatCapacity": {
+      "long": null,
+      "plural": null,
+      "quantity": "specific heat capacity"
+    },
+    "SpecificVolume": {
+      "long": "cubic metre per kilogram",
+      "plural": "cubic metres per kilogram",
+      "quantity": "specific volume"
+    },
+    "Speed": {
+      "long": "metre per second",
+      "plural": "metres per second",
+      "quantity": "speed"
+    },
+    "SquareFoot": {
+      "long": null,
+      "plural": null,
+      "quantity": "area"
+    },
+    "SquareInch": {
+      "long": null,
+      "plural": null,
+      "quantity": "area"
+    },
+    "SquareMileInternational": {
+      "long": null,
+      "plural": null,
+      "quantity": "area"
+    },
+    "SquareMileUsSurvey": {
+      "long": null,
+      "plural": null,
+      "quantity": "area"
+    },
+    "SquareYard": {
+      "long": null,
+      "plural": null,
+      "quantity": "area"
+    },
+    "Steradian": {
+      "long": "steradian",
+      "plural": "steradians",
+      "quantity": "solid angle"
+    },
+    "Stone": {
+      "long": "stone",
+      "plural": "stones",
+      "quantity": "mass"
+    },
+    "Stop": {
+      "long": "stop",
+      "plural": "stops",
+      "quantity": null
+    },
+    "StreckSwedish": {
+      "long": "Swedish streck",
+      "plural": "Swedish streck",
+      "quantity": "plane angle"
+    },
+    "SurfaceDensity": {
+      "long": "kilogram per square metre",
+      "plural": "kilograms per square metre",
+      "quantity": "surface density"
+    },
+    "SurfaceTension": {
+      "long": "newton per metre",
+      "plural": "newtons per metre",
+      "quantity": "surface tension"
+    },
+    "TablespoonFda": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "TablespoonUs": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "TeaspoonFda": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "TeaspoonUs": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "Tesla": {
+      "long": "tesla",
+      "plural": "teslas",
+      "quantity": "magnetic flux density"
+    },
+    "ThermEc": {
+      "long": null,
+      "plural": null,
+      "quantity": "energy"
+    },
+    "ThermUs": {
+      "long": null,
+      "plural": null,
+      "quantity": "energy"
+    },
+    "ThermalConductance": {
+      "long": "watt per kelvin",
+      "plural": "watts per kelvin",
+      "quantity": "thermal conductance"
+    },
+    "ThermalConductivity": {
+      "long": null,
+      "plural": null,
+      "quantity": "thermal conductivity"
+    },
+    "ThermalResistance": {
+      "long": "kelvin per watt",
+      "plural": "kelvins per watt",
+      "quantity": "thermal resistance"
+    },
+    "Thou": {
+      "long": "thou",
+      "plural": "thou",
+      "quantity": "length"
+    },
+    "TonForceShort": {
+      "long": "short ton-force",
+      "plural": "short tons-force",
+      "quantity": "force"
+    },
+    "TonLong": {
+      "long": null,
+      "plural": null,
+      "quantity": "mass"
+    },
+    "TonOfRefrigeration": {
+      "long": "ton of refrigeration",
+      "plural": "tons of refrigeration",
+      "quantity": "power"
+    },
+    "TonOfTnt": {
+      "long": "ton of TNT",
+      "plural": "tons of TNT",
+      "quantity": "energy"
+    },
+    "TonRegister": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "TonShort": {
+      "long": "short ton",
+      "plural": "short tons",
+      "quantity": "mass"
+    },
+    "TonWater": {
+      "long": null,
+      "plural": null,
+      "quantity": "volume"
+    },
+    "Tonne": {
+      "long": "tonne",
+      "plural": "tonnes",
+      "quantity": "mass"
+    },
+    "Torque": {
+      "long": "newton metre",
+      "plural": "newton metres",
+      "quantity": "torque"
+    },
+    "Torr": {
+      "long": "torr",
+      "plural": "torr",
+      "quantity": "pressure"
+    },
+    "TropicalYearNubase2020": {
+      "long": "year (NUBASE2020)",
+      "plural": "years (NUBASE2020)",
+      "quantity": "time"
+    },
+    "Turn": {
+      "long": "revolution",
+      "plural": "revolutions",
+      "quantity": "plane angle"
+    },
+    "Var": {
+      "long": "var",
+      "plural": "vars",
+      "quantity": "reactive power"
+    },
+    "Volt": {
+      "long": "volt",
+      "plural": "volts",
+      "quantity": "voltage"
+    },
+    "VoltAmpere": {
+      "long": "volt-ampere",
+      "plural": "volt-amperes",
+      "quantity": "apparent power"
+    },
+    "Volume": {
+      "long": "cubic metre",
+      "plural": "cubic metres",
+      "quantity": "volume"
+    },
+    "VolumetricFlow": {
+      "long": "cubic metre per second",
+      "plural": "cubic metres per second",
+      "quantity": "volumetric flow"
+    },
+    "Watt": {
+      "long": "watt",
+      "plural": "watts",
+      "quantity": "power"
+    },
+    "Wavenumber": {
+      "long": "reciprocal metre",
+      "plural": "reciprocal metres",
+      "quantity": "wavenumber"
+    },
+    "Weber": {
+      "long": "weber",
+      "plural": "webers",
+      "quantity": "magnetic flux"
+    },
+    "Week": {
+      "long": "week",
+      "plural": "weeks",
+      "quantity": "time"
+    },
+    "Word": {
+      "long": "word",
+      "plural": "words",
+      "quantity": "information"
+    },
+    "Yank": {
+      "long": "newton per second",
+      "plural": "newtons per second",
+      "quantity": "yank"
+    },
+    "Yard": {
+      "long": "yard",
+      "plural": "yards",
+      "quantity": "length"
+    }
+  }
+}

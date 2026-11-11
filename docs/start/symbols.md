@@ -26,7 +26,7 @@ let _ = q!(5 min); // a minute or a minim?
 
 ## Where the table comes from
 
-The table is generated from the crate's `unit!` and `origin!` lines, so a new marker gets its symbol without a second list to keep. `just q-symbols` writes it (`macros/src/pure/table.rs`) and the tables of this page; `just test` fails when either is stale. The rules:
+The table is generated from the crate's `unit!` and `origin!` lines, so a new marker gets its symbol without a second list to keep. `just q-symbols` writes it (`macros/src/pure/table.rs`), the tables of this page and the names and quantities this book's unit tooltips show (`docs_ext/eu_docs_ext/unit_info.json`); `just test` fails when any is stale. The rules:
 
 - **One word.** A `unit!` symbol is a `q!` symbol when it has no `/`, `·`, space, parenthesis, digit or exponent. `m/s²` is written `m/s^2`, a product of symbols. A qualified symbol (`gal (US)`) is written as its marker, `GallonUs`.
 - **Prefixes where the SI allows them.** A coherent SI unit takes the SI prefixes, and so do g, L and eV. The tonne takes them from kilo up (`kt`, `Mt`): a smaller mass is written in grams. bit and B take the binary ones too (`KiB`). Nothing else does: no `kh`, `mdeg` or `kin`.

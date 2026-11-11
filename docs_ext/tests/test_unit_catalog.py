@@ -77,10 +77,32 @@ def test_more_than_one_slash_is_refused(catalog):
         resolve_expression("m/s/s", catalog)
 
 
-def test_every_curated_unit_marker_is_a_real_marker_in_the_table(catalog):
-    from eu_docs_ext.unit_info import UNIT_INFO
+def test_every_marker_of_the_table_has_a_generated_entry(catalog):
+    # unit_info.json is generated (just q-symbols): every marker q!'s table reads has a long name there, so no
+    # tooltip goes without one
+    from eu_docs_ext.unit_info import LEVEL_INFO, ORIGIN_INFO, UNIT_INFO
 
-    known_markers = {entry.marker for entry in catalog.units.values()}
-    known_markers |= {prefix_word_marker.rsplit(" ", 1)[-1] for prefix_word_marker in catalog.folded.values()}
-    for marker in UNIT_INFO:
-        assert marker in known_markers, f"{marker!r} is curated in unit_info.py but not in symbols.md"
+    markers = {entry.marker for entry in catalog.units.values()}
+    markers |= {read_as.rsplit(" ", 1)[-1] for read_as in catalog.folded.values()}
+    for marker in markers:
+        assert marker in UNIT_INFO, f"{marker!r} of symbols.md has no entry in unit_info.json"
+        assert UNIT_INFO[marker].name, f"{marker!r} has no long name: give its unit! line one"
+    for origin in set(catalog.origins.values()):
+        assert ORIGIN_INFO[origin].name and ORIGIN_INFO[origin].quantity, origin
+    for level in set(catalog.levels.values()):
+        assert LEVEL_INFO[level].name and LEVEL_INFO[level].quantity, level
+
+
+def test_unit_info_is_not_curated_by_hand():
+    # the module reads the generated file and holds no entries of its own
+    import eu_docs_ext.unit_info as unit_info
+
+    source = open(unit_info.__file__, encoding="utf-8").read()
+    assert 'Info("' not in source and 'PrefixEntry("' not in source
+
+
+def test_tooltip_names_the_quantity_where_there_is_one(catalog):
+    (_, becquerel), = resolve_expression("kBq", catalog)
+    assert becquerel.tooltip == "kilo- becquerel · activity"
+    (_, item), = resolve_expression("item", catalog)
+    assert item.tooltip == "item"

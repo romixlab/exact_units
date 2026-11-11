@@ -128,14 +128,19 @@ def _split_exponent(token: str) -> tuple[str, str]:
     return token, ""
 
 
+def _tooltip(name: str, quantity: str | None) -> str:
+    return f"{name} · {quantity}" if quantity else name
+
+
 def _unit_tooltip(marker: str, prefix_name: str | None) -> str:
     info = UNIT_INFO.get(marker)
-    if info is None:
+    if info is None or not info.name:
         raise UnitSymbolError(
-            f"unit_catalog: no name/quantity curated for marker {marker!r} (add it to eu_docs_ext/unit_info.py)"
+            f"unit_catalog: no long name for marker {marker!r} in unit_info.json: give its unit! line a"
+            " `long \"..\"` and run `just q-symbols`"
         )
     name = f"{prefix_name}- {info.name}" if prefix_name else info.name
-    return f"{name} · {info.quantity}"
+    return _tooltip(name, info.quantity)
 
 
 def resolve_base(base: str, catalog: Catalog) -> Factor:
@@ -154,16 +159,16 @@ def resolve_base(base: str, catalog: Catalog) -> Factor:
     if base in catalog.origins:
         path_name = catalog.origins[base]
         info = ORIGIN_INFO.get(path_name)
-        if info is None:
-            raise UnitSymbolError(f"unit_catalog: no name/quantity curated for origin {path_name!r}")
-        return Factor(text=base, anchor=f"sym-{path_name}", tooltip=f"{info.name} · {info.quantity}")
+        if info is None or not info.name:
+            raise UnitSymbolError(f"unit_catalog: no entry for origin {path_name!r} in unit_info.json")
+        return Factor(text=base, anchor=f"sym-{path_name}", tooltip=_tooltip(info.name, info.quantity))
 
     if base in catalog.levels:
         marker = catalog.levels[base]
         info = LEVEL_INFO.get(marker)
-        if info is None:
-            raise UnitSymbolError(f"unit_catalog: no name/quantity curated for level {marker!r}")
-        return Factor(text=base, anchor=f"sym-{base}", tooltip=f"{info.name} · {info.quantity}")
+        if info is None or not info.name:
+            raise UnitSymbolError(f"unit_catalog: no entry for level {marker!r} in unit_info.json")
+        return Factor(text=base, anchor=f"sym-{base}", tooltip=_tooltip(info.name, info.quantity))
 
     # A prefix on a symbol that takes it: "keV" = kilo `ElectronVolt`, "mcd" = milli `Candela` (never milli `Cord`,
     # as `Cord` takes no prefix: only one candidate ever matches).

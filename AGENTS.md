@@ -29,7 +29,8 @@ The optional `serde` feature (`src/serde.rs`) is serde alone, `no_std` without a
 Docs: this crate's own book, `docs/` (built with zensical, `zensical.toml`; served at
 [exact.vhrd.tech](https://exact.vhrd.tech/)), covers the library end to end; `docs/customary.md`'s tables are
 generated, `just customary-docs`, as are `q!`'s symbol table (`macros/src/pure/table.rs`) and the tables of
-`docs/start/symbols.md`, `just q-symbols`. WireWeaver's docs site keeps only the API-model, `ww`, Python,
+`docs/start/symbols.md`, and the long names and quantities the book's `[[symbol]]` tooltips show
+(`docs_ext/eu_docs_ext/unit_info.json`), `just q-symbols`. WireWeaver's docs site keeps only the API-model, `ww`, Python,
 dynamic-client and wire-bytes side of `exact_units` (`std_library/exact_units`, `magnitude`, `points`, `rounding`,
 `indices`, `customary`, `units_in_the_model`), each page there linking back here for the library part.
 Features and their status are tracked in this crate's own `FEATURES.md`, six areas: `NUM` (number core), `UNIT`
@@ -77,7 +78,7 @@ just lint            # fmt, cargo sort, typos, no long decimals in docs/ and exa
 just check           # cargo check of the feature sets firmware uses
 just cov             # test coverage as CI computes it, lcov.info plus a printed summary
 just customary-docs  # regenerate docs/customary.md's tables from the catalogue
-just q-symbols       # regenerate q!'s symbol table and docs/start/symbols.md from the unit! lines
+just q-symbols       # regenerate q!'s symbol table, docs/start/symbols.md and the tooltips' unit_info.json from the unit! lines
 just logo            # export the logo from assets/logo/logo.typ (typst and the Audiowide font installed)
 just verify          # the Kani proofs of tests/props (minutes; needs cargo-kani, not in CI)
 just fuzz T SECS     # one cargo-fuzz target of fuzz/ for SECS seconds (nightly and cargo-fuzz; not in CI)

@@ -1,6 +1,8 @@
-//! The symbol table of `q!` (`macros/src/pure/table.rs`) and the book's page of its symbols (`docs/start/symbols.md`),
-//! generated from the `unit!` and `origin!` lines and the catalogue they declare. `Q_SYMBOLS=update` (`just
-//! q-symbols`) writes both; without it the test fails when either is stale, so the table and the markers agree.
+//! The symbol table of `q!` (`macros/src/pure/table.rs`), the book's page of its symbols (`docs/start/symbols.md`)
+//! and the long names and quantities its `[[symbol]]` tooltips show (`docs_ext/eu_docs_ext/unit_info.json`),
+//! generated from the `unit!` and `origin!` lines, the catalogue they declare and the prefixes of `src/si_prefix.rs`.
+//! `Q_SYMBOLS=update` (`just q-symbols`) writes all three; without it the test fails when any is stale, so the
+//! table, the book and the markers agree.
 //!
 //! The rules, so that a symbol never reads two ways (AGENTS.md, rule 5):
 //!
@@ -728,21 +730,211 @@ fn docs_page(page: &str, g: &Generated) -> String {
     out
 }
 
-/// The committed table and page are the generator's: `Q_SYMBOLS=update` (`just q-symbols`) writes them.
+/// The quantity a unit measures, as the book's tooltips name it: its line's `quantity`, else its dimension's open
+/// root (`Derived(L)` is a length), else "dimensionless" for dimension one, else the name of the dimension's one
+/// coherent unit with a compound symbol (`units::Area`, m², "area"); `None` where none of these is.
+fn quantity_name(def: &exact_units::UnitDef<'_>) -> Option<String> {
+    use exact_units::QuantityRef;
+    if let Some(q) = def.quantity {
+        return Some(match q {
+            QuantityRef::Def(d) => d.name().to_string(),
+            QuantityRef::Id(id) => exact_units::quantity::QuantityName(id.name).to_string(),
+        });
+    }
+    if let Some(root) = exact_units::quantities::ALL
+        .iter()
+        .find(|q| q.is_open_root() && q.dim.same(def.dim))
+    {
+        return Some(root.name().to_string());
+    }
+    if def.dim.is_one() {
+        return Some("dimensionless".to_owned());
+    }
+    // a coherent unit with a compound symbol is named after its quantity (`Area`, m²; `Jerk`, m/s³)
+    let mut coherent = units::ALL.iter().filter_map(|e| match e {
+        UnitExpr::Named(u)
+            if u.dim.same(def.dim)
+                && u.quantity.is_none()
+                && u.scale == Magnitude::ONE
+                && !atomic(u.names.symbol) =>
+        {
+            Some(exact_units::quantity::QuantityName(u.id.name).to_string())
+        }
+        _ => None,
+    });
+    match (coherent.next(), coherent.next()) {
+        (Some(name), None) => Some(name),
+        _ => None,
+    }
+}
+
+/// A marker's entry of `unit_info.json`: its long name, plural and quantity, `null` where it has none.
+fn info_entry(long: &str, plural: &str, quantity: Option<&str>) -> serde_json::Value {
+    let text = |s: &str| (!s.is_empty()).then(|| s.to_owned());
+    serde_json::json!({ "long": text(long), "plural": text(plural), "quantity": quantity })
+}
+
+/// The origins of `src/point/origins.rs`, each with the unit its `origin!` line names: `(origin, unit)`.
+fn origin_units() -> Vec<(String, String)> {
+    let src = std::fs::read_to_string(root().join("src/point/origins.rs")).unwrap();
+    let mut out = Vec::new();
+    for block in src.split("crate::origin! {").skip(1) {
+        let (_, rest) = block.split_once("pub struct ").unwrap();
+        let name: String = rest
+            .chars()
+            .take_while(char::is_ascii_alphanumeric)
+            .collect();
+        let (_, unit) = rest.split_once("unit: ").unwrap();
+        let unit: String = unit
+            .chars()
+            .take_while(char::is_ascii_alphanumeric)
+            .collect();
+        out.push((name, unit));
+    }
+    out
+}
+
+/// `docs_ext/eu_docs_ext/unit_info.json`, what the book's `[[symbol]]` and `\unit{}` tooltips show: every unit marker
+/// of the catalogue (the `unit!` lines), origin and level with its long name, plural and quantity, and every prefix
+/// of [exact_units::Prefix::ALL] with its name, kind and power of ten.
+fn unit_info_json() -> String {
+    let unit_of = |name: &str| match units::by_name(name) {
+        Some(UnitExpr::Named(def)) => *def,
+        _ => panic!("{name} is no named unit"),
+    };
+    let mut unit_map = serde_json::Map::new();
+    for e in units::ALL.iter().chain(units::CUSTOMARY) {
+        let UnitExpr::Named(def) = e else {
+            panic!("{e:?} in the catalogue")
+        };
+        unit_map.insert(
+            def.id.name.to_owned(),
+            info_entry(
+                def.names.long,
+                def.names.plural,
+                quantity_name(def).as_deref(),
+            ),
+        );
+    }
+    // an origin is named after its marker, as a quantity is (`Celsius` "celsius"), and measures its unit's quantity
+    let mut origin_map = serde_json::Map::new();
+    for (origin, unit) in origin_units() {
+        let name = exact_units::quantity::QuantityName(&origin).to_string();
+        let quantity = quantity_name(unit_of(&unit));
+        origin_map.insert(origin, info_entry(&name, "", quantity.as_deref()));
+    }
+    // a level of a gain is named as the unit of its symbol (`dB` the decibel)
+    let mut level_map = serde_json::Map::new();
+    for (symbol, marker) in LEVEL_SYMBOLS {
+        let def = units::ALL
+            .iter()
+            .find_map(|e| match e {
+                UnitExpr::Named(def) if def.names.symbol == *symbol => Some(*def),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("no unit of the level symbol {symbol}"));
+        level_map.insert(
+            (*marker).to_owned(),
+            info_entry(def.names.long, def.names.plural, Some("gain level")),
+        );
+    }
+    let mut prefix_map = serde_json::Map::new();
+    for p in exact_units::Prefix::ALL
+        .iter()
+        .filter(|p| **p != exact_units::Prefix::Unit)
+    {
+        let kind = if p.si_pow10().is_some() {
+            "si"
+        } else {
+            "binary"
+        };
+        prefix_map.insert(
+            p.symbol().to_owned(),
+            serde_json::json!({ "name": p.name().to_lowercase(), "kind": kind, "exp": p.si_pow10() }),
+        );
+    }
+    let info = serde_json::json!({
+        "_generated": "by tests/q_symbols.rs from the unit! and origin! lines and src/si_prefix.rs: run `just q-symbols`, don't edit it by hand",
+        "units": unit_map,
+        "origins": origin_map,
+        "levels": level_map,
+        "prefixes": prefix_map,
+    });
+    let mut out = serde_json::to_string_pretty(&info).unwrap();
+    out.push('\n');
+    out
+}
+
+/// Every marker `q!`'s table reads, every origin and level has a long name and a quantity in `unit_info.json`, so
+/// no tooltip of the book is left without one; a unit that is a base of its own (a counted thing, a level) has no
+/// quantity.
+#[test]
+fn every_table_marker_has_a_name_and_quantity() {
+    let info: serde_json::Value = serde_json::from_str(&unit_info_json()).unwrap();
+    let mut missing = Vec::new();
+    let markers = table::UNITS
+        .iter()
+        .map(|e| ("units", e.marker.trim_start_matches("units::")))
+        .chain(
+            table::ORIGINS
+                .iter()
+                .map(|o| ("origins", o.path.trim_start_matches("origins::"))),
+        )
+        .chain(
+            table::LEVELS
+                .iter()
+                .map(|l| ("levels", l.marker.trim_start_matches("literal::"))),
+        );
+    // a counted thing (`Item`) or a level (`Stop`, Np) is its own base: no quantity names it
+    let own_base = |kind: &str, marker: &str| {
+        kind == "units"
+            && units::by_name(marker)
+                .and_then(UnitExpr::def)
+                .is_some_and(|d| {
+                    !d.dim.has_true_exps()
+                        && [
+                            d.id,
+                            exact_units::MarkerId::NEPER,
+                            exact_units::MarkerId::NEPER_LOSS,
+                        ]
+                        .iter()
+                        .any(|b| !d.dim.exp_of(*b).is_zero())
+                })
+    };
+    for (kind, marker) in markers {
+        let entry = &info[kind][marker];
+        if !entry["long"].is_string() || !(entry["quantity"].is_string() || own_base(kind, marker))
+        {
+            missing.push(format!("{kind}::{marker}: {entry}"));
+        }
+    }
+    missing.sort();
+    missing.dedup();
+    assert!(
+        missing.is_empty(),
+        "markers of q!'s table without a long name or quantity:\n{}",
+        missing.join("\n")
+    );
+}
+
+/// The committed table, page and tooltip data are the generator's: `Q_SYMBOLS=update` (`just q-symbols`) writes
+/// them.
 #[test]
 fn table_and_page_are_generated() {
     let g = generate();
     let update = std::env::var("Q_SYMBOLS").as_deref() == Ok("update");
     let files = [
         ("macros/src/pure/table.rs", None),
-        ("docs/start/symbols.md", Some(())),
+        ("docs/start/symbols.md", Some(true)),
+        ("docs_ext/eu_docs_ext/unit_info.json", Some(false)),
     ];
     for (file, page) in files {
         let path = root().join(file);
-        let old = std::fs::read_to_string(&path).unwrap();
+        let old = std::fs::read_to_string(&path).unwrap_or_default();
         let new = match page {
             None => table_rs(&g),
-            Some(()) => docs_page(&old, &g),
+            Some(true) => docs_page(&old, &g),
+            Some(false) => unit_info_json(),
         };
         if update {
             std::fs::write(&path, new).unwrap();

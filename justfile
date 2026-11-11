@@ -123,7 +123,8 @@ docs-prep:
 customary-docs:
     CUSTOMARY_DOCS=update cargo nextest run --all-features docs_page_tables
 
-# Regenerate q!'s symbol table (macros/src/pure/table.rs) and the book's docs/start/symbols.md from the unit! lines
+# Regenerate q!'s symbol table (macros/src/pure/table.rs), the book's docs/start/symbols.md and its tooltip data
+# (docs_ext/eu_docs_ext/unit_info.json) from the unit! lines
 q-symbols:
     Q_SYMBOLS=update cargo nextest run --all-features --test q_symbols table_and_page_are_generated
 
