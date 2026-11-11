@@ -4,7 +4,8 @@
 //! - Lossless lifting: T.800's 5/3 wavelet (F.3.8.1, eq. F-5 and F-6, and its forward F.4.8.1), its reversible
 //!   colour transform (G.2, eq. G-3 to G-8) and H.273's YCgCo-R (eq. 58 to 65) give back every input: each walked
 //!   whole over 8-bit inputs, drawn by proptest over 16 bits, and a Kani proof over `i16`. T.800's forward F-9 as
-//!   the 2002 edition prints it, ⌊·/4⌋, is not the inverse of F-6's ⌊·/2⌋: a test finds the inputs it loses.
+//!   the 08/2002 edition prints it, ⌊·/4⌋, is not the inverse of F-6's ⌊·/2⌋: a test finds the inputs it loses.
+//!   Technical Corrigendum 4 (10/2014) corrects the divisor to 2, and the 06/2019 edition prints it right.
 //! - The rounding chain: T.81's two point transforms (A.4), every row of K.10's table, `Truncate` and `Floor` on
 //!   every `i16` and every Pt; H.273's Round (eq. 8) is `NearestAway`; JFIF's Round (T.871 clause 7), AV1's Round2
 //!   (4.7) and the add-half-then-shift of H.264 (eq. 8-337) and H.265 (eq. 8-309) are one rounding, a tie toward +∞,
@@ -174,8 +175,9 @@ fn lifting_53_every_i8_pair() {
     }
 }
 
-/// F-9 as T.800 (08/2002) prints it, ⌊(X(2n) + X(2n + 2)) / 4⌋, against F-6's ⌊(X(2n) + X(2n + 2)) / 2⌋: the
-/// inverse doesn't give back what that forward transform made, `[2, 0]` the first case.
+/// F-9 as T.800's 08/2002 edition prints it, ⌊(X(2n) + X(2n + 2)) / 4⌋, against F-6's ⌊(X(2n) + X(2n + 2)) / 2⌋: the
+/// inverse doesn't give back what that forward transform made, `[2, 0]` the first case. Technical Corrigendum 4
+/// (10/2014) corrects the divisor to 2; the 06/2019 edition prints it right.
 #[test]
 fn f9_as_printed_is_not_the_inverse_of_f6() {
     let lost = |x: &[i128]| reference::idwt53(&reference::fdwt53(x, 4)) != x;
@@ -477,9 +479,10 @@ fn decimals_15(v: &super::reference::interval::Interval, r: Rounding) -> Option<
     lo.filter(|lo| Some(*lo) == hi)
 }
 
-/// Tables F.4 to F.7 print each parameter "including approximations up to 15 decimal points" (F.3.8.2.1). Each is
-/// the closed form rounded to 15 decimals, but r₀ (Table F.6), 1.449513704087942|3…, printed …943, and γ (Table
-/// F.4), 0.882911075530933|29…, printed …934: one in the last place each.
+/// Tables F.4 to F.7 of T.800's 08/2002 edition print each parameter "including approximations up to 15 decimal
+/// points" (F.3.8.2.1). Each is the closed form rounded to 15 decimals, but r₀ (Table F.6), 1.449513704087942|3…,
+/// printed …943, and γ (Table F.4), 0.882911075530933|29…, printed …934: one in the last place each. The 06/2019
+/// edition prints these the same; the current edition, 07/2024, is not freely available and was not checked.
 #[cfg(not(kani))]
 #[test]
 fn taps_97_are_their_closed_forms_rounded() {
@@ -516,7 +519,7 @@ fn taps_97_are_their_closed_forms_rounded() {
             _ => assert_eq!(true_digits, printed, "{name}"),
         }
     }
-    // the misprinted two, with the digits they have, and as printed they are not
+    // r0 and gamma, with the digits they have, round differently from the exact value than as printed
     #[cfg(feature = "q")]
     {
         let r0 = exact_ends(&taps[10].1);
@@ -698,11 +701,16 @@ fn decimals(x: &num_rational::BigRational, places: u8) -> String {
 }
 
 /// The forward and inverse matrices from K_R and K_B are each other's inverse, exactly. JFIF prints them to four
-/// decimals (T.871 clause 7), and every one is the exact entry rounded. T.800 prints them to five or six (G.3), and
-/// three are off: G-10's 0,16875 (the exact entry rounds to 0.16874) and G-13's 0,34413 (0.34414) by one in the last
-/// place, G-10's 0,331260 (0.331264) by four in the sixth decimal, though 0,33126 would be right to five. G-9 prints
-/// Y0(x, y) = −0,299 I0(x, y) − 0,587 I1(x, y) + 0,114 I2(x, y): with those signs the inverse G-12 to G-14 does not
-/// undo it, with plus signs it does.
+/// decimals (T.871 clause 7), and every one is the exact entry rounded. T.800's 08/2002 edition prints them to five
+/// or six (G.3), and three round differently from the exact entry: G-10's 0,16875 (0.16874) and G-13's 0,34413
+/// (0.34414) by one in the last place, G-10's 0,331260 (0.331264) by four in the sixth decimal, though 0,33126
+/// would match to five. The 06/2019 edition prints these three the same; T.800 says directly of G-12 to G-14's
+/// coefficients, "Equations (G-12), (G-13) and (G-14) do not imply a required precision for the coefficients"
+/// (06/2019 edition, p. 135); G-10's forward coefficients are printed to the same kind of approximation. The
+/// current edition, 07/2024, is not freely available and was not checked. G-9 is a formula error, not a rounding
+/// difference: as 08/2002 prints it, Y0(x, y) = −0,299 I0(x, y) − 0,587 I1(x, y) + 0,114 I2(x, y), with those signs
+/// the inverse G-12 to G-14 does not undo it, with plus signs it does. Technical Corrigendum 3 (10/2014) corrects
+/// G-9 to the plus signs, and the 06/2019 edition prints it right.
 #[cfg(not(kani))]
 #[test]
 fn ycbcr_matrices_from_kr_and_kb() {

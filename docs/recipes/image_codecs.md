@@ -68,7 +68,7 @@ assert_eq!((y2 + back1, back1, y1 + back1), (i0, i1, i2));
 
 The properties check the three transforms against the standards' formulas written out in `i128`. They walk every pair of 8-bit samples (every 8-bit colour for YCgCo-R), draw 16-bit ones with proptest, and prove them for 16-bit samples with Kani (`just verify`).
 
-The forward 5/3 is informative (F.4.8.1), and its first step, F-9, is printed with ⌊(X(2n) + X(2n+2))/4⌋. Its inverse F-6 adds back ⌊(X(2n) + X(2n+2))/2⌋, so with a 4 the inverse doesn't undo the forward: `[2, 0]` comes back as `[2, 1]`, and of the 65 536 two-sample 8-bit signals only 512 survive. A 2 is meant.
+The forward 5/3 is informative (F.4.8.1), and in the 08/2002 edition its first step, F-9, is printed with ⌊(X(2n) + X(2n+2))/4⌋. Its inverse F-6 adds back ⌊(X(2n) + X(2n+2))/2⌋, so with a 4 the inverse doesn't undo the forward: `[2, 0]` comes back as `[2, 1]`, and of the 65 536 two-sample 8-bit signals only 512 survive. A 2 is meant, and Technical Corrigendum 4 (10/2014) corrects the divisor to 2; the 06/2019 edition prints it right. The current edition, 07/2024, is not freely available and was not checked.
 
 ## Mantissa times a power of two
 
@@ -105,7 +105,7 @@ H.264's NOTE 2 in 8.5.8 says the scale "doubles for every increment of 6 in QPY"
 
 JPEG 2000's irreversible 9/7 wavelet lifts by α, β, γ, δ and K (T.800 Table F.4). Tables F.5 to F.7 give their closed forms, built from √15 and two cube roots, and print each "including approximations up to 15 decimal points" (F.3.8.2.1). These are algebraic numbers, not a [Magnitude](../nomicon/magnitude.md), so a 9/7 transform is a float edge by necessity.
 
-The property computes every one of the 19 parameters as an interval of exact rationals, about 10⁻²² wide, and rounds both ends to 15 decimals. 17 are the printed digits. Two are one off in the last place:
+The property computes every one of the 19 parameters as an interval of exact rationals, about 10⁻²² wide, and rounds both ends to 15 decimals. 17 are the printed digits, in the 08/2002 edition. Two round differently from the exact value, one off in the 15th decimal, unchanged in the 06/2019 edition (the current edition, 07/2024, is not freely available and was not checked):
 
 - r₀ (Table F.6) is printed 1.449 513 704 087 943; it is 1.449 513 704 087 942 3….
 - γ (Table F.4) is printed 0.882 911 075 530 934; it is 0.882 911 075 530 932 9….
@@ -119,10 +119,10 @@ H.264's sample aspect ratio indicator (Table E-1, H.265 Table E.1 the same) has 
 JFIF's and JPEG 2000's Y′CbCr matrices come from BT.601's K_R = 0.299 and K_B = 0.114. Every entry is then a rational: Cb divides by 2(1 − K_B) = 1.772 and Cr by 2(1 − K_R) = 1.402 (T.871 clause 7). The property builds both matrices exactly, checks that each undoes the other, and rounds the entries to the printed places:
 
 - JFIF's four-decimal entries (0.1687, 0.3313, 0.4187, 0.0813, 0.3441, 0.7141) are all right.
-- T.800's G-10 prints 0,16875, which is 0.16874: one off in the last place.
-- T.800's G-10 prints 0,331260, which is 0.331264 (0.587/1.772 = 0.331 264 1…): four off in the sixth decimal. As 0,33126 it would be right to five places.
-- T.800's G-13 prints 0,34413, which is 0.34414: one off in the last place.
-- T.800's G-9 prints Y0(x, y) = −0,299 I0(x, y) − 0,587 I1(x, y) + 0,114 I2(x, y). Its inverse, G-12 to G-14, undoes the matrix with plus signs, not that one.
+- T.800's 08/2002 edition's G-10 prints 0,16875, which rounds differently from the exact K_R/K_B value, 0.16874: one off in the last place. The 06/2019 edition prints it the same.
+- T.800's 08/2002 edition's G-10 prints 0,331260, which rounds differently from the exact value, 0.331264 (0.587/1.772 = 0.331 264 1…): four off in the sixth decimal. As 0,33126 it would match to five places. The 06/2019 edition prints it the same.
+- T.800's 08/2002 edition's G-13 prints 0,34413, which rounds differently from the exact value, 0.34414: one off in the last place. The 06/2019 edition prints it the same. T.800 says directly of G-12 to G-14's coefficients, "Equations (G-12), (G-13) and (G-14) do not imply a required precision for the coefficients" (06/2019 edition, p. 135); G-10's forward coefficients are printed to the same kind of approximation. The current edition, 07/2024, is not freely available and was not checked.
+- T.800's 08/2002 edition's G-9 is a formula error, not a rounding difference: it prints Y0(x, y) = −0,299 I0(x, y) − 0,587 I1(x, y) + 0,114 I2(x, y), where its inverse, G-12 to G-14, undoes the matrix with plus signs, not that one. Technical Corrigendum 3 (10/2014) corrects G-9 to the plus signs, and the 06/2019 edition prints it right.
 
 JFIF's `units` byte (T.871 10.1) picks what its densities mean. 0 means only the pixel aspect ratio, Vdensity:Hdensity. 1 means dots per inch, "dots per 2.54 cm". 2 means dots per cm. In dots per metre, 72 dpi is 360 000/127 exactly. One byte choosing among three kinds of value is something a codec, with its one `Linear`, can't say; the example uses an enum.
 

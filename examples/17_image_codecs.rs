@@ -2,7 +2,8 @@
 //!
 //! Codecs compute in integers on purpose: a decoder must give the same bits on every machine. Their standards name
 //! a rounding in each formula, or forget to, and they print irrational constants as decimals. This example walks
-//! through what is exact in them, which rounding each step is, and where the printed numbers are wrong.
+//! through what is exact in them, which rounding each step is, where a formula was printed wrong, and where a
+//! constant's printed digits round differently from the exact value.
 //!
 //! - **Four roundings in one chain.** JPEG quantizes "to the nearest integer" with no tie named (ITU-T T.81 A.3.4).
 //!   Its point transform truncates for AC coefficients and floors for DC ones (A.4, K.10). JFIF rounds a half up
@@ -185,8 +186,12 @@ fn lossless() {
     let y = fdwt53(&x);
     println!("  {x:?} -> {y:?}");
     assert_eq!(idwt53(&y), x);
-    // F-9 as T.800 (08/2002) prints it divides by 4, where F-6 inverts a divide by 2: [2, 0] comes back [2, 1]
-    println!("  F-9 is printed with /4; F-6 undoes /2. With /4, [2, 0] would come back as [2, 1].");
+    // F-9 as T.800 (08/2002) prints it divides by 4, where F-6 inverts a divide by 2: [2, 0] comes back [2, 1].
+    // Technical Corrigendum 4 (10/2014) corrects the divisor to 2; the 06/2019 edition prints it right.
+    println!(
+        "  F-9 is printed with /4 in 08/2002; F-6 undoes /2. With /4, [2, 0] would come back as [2, 1]."
+    );
+    println!("  Corrigendum 4 (10/2014) fixes it to /2; 06/2019 prints it right.");
 
     println!("JPEG 2000's reversible colour transform (G.2, eq. G-3 to G-8)");
     let (i0, i1, i2) = (200 - 128, 30 - 128, 255 - 128);
@@ -449,13 +454,16 @@ fn tables_and_matrices() {
     for (name, x, jfif, t800) in entries {
         let places = u8::try_from(t800.len() - 2).unwrap();
         println!(
-            "  {name} = -{x:#}: to 4 places {:#} (JFIF prints {jfif}), to {places} {:#} (T.800 prints {t800})",
+            "  {name} = -{x:#}: to 4 places {:#} (JFIF prints {jfif}), to {places} {:#} (T.800's 08/2002 edition prints {t800})",
             x.rounded(4, Rounding::NearestEven),
             x.rounded(places, Rounding::NearestEven),
         );
     }
     println!(
-        "  T.800's G-9 prints -0,299 and -0,587 for Y0; its inverse G-12 to G-14 is the matrix with plus signs"
+        "  T.800's 08/2002 edition prints -0,299 and -0,587 for G-9's Y0; its inverse G-12 to G-14 is the matrix with plus signs"
+    );
+    println!(
+        "  Corrigendum 3 (10/2014) corrects G-9 to the plus signs; the 06/2019 edition prints it right"
     );
 
     println!("JFIF's density (T.871 10.1): the units byte picks the unit");
