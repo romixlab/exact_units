@@ -28,7 +28,7 @@
     reason = "an example writes the typed operators as a firmware would; each type's bound says what overflow does"
 )]
 
-use exact_units::units::{Item, Packet, Second};
+use exact_units::units::{self, Item, Packet, Second};
 use exact_units::{Fixed, Index, IndexFrom1, Millis, Offset, Point, Range, Seq, origin};
 
 origin! {
@@ -37,7 +37,7 @@ origin! {
 }
 
 /// CH1..CH4, as printed on the board and the datasheet.
-type Channel = IndexFrom1<Item, u8, Range<1, 4>>;
+type Channel = IndexFrom1<units::Channel, u8, Range<1, 4>>;
 
 /// One of the eight slots of the ring buffer.
 type Slot = Index<Item, u8, Range<0, 7>>;
@@ -136,8 +136,8 @@ fn main() {
     // error[E0308]: mismatched types
     //    --> examples/08_data_logger.rs:103:30
     //     |
-    // 103 |     let _: Index<Item, u8> = ch;
-    //     |            ---------------   ^^ expected `Index<Item, u8>`, found `IndexFrom1<Item, u8, Range<1, 4>>`
+    // 103 |     let _: Index<units::Channel, u8> = ch;
+    //     |            -------------------------   ^^ expected `Index<Channel, u8>`, found `IndexFrom1<Channel, u8, Range<1, 4>>`
     //
-    // let _: Index<Item, u8> = ch;
+    // let _: Index<units::Channel, u8> = ch;
 }

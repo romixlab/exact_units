@@ -53,9 +53,9 @@ assert_eq!(last.checked_sub(Fixed::new(7)), Some(Slot::try_new(0).unwrap()));
 Channel 1 to 4, motor 1 to 4: never 0. `to_index` gives the 0-based position.
 
 ```rust
-use exact_units::{Index, IndexFrom1, Range, units::Item};
+use exact_units::{Index, IndexFrom1, Range, units};
 
-type Channel = IndexFrom1<Item, u8, Range<1, 4>>;
+type Channel = IndexFrom1<units::Channel, u8, Range<1, 4>>;
 
 let ch = Channel::try_new(3).unwrap();
 assert_eq!(ch.to_index(), Index::new(2));

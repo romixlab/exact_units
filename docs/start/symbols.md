@@ -78,15 +78,19 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `VA` | `VoltAmpere` | `electrical` | SI |
 | `W` | `Watt` | `electrical` | SI |
 | `Wb` | `Weber` | `electrical` | SI |
+| `arg` | `Argument` | `counting` | none |
 | `at` | `AtmosphereTechnical` | `customary` | none |
 | `atm` | `AtmosphereStandard` | `customary` | none |
 | `b` | `Barn` | `nuclear` | none |
 | `bit` | `Bit` | `information` | SI and binary |
 | `block` | `Block` | `counting` | none |
+| `boot` | `Boot` | `counting` | none |
+| `buffer` | `Buffer` | `counting` | none |
 | `cal_IT` | `CalorieIt` | `customary` | none |
 | `cal_mean` | `CalorieMean` | `customary` | none |
 | `cal_th` | `CalorieTh` | `customary` | none |
 | `cd` | `Candela` | `photometric` | SI |
+| `channel` | `Channel` | `counting` | none |
 | `char` | `Char` | `counting` | none |
 | `chunk` | `Chunk` | `counting` | none |
 | `cmil` | `CircularMil` | `customary` | none |
@@ -99,6 +103,9 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `dwt` | `Pennyweight` | `customary` | none |
 | `eV` | `ElectronVolt` | `radiation` | SI |
 | `entry` | `Entry` | `counting` | none |
+| `event` | `Event` | `counting` | none |
+| `fifo` | `Fifo` | `counting` | none |
+| `filter` | `Filter` | `counting` | none |
 | `frame` | `Frame` | `counting` | none |
 | `g` | `Gram` | `mechanical` | SI |
 | `gon` | `Gon` | `customary` | none |
@@ -127,14 +134,17 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `nit` | `Nit` | `photometric` | SI |
 | `nt` | `Nit` | `photometric` | SI |
 | `ohm` | `Ohm` | `electrical` | SI |
+| `op` | `Operation` | `counting` | none |
 | `ozf` | `OunceForce` | `customary` | none |
 | `packet` | `Packet` | `counting` | none |
 | `pdl` | `Poundal` | `customary` | none |
 | `percent` | `Ratio` · 10⁻² | `dimensionless` | none |
+| `pin` | `Pin` | `counting` | none |
 | `ppb` | `Ratio` · 10⁻⁹ | `dimensionless` | none |
 | `ppm` | `Ratio` · 10⁻⁶ | `dimensionless` | none |
 | `psf` | `Psf` | `customary` | none |
 | `psi` | `Psi` | `customary` | none |
+| `pulse` | `Pulse` | `counting` | none |
 | `quad` | `Quad` | `customary` | none |
 | `rad` | `Radian` | `angle` | SI |
 | `record` | `Record` | `counting` | none |
@@ -144,17 +154,23 @@ The symbols `q!` reads as a unit marker, and the feature each needs. `%`, `‰`,
 | `row` | `Row` | `counting` | none |
 | `s` | `Second` | `time` | SI |
 | `sample` | `Sample` | `counting` | none |
+| `scan` | `Scan` | `counting` | none |
 | `sector` | `Sector` | `counting` | none |
+| `segment` | `Segment` | `counting` | none |
+| `session` | `Session` | `counting` | none |
 | `slug` | `Slug` | `customary` | none |
 | `sr` | `Steradian` | `angle` | SI |
 | `st` | `Stone` | `customary` | none |
+| `step` | `Step` | `counting` | none |
 | `stop` | `Stop` | `levels` | none |
 | `streck` | `StreckSwedish` | `customary` | none |
 | `t` | `Tonne` | `customary` | SI from kilo up |
 | `tTNT` | `TonOfTnt` | `customary` | none |
 | `thou` | `Thou` | `customary` | none |
+| `tick` | `Tick` | `counting` | none |
 | `tn` | `TonShort` | `customary` | none |
 | `tnf` | `TonForceShort` | `customary` | none |
+| `tq` | `TimeQuantum` | `counting` | none |
 | `var` | `Var` | `electrical` | SI |
 | `wk` | `Week` | `time` | none |
 | `word` | `Word` | `information` | none |

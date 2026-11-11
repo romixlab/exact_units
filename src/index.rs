@@ -248,13 +248,13 @@ impl<Of, T: UnsignedStorage, B: Bounds<T>> Sub for Index<Of, T, B> {
 /// four channels). On the wire exactly the `T`.
 ///
 /// ```
-/// use exact_units::{Index, IndexFrom1, Range, units::Item};
+/// use exact_units::{Index, IndexFrom1, Range, units};
 ///
-/// type Channel = IndexFrom1<Item, u8, Range<1, 4>>;
+/// type Channel = IndexFrom1<units::Channel, u8, Range<1, 4>>;
 /// let ch = Channel::try_new(3).unwrap();
 /// assert_eq!(ch.to_string(), "3");
 /// assert_eq!(ch.to_index(), Index::new(2));
-/// assert_eq!(Channel::from_index(Index::<Item, u8>::new(0)), Some(Channel::try_new(1).unwrap()));
+/// assert_eq!(Channel::from_index(Index::<units::Channel, u8>::new(0)), Some(Channel::try_new(1).unwrap()));
 /// assert!(Channel::try_new(0).is_err());
 /// assert!(Channel::try_new(5).is_err());
 /// ```

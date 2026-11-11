@@ -170,7 +170,8 @@ customary = []
 # TropicalYearNubase2020) outside the SI. Opt-in only, not in `quantities` or `std`, as `customary` is: with
 # `customary` too, q! refuses "rd" (the rad, not the radian), naming both it and `customary::RodInternational`.
 nuclear = []
-# Item, Sample, Frame, Packet, Line, Row, Record, Entry, Cycle, Block, Sector, Chunk, Char, Code: counted bases, each a dimension of its own
+# Item, Sample, Frame, Packet, Line, Row, Record, Entry, Cycle, Block, Sector, Chunk, Char, Code, Event, Pulse, Tick, Channel, Pin,
+# Step, Segment, Session, Boot, Operation, Argument, Filter, Fifo, Buffer, TimeQuantum, Scan: counted bases, each a dimension of its own
 counting = []
 # Neper, Decibel and their losses (Loss<Neper>, Loss<Decibel>): levels on a base of their own, rates of them (dB/m,
 # Np/s), and the edge to a gain (to_level, to_gain); Absorbance and OpticalDepth (Beer-Lambert); DampingRatio and

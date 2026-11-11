@@ -710,3 +710,31 @@ fn data_rates() {
     assert_eq!(link.get(), 24_576);
     assert_eq!(Fixed::<BitPerSecond, Kilo, u32>::new(100).to_string(), "100 kbit/s");
 }
+
+/// Every counted marker is a base of its own: no two of them are one dimension, none is a number, and each prints its
+/// own symbol.
+#[test]
+fn counted_markers_are_distinct() {
+    use exact_units::Fixed;
+    use exact_units::prefix::One;
+
+    macro_rules! dims {
+        ($($m:ident: $symbol:literal),* $(,)?) => {{
+            $(assert_eq!(Fixed::<units::$m, One, u8>::new(3).to_string(), concat!("3 ", $symbol));)*
+            [$(<units::$m as Unit>::DIM),*]
+        }};
+    }
+    let all = dims!(
+        Item: "item", Sample: "sample", Frame: "frame", Packet: "packet", Line: "line", Row: "row",
+        Record: "record", Entry: "entry", Cycle: "cycle", Block: "block", Sector: "sector", Chunk: "chunk",
+        Char: "char", Code: "code", Event: "event", Pulse: "pulse", Tick: "tick", Channel: "channel", Pin: "pin",
+        Step: "step", Segment: "segment", Session: "session", Boot: "boot", Operation: "op", Argument: "arg",
+        Filter: "filter", Fifo: "fifo", Buffer: "buffer", TimeQuantum: "tq", Scan: "scan",
+    );
+    for (i, a) in all.iter().enumerate() {
+        assert!(!a.is_one());
+        for b in all.iter().skip(i + 1) {
+            assert!(!a.same(*b), "{a} and {b}");
+        }
+    }
+}

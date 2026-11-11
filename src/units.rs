@@ -735,7 +735,7 @@ crate::unit! {
     // samples don't add to bytes, and become bytes only through a `Per<Byte, Sample>`. An API that counts something else
     // declares its own marker with a `base` line of `unit!` (`exact_units::base!(Name)` is its id), see [Unit].
 
-    /// A count of things, item: a queue's length, a number of filters, channels, presses, repeats, steps.
+    /// A count of things, item: a queue's length, presses, repeats, where no marker below names what is counted.
     #[cfg(feature = "counting")]
     pub struct Item = "item" (long "item"), base;
 
@@ -790,6 +790,72 @@ crate::unit! {
     /// A count of raw codes of a converter, code: an ADC's or DAC's output before scaling (LSB).
     #[cfg(feature = "counting")]
     pub struct Code = "code" (long "code"), base;
+
+    /// A count of events, event: occurrences counted as such, errors, stalls, overruns, retries.
+    #[cfg(feature = "counting")]
+    pub struct Event = "event" (long "event"), base;
+
+    /// A count of pulses, pulse: of an encoder, a flow meter, a pulse output.
+    #[cfg(feature = "counting")]
+    pub struct Pulse = "pulse" (long "pulse"), base;
+
+    /// A count of ticks, tick: of a timer or an OS tick, time only with its rate (`Per<Tick, Second>`).
+    #[cfg(feature = "counting")]
+    pub struct Tick = "tick" (long "tick"), base;
+
+    /// A count of channels, channel: of an ADC, a DAC, a logic analyzer, a signal generator; `Index<Channel, u8>` is
+    /// one of them.
+    #[cfg(feature = "counting")]
+    pub struct Channel = "channel" (long "channel"), base;
+
+    /// A count of pins, pin: of a GPIO port or a chip; `Index<Pin, u8>` is one of them.
+    #[cfg(feature = "counting")]
+    pub struct Pin = "pin" (long "pin"), base;
+
+    /// A count of steps, step: of a plan, a procedure, an update; a stepper motor's steps.
+    #[cfg(feature = "counting")]
+    pub struct Step = "step" (long "step"), base;
+
+    /// A count of segments, segment: of a ring buffer, a log, a file, a route.
+    #[cfg(feature = "counting")]
+    pub struct Segment = "segment" (long "segment"), base;
+
+    /// A count of sessions, session: of a recorder, a connection, a login.
+    #[cfg(feature = "counting")]
+    pub struct Session = "session" (long "session"), base;
+
+    /// A count of boots, boot: a device's starts, a boot counter.
+    #[cfg(feature = "counting")]
+    pub struct Boot = "boot" (long "boot"), base;
+
+    /// A count of operations, op: of a bus transaction (an I2C write then read is two), a batch.
+    #[cfg(feature = "counting")]
+    pub struct Operation = "op" (long "operation"), base;
+
+    /// A count of arguments, arg: of a call or a command; `Index<Argument, u8>` names the one an error is about.
+    #[cfg(feature = "counting")]
+    pub struct Argument = "arg" (long "argument"), base;
+
+    /// A count of filters, filter: a CAN controller's acceptance filters, a packet filter's rules.
+    #[cfg(feature = "counting")]
+    pub struct Filter = "filter" (long "filter"), base;
+
+    /// A count of FIFOs, fifo: a peripheral's receive or transmit queues.
+    #[cfg(feature = "counting")]
+    pub struct Fifo = "fifo" (long "fifo"), base;
+
+    /// A count of buffers, buffer: a peripheral's dedicated message buffers, a pool's.
+    #[cfg(feature = "counting")]
+    pub struct Buffer = "buffer" (long "buffer"), base;
+
+    /// A count of time quanta, tq: a CAN bit's segments, a bit time's unit, time only with the quantum's length
+    /// (`Per<Cycle, TimeQuantum>` clock cycles each).
+    #[cfg(feature = "counting")]
+    pub struct TimeQuantum = "tq" (long "time quantum" plural "time quanta"), base;
+
+    /// A count of scans, scan: one reading of every channel of a multi-channel converter, a sample of each.
+    #[cfg(feature = "counting")]
+    pub struct Scan = "scan" (long "scan"), base;
 }
 
 // Compound

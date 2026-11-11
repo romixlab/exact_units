@@ -384,8 +384,7 @@ counted units, and the kinds that keep look-alike quantities apart.
   qualified symbol's stem is never read as one of its units (`ft`, `qt`, `oz` refused: no bare default). Prefixes
   only on the units the SI lets take one, the tonne's from kilo up. Every symbol resolves as the generator says, and the run-time text reader reads each the same or
   not at all. Book: [The symbols of `q!`](docs/start/symbols.md).
-- 📋 **UNIT-6 More counted units** (was STD-69) · `v0.5` — Symbol (baud = Symbol/s), Packet, Pulse, Event, Tick, Chunk, Particle,
-  each a dimension of its own; `AVOGADRO` bridges `Particle` and mol exactly.
+- 🚧 **UNIT-6 More counted units** (was STD-69) · `v0.5` — each a dimension of its own. Done (P2401#11nov-0946d, P2401#11nov-1033): `Event`, `Pulse`, `Tick`, and the markers the ww_stdlib device APIs count and index by, `Channel`, `Pin`, `Step`, `Segment`, `Session`, `Boot`, `Operation` (op), `Argument` (arg), `Filter`, `Fifo`, `Buffer`, `TimeQuantum` (tq) and `Scan` (one reading of every channel), beside the earlier `Packet` and `Chunk`; `q!` reads each by its symbol. Test: `tests/units.rs` (`counted_markers_are_distinct`). Open: `Symbol` (baud = Symbol/s, a change to `Baud`'s dimension) and `Particle`, with `AVOGADRO` bridging it and mol exactly.
 - ✅ **UNIT-7 The unit's identity and data form** · `foundations` — a named unit is a `UnitDef` (`id: MarkerId {
   crate_name, name }`, names, dim, quantity, `scale: Magnitude`, provenance), built by `unit!` with the crate from
   `CARGO_CRATE_NAME`: two crates' `Rpm` are two units that print the same. `Scale` is gone (no `Affine`, no
