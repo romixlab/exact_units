@@ -997,9 +997,9 @@ fn unit_info_json() -> String {
 }
 
 /// Every marker `q!`'s table reads, every origin and level has an entry in `unit_info.json`, so the book's markup
-/// finds each one it can resolve.
+/// finds each one it can resolve, and a long name for its tooltip.
 #[test]
-fn every_table_marker_has_an_entry() {
+fn every_table_marker_has_an_entry_and_a_name() {
     let info: serde_json::Value = serde_json::from_str(&unit_info_json()).unwrap();
     let markers = table::UNITS
         .iter()
@@ -1014,15 +1014,20 @@ fn every_table_marker_has_an_entry() {
                 .iter()
                 .map(|l| ("levels", l.marker.trim_start_matches("literal::"))),
         );
+    // τ has no unit name of its own: optical depth is the quantity, and its tooltip names the marker
+    const NO_LONG_NAME: &[&str] = &["OpticalDepth"];
     let mut missing: Vec<String> = markers
-        .filter(|(kind, marker)| !info[kind][marker].is_object())
+        .filter(|(kind, marker)| {
+            !info[kind][marker].is_object()
+                || (!info[kind][marker]["long"].is_string() && !NO_LONG_NAME.contains(marker))
+        })
         .map(|(kind, marker)| format!("{kind}::{marker}"))
         .collect();
     missing.sort();
     missing.dedup();
     assert!(
         missing.is_empty(),
-        "markers of q!'s table without an entry: {missing:?}"
+        "markers of q!'s table without an entry or a long name (give its unit! line one): {missing:?}"
     );
 }
 
@@ -1271,4 +1276,20 @@ fn text_reader_agrees() {
     };
     let other: Vec<&String> = only_q.iter().filter(|e| !gap(e)).collect();
     assert!(other.is_empty(), "only q! reads these: {other:?}");
+}
+
+/// A unit's long name and plural read as text through the [Registry](exact_units::Registry), as its symbol does:
+/// `3 inches` is 3 `Inch`.
+#[test]
+fn long_names_read_as_text() {
+    use exact_units::{Exact, Registry};
+    let tables = [units::ALL, units::CUSTOMARY];
+    let r = Registry::new(&tables);
+    assert_eq!(r.parse::<units::Inch>("3 inches").ok(), Some(Exact::int(3)));
+    assert_eq!(r.parse::<units::Inch>("1 inch").ok(), Some(Exact::int(1)));
+    assert_eq!(
+        r.parse::<units::Stone>("2 stones").ok(),
+        Some(Exact::int(2))
+    );
+    assert_eq!(r.parse::<units::Knot>("4 knots").ok(), Some(Exact::int(4)));
 }

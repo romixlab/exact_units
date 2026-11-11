@@ -460,8 +460,8 @@
     "Arcminute": {
       "description": "Minute of arc: 1/60°.",
       "dim": "rad",
-      "long": null,
-      "plural": null,
+      "long": "arcminute",
+      "plural": "arcminutes",
       "quantity": "plane angle",
       "related": [
         "Radian",
@@ -479,8 +479,8 @@
     "Arcsecond": {
       "description": "Second of arc: 1/60′.",
       "dim": "rad",
-      "long": null,
-      "plural": null,
+      "long": "arcsecond",
+      "plural": "arcseconds",
       "quantity": "plane angle",
       "related": [
         "Radian",
@@ -519,8 +519,8 @@
     "AtmosphereStandard": {
       "description": "Atmosphere (standard): 101 325 Pa.",
       "dim": "kg·m⁻¹·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "standard atmosphere",
+      "plural": "standard atmospheres",
       "quantity": "pressure",
       "related": [
         "Pascal",
@@ -548,8 +548,8 @@
     "AtmosphereTechnical": {
       "description": "Atmosphere (technical, kgf/cm²): 1 kgf/cm².",
       "dim": "kg·m⁻¹·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "technical atmosphere",
+      "plural": "technical atmospheres",
       "quantity": "pressure",
       "related": [
         "Pascal",
@@ -1154,8 +1154,8 @@
     "BtuIt": {
       "description": "British thermal unit (International Table): 1.055 055 852 62 kJ; cal_IT/(g·°C) · lb · °F.",
       "dim": "kg·m²·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "IT British thermal unit",
+      "plural": "IT British thermal units",
       "quantity": "energy",
       "related": [
         "Joule",
@@ -1206,8 +1206,8 @@
     "BtuMean": {
       "description": "British thermal unit (mean): measured.",
       "dim": "kg·m²·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "mean British thermal unit",
+      "plural": "mean British thermal units",
       "quantity": "energy",
       "related": [
         "Joule",
@@ -1240,8 +1240,8 @@
     "BtuTh": {
       "description": "British thermal unit (thermochemical): cal_th/(g·°C) · lb · °F.",
       "dim": "kg·m²·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "thermochemical British thermal unit",
+      "plural": "thermochemical British thermal units",
       "quantity": "energy",
       "related": [
         "Joule",
@@ -1513,8 +1513,8 @@
     "CalorieFoodIt": {
       "description": "Calorie (food, kilogram calorie IT): 1 kcal_IT.",
       "dim": "kg·m²·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "IT food calorie",
+      "plural": "IT food calories",
       "quantity": "energy",
       "related": [
         "Joule",
@@ -1547,8 +1547,8 @@
     "CalorieFoodTh": {
       "description": "Calorie (food, kilogram calorie thermochemical): 1 kcal_th.",
       "dim": "kg·m²·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "thermochemical food calorie",
+      "plural": "thermochemical food calories",
       "quantity": "energy",
       "related": [
         "Joule",
@@ -1581,8 +1581,8 @@
     "CalorieIt": {
       "description": "Calorie (International Table): 4.1868 J.",
       "dim": "kg·m²·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "IT calorie",
+      "plural": "IT calories",
       "quantity": "energy",
       "related": [
         "Joule",
@@ -1615,8 +1615,8 @@
     "CalorieMean": {
       "description": "Calorie (mean): measured.",
       "dim": "kg·m²·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "mean calorie",
+      "plural": "mean calories",
       "quantity": "energy",
       "related": [
         "Joule",
@@ -1649,8 +1649,8 @@
     "CalorieTh": {
       "description": "Calorie (thermochemical): 4.184 J.",
       "dim": "kg·m²·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "thermochemical calorie",
+      "plural": "thermochemical calories",
       "quantity": "energy",
       "related": [
         "Joule",
@@ -1693,8 +1693,8 @@
     "Cental": {
       "description": "Cental: 100 lb.",
       "dim": "kg",
-      "long": null,
-      "plural": null,
+      "long": "cental",
+      "plural": "centals",
       "quantity": null,
       "related": [
         "Gram",
@@ -1857,8 +1857,8 @@
     "CircularMil": {
       "description": "Circular mil: area of a circle 1 mil across, π/4 mil².",
       "dim": "m²",
-      "long": null,
-      "plural": null,
+      "long": "circular mil",
+      "plural": "circular mils",
       "quantity": "area",
       "related": [
         "Area",
@@ -3617,8 +3617,8 @@
     "Gon": {
       "description": "Gon (grade): 0.9°.",
       "dim": "rad",
-      "long": null,
-      "plural": null,
+      "long": "gon",
+      "plural": "gons",
       "quantity": "plane angle",
       "related": [
         "Radian",
@@ -3636,8 +3636,8 @@
     "Grain": {
       "description": "Grain: 1/7000 lb.",
       "dim": "kg",
-      "long": null,
-      "plural": null,
+      "long": "grain",
+      "plural": "grains",
       "quantity": null,
       "related": [
         "Gram",
@@ -3782,8 +3782,8 @@
     "Hand": {
       "description": "Hand: 4 in (custom, bracketed in HB 44).",
       "dim": "m",
-      "long": null,
-      "plural": null,
+      "long": "hand",
+      "plural": "hands",
       "quantity": "length",
       "related": [
         "Meter",
@@ -4095,8 +4095,8 @@
     "Inch": {
       "description": "Inch: 1/36 yd.",
       "dim": "m",
-      "long": null,
-      "plural": null,
+      "long": "inch",
+      "plural": "inches",
       "quantity": "length",
       "related": [
         "Meter",
@@ -4426,8 +4426,8 @@
     "KilocalorieIt": {
       "description": "Kilocalorie (International Table): 1000 cal_IT.",
       "dim": "kg·m²·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "IT kilocalorie",
+      "plural": "IT kilocalories",
       "quantity": "energy",
       "related": [
         "Joule",
@@ -4460,8 +4460,8 @@
     "KilocalorieTh": {
       "description": "Kilocalorie (thermochemical): 1000 cal_th.",
       "dim": "kg·m²·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "thermochemical kilocalorie",
+      "plural": "thermochemical kilocalories",
       "quantity": "energy",
       "related": [
         "Joule",
@@ -4494,8 +4494,8 @@
     "KilogramForce": {
       "description": "Kilogram-force (kilopond): kg · g_n.",
       "dim": "kg·m·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "kilogram-force",
+      "plural": "kilograms-force",
       "quantity": null,
       "related": [
         "Newton",
@@ -4565,8 +4565,8 @@
     "Kip": {
       "description": "Kip (1000 lbf): 1000 lbf.",
       "dim": "kg·m·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "kip",
+      "plural": "kips",
       "quantity": null,
       "related": [
         "Newton",
@@ -4583,8 +4583,8 @@
     "Knot": {
       "description": "Knot: 1 nmi/h = 1852/3600 m/s.",
       "dim": "m·s⁻¹",
-      "long": null,
-      "plural": null,
+      "long": "knot",
+      "plural": "knots",
       "quantity": "speed",
       "related": [
         "CentimetreMegahertz",
@@ -4598,8 +4598,8 @@
     "Ksi": {
       "description": "Kip per square inch: kip/in².",
       "dim": "kg·m⁻¹·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "kip per square inch",
+      "plural": "kips per square inch",
       "quantity": "pressure",
       "related": [
         "Pascal",
@@ -5027,8 +5027,8 @@
     "Microinch": {
       "description": "Microinch: 10⁻⁶ in.",
       "dim": "m",
-      "long": null,
-      "plural": null,
+      "long": "microinch",
+      "plural": "microinches",
       "quantity": "length",
       "related": [
         "Meter",
@@ -5151,8 +5151,8 @@
     "MilePerHour": {
       "description": "Mile per hour: mi/h.",
       "dim": "m·s⁻¹",
-      "long": null,
-      "plural": null,
+      "long": "mile per hour",
+      "plural": "miles per hour",
       "quantity": "speed",
       "related": [
         "CentimetreMegahertz",
@@ -5856,8 +5856,8 @@
     "OunceForce": {
       "description": "Ounce-force (avoirdupois): oz · g_n.",
       "dim": "kg·m·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "ounce-force",
+      "plural": "ounces-force",
       "quantity": null,
       "related": [
         "Newton",
@@ -6058,8 +6058,8 @@
     "Pennyweight": {
       "description": "Pennyweight: 24 gr.",
       "dim": "kg",
-      "long": null,
-      "plural": null,
+      "long": "pennyweight",
+      "plural": "pennyweights",
       "quantity": null,
       "related": [
         "Gram",
@@ -6517,8 +6517,8 @@
     "PoundForce": {
       "description": "Pound-force: lb · g_n.",
       "dim": "kg·m·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "pound-force",
+      "plural": "pounds-force",
       "quantity": null,
       "related": [
         "Newton",
@@ -6568,8 +6568,8 @@
     "Poundal": {
       "description": "Poundal: lb·ft/s².",
       "dim": "kg·m·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "poundal",
+      "plural": "poundals",
       "quantity": null,
       "related": [
         "Newton",
@@ -6596,8 +6596,8 @@
     "Psf": {
       "description": "Pound-force per square foot: lbf/ft².",
       "dim": "kg·m⁻¹·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "pound-force per square foot",
+      "plural": "pounds-force per square foot",
       "quantity": "pressure",
       "related": [
         "Pascal",
@@ -6625,8 +6625,8 @@
     "Psi": {
       "description": "Pound-force per square inch: lbf/in².",
       "dim": "kg·m⁻¹·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "pound-force per square inch",
+      "plural": "pounds-force per square inch",
       "quantity": "pressure",
       "related": [
         "Pascal",
@@ -6654,8 +6654,8 @@
     "Quad": {
       "description": "Quad (10¹⁵ Btu_IT): 10¹⁵ Btu_IT.",
       "dim": "kg·m²·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "quad",
+      "plural": "quads",
       "quantity": "energy",
       "related": [
         "Joule",
@@ -6996,8 +6996,8 @@
     "Ratio": {
       "description": "A fraction: a duty cycle, a probability, a scale factor, an efficiency (dimensionless, 1). 0.5 is half, not a level in decibels.",
       "dim": null,
-      "long": null,
-      "plural": null,
+      "long": "ratio",
+      "plural": "ratios",
       "quantity": null,
       "related": [
         "Ln2",
@@ -7139,8 +7139,8 @@
     "Rood": {
       "description": "Rood: 1210 yd².",
       "dim": "m²",
-      "long": null,
-      "plural": null,
+      "long": "rood",
+      "plural": "roods",
       "quantity": "area",
       "related": [
         "Area",
@@ -7273,8 +7273,8 @@
     "Slug": {
       "description": "Slug: lbf·s²/ft.",
       "dim": "kg",
-      "long": null,
-      "plural": null,
+      "long": "slug",
+      "plural": "slugs",
       "quantity": null,
       "related": [
         "Gram",
@@ -7466,8 +7466,8 @@
     "Stone": {
       "description": "Stone: 14 lb.",
       "dim": "kg",
-      "long": null,
-      "plural": null,
+      "long": "stone",
+      "plural": "stones",
       "quantity": null,
       "related": [
         "Gram",
@@ -7513,8 +7513,8 @@
     "StreckSwedish": {
       "description": "Streck (angle, Swedish, 1/6300 turn): 1/6300 turn.",
       "dim": "rad",
-      "long": null,
-      "plural": null,
+      "long": "Swedish streck",
+      "plural": "Swedish streck",
       "quantity": "plane angle",
       "related": [
         "Radian",
@@ -7884,8 +7884,8 @@
     "Thou": {
       "description": "Thou (mil, 0.001 in): 0.001 in.",
       "dim": "m",
-      "long": null,
-      "plural": null,
+      "long": "thou",
+      "plural": "thou",
       "quantity": "length",
       "related": [
         "Meter",
@@ -7927,8 +7927,8 @@
     "TonForceShort": {
       "description": "Ton-force (short, 2000 lbf): 2000 lbf.",
       "dim": "kg·m·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "short ton-force",
+      "plural": "short tons-force",
       "quantity": null,
       "related": [
         "Newton",
@@ -7978,8 +7978,8 @@
     "TonOfRefrigeration": {
       "description": "Ton of refrigeration (12 000 Btu_IT/h): 12 000 Btu_IT/h.",
       "dim": "kg·m²·s⁻³",
-      "long": null,
-      "plural": null,
+      "long": "ton of refrigeration",
+      "plural": "tons of refrigeration",
       "quantity": "power",
       "related": [
         "Watt",
@@ -7996,8 +7996,8 @@
     "TonOfTnt": {
       "description": "Ton of TNT (energy equivalent): 10⁹ cal_th = 4.184 GJ.",
       "dim": "kg·m²·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "ton of TNT",
+      "plural": "tons of TNT",
       "quantity": "energy",
       "related": [
         "Joule",
@@ -8086,8 +8086,8 @@
     "TonShort": {
       "description": "Ton (short, net): 2000 lb.",
       "dim": "kg",
-      "long": null,
-      "plural": null,
+      "long": "short ton",
+      "plural": "short tons",
       "quantity": null,
       "related": [
         "Gram",
@@ -8218,8 +8218,8 @@
     "Torr": {
       "description": "Torr: 1/760 atm.",
       "dim": "kg·m⁻¹·s⁻²",
-      "long": null,
-      "plural": null,
+      "long": "torr",
+      "plural": "torr",
       "quantity": "pressure",
       "related": [
         "Pascal",
@@ -8462,8 +8462,8 @@
     "Yard": {
       "description": "Yard: 0.9144 m.",
       "dim": "m",
-      "long": null,
-      "plural": null,
+      "long": "yard",
+      "plural": "yards",
       "quantity": "length",
       "related": [
         "Meter",

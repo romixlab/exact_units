@@ -662,7 +662,7 @@ crate::unit! {
     /// # }
     /// ```
     #[cfg(feature = "dimensionless")]
-    pub struct Ratio = "", [];
+    pub struct Ratio = "" (long "ratio"), [];
 
     /// The number ln 2 as a unit, dimensionless: `Exact<Ln2>::int(3)` is exactly 3·ln 2. A decay constant λ = ln 2/T½ is
     /// an `Exact<Times<Ln2, Per<Ratio, Second>>>` holding 1/T½, so ln 2 stays exact in the type and `ln 2 · a + b` (two
