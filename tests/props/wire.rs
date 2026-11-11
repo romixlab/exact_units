@@ -576,7 +576,12 @@ pub(crate) fn any_bytes(which: u8, bytes: &[u8]) {
                 #[expect(clippy::expect_used, reason = "a property fails by panicking")]
                 let back = UnitDef::from_ww_bytes(&again).expect("decodes");
                 assert_eq!(back, d);
-                let _ = (d.id.to_string(), d.scale.to_f64(), d.quantity_expr());
+                // a measured constant (μ₀, G, m_u) left in the scale, which the wire doesn't refuse, has no value
+                let _ = (
+                    d.id.to_string(),
+                    d.scale.checked_to_f64(),
+                    d.quantity_expr(),
+                );
             }
         }
         9 => {
@@ -693,6 +698,23 @@ mod tests {
                 super::si_expr(&e);
             }
         }
+    }
+
+    /// Hand-picked input of the fuzz target `wire_bytes`: bytes the fuzzer found that decode into a `UnitDef` whose
+    /// scale has a measured constant (μ₀, G, m_u) left in it.
+    #[test]
+    fn hand_picked_bytes() {
+        super::any_bytes(
+            0x40,
+            &[
+                0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x24, 0x02, 0x00, 0x00, 0x00, 0x23, 0x65, 0x73,
+                0xff, 0xff, 0xff, 0x54, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6d,
+                0x92, 0x00, 0x22, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x32, 0x00, 0x3a, 0x77, 0x6b, 0x32, 0x50, 0x30, 0x10, 0x00,
+                0x10, 0x10, 0x24, 0x24,
+            ],
+        );
     }
 
     proptest! {

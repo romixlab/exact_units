@@ -29,11 +29,12 @@ fn read<T: DeserializeOwned + Serialize + PartialEq + Debug>(s: &str) -> Option<
 pub(crate) fn any_json(s: &str) {
     if let Some(m) = read::<Magnitude>(s) {
         round_trip(&m);
-        let _ = (m.to_string(), m.to_f64());
+        // a measured constant (μ₀, G, m_u) left in it, which JSON doesn't refuse, has no value: to_f64 panics there
+        let _ = (m.to_string(), m.checked_to_f64());
     }
     if let Some(o) = read::<Offset>(s) {
         round_trip(&o);
-        let _ = (o.to_string(), o.to_f64(), o.to_ratio());
+        let _ = (o.to_string(), o.checked_to_f64(), o.to_ratio());
     }
     if let Some(d) = read::<DimOwned>(s) {
         // serde keeps only a canonical dimension, as the wire reader does: every one read goes on the wire
@@ -132,6 +133,9 @@ mod tests {
             r#"{"exps":[{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0}],"bases":[{"base":{"crate_name":"exact_units","name":"Sample"},"exp":{"halves":2}},{"base":{"crate_name":"exact_units","name":"Frame"},"exp":{"halves":-2}}]}"#,
             r#"{"exps":[{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0},{"halves":0}],"bases":[{"base":{"crate_name":"exact_units","name":"Sample"},"exp":{"halves":0}}]}"#,
             r#"{"Conventional":{"source":"NIST SP 811","year":2008}}"#,
+            // found by the fuzz target serde_json: a Magnitude with a measured constant left in it, which to_f64
+            // (unlike checked_to_f64) panics on
+            "\t[7,6,43,7,6,4]",
         ] {
             super::any_json(s);
         }
