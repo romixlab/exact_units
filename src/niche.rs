@@ -57,6 +57,7 @@ pub trait Niches<T: Storage>: Copy + Eq + fmt::Debug + 'static {
 /// The one-code set: `CODE` means null, no value. `Niched<V, Null<CODE>>` converts to and from `Option<V>`; Matter's
 /// nullable integers are `Null<0xFF>` on an `u8` and `Null<-128>` on an `i8`.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Null<const CODE: i128>;
 
 impl<T: Storage, const CODE: i128> Niches<T> for Null<CODE> {
@@ -667,6 +668,20 @@ impl<T: Storage, V: RawValue<Raw = T> + fmt::Debug, N: Niches<T>> fmt::Debug for
     }
 }
 
+/// The value, a niche by its meaning's name through its `Debug` (the niche enums `niches!` declares don't derive
+/// `defmt::Format`: that derive can't run in a caller's crate whose name isn't an identifier).
+#[cfg(feature = "defmt")]
+impl<T: Storage, V: RawValue<Raw = T> + defmt::Format, N: Niches<T> + fmt::Debug> defmt::Format
+    for Niched<V, N, T>
+{
+    fn format(&self, f: defmt::Formatter<'_>) {
+        match self.get() {
+            Reading::Value(v) => defmt::write!(f, "{}", v),
+            Reading::Niche(n) => defmt::write!(f, "{}", defmt::Debug2Format(&n)),
+        }
+    }
+}
+
 /// The value as it displays, a niche by its meaning's name (`NotAvailable`, `Reserved(252)`).
 impl<T: Storage, V: RawValue<Raw = T> + fmt::Display, N: Niches<T>> fmt::Display
     for Niched<V, N, T>
@@ -888,6 +903,18 @@ impl<V: RawValue + fmt::Debug, R: Rails> fmt::Debug for Clipped<V, R> {
 }
 
 /// The value as it displays, `≥ ` before it at the high rail and `≤ ` at the low one.
+/// The value, with `≤` or `≥` at a rail, as `Display` writes it.
+#[cfg(feature = "defmt")]
+impl<V: RawValue + defmt::Format, R: Rails> defmt::Format for Clipped<V, R> {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        match self.get() {
+            Clip::Exact(v) => defmt::write!(f, "{}", v),
+            Clip::AtMost(v) => defmt::write!(f, "≤ {}", v),
+            Clip::AtLeast(v) => defmt::write!(f, "≥ {}", v),
+        }
+    }
+}
+
 impl<V: RawValue + fmt::Display, R: Rails> fmt::Display for Clipped<V, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.get() {
@@ -928,3 +955,20 @@ use shrink_wrap::refused::{Refused, Rule};
 
 #[cfg(test)]
 mod tests;
+
+/// `defmt::Format` is there for what a firmware logs (tests can't link with defmt, so the claim is a build one).
+#[cfg(feature = "defmt")]
+const _: () = {
+    use crate::{Fixed, Range, prefix::One, units::Ratio};
+
+    fn is_format<T: defmt::Format>() {}
+
+    #[expect(dead_code, reason = "never called, it only has to compile")]
+    fn check() {
+        type Value = Fixed<Ratio, One, u8, Range<0, 250>>;
+        is_format::<Null<0>>();
+        is_format::<Niched<Value, J1939U8>>();
+        is_format::<Niched<Fixed<Ratio, One, u8, Range<1, 254>>, Null<0>>>();
+        is_format::<Clipped<Value>>();
+    }
+};
