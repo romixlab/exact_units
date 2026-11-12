@@ -483,7 +483,8 @@ counted units, and the kinds that keep look-alike quantities apart.
   NUM-35's `units::Ln2` is not written yet). The names follow the plan's reading of ISO 80000-10 and are
   unchecked against the standard itself (not in the library): its item numbers, and whether its reaction rate is
   per target or per volume, are still to check. Tests: `tests/rates.rs`, `tests/quantities.rs` (the new quantities
-  in every pair), compile_fail doctests in `src/quantity/rates.rs`. P2401#10nov-1911c.
+  in every pair), compile_fail doctests in `src/quantity/rates.rs` and the book. Book:
+  [nuclear physics recipes](docs/recipes/nuclear.md), `examples/15_nuclear.rs`. P2401#10nov-1911c.
 - ✅ **UNIT-14 Nuclear units** — an opt-in group `nuclear`, not in `quantities` or `std`, as `customary` is:
   `Dalton` (Da, 1 Da = m_u, NUM-32's symbol, no `quantity` line, so its dimension matches a gram's with no step,
   as `Gram`'s kg has none either, but a value in grams still needs `convert_with` and a named set: the scale keeps
@@ -505,8 +506,8 @@ counted units, and the kinds that keep look-alike quantities apart.
   "y" names `TropicalYearNubase2020` alone (a qualified symbol, no bare default) — a bare year is refused even at
   the single letter, not only the word. The book's
   [nuclear physics recipes](docs/recipes/nuclear.md) and `examples/15_nuclear.rs` use these units now, their local
-  `unit!` declarations of the dalton, the barn, the curie and NUBASE's year dropped (a fluence rate stays local,
-  UNIT-13). Tests: `tests/units.rs` (`nuclear_units`, dimensions, quantities and exact conversions; `derived_names`
+  `unit!` declarations of the dalton, the barn, the curie and NUBASE's year dropped (the fluence rate is UNIT-13's
+  `PerSquareCentimeterSecond` now). Tests: `tests/units.rs` (`nuclear_units`, dimensions, quantities and exact conversions; `derived_names`
   and `symbols_are_unique_but_for_shared_units` updated for `CoulombPerKilogram`), `tests/quantities.rs` (`Exposure`
   in `TREE`/`DEFS`), `tests/compile_fail/q_symbols_nuclear.rs` ("rd" refused with both features on). P2401#10nov-1911d.
 - ✅ **UNIT-19 Data rates in bit/s and B/s** (P2401#11nov-0946d, P2401#25oct-1944) — `units::BitPerSecond` (`Per<Bit, Second>`) and `units::BytePerSecond` (`Per<Byte, Second>`), features `information` and `time`: one dimension (bit·s⁻¹), exact to each other through `convert`, never a `Baud` (a symbol rate) or a `Hertz`. A prefix on a quotient goes on a numerator that takes it, judged by the unit's own prefixes and not by its scale being a power of ten, so the byte (8 bit) writes `kB/s` (was `k(B/s)`), and binary prefixes go there too: `KiB/s`, `Mibit/s`, `KiB/sample`, each read back from the same text; `Ki(V/s)` stays where the numerator takes no binary prefix. Tests: `tests/units.rs` (`data_rates`), `tests/props/unit_text.rs` (`data_rates`, both rates in the quotient walk).

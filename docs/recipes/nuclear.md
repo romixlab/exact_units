@@ -194,25 +194,29 @@ Avogadro's number doesn't appear. The textbook route goes through the molar mass
 
 NUBASE2020 gives $T_{1/2}$ of $^{226}\mathrm{Ra}$ as 1600(7) y (its Table I). Which year? NUBASE2020's own: $1\,\mathrm{y} = 365.2422\,\unit{d}$ (NUBASE2020, §2.3), the tropical year. It is not the Julian 365.25 [[d]] nor the Gregorian calendar's 365.2425 [[d]]. A bare "year" would read three ways, so the crate refuses one ([rule 5](../start/exact.md)) and names this one `TropicalYearNubase2020` (feature `nuclear`), its `conventional` naming where its value comes from:
 
-```rust
-use exact_units::{Exact, prefix::Kilo, units::{Second, TropicalYearNubase2020}};
+A half-life is a time, but not every time is a half-life: the mean life τ = T½/ln 2 is a time too, and the two don't convert into each other. `as_quantity::<HalfLife>()` says which one this is:
 
-let t_half = Exact::<TropicalYearNubase2020>::new_in::<Kilo>(16, 10).convert::<Second>().unwrap();
-assert_eq!(t_half, Exact::int(50_491_081_728));
+```rust
+use exact_units::{Exact, prefix::Kilo, quantities::HalfLife, units::{Second, TropicalYearNubase2020}};
+
+let t_half = Exact::<TropicalYearNubase2020>::new_in::<Kilo>(16, 10).as_quantity::<HalfLife>();
+assert_eq!(t_half.convert::<Second>(), Some(Exact::int(50_491_081_728))); // a half-life is a time
 ```
 
 ### The activity: a float edge, named
 
-$\ln 2$ is exact as a `Magnitude` symbol, but no run-time value carries a symbol. So $A = \ln 2 \cdot N/T_{1/2}$ is where the calculation becomes a float, once, at the end. Decays per second are also not yet an activity: a plain [[s⁻¹]] doesn't `convert` to [[Bq]]. The named step `as_quantity::<Activity>()` says that these are decays of a radionuclide:
+The decay constant $\lambda = \ln 2/T_{1/2}$ is a `DecayConstant`: [[s⁻¹]], but neither a frequency nor an activity. $\ln 2$ is exact as a `Magnitude` symbol, but no run-time value carries a symbol, so $\lambda$ from a half-life is where the calculation becomes a float, once: the step says so in its name, `decay_constant_f64`. From a mean life, $\lambda = 1/\tau$ is exact (`decay_constant`), and so is $\tau$ from $\lambda$ (`mean_life`).
+
+$\lambda \cdot N$ is still a decay constant: a dimension-one factor keeps the quantity it multiplies, so a plain product never reaches [[Bq]]. The named step `times_nuclei`, $A = \lambda \cdot N$, says that these are decays of a radionuclide:
 
 ```rust
-use core::f64::consts::LN_2;
-use exact_units::{Fixed, Rounding, prefix::One, quantities::Activity};
-use exact_units::units::{Becquerel, Curie, Per, Ratio, Second};
+use exact_units::{Exact, Fixed, Rounding, prefix::{Kilo, One}, quantities::HalfLife};
+use exact_units::units::{Becquerel, Curie, Per, Ratio, Second, TropicalYearNubase2020};
 
-let (atoms, t_half) = (2.6644e21, 50_491_081_728.0); // N and T½ in s, from above
-let per_s = Fixed::<Per<Ratio, Second>, One, f64>::try_new(atoms / t_half * LN_2).unwrap();
-let a: Fixed<Becquerel, One, f64> = per_s.as_quantity::<Activity>().convert().unwrap();
+let atoms = 2.6644e21; // N, from above
+let t_half = Exact::<TropicalYearNubase2020>::new_in::<Kilo>(16, 10).as_quantity::<HalfLife>();
+let lambda = t_half.decay_constant_f64::<Per<Ratio, Second>>().unwrap(); // ln 2/T½, a float edge
+let a: Fixed<Becquerel, One, f64> = lambda.times_nuclei(atoms).unwrap().convert().unwrap();
 let ci: Fixed<Curie, One, f64> = a.convert_rounded(Rounding::NearestEven).unwrap();
 // the curie was once "a gram of radium": with today's half-life a gram is 1.1 % short of it
 assert!(ci.get() > 0.988 && ci.get() < 0.989);
@@ -222,24 +226,52 @@ A gram of radium is 0.988 [[Ci]]: the curie, fixed at $3.7 \cdot 10^{10}\,\unit{
 
 ## Counting reactions: barns
 
-A beam of neutrons through a target makes reactions at a rate $\sigma \cdot \varphi \cdot N$: the cross section, times the fluence rate, times the number of target nuclei. Cross sections are given in barns, $1\,\unit{b} = 10^{-28}\,\unit{m^2}$ (SI Brochure, 9th ed., Table 8), and `Barn` is the crate's own (feature `nuclear`). The fluence rate isn't one of the crate's units yet (UNIT-13), so it is declared here. The product is exact:
+A beam of neutrons through a target makes reactions at a rate $\sigma \cdot \varphi \cdot N$: the cross section, times the fluence rate, times the number of target nuclei. Cross sections are given in barns, $1\,\unit{b} = 10^{-28}\,\unit{m^2}$ (SI Brochure, 9th ed., Table 8), and `Barn` is the crate's own (feature `nuclear`). A fluence rate $\varphi$ in particles per [[cm²]] per second is the unit `PerSquareCentimeterSecond`, a `FluenceRate` (`PerSquareCentimeter` and `PerSquareMeter` measure a `Fluence` $\Phi$). The product is exact:
 
 ```rust
-use exact_units::{Exact, units::{Barn, Per, Ratio, Second}};
-
-exact_units::unit! {
-    /// Particles per square centimetre per second.
-    struct FluenceRate = "cm⁻²·s⁻¹" (ascii "cm^-2.s^-1"), [m -2, s -1], Pow10(4);
-}
+use exact_units::{Exact, quantities::ReactionRate};
+use exact_units::units::{Barn, Becquerel, Per, PerSquareCentimeterSecond, Ratio, Second};
 
 let sigma = Exact::<Barn>::int(100);
-let phi = Exact::<FluenceRate>::new(10_000_000_000_000, 1);
+let phi = Exact::<PerSquareCentimeterSecond>::new(10_000_000_000_000, 1);
 let targets = Exact::<Ratio>::new(100_000_000_000_000_000_000, 1);
 let rate = ((sigma * phi).unwrap() * targets).unwrap().convert::<Per<Ratio, Second>>().unwrap();
+let rate = rate.as_quantity::<ReactionRate>();
 assert_eq!(rate, Exact::int(100_000_000_000));
+
+let saturation = rate.saturation_activity().convert::<Becquerel>().unwrap();
+assert_eq!(saturation, Exact::int(100_000_000_000));
 ```
 
-The inputs are illustrative: 100 [[b]], $10^{13}$ per [[cm²]] per second, $10^{20}$ nuclei. The result is a plain [[s⁻¹]], and that is deliberate. A reaction rate isn't periodic, so it isn't a frequency in [[Hz]]. It isn't decays of a radionuclide either, so it isn't an activity in [[Bq]] (SI Brochure, 9th ed., Table 4, note d). At saturation the activity of the product equals that rate. That is a statement of physics, so the code says it: `rate.as_quantity::<Activity>()`, then `convert::<Becquerel>()`.
+The inputs are illustrative: 100 [[b]], $10^{13}$ per [[cm²]] per second, $10^{20}$ nuclei. The product is a plain [[s⁻¹]], and `as_quantity::<ReactionRate>()` names it. A reaction rate isn't periodic, so it isn't a frequency in [[Hz]]. It isn't decays of a radionuclide either, so it isn't an activity in [[Bq]] (SI Brochure, 9th ed., Table 4, note d). At saturation the activity of the product equals that rate. That is a statement of physics, so it is the named step `saturation_activity`.
+
+A detector's count rate is a `CountRate`, also [[s⁻¹]] and also not an activity. With the efficiency $\varepsilon$, counts per decay, the source's activity is $A = R/\varepsilon$, the named step `over_efficiency`, exact or `None` for $\varepsilon \le 0$:
+
+```rust
+use exact_units::{Exact, units::{Becquerel, CountRate, Ratio}};
+
+let r = Exact::<CountRate>::int(1200);
+let a = r.over_efficiency(Exact::<Ratio>::new(3, 10)).unwrap();
+assert_eq!(a.convert::<Becquerel>(), Some(Exact::int(4000)));
+```
+
+None of the three converts to [[Bq]] or [[Hz]] by itself:
+
+```rust,compile_fail
+use exact_units::{Fixed, prefix::One, units::{Becquerel, CountRate}};
+
+let r = Fixed::<CountRate, One, u32>::new(1200);
+let _: Fixed<Becquerel, One, u32> = r.convert().unwrap();
+```
+
+```rust,compile_fail
+use exact_units::{Fixed, prefix::Pico, units::{Becquerel, DecayConstant, Ratio}};
+
+// λ·N keeps λ's quantity: a decay constant, not an activity
+let lambda = Fixed::<DecayConstant, Pico, u64>::new(13_700);
+let n = Fixed::<Ratio, Pico, u64>::new(1_000_000);
+let _ = (lambda * n).convert::<Becquerel, Pico, u64>();
+```
 
 ## A dose needs a weighting: Gy is not Sv
 
@@ -289,7 +321,7 @@ The coefficients are a fit, and every fit is a convention: which nuclides, which
 | A mass in u to an energy | | $m_{\mathrm{u}}$ | |
 | An energy in [[eV]] to a mass in [[kg]] | the factor $e/c^2$, and the kilograms | | |
 | Atoms in a gram | yes, with the named set's $m_{\mathrm{u}}$ | $m_{\mathrm{u}}$ | |
-| Activity $A = \ln 2 \cdot N/T_{1/2}$ | $N/T_{1/2}$ | | $\ln 2$ |
+| Activity $A = \lambda \cdot N$, $\lambda = \ln 2/T_{1/2}$ | $N$, and $\lambda = 1/\tau$ from a mean life | | $\ln 2$ |
 | Reaction rate $\sigma \cdot \varphi \cdot N$ | yes | | |
 | [[Gy]] to [[Sv]] | ICRP 60's $w_{\mathrm{R}}$ | $w_{\mathrm{R}}$ named by its set (ICRP 103, ICRP 60) | ICRP 103 neutrons' $w_{\mathrm{R}}(E)$ |
 | Semi-empirical mass formula | volume, asymmetry | | $A^{1/3}$ |
@@ -350,6 +382,5 @@ CODATA 2018 prints $R_\infty h c$ as 13.605 693 122 994(26) [[eV]]. A `BigFracti
 
 ### What the crate doesn't do yet
 
-- **No quantity for a reaction rate or a decay constant.** Both are [[s⁻¹]], but neither is a frequency nor an activity.
 - **No exact cube root.** $A^{1/3}$ is a float, and so is $\ln 2$ times a run-time value.
-- **No activity from an `Exact`.** $N/T_{1/2}$ is exact, but the step to [[Bq]] goes through an `f64` because of $\ln 2$.
+- **No exact decay constant from a half-life.** $\lambda = \ln 2/T_{1/2}$ goes through an `f64` (`decay_constant_f64`), though `units::Ln2` could carry $\ln 2$ exactly.

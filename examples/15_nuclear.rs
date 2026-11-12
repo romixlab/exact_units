@@ -12,10 +12,12 @@
 //! M_u = N_A·m_u is measured since 2019, CODATA 2018 and 2022 put it on either side of 1 g/mol), a half-life in
 //! NUBASE2020's year (365.2422 d, its §2.3) and
 //! ln 2, which is exact as a symbol but has no exact product with a run-time number: that last step is a float edge.
-//! A cross section in barns times a fluence rate is a reaction rate, which is neither a frequency (Hz) nor an
-//! activity (Bq). An absorbed dose in Gy becomes an equivalent dose in Sv only through a radiation weighting factor
-//! from a named set (ICRP 103, 2007: protons 2; ICRP 60, 1991: protons 5), `equivalent_dose`, and the crate refuses
-//! the step without one. The semi-empirical mass formula ends the tour: its volume and asymmetry terms are exact, the
+//! λ = ln 2/T½ is a decay constant, and λ·N an activity only by the named step `times_nuclei`. A cross section in
+//! barns times a fluence rate times a number of target nuclei is a reaction rate, which is neither a frequency (Hz)
+//! nor an activity (Bq); the activity it saturates to is the named step `saturation_activity`. An absorbed dose in
+//! Gy becomes an equivalent dose in Sv only through a radiation weighting factor from a named set (ICRP 103, 2007:
+//! protons 2; ICRP 60, 1991: protons 5), `equivalent_dose`, and the crate refuses the step without one. The
+//! semi-empirical mass formula ends the tour: its volume and asymmetry terms are exact, the
 //! surface, Coulomb and pairing terms need A^(1/3), a float edge by necessity.
 //!
 //! AME2020's values are written as it prints them, `exact!(8071.31806 keV)`: the literal `q!` reads, as an `Exact` of
@@ -36,23 +38,16 @@
     reason = "Z, N and A are below 300; an `Exact`'s + − × ÷ give an Option, unwrapped where the value fits"
 )]
 
-use core::f64::consts::LN_2;
-
 use exact_units::constants::{Codata2018, Codata2022, Constants};
 use exact_units::prefix::{Kilo, Micro, Milli, One};
-use exact_units::quantities::Activity;
+use exact_units::quantities::{HalfLife, ReactionRate};
 use exact_units::radiation::{Icrp60, Icrp103};
 use exact_units::systems::{Natural, Si, natural::NaturalElectronVolt};
 use exact_units::units::{
-    Barn, Becquerel, Curie, Dalton, ElectronVolt, EquivalentDose, Gram, Gray, Joule, Per, Ratio,
-    Second, Speed, TropicalYearNubase2020,
+    Barn, Becquerel, Curie, Dalton, ElectronVolt, EquivalentDose, Gram, Gray, Joule, Per,
+    PerSquareCentimeterSecond, Ratio, Second, Speed, TropicalYearNubase2020,
 };
 use exact_units::{Exact, Fixed, Fraction, Prefix, Rounding, exact};
-
-exact_units::unit! {
-    /// A fluence rate in particles per square centimetre per second, cm⁻²·s⁻¹ (10⁴ m⁻²·s⁻¹).
-    struct FluenceRate = "cm⁻²·s⁻¹" (ascii "cm^-2.s^-1"), [m -2, s -1], Pow10(4);
-}
 
 /// An atomic mass from AME2020 in µu, as the ratio M/m_u it is: a mass spectrometer measures ratios of masses.
 const fn micro_u(num: i128, den: u128) -> Exact<Ratio> {
@@ -321,15 +316,20 @@ fn radium_activity() {
     println!("  N = {:e} atoms", count.rounded(6, Rounding::NearestEven));
     let atoms = count.to_f64();
 
-    // T½ = 1600(7) y, NUBASE2020 Table I, in NUBASE's year
-    let half_life = Exact::<TropicalYearNubase2020>::new_in::<Kilo>(16, 10);
-    let seconds = half_life.convert::<Second>().unwrap();
-    assert_eq!(seconds, Exact::int(50_491_081_728));
-    // N/T½ is exact; A = ln 2 · N/T½, and ln 2 is a `Magnitude` symbol that no run-time value carries: a float edge
-    let per_s =
-        Fixed::<Per<Ratio, Second>, One, f64>::try_new(atoms / seconds.to_f64() * LN_2).unwrap();
-    // decays per second are an activity by the named step, not by `convert`
-    let activity: Fixed<Becquerel, One, f64> = per_s.as_quantity::<Activity>().convert().unwrap();
+    // T½ = 1600(7) y, NUBASE2020 Table I, in NUBASE's year: a half-life, a time that isn't a mean life
+    let half_life =
+        Exact::<TropicalYearNubase2020>::new_in::<Kilo>(16, 10).as_quantity::<HalfLife>();
+    assert_eq!(
+        half_life.convert::<Second>(),
+        Some(Exact::int(50_491_081_728))
+    );
+    // λ = ln 2/T½, and ln 2 is a `Magnitude` symbol that no run-time value carries: a float edge, named `_f64`
+    let lambda = half_life
+        .decay_constant_f64::<Per<Ratio, Second>>()
+        .unwrap();
+    // λ·N is still a decay constant; the named step says it is an activity, A = λ·N
+    let activity: Fixed<Becquerel, One, f64> =
+        lambda.times_nuclei(atoms).unwrap().convert().unwrap();
     let curies: Fixed<Curie, One, f64> = activity.convert_rounded(Rounding::NearestEven).unwrap();
     println!("  A = {:.4e} Bq = {:.4} Ci", activity.get(), curies.get());
     // the curie was once "a gram of radium"; with today's half-life a gram is 1.1 % short of it
@@ -339,20 +339,19 @@ fn radium_activity() {
 fn reaction_rate() {
     println!("A reaction rate (illustrative inputs: 100 b, 10¹³ cm⁻²·s⁻¹, 10²⁰ target nuclei):");
     let sigma = Exact::<Barn>::int(100);
-    let flux = Exact::<FluenceRate>::new(10_000_000_000_000, 1);
+    let flux = Exact::<PerSquareCentimeterSecond>::new(10_000_000_000_000, 1);
     let targets = Exact::<Ratio>::new(100_000_000_000_000_000_000, 1);
-    // σ·φ·N is s⁻¹: a reaction rate, which is neither a frequency (Hz, periodic) nor an activity (Bq, decays)
+    // σ·φ·N is a plain s⁻¹; the step names it a reaction rate, which is neither a frequency (Hz, periodic) nor an
+    // activity (Bq, decays)
     let rate = ((sigma * flux).unwrap() * targets)
         .unwrap()
         .convert::<Per<Ratio, Second>>()
-        .unwrap();
+        .unwrap()
+        .as_quantity::<ReactionRate>();
     assert_eq!(rate, Exact::int(100_000_000_000));
     println!("  R = σ·φ·N = {rate}");
-    // at saturation the product's activity equals R: a reaction rate becomes an activity by the named step
-    let saturation = rate
-        .as_quantity::<Activity>()
-        .convert::<Becquerel>()
-        .unwrap();
+    // at saturation the product's activity equals R: a statement of physics, so a named step
+    let saturation = rate.saturation_activity().convert::<Becquerel>().unwrap();
     assert_eq!(saturation, Exact::int(100_000_000_000));
     println!("  saturation activity: {saturation}");
 }
