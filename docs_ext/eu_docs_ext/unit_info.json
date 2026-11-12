@@ -1220,7 +1220,7 @@
         "HorsepowerWater",
         "TonOfRefrigeration"
       ],
-      "scale": "0.29307107017(2)",
+      "scale": "0.29307107017[2]",
       "symbol": "Btu_IT/h"
     },
     "BtuMean": {
@@ -1288,7 +1288,7 @@
         "TonOfTnt",
         "HorsepowerHour"
       ],
-      "scale": "1054.3502644(8)",
+      "scale": "1054.3502644[8]",
       "symbol": "Btu_th"
     },
     "Buffer": {
@@ -3093,7 +3093,7 @@
         "QuarterImperialVolume",
         "TonWater"
       ],
-      "scale": "0.0000011838776041(6)",
+      "scale": "0.0000011838776041[6]",
       "symbol": "fl s (imp)"
     },
     "FootInternational": {
@@ -4672,7 +4672,7 @@
         "MilePerHour",
         "FootPerSecond"
       ],
-      "scale": "0.51(4)",
+      "scale": "0.51[4]",
       "symbol": "kn"
     },
     "Ksi": {
@@ -5426,7 +5426,7 @@
         "QuarterImperialVolume",
         "TonWater"
       ],
-      "scale": "0.000000059193880208(3)",
+      "scale": "0.000000059193880208[3]",
       "symbol": "min (imp)"
     },
     "MinimUs": {
@@ -6296,7 +6296,7 @@
         "PointPrinters",
         "PicaPrinters"
       ],
-      "scale": "0.0042(3)",
+      "scale": "0.0042[3]",
       "symbol": "pc (DTP)"
     },
     "PicaPrinters": {
@@ -6560,7 +6560,7 @@
         "PointPrinters",
         "PicaPrinters"
       ],
-      "scale": "0.000352(7)",
+      "scale": "0.000352[7]",
       "symbol": "pt (DTP)"
     },
     "PointPrinters": {
@@ -7485,7 +7485,7 @@
       "plural": "sieverts per hour",
       "quantity": "dose equivalent rate",
       "related": [],
-      "scale": "0.0002(7)",
+      "scale": "0.0002[7]",
       "symbol": "Sv/h"
     },
     "Slug": {
@@ -8238,7 +8238,7 @@
         "HorsepowerWater",
         "BtuItPerHour"
       ],
-      "scale": "3516.8528420(6)",
+      "scale": "3516.8528420[6]",
       "symbol": "TR"
     },
     "TonOfTnt": {
