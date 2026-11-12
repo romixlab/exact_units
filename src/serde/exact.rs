@@ -1,9 +1,9 @@
 //! serde of a [Fraction] and an [Exact] as the number alone, in the unit itself: in a human-readable format the
 //! text `{:#}` writes for the number (`"333.[3]"`, `"80000000"`, `"1000/7919"`), an integer read too; in a binary
 //! one the quadruple `(negative, numerator, denominator, exponent)`, the canonical form ([Fraction::mantissa],
-//! [Fraction::exp10]).
+//! [Fraction::exp10]). An [Uncertain] is the pair `(value, u)` of its two `Exact`s, a `u` below 0 refused.
 
-use crate::{Exact, ExactNum, Fraction};
+use crate::{Exact, ExactNum, Fraction, Uncertain};
 use ::serde::de::{self, Deserialize, Deserializer, SeqAccess, Visitor};
 use ::serde::ser::{Serialize, Serializer};
 use core::fmt;
@@ -38,6 +38,19 @@ impl<U, R: ExactNum + Serialize> Serialize for Exact<U, R> {
 impl<'de, U, R: ExactNum + Deserialize<'de>> Deserialize<'de> for Exact<U, R> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         R::deserialize(deserializer).map(Exact::of)
+    }
+}
+
+impl<U, R: ExactNum + Serialize> Serialize for Uncertain<U, R> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        (self.value(), self.u()).serialize(serializer)
+    }
+}
+
+impl<'de, U, R: ExactNum + Deserialize<'de>> Deserialize<'de> for Uncertain<U, R> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let (value, u) = <(Exact<U, R>, Exact<U, R>)>::deserialize(deserializer)?;
+        Uncertain::new(value, u).ok_or_else(|| de::Error::custom("a standard uncertainty below 0"))
     }
 }
 

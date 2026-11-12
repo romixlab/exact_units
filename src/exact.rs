@@ -78,6 +78,7 @@ mod num;
 mod rounded;
 mod steps;
 mod text;
+mod uncertain;
 
 /// Not API: the order of a [Fixed]'s and an [Exact]'s magnitudes in their parts, the fast path by bit length and the
 /// wide products apart, for the property that checks one against the other (`tests/props/exact.rs`).
@@ -104,6 +105,7 @@ pub use text::{ParseExactError, ParseFractionError};
 pub(crate) use text::{number, scale};
 #[cfg(feature = "dimensionless")]
 pub use tolerance::{OffTarget, Tolerance};
+pub use uncertain::{ParseUncertainError, PlusMinus, Uncertain};
 
 /// A value of unit `U` as an exact fraction: the unit in the type, the value a [Fraction] (a sign and `u128`s in
 /// lowest terms) chosen at run time. For values worked out on a host that no fixed scale holds: an STM32H7 PLL

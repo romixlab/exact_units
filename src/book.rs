@@ -25,6 +25,8 @@ pages! {
     Conversions = "maths/conversions.md";
     #[cfg(all(feature = "time", feature = "dimensionless"))]
     Fractions = "maths/fractions.md";
+    #[cfg(all(feature = "time", feature = "dimensionless", feature = "nuclear"))]
+    Uncertainty = "maths/uncertainty.md";
     Bounds = "maths/bounds.md";
     #[cfg(feature = "time")]
     RunTimeScales = "maths/run_time_scales.md";

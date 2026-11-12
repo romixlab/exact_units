@@ -21,5 +21,7 @@ pub mod registry;
 pub mod serde_input;
 #[path = "../../tests/props/text.rs"]
 pub mod text;
+#[path = "../../tests/props/uncertain_text.rs"]
+pub mod uncertain_text;
 #[path = "../../tests/props/wire.rs"]
 pub mod wire;

@@ -28,6 +28,9 @@
 //! (`"1000/3 kHz"`), always exactly: there are no steps to miss and no storage to pass, so the refusals are another
 //! unit, not a number, and a number past what a fraction of `u128`s holds.
 //!
+//! An [Uncertain] field is its concise form, as `{}` writes and `parse` reads it: `"1.600(7) ks"`, `"6.674
+//! 30(15)e-11"`; a `#`, a limit and an asymmetric uncertainty are refused by name.
+//!
 //! ```
 //! # #[cfg(feature = "time")] {
 //! use exact_units::{Exact, units::Hertz};
@@ -76,14 +79,17 @@ use crate::fixed::write_prefix_unit;
 use crate::text::unit::{TextPrefix, UnitText, prefix_of};
 use crate::text::{Buf, Decimal};
 use crate::tree::is_ratio;
-use crate::{Bounds, Exact, ExactNum, Fixed, FixedScale, ParseExactError, Storage, Unit};
+use crate::{
+    Bounds, Exact, ExactNum, Fixed, FixedScale, ParseExactError, Storage, Uncertain, Unit,
+};
 use ::serde::de::{self, Deserializer, Visitor};
 use ::serde::ser::Serializer;
 use core::fmt::{self, Write};
 use core::marker::PhantomData;
 
 /// A value [with_unit](super::with_unit) writes and reads as text: a [Fixed] (written as `{:#}`, read exactly into
-/// its scale and storage) or an [Exact] (written as `{}`, with the prefix it picks, read exactly). Sealed.
+/// its scale and storage), an [Exact] (written as `{}`, with the prefix it picks, read exactly) or an [Uncertain] (its
+/// concise form, `"1.600(7) ks"`). Sealed.
 pub trait Value: sealed::Sealed + Sized {
     #[doc(hidden)]
     fn write_text<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error>;
@@ -101,6 +107,8 @@ mod sealed {
     impl<U, P, T: crate::Storage, B: crate::Bounds<T>> Sealed for crate::Fixed<U, P, T, B> {}
 
     impl<U, R: crate::ExactNum> Sealed for crate::Exact<U, R> {}
+
+    impl<U, R: crate::ExactNum> Sealed for crate::Uncertain<U, R> {}
 }
 
 /// Writes `value` as text with its unit: a [Fixed] as `{:#}` writes it (`"1.5 ms"` is written `"0.0015 s"`), an
@@ -229,6 +237,25 @@ impl<U: Unit, R: ExactNum> Value for Exact<U, R> {
         write!(
             f,
             "an exact number with its unit, like \"1.5{0}\" or \"1000/3{0}\"",
+            UnitText::<U>(PhantomData)
+        )
+    }
+}
+
+impl<U: Unit, R: ExactNum> Value for Uncertain<U, R> {
+    fn write_text<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+
+    fn read_text<E: de::Error>(s: &str) -> Result<Self, E> {
+        s.parse::<Self>()
+            .map_err(|e| E::custom(format_args!("{s:?}: {e}")))
+    }
+
+    fn expecting(f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "a value with its standard uncertainty and unit, like \"1600(7){}\"",
             UnitText::<U>(PhantomData)
         )
     }

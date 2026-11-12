@@ -11,7 +11,7 @@ cargo-fuzz = true
 # (fuzz_targets/props.rs): each of these is used there, not in a fuzz_targets file directly.
 [package.metadata.cargo-machete]
 ignored = [
-    # tests/props/reference.rs, exact_text.rs, q_text.rs, registry.rs, serde_input.rs, text.rs and wire.rs call it
+    # tests/props/reference.rs, exact_text.rs, uncertain_text.rs, q_text.rs, registry.rs, serde_input.rs, text.rs and wire.rs call it
     "exact_units",
     # tests/props/serde_input.rs derives Serialize/Deserialize and reads JSON through serde's Deserializer
     "serde",
@@ -127,6 +127,13 @@ bench = false
 [[bin]]
 name = "nan_free"
 path = "fuzz_targets/nan_free.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "uncertain_text"
+path = "fuzz_targets/uncertain_text.rs"
 test = false
 doc = false
 bench = false

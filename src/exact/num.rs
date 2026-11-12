@@ -91,7 +91,7 @@ pub(crate) mod sealed {
 
     /// What the crate needs of a number and doesn't offer: the order against a [Fixed](crate::Fixed)'s
     /// representation, text both ways.
-    pub trait Sealed: Sized {
+    pub trait Sealed: Sized + fmt::Display {
         /// The order of a `Fixed` of `x` steps of `scale` against `self`, `None` only for NaN.
         fn order_of(&self, x: Repr, scale: super::Fraction) -> Option<Ordering>;
 

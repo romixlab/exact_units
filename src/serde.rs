@@ -19,6 +19,8 @@
 //! - [Exact](crate::Exact) and [Fraction](crate::Fraction): in a human-readable format the exact number as text, in
 //!   the unit itself (`"333.[3]"`, `"80000000"`, `"1000/7919"`; an integer reads too, a float is refused, its digits
 //!   already rounded), in a binary one `(negative, numerator, denominator)` in lowest terms.
+//! - [Uncertain](crate::Uncertain): the pair `(value, u)`, each as an `Exact`; a `u` below 0 is refused.
+//!   `with_unit` writes its concise form, `"1.600(7) ks"`.
 //!
 //! Reading checks what construction checks and never builds a value that breaks it: a [Fixed] or an
 //! index outside its [Bounds], an [IndexFrom1](crate::IndexFrom1) of 0, a level with more than

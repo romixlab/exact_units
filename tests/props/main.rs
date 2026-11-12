@@ -89,6 +89,8 @@ mod symbols;
 mod systems;
 #[cfg(not(kani))]
 mod text;
+#[cfg(not(kani))]
+mod uncertain_text;
 #[cfg(all(not(kani), feature = "serde"))]
 mod unit_text;
 #[cfg(feature = "dimensionless")]

@@ -38,6 +38,7 @@ nav = [
             "maths/arithmetic.md",
             "maths/conversions.md",
             "maths/fractions.md",
+            "maths/uncertainty.md",
             "maths/bounds.md",
             "maths/floats.md",
             { "Advanced" = [
