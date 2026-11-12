@@ -73,6 +73,7 @@ pub(crate) mod compare;
 mod decimal;
 #[cfg(feature = "dimensionless")]
 mod exp;
+mod first_order;
 mod fraction;
 mod num;
 mod rounded;
@@ -95,6 +96,7 @@ pub use big_exact::BigExact;
 pub use bignum::{BigFraction, NotAFraction};
 pub use certified::{NearTie, Refused};
 use decimal::{Expansion, write_fraction};
+pub use first_order::{FirstOrder, MAX_SOURCES, Source};
 pub use fraction::{Fraction, Fraction8};
 pub use num::ExactNum;
 pub use rounded::Rounded;

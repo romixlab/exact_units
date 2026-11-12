@@ -142,8 +142,8 @@ pub use exact::order_parts as __order_parts;
 #[cfg(feature = "bignum")]
 pub use exact::{BigExact, BigFraction, NotAFraction};
 pub use exact::{
-    Exact, ExactNum, Fraction, InPrefix, NearTie, ParseExactError, ParseFractionError,
-    ParseUncertainError, PlusMinus, Refused, Rounded, Uncertain,
+    Exact, ExactNum, FirstOrder, Fraction, InPrefix, MAX_SOURCES, NearTie, ParseExactError,
+    ParseFractionError, ParseUncertainError, PlusMinus, Refused, Rounded, Source, Uncertain,
 };
 #[cfg(feature = "dimensionless")]
 pub use exact::{OffTarget, Tolerance};

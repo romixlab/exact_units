@@ -31,6 +31,8 @@ mod exact_text;
 mod exp;
 #[cfg(feature = "levels")]
 mod exposure;
+#[cfg(all(feature = "time", feature = "dimensionless"))]
+mod first_order;
 #[cfg(not(any(kani, fuzzing)))]
 mod float_conv;
 mod format;

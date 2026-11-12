@@ -18,7 +18,8 @@ use core::str::FromStr;
 /// every operand were independent give `a − a` an uncertainty of √2·u instead of 0, so this type has none; the value
 /// and its uncertainty are [value](Self::value) and [u](Self::u), and an exact change of unit is
 /// [convert](Self::convert). [rel_u](Self::rel_u) is u/|value|, [expanded](Self::expanded) is k·u for a coverage
-/// factor k the caller names: there is no default k.
+/// factor k the caller names: there is no default k. A calculation takes it as an input with
+/// [with_source](Self::with_source), into first-order propagation ([FirstOrder](super::FirstOrder)).
 ///
 /// Text, every form read exactly or refused:
 ///

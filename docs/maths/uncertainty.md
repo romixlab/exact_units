@@ -19,7 +19,7 @@ The standard uncertainty is an uncertainty given as a standard deviation (GUM, J
 
 ## No arithmetic, on purpose
 
-An `Uncertain` has no `+`, `-`, `*` or `/`. The obvious operators would combine the uncertainties as if every operand were independent. Then `a - a` would get an uncertainty of $\sqrt{2}\,u$ instead of 0, and `a * a` one of $\sqrt{2}\,a\,u$ instead of $2\,a\,u$. That is a silent error, so this type doesn't offer it. First-order propagation that tracks where each uncertainty came from is a separate, later piece of work (IO-15).
+An `Uncertain` has no `+`, `-`, `*` or `/`. The obvious operators would combine the uncertainties as if every operand were independent. Then `a - a` would get an uncertainty of $\sqrt{2}\,u$ instead of 0, and `a * a` one of $\sqrt{2}\,a\,u$ instead of $2\,a\,u$. That is a silent error, so this type doesn't offer it. A calculation goes through [first-order propagation](#propagation-first-order), which tracks where each uncertainty came from.
 
 What there is:
 
@@ -110,3 +110,34 @@ assert!("1600(+4-3) s".parse::<Uncertain<Second>>().is_err());
 ## serde
 
 With the feature `serde`, an `Uncertain` is the pair `(value, u)` of its two `Exact`s, and a `u` below 0 is refused. `serde::with_unit` writes and reads the concise form with its unit, `"1.600(7) ks"`.
+
+## Propagation, first order
+
+`with_source(Source::new(id))` makes an input of a calculation from an `Uncertain`. The result is a `FirstOrder<U>`: a value and, for each input it came from, that input's contribution $c_i\,u(x_i)$, the sensitivity coefficient $\partial f/\partial x_i$ times the input's standard uncertainty, signed and in `U`. This is the GUM's law of propagation of uncertainty (JCGM 100:2008 §5.1.2, eq. (10)), worked exactly:
+
+- `checked_add` and `checked_sub` add the contributions of one source, so `a - a` is 0 with no uncertainty.
+- `checked_mul` and `checked_div` scale them by the other operand's value, the product and quotient rules, so `a * a` has $2\,a\,u(a)$ and `a / a` is 1 with none.
+- `FirstOrder::exact(x)` is a value with no uncertainty: a count, a constant the SI fixes, $\ln 2$ as an `Exact<Ln2>`.
+- `variance()` is $u_c^2 = \sum_i (c_i\,u(x_i))^2$, exactly, and `rel_variance()` is $(u_c/y)^2$.
+- `standard_uncertainty::<P, T>(rounding)` is $u_c$ itself, a square root, so it takes a rounding by name. It is decided exactly from the variance, with no float.
+
+Two inputs with the same `Source` are the same input, and two with different sources are independent. A result keeps at most eight sources (`MAX_SOURCES`), and a ninth refuses with `None`, as does a number that no `Fraction` holds. A long chain can run on `BigFraction`.
+
+```rust
+use exact_units::{Exact, FirstOrder, Fixed, Rounding, Source, Uncertain, prefix::One};
+use exact_units::units::{Ln2, Ratio, Second};
+
+let t_half = "1600(7) s".parse::<Uncertain<Second>>().unwrap().with_source(Source::new(1));
+// the same input twice: 0 with no uncertainty, not √2 · 7 s
+assert_eq!(t_half.checked_sub(&t_half).unwrap().components().count(), 0);
+// an independent input: √(7² + 24²) = 25 s
+let t = "400(24) s".parse::<Uncertain<Second>>().unwrap().with_source(Source::new(2));
+let sum = t_half.checked_add(&t).unwrap();
+assert_eq!(sum.standard_uncertainty::<One, i32>(Rounding::Floor), Some(Fixed::new(25)));
+// A = ln 2 · N / T½ carries T½'s relative uncertainty, 7/1600
+let n = FirstOrder::exact(Exact::<Ratio>::int(1_000_000));
+let a = FirstOrder::exact(Exact::<Ln2>::int(1)).checked_mul(&n).unwrap().checked_div(&t_half).unwrap();
+assert_eq!(a.rel_variance(), Some(Exact::new(49, 2_560_000)));
+```
+
+First order means the terms of the Taylor series past the first are dropped, as eq. (10) drops them. Where the function is far from linear within a few $u$ of the inputs, such as a quotient whose divisor's uncertainty is a large part of it, or a product of two values near 0, eq. (10) understates $u_c$. The note to GUM §5.1.2 gives the second-order terms, and JCGM 101 propagates the distributions themselves by Monte Carlo. Correlation between distinct inputs given as coefficients $r(x_i, x_j)$, as CODATA's correlation tables give them (GUM §5.2), is not modelled.
