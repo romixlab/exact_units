@@ -43,8 +43,14 @@ serde_json = { version = "1.0", default-features = false, features = ["std"] }
 shrink_wrap = { version = "0.2.0", git = "https://github.com/vhrdtech/wire_weaver", default-features = false, features = ["std"] }
 
 [lints.rust]
-# cfg(kani) and cfg(fuzzing) pick what of tests/props is compiled in
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)", "cfg(fuzzing)"] }
+# cfg(kani) and cfg(fuzzing) pick what of tests/props is compiled in. The feature values are exact_units' unit
+# groups: tests/props' modules are shared with tests/props/reference.rs's own test crate, which turns them all on,
+# so they appear in #[cfg(feature = ..)] here too even though this crate forwards only a handful of them.
+unexpected_cfgs = { level = "warn", check-cfg = [
+    "cfg(kani)",
+    "cfg(fuzzing)",
+    "cfg(feature, values(\"angle\", \"counting\", \"dimensionless\", \"electrical\", \"information\", \"levels\", \"libm\", \"mechanical\", \"photometric\", \"q\", \"quantities\", \"radiation\", \"systems\", \"thermal\", \"time\"))",
+] }
 
 # Each target calls a property function of tests/props, compiled in by path (see props.rs).
 

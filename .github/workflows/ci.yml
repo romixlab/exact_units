@@ -142,3 +142,17 @@ jobs:
           target: thumbv7em-none-eabihf
       # levels in dB without std: log10 and 10^x from libm, in f32 on a Cortex-M4F
       - run: cargo build --target thumbv7em-none-eabihf --no-default-features --features electrical,libm
+
+  fuzz-build:
+    name: fuzz build (nightly, not run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: nightly
+          # fuzz/ is its own workspace (its Cargo.lock, not the root's)
+          cache-workspaces: fuzz
+      - run: cargo install --locked cargo-fuzz
+      - run: cargo fuzz build
+        working-directory: fuzz

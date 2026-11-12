@@ -75,7 +75,8 @@ page under "Where the crate falls short today", never hidden.
 ```sh
 just test            # cargo nextest with all features, without the wire format, without std; every example built; doctests
 just lint            # fmt, cargo sort, typos, no long decimals in docs/ and examples/, clippy and rustdoc with -D warnings
-just check           # cargo check of the feature sets firmware uses
+just check           # cargo check of the feature sets firmware uses, stable only
+just fuzz-check      # the fuzz crate builds (not run), nightly; CI runs this in its own job, not in just check
 just cov             # test coverage as CI computes it, lcov.info plus a printed summary
 just customary-docs  # regenerate docs/customary.md's tables from the catalogue
 just q-symbols       # regenerate q!'s symbol table, docs/start/symbols.md and the tooltips' unit_info.json from the unit! lines
@@ -86,7 +87,8 @@ just mutants         # cargo-mutants over the library (.cargo/mutants.toml; hour
 just props-hunt      # tests/props with a random seed and many cases; for a spare PC overnight, not the gate
 ```
 
-CI (`.github/workflows/ci.yml`) fails on any warning and also builds for `thumbv6m-none-eabi`. Run `just lint` and
+CI (`.github/workflows/ci.yml`) fails on any warning and also builds for `thumbv6m-none-eabi`; a separate nightly job
+builds (not runs) the fuzz crate, so it can't rot unnoticed, without holding up the stable jobs. Run `just lint` and
 `just test` before declaring a change done.
 
 Lints are strict on purpose (`[lints]` in `Cargo.toml`, `clippy.toml`): pedantic, the cast lints, no panics in library
