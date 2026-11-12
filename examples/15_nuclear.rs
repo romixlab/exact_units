@@ -11,9 +11,10 @@
 //! The activity of a gram of ²²⁶Ra needs the atoms in it, m/(A_r·m_u) (Avogadro cancels: the molar mass constant
 //! M_u = N_A·m_u is measured since 2019, CODATA 2018 and 2022 put it on either side of 1 g/mol), a half-life in
 //! NUBASE2020's year (365.2422 d, its §2.3) and
-//! ln 2, which is exact as a symbol but has no exact product with a run-time number: that last step is a float edge.
-//! λ = ln 2/T½ is a decay constant, and λ·N an activity only by the named step `times_nuclei`. A cross section in
-//! barns times a fluence rate times a number of target nuclei is a reaction rate, which is neither a frequency (Hz)
+//! ln 2, which stays exact in the unit (`units::Ln2`): A = ln 2 · N/T½ is exact, and the step to whole becquerels
+//! is the certified `convert_rounded`, the true value rounded or a refusal, never a float's. λ = ln 2/T½ alone is a
+//! decay constant, a float edge named `decay_constant_f64`; λ·N is an activity only by a named step. A cross section
+//! in barns times a fluence rate times a number of target nuclei is a reaction rate, which is neither a frequency (Hz)
 //! nor an activity (Bq); the activity it saturates to is the named step `saturation_activity`. An absorbed dose in
 //! Gy becomes an equivalent dose in Sv only through a radiation weighting factor from a named set (ICRP 103, 2007:
 //! protons 2; ICRP 60, 1991: protons 5), `equivalent_dose`, and the crate refuses the step without one. The
@@ -23,8 +24,8 @@
 //! AME2020's values are written as it prints them, `exact!(8071.31806 keV)`: the literal `q!` reads, as an `Exact` of
 //! its unit, the prefix folded into the value exactly.
 //!
-//! Each number names its table. Where the crate has no place for something (an activity from an `Exact`), the
-//! comment says so where the example works around it.
+//! Each number names its table. Where the crate has no place for something, the comment says so where the example
+//! works around it.
 //!
 //! `cargo run --example 15_nuclear --features radiation,nuclear,systems,time,chemical,dimensionless,mechanical,libm,q`
 
@@ -40,11 +41,11 @@
 
 use exact_units::constants::{Codata2018, Codata2022, Constants};
 use exact_units::prefix::{Kilo, Micro, Milli, One};
-use exact_units::quantities::{HalfLife, ReactionRate};
+use exact_units::quantities::{Activity, HalfLife, ReactionRate};
 use exact_units::radiation::{Icrp60, Icrp103};
 use exact_units::systems::{Natural, Si, natural::NaturalElectronVolt};
 use exact_units::units::{
-    Barn, Becquerel, Curie, Dalton, ElectronVolt, EquivalentDose, Gram, Gray, Joule, Per,
+    Barn, Becquerel, Curie, Dalton, ElectronVolt, EquivalentDose, Gram, Gray, Joule, Ln2, Per,
     PerSquareCentimeterSecond, Ratio, Second, Speed, TropicalYearNubase2020,
 };
 use exact_units::{Exact, Fixed, Fraction, Prefix, Rounding, exact};
@@ -310,30 +311,36 @@ fn radium_activity() {
         .convert_with::<Codata2018, Gram>()
         .unwrap();
     // one atom's mass in g, 3.75·10⁻²² g with 21 digits over 10⁴², exact with its power of ten apart, and so is the
-    // count; the half-life's 0.44 % then makes the activity a float edge
+    // count
     let atom = dalton.scaled(RA226.mass).unwrap();
     let count = (mass / atom).unwrap().as_ratio();
     println!("  N = {:e} atoms", count.rounded(6, Rounding::NearestEven));
-    let atoms = count.to_f64();
 
     // T½ = 1600(7) y, NUBASE2020 Table I, in NUBASE's year: a half-life, a time that isn't a mean life
     let half_life =
         Exact::<TropicalYearNubase2020>::new_in::<Kilo>(16, 10).as_quantity::<HalfLife>();
-    assert_eq!(
-        half_life.convert::<Second>(),
-        Some(Exact::int(50_491_081_728))
-    );
-    // λ = ln 2/T½, and ln 2 is a `Magnitude` symbol that no run-time value carries: a float edge, named `_f64`
+    let seconds = half_life.convert::<Second>().unwrap();
+    assert_eq!(seconds, Exact::int(50_491_081_728));
+    // λ = ln 2/T½ on its own is a decay constant, and a float edge named `_f64`
     let lambda = half_life
         .decay_constant_f64::<Per<Ratio, Second>>()
         .unwrap();
-    // λ·N is still a decay constant; the named step says it is an activity, A = λ·N
-    let activity: Fixed<Becquerel, One, f64> =
-        lambda.times_nuclei(atoms).unwrap().convert().unwrap();
-    let curies: Fixed<Curie, One, f64> = activity.convert_rounded(Rounding::NearestEven).unwrap();
-    println!("  A = {:.4e} Bq = {:.4} Ci", activity.get(), curies.get());
+    println!("  λ = {:.4e} /s", lambda.get());
+    // A = ln 2 · N/T½ needs no float: N/T½ counted in ln 2 per second, ln 2 kept in the unit
+    let per_half_life = (count / seconds).unwrap();
+    let rate = (Exact::<Ln2>::int(1) * per_half_life).unwrap();
+    // decays per second are an activity by the named step, not by `convert`
+    let activity = rate.as_quantity::<Activity>();
+    // whole becquerels and microcuries, certified: the rounding of the true value, ln 2 bounded to 128 bits
+    let bq = activity
+        .convert_rounded::<Becquerel, One, u64>(Rounding::NearestEven)
+        .unwrap();
+    let micro_ci = activity
+        .convert_rounded::<Curie, Micro, u64>(Rounding::NearestEven)
+        .unwrap();
+    println!("  A = {bq} = {micro_ci}");
     // the curie was once "a gram of radium"; with today's half-life a gram is 1.1 % short of it
-    assert!(curies.get() > 0.988 && curies.get() < 0.989);
+    assert!(micro_ci.get() > 988_000 && micro_ci.get() < 989_000);
 }
 
 fn reaction_rate() {

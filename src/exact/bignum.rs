@@ -705,6 +705,27 @@ impl Sealed for BigFraction {
         }
         Some(k)
     }
+
+    fn parts(&self) -> Option<super::num::sealed::Parts> {
+        if self.is_zero() {
+            return None;
+        }
+        // the top 127 bits, so that m + 1 fits a u128 where bits below are cut
+        let top = |u: &UBig| {
+            let s = u.bit_len().saturating_sub(127);
+            Some(super::num::sealed::Top {
+                m: u128::try_from(&(u >> s)).ok()?,
+                shift: i64::try_from(s).ok()?,
+                exact: u.trailing_zeros().is_none_or(|z| z >= s),
+            })
+        };
+        Some(super::num::sealed::Parts {
+            neg: self.is_negative(),
+            num: top(&self.numer())?,
+            den: top(&self.denom())?,
+            exp10: 0,
+        })
+    }
 }
 
 impl ExactNum for BigFraction {

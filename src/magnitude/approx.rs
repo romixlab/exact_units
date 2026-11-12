@@ -41,6 +41,14 @@ const fn mul_256(a: u128, b: u128) -> (u128, u128) {
     (hi, lo)
 }
 
+/// π, ln 2 and ln 10 rounded to nearest in a 128-bit mantissa, `(m, e)` for `m · 2^e`, `2¹²⁷ <= m`: within half a
+/// unit of `m` of the true value, which [bounds](super::Magnitude::bounds) widens to a whole unit either way.
+pub(super) const SYMBOLS_128: [(u128, i32); 3] = [
+    (Wide::PI.m, Wide::PI.e),
+    (Wide::LN2.m, Wide::LN2.e),
+    (Wide::LN10.m, Wide::LN10.e),
+];
+
 impl Wide {
     const ONE: Wide = Wide { m: TOP, e: -127 };
 

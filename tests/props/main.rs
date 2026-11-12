@@ -15,6 +15,8 @@ mod arith;
 mod big_fraction;
 #[cfg(feature = "information")]
 mod can_fd;
+#[cfg(all(feature = "dimensionless", feature = "angle"))]
+mod certified;
 #[cfg(feature = "dimensionless")]
 mod codec;
 #[cfg(all(feature = "dimensionless", feature = "libm"))]

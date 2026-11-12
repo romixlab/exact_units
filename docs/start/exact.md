@@ -336,7 +336,20 @@ These places break a rule above. Each is known and tracked, and until it is fixe
 - **A product into a float storage rounds in `f64`.** `times_into` and `per_into` with a float on either side multiply in `f64` and scale the product there; the `Rounding` they take is not applied to a float result.
 - **Integer `/` truncates**, as the storage's own `/` does: $3\,\unit{V} / 2\,\unit{A}$ is $1\,\unit{V/A}$. `per_into` and `times_into` name a rounding.
 - **`+` without bounds is the storage's own `+`**: a panic on overflow in a debug build, a wrap in a release build. Bounds `Saturating`, `Wrapping` or `checked_add` say what you mean.
-- **`to_rounded` across $\pi$, $\ln 2$ or $\ln 10$** works with a 64-bit approximation of the factor, so within $\lvert x \rvert \cdot 2^{-64}$ of a rounding step it can be one step off.
+- **`Fixed::convert_rounded` and `to_rounded` across $\pi$, $\ln 2$ or $\ln 10$** work with a 64-bit approximation of the factor, so within $\lvert x \rvert \cdot 2^{-64}$ of a rounding step they can be one step off, and say nothing. $527\,999\,952\,486°$ is $9\,215\,337\,621\,254\,319\,373.571..$ [[nrad]], whose nearest is …374; a `Fixed` gives …373. The same value as an `Exact` goes through the certified `Exact::convert_rounded`, which bounds the factor by 128-bit intervals and gives the true value's rounding or refuses (P2401#12nov-1853 makes `Fixed`'s certified too):
+
+    ```rust
+    # #[cfg(feature = "angle")] {
+    use exact_units::{Exact, Fixed, Rounding, prefix::{Nano, One}, units::{Degree, Radian}};
+
+    let x = 527_999_952_486;
+    let fixed = Fixed::<Degree, One, i64>::new(x).convert_rounded::<Radian, Nano, i64>(Rounding::NearestEven);
+    let exact = Exact::<Degree>::int(x.into()).convert_rounded::<Radian, Nano, i64>(Rounding::NearestEven);
+    assert_eq!(fixed.map(|f| f.get()), Some(9_215_337_621_254_319_373)); // one step low
+    assert_eq!(exact.map(|f| f.get()), Ok(9_215_337_621_254_319_374));
+    # }
+    ```
+
 - **`Exact` and `Fraction` on `u128` are checked by drawn inputs, not proved.** That every operation is exact or refused only where no form of the result fits, that `to_f64` is the nearest float and that every printed form reads back are properties drawn against `BigRational` and fuzzed. The same arithmetic code is walked on `u8` with an `i8` exponent, and its pieces (the 256-bit multiply, the 512-bit steps, the division, the gcd, a 5 by its inverse) are Kani proofs on `u8` limbs, but no proof or walk covers the `u128` operations themselves.
 - **A sum of terms far apart in their power of ten can be refused although it fits.** `Fraction`'s `+` and `−` align the term of the larger exponent in 512 bits. Where that passes (exponents 77 or more apart), a sum is refused, also in the rare case where the two terms cancel down to a result that would fit ([Range](../maths/fractions.md#range)). A property draws sums on both sides of that window.
 - **A logarithm, a root or $\pi$ in `f64`.** `to_level` (a gain's $\ln$), `over` (a rate times a length), `log_decrement` and `from_log_decrement` work their value in `f64` and then round it once by the `Rounding` you pass. The mode is named, but the number rounded is the `f64` one, so within an ulp of a rounding step the result can be one step off. `over` between integer storages could be worked exactly; it isn't yet.

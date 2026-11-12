@@ -1510,6 +1510,57 @@ pub(crate) mod interval {
         }
     }
 
+    /// `Σ s^n / ((2n + 1) · k^(2n + 1))` over n ≥ 0 (atanh `1/k` with `s = 1`, atan `1/k` with `s = −1`), `k ≥ 2`, as
+    /// an interval of multiples of `2^-bits`: each term is floored, so the sum of the floors is at most one unit per
+    /// term below the true partial sum, and the terms left out total less than the first of them (they fall by
+    /// `k²` each, and alternate for atan).
+    fn arc(k: i64, alternate: bool, bits: u32) -> Interval {
+        let one = BigInt::from(1) << bits;
+        let k2 = BigInt::from(k * k);
+        let mut pow = BigInt::from(k);
+        let (mut sum, mut n, mut terms) = (BigInt::from(0), 0i64, 0i64);
+        loop {
+            let t = &one / (&pow * BigInt::from(2 * n + 1));
+            if t == BigInt::from(0) {
+                break;
+            }
+            if alternate && n % 2 == 1 {
+                sum -= t;
+            } else {
+                sum += t;
+            }
+            terms += 1;
+            pow *= &k2;
+            n += 1;
+        }
+        // floors are off by less than one each (either sign for atan), and the rest is below 4/3 of a unit (k ≥ 2)
+        let slack = BigInt::from(terms + 2);
+        let den = one;
+        Interval {
+            lo: BigRational::new(&sum - &slack, den.clone()),
+            hi: BigRational::new(sum + slack, den),
+        }
+    }
+
+    /// ln 2 = 2 atanh(1/3), to within about `2^-bits`, by series in big integers: no digits typed in.
+    pub(crate) fn ln2(bits: u32) -> Interval {
+        arc(3, false, bits).mul(&Interval::of(2, 1))
+    }
+
+    /// ln 10 = 3 ln 2 + 2 atanh(1/9), as 10/8 = (1 + 1/9)/(1 − 1/9).
+    pub(crate) fn ln10(bits: u32) -> Interval {
+        ln2(bits)
+            .mul(&Interval::of(3, 1))
+            .add(&arc(9, false, bits).mul(&Interval::of(2, 1)))
+    }
+
+    /// π = 16 atan(1/5) − 4 atan(1/239) (Machin), to within about `2^-bits`.
+    pub(crate) fn pi_series(bits: u32) -> Interval {
+        arc(5, true, bits)
+            .mul(&Interval::of(16, 1))
+            .sub(&arc(239, true, bits).mul(&Interval::of(4, 1)))
+    }
+
     /// cos `x` for `0 <= x <= 2`, as an interval: the Taylor series to x^40/40!, whose terms alternate in sign and
     /// fall from there on, so the true value lies between that sum and the sum with the next term.
     pub(crate) fn cos_point(x: &BigRational) -> Interval {

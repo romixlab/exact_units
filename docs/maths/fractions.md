@@ -191,6 +191,22 @@ assert!(a.to_f64() > b_rad);
 
 This is how a planner hands its results to firmware: as `Fixed` constants, rounded where a register needs a whole number, with the rounding named.
 
+### Across π, ln 2 and ln 10: the certified edge
+
+A unit can carry an irrational factor: `Degree` is $\pi/180$ [[rad]], `units::Ln2` is the number $\ln 2$. An `Exact` of such a unit holds its value exactly ($45°$ is exactly $\pi/4$ [[rad]]), and `convert` to a unit without the factor doesn't compile, as no fraction holds the result. `convert_rounded::<U2, P, T>(rounding)` gives it as a `Fixed`, and `to_f64_in::<U2>()` as the nearest `f64`.
+
+Both are certified. The factor is bounded at compile time by intervals with 128-bit ends, rounded outward at every step, and multiplied by the value's own interval. A result is given only where both ends round to it, so it is the rounding of the true value, not of an approximation. Where they round apart, the true value is within about $2^{-120}$ of itself of a rounding boundary, and the call refuses with `Refused::NearTie { below, above }` (a `NearTie` for the float). A caller who wants one of them takes it by name. A value has to be built to land there: $x \cdot \pi$ is never a whole number.
+
+```rust
+use exact_units::{Exact, Fixed, Rounding, prefix::Micro, units::{Degree, Ln2, Radian, Ratio}};
+
+let r = Exact::<Degree>::int(45).convert_rounded::<Radian, Micro, i32>(Rounding::NearestEven);
+assert_eq!(r, Ok(Fixed::new(785_398))); // π/4 rad
+assert_eq!(Exact::<Ln2>::int(1).to_f64_in::<Ratio>(), Ok(core::f64::consts::LN_2));
+```
+
+A factor that is a fraction rounds exactly, as `to_rounded` does. A measured constant in the factor (μ₀, G, m_u) doesn't compile here: `convert_with` names its set first.
+
 ## Printing
 
 `{}` picks an SI prefix: the largest power of 1000 that leaves at least 1 before the point. On a ratio it picks %, ppm or ppb: the largest that leaves at least 0.1. `{:#}` writes the unit itself, and `in_prefix(p)` the prefix you give.

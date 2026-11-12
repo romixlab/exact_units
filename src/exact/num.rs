@@ -106,6 +106,35 @@ pub(crate) mod sealed {
 
         /// `k` with `10^k <= |self| < 10^(k+1)`, `None` for 0 and where it can't be told.
         fn decade(&self) -> Option<i32>;
+
+        /// The sign and `|self| = num / den · 10^exp10` with `num` and `den` by their top bits, what an interval
+        /// starts from (the certified edge, `exact/certified.rs`). `None` for 0.
+        fn parts(&self) -> Option<Parts>;
+    }
+
+    /// A positive integer by its top bits: `m · 2^shift` where `exact`, else between that and `(m + 1) · 2^shift`
+    /// (then `m < 2^127`, so `m + 1` fits).
+    #[derive(Copy, Clone, Debug)]
+    pub struct Top {
+        /// The top bits, above 0.
+        pub m: u128,
+        /// The bits below them.
+        pub shift: i64,
+        /// Whether the bits below are all 0.
+        pub exact: bool,
+    }
+
+    /// A number other than 0 as [Sealed::parts] gives it.
+    #[derive(Copy, Clone, Debug)]
+    pub struct Parts {
+        /// Below 0.
+        pub neg: bool,
+        /// The numerator.
+        pub num: Top,
+        /// The denominator.
+        pub den: Top,
+        /// The power of ten.
+        pub exp10: i64,
     }
 }
 
@@ -142,6 +171,24 @@ impl sealed::Sealed for Fraction {
                 .is_some_and(|m| m >= Fraction::ONE)
         })?;
         i32::try_from(e.checked_add(k)?).ok()
+    }
+
+    fn parts(&self) -> Option<sealed::Parts> {
+        if self.is_zero() {
+            return None;
+        }
+        let (num, den) = self.mantissa();
+        let whole = |m: u128| sealed::Top {
+            m,
+            shift: 0,
+            exact: true,
+        };
+        Some(sealed::Parts {
+            neg: self.is_negative(),
+            num: whole(num),
+            den: whole(den),
+            exp10: i64::from(self.exp10()),
+        })
     }
 }
 

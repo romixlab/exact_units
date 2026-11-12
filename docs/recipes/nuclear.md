@@ -203,23 +203,28 @@ let t_half = Exact::<TropicalYearNubase2020>::new_in::<Kilo>(16, 10).as_quantity
 assert_eq!(t_half.convert::<Second>(), Some(Exact::int(50_491_081_728))); // a half-life is a time
 ```
 
-### The activity: a float edge, named
+### The activity: exact, then rounded by name
 
-The decay constant $\lambda = \ln 2/T_{1/2}$ is a `DecayConstant`: [[s⁻¹]], but neither a frequency nor an activity. $\ln 2$ is exact as a `Magnitude` symbol, but no run-time value carries a symbol, so $\lambda$ from a half-life is where the calculation becomes a float, once: the step says so in its name, `decay_constant_f64`. From a mean life, $\lambda = 1/\tau$ is exact (`decay_constant`), and so is $\tau$ from $\lambda$ (`mean_life`).
+The decay constant $\lambda = \ln 2/T_{1/2}$ is a `DecayConstant`: [[s⁻¹]], but neither a frequency nor an activity. From a mean life, $\lambda = 1/\tau$ is exact (`decay_constant`), and so is $\tau$ from $\lambda$ (`mean_life`). From a half-life alone, `decay_constant_f64` gives $\lambda$ as a float, and the step says so in its name.
 
-$\lambda \cdot N$ is still a decay constant: a dimension-one factor keeps the quantity it multiplies, so a plain product never reaches [[Bq]]. The named step `times_nuclei`, $A = \lambda \cdot N$, says that these are decays of a radionuclide:
+The activity needs no such float. $\ln 2$ is irrational, so no fraction holds $A = \ln 2 \cdot N/T_{1/2}$. The crate keeps it in the unit instead: `units::Ln2` is the number $\ln 2$ as a dimensionless unit, as `Degree` holds $\pi/180$. $N/T_{1/2}$ counted in $\ln 2$ per second is $A$, exactly. Decays per second are not yet an activity: a plain [[s⁻¹]] doesn't `convert` to [[Bq]]. The named step `as_quantity::<Activity>()` says that these are decays of a radionuclide.
+
+The last step, to whole becquerels, is `convert_rounded`. It bounds $\ln 2$ by 128-bit intervals and gives the rounding of the true value. Where the true value is too close to a rounding boundary to tell, it refuses and names both candidates; it never rounds a float's approximation:
 
 ```rust
-use exact_units::{Exact, Fixed, Rounding, prefix::{Kilo, One}, quantities::HalfLife};
-use exact_units::units::{Becquerel, Curie, Per, Ratio, Second, TropicalYearNubase2020};
+use exact_units::{Exact, Rounding, prefix::{Kilo, Micro, One}, quantities::{Activity, HalfLife}};
+use exact_units::units::{Becquerel, Curie, Ln2, Ratio, Second, TropicalYearNubase2020};
 
-let atoms = 2.6644e21; // N, from above
+// N from above, exact, and T½ as a half-life
+let n = Exact::<Ratio>::new(2_664_365_000_000_000_000_000, 1); // rounded here for the page
 let t_half = Exact::<TropicalYearNubase2020>::new_in::<Kilo>(16, 10).as_quantity::<HalfLife>();
-let lambda = t_half.decay_constant_f64::<Per<Ratio, Second>>().unwrap(); // ln 2/T½, a float edge
-let a: Fixed<Becquerel, One, f64> = lambda.times_nuclei(atoms).unwrap().convert().unwrap();
-let ci: Fixed<Curie, One, f64> = a.convert_rounded(Rounding::NearestEven).unwrap();
+let rate = (Exact::<Ln2>::int(1) * (n / t_half.convert::<Second>().unwrap()).unwrap()).unwrap();
+let a = rate.as_quantity::<Activity>();
+let bq = a.convert_rounded::<Becquerel, One, u64>(Rounding::NearestEven).unwrap();
+let micro_ci = a.convert_rounded::<Curie, Micro, u64>(Rounding::NearestEven).unwrap();
 // the curie was once "a gram of radium": with today's half-life a gram is 1.1 % short of it
-assert!(ci.get() > 0.988 && ci.get() < 0.989);
+assert!(micro_ci.get() > 988_000 && micro_ci.get() < 989_000);
+assert!(bq.get() > 36_576_000_000 && bq.get() < 36_577_000_000);
 ```
 
 A gram of radium is 0.988 [[Ci]]: the curie, fixed at $3.7 \cdot 10^{10}\,\unit{Bq}$, outlived the half-life it was measured with.
@@ -321,7 +326,7 @@ The coefficients are a fit, and every fit is a convention: which nuclides, which
 | A mass in u to an energy | | $m_{\mathrm{u}}$ | |
 | An energy in [[eV]] to a mass in [[kg]] | the factor $e/c^2$, and the kilograms | | |
 | Atoms in a gram | yes, with the named set's $m_{\mathrm{u}}$ | $m_{\mathrm{u}}$ | |
-| Activity $A = \lambda \cdot N$, $\lambda = \ln 2/T_{1/2}$ | $N$, and $\lambda = 1/\tau$ from a mean life | | $\ln 2$ |
+| Activity $A = \ln 2 \cdot N/T_{1/2}$ | yes, $\ln 2$ in the unit (`Ln2`); whole [[Bq]] by the certified `convert_rounded`; $\lambda = 1/\tau$ from a mean life | | $\lambda$ from a half-life alone (`decay_constant_f64`) |
 | Reaction rate $\sigma \cdot \varphi \cdot N$ | yes | | |
 | [[Gy]] to [[Sv]] | ICRP 60's $w_{\mathrm{R}}$ | $w_{\mathrm{R}}$ named by its set (ICRP 103, ICRP 60) | ICRP 103 neutrons' $w_{\mathrm{R}}(E)$ |
 | Semi-empirical mass formula | volume, asymmetry | | $A^{1/3}$ |
@@ -382,5 +387,5 @@ CODATA 2018 prints $R_\infty h c$ as 13.605 693 122 994(26) [[eV]]. A `BigFracti
 
 ### What the crate doesn't do yet
 
-- **No exact cube root.** $A^{1/3}$ is a float, and so is $\ln 2$ times a run-time value.
-- **No exact decay constant from a half-life.** $\lambda = \ln 2/T_{1/2}$ goes through an `f64` (`decay_constant_f64`), though `units::Ln2` could carry $\ln 2$ exactly.
+- **No exact cube root.** $A^{1/3}$ is a float.
+- **No exact decay constant from a half-life.** $\lambda = \ln 2/T_{1/2}$ on its own goes through an `f64` (`decay_constant_f64`). The activity doesn't: $\ln 2 \cdot N/T_{1/2}$ stays exact in `Ln2` units, but `DecayConstant` has no form in them yet.

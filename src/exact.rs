@@ -68,6 +68,7 @@ mod big;
 mod big_exact;
 #[cfg(feature = "bignum")]
 mod bignum;
+mod certified;
 pub(crate) mod compare;
 mod decimal;
 mod fraction;
@@ -89,6 +90,7 @@ mod tolerance;
 pub use big_exact::BigExact;
 #[cfg(feature = "bignum")]
 pub use bignum::{BigFraction, NotAFraction};
+pub use certified::{NearTie, Refused};
 use decimal::{Expansion, write_fraction};
 pub use fraction::{Fraction, Fraction8};
 pub use num::ExactNum;
