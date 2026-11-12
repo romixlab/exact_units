@@ -207,6 +207,15 @@ mod tests {
             // read in place (a BigFraction writes one past any buffer)
             "100.e021 47(0.000475) Hz",
             "100.e021(0.000475) Hz",
+            // the review of 1bb9530: grouping after ±, two exponents, limits by position, a unit's parentheses
+            "1 ± 2 2 Hz",
+            "1e3(1)e3 Hz",
+            "1600(15e-1) Hz",
+            "(<5 ± 1) Hz",
+            "5 ± <1 Hz",
+            "5(<1) Hz",
+            "1600 Hz (7)",
+            "1600 (7) Hz",
         ] {
             super::any_text(s);
         }

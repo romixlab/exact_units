@@ -66,6 +66,14 @@ fn concise_refusals() {
     refused::<Second>("1000/3(3) s", "last digit");
     refused::<Second>("1600(7 s", "not a number");
     refused::<Second>("(7) s", "not a number");
+    // review of 1bb9530: each refusal by the position it is at
+    refused::<Second>("1e3(1)e3 s", "not a number");
+    refused::<Second>("1600(15e-1) s", "not a number");
+    refused::<Second>("(<5 ± 1) s", "limit");
+    refused::<Second>("5(<1) s", "limit");
+    refused::<Second>("1600 (7) s", "a space between");
+    refused::<Second>("1600 s (7)", "no uncertainty");
+    refused::<Ratio>("6.674 30e-11 m³/(kg·s²)", "no uncertainty");
     // digits are grouped before the exponent only
     refused::<Second>("1.5e1 2(3) s", "not a number");
 }
@@ -124,6 +132,8 @@ fn columns() {
     assert!(err("5", "-3").contains("asymmetric"));
     assert!(err("stbl", "").contains("not a number"));
     assert!(err("5", "1 s").contains("not a number"));
+    assert!(err("5", "2 2").contains("not a number"));
+    assert!(err("5", "<1").contains("limit"));
 }
 
 #[test]
@@ -156,6 +166,15 @@ fn plus_minus() {
     assert!(err("10# ± 1 s", one).contains("estimated"));
     assert!(err("10 ± -1 s", one).contains("asymmetric"));
     assert!(err("10 ± 1 kg", one).contains("not in s"));
+    // review of 1bb9530: a space ends the uncertainty after ±, a limit at either place
+    assert!(err("1 ± 2 2 s", one).contains("not a number"));
+    assert!(err("(1 ± 2 2) s", one).contains("not a number"));
+    assert!(err("(<5 ± 1) s", one).contains("limit"));
+    assert!(err("5 ± <1 s", one).contains("limit"));
+    assert_eq!(
+        Uncertain::<Second>::parse_pm("1 000 ± 2 s", &one),
+        Ok(read("1000(2) s"))
+    );
     assert!(a.pm(&Fraction::ZERO).is_none());
 }
 
@@ -185,6 +204,8 @@ fn nubase_and_ame() {
     let t = Uncertain::<Y>::from_columns("1.600", "0.007", Prefix::Kilo).unwrap();
     assert_eq!(format!("{t:#}"), "1600(7) y (NUBASE2020)");
     assert_eq!(read::<Y>("1600(7) y (NUBASE2020)"), t);
+    // the unit's own parentheses are no uncertainty
+    refused::<Y>("1600 y (NUBASE2020)", "no uncertainty");
     // a change of unit is exact, the uncertainty with the value (here into seconds: a measured year, exact digits)
     let s = t.convert::<Second>().unwrap();
     assert_eq!(*s.u(), Exact::new(7 * 3_155_692_608, 100));

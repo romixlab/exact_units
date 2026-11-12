@@ -26,7 +26,9 @@ use core::str::FromStr;
 ///   with u = 7 in the units of the value's last digit, `6.674 30(15)e-11 m³/(kg·s²)` is 6.674 30·10⁻¹¹ with u =
 ///   0.000 15·10⁻¹¹. Digits in parentheses that hold a point (or a repetend or a fraction) are in the value's unit
 ///   itself, the GUM's other form: `100.021 47(0.000 35) g`. Digits may be grouped by spaces (CODATA's thin spaces
-///   too).
+///   too) in the value and inside the parentheses, never in an exponent; one exponent, after the parentheses or in
+///   the value. The parentheses follow the value's last digit: `1600 (7)` is refused by name, and `1600 y
+///   (NUBASE2020)` has no uncertainty.
 /// - Columns, as AME and NUBASE print them: [from_columns](Self::from_columns), the value and its uncertainty as two
 ///   texts in one prefix of `U`.
 /// - `±` with a coverage factor the caller names: [parse_pm](Self::parse_pm) and [pm](Self::pm). AME prints ± for
@@ -235,6 +237,8 @@ enum Why {
     Asymmetric,
     /// No uncertainty in parentheses (or no `±`).
     Missing,
+    /// A space between the value and its parentheses (`1600 (7)`).
+    Spaced,
     /// Whole digits in parentheses after a value with a repetend or a fraction, which has no last digit to count in.
     NoLastDigit,
     /// A coverage factor at or below 0.
@@ -298,6 +302,10 @@ impl<U: Unit> fmt::Display for ParseUncertainError<U> {
             Why::Missing => write!(
                 f,
                 "no uncertainty: a value with its standard uncertainty in parentheses, like \"1600(7){unit}\""
+            ),
+            Why::Spaced => f.write_str(
+                "a space between a value and its uncertainty in parentheses: the concise form writes them together, \
+                 1600(7)",
             ),
             Why::NoLastDigit => f.write_str(
                 "whole digits in parentheses count the value's last digit, and a value with a repetend or a \
@@ -368,15 +376,26 @@ impl<'a> Ungrouped<'a> {
     }
 }
 
-/// A `#` anywhere, or a limit sign first: refused by name before anything is read as a number.
-fn marks(s: &str) -> Result<(), Why> {
+/// A `#` anywhere in `s`: an estimated value, refused by name before anything is read as a number.
+fn estimated(s: &str) -> Result<(), Why> {
     if s.contains('#') {
         return Err(Why::Estimated);
     }
-    if s.starts_with(['>', '<', '~', '≥', '≤']) {
+    Ok(())
+}
+
+/// A limit sign first in `s`, the text of one number (the value or the uncertainty, each at its place).
+fn limit(s: &str) -> Result<(), Why> {
+    if s.trim_start().starts_with(['>', '<', '~', '≥', '≤']) {
         return Err(Why::Limit);
     }
     Ok(())
+}
+
+/// [estimated] and [limit] of one number's text.
+fn marks(s: &str) -> Result<(), Why> {
+    estimated(s)?;
+    limit(s)
 }
 
 /// A sign in an uncertainty's text (other than an exponent's): a signed or asymmetric uncertainty.
@@ -391,10 +410,16 @@ fn signed(s: &str) -> bool {
     false
 }
 
-/// The whole text `s` as a number, `x · 10^e`.
+/// The whole text `s` as a number, `x · 10^e`, its digits grouped by spaces or not.
 fn whole<R: ExactNum>(s: &str) -> Result<(R, i32), Why> {
     let s = Ungrouped::of(s).ok_or(Why::Number(Kind::Fit))?;
-    match R::read_number(s.as_str())? {
+    plain(s.as_str())
+}
+
+/// The whole text `s` as a number, `x · 10^e`, without group spaces: an uncertainty outside parentheses, where a
+/// space ends the number (`2 2` is two columns, not 22).
+fn plain<R: ExactNum>(s: &str) -> Result<(R, i32), Why> {
+    match R::read_number(s)? {
         (x, e, "") => Ok((x, e)),
         _ => Err(Why::Number(Kind::Form)),
     }
@@ -418,7 +443,7 @@ fn columns<U, R: ExactNum>(value: &str, u: &str, prefix: Prefix) -> Result<Uncer
         return Err(Why::Asymmetric);
     }
     let (v, ve) = whole::<R>(value)?;
-    let (x, xe) = whole::<R>(u)?;
+    let (x, xe) = plain::<R>(u)?;
     Ok(Uncertain {
         value: Exact::of(in_prefix(v, ve, prefix)?),
         u: Exact::of(in_prefix(x, xe, prefix)?),
@@ -470,10 +495,24 @@ fn exponent(s: &str) -> Result<(i32, &str), Why> {
 
 /// The concise form, `1600(7) y`: [Uncertain]'s `FromStr`.
 fn concise<U: Unit, R: ExactNum>(s: &str) -> Result<Uncertain<U, R>, Why> {
-    marks(s)?;
+    estimated(s)?;
+    limit(s)?;
     let (v_text, rest) = s.split_once('(').ok_or(Why::Missing)?;
     let (u_text, after) = rest.split_once(')').ok_or(Why::Number(Kind::Form))?;
     let u_text = u_text.trim();
+    limit(u_text)?;
+    // the parentheses follow the value's last digit; any other is the unit's (`y (NUBASE2020)`, `m³/(kg·s²)`)
+    let ends_number = |t: &str| t.ends_with(|c: char| c.is_ascii_digit() || matches!(c, '.' | ']'));
+    if !ends_number(v_text) {
+        let trimmed = v_text.trim_end();
+        return Err(if trimmed.is_empty() {
+            Why::Number(Kind::Form)
+        } else if trimmed.len() < v_text.len() && ends_number(trimmed) {
+            Why::Spaced
+        } else {
+            Why::Missing
+        });
+    }
     if signed(u_text) {
         return Err(Why::Asymmetric);
     }
@@ -483,11 +522,21 @@ fn concise<U: Unit, R: ExactNum>(s: &str) -> Result<Uncertain<U, R>, Why> {
     let xe = if u_text.contains(['.', '/', '[']) {
         xe
     } else {
-        // whole digits: in units of the value's last digit
+        // whole digits, nothing else: in units of the value's last digit
+        if !u_text
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '_' || GROUP.contains(&c))
+        {
+            return Err(Why::Number(Kind::Form));
+        }
         let last = last_digit(v_clean.as_str()).ok_or(Why::NoLastDigit)?;
         xe.checked_add(last).ok_or(Why::Number(Kind::Fit))?
     };
     let (e, unit) = exponent(after)?;
+    // one exponent, before the parentheses or after them, never both
+    if e != 0 && v_clean.as_str().contains(['e', 'E']) {
+        return Err(Why::Number(Kind::Form));
+    }
     let p = prefix_of::<U>(unit.trim()).ok_or(Why::Number(Kind::Unit))?;
     let scale = |x: R, xe: i32| {
         xe.checked_add(e)
@@ -506,7 +555,7 @@ fn plus_minus<U: Unit, R: ExactNum>(s: &str, k: &R) -> Result<Uncertain<U, R>, W
     if k.is_negative() || k.is_zero() {
         return Err(Why::Coverage);
     }
-    marks(s)?;
+    estimated(s)?;
     let (inner, unit) = match s.strip_prefix('(') {
         Some(r) => r.split_once(')').ok_or(Why::Number(Kind::Form))?,
         None => (s, ""),
@@ -516,17 +565,22 @@ fn plus_minus<U: Unit, R: ExactNum>(s: &str, k: &R) -> Result<Uncertain<U, R>, W
         .or_else(|| inner.split_once("+/-"))
         .ok_or(Why::Missing)?;
     let rest = rest.trim();
+    limit(v_text)?;
+    limit(rest)?;
     if rest.starts_with(['+', '-', '−']) {
         return Err(Why::Asymmetric);
     }
     let (v, ve) = whole::<R>(v_text.trim())?;
+    // the uncertainty after ± is not grouped: a space ends it (`1 ± 2 2 s` is no 22)
     let (x, xe, unit) = if unit.is_empty() {
-        let clean = Ungrouped::of(rest).ok_or(Why::Number(Kind::Fit))?;
-        let (x, xe, after) = R::read_number(clean.as_str())?;
+        let (x, xe, after) = R::read_number(rest)?;
+        if after.trim_start().starts_with(|c: char| c.is_ascii_digit()) {
+            return Err(Why::Number(Kind::Form));
+        }
         let p = prefix_of::<U>(after.trim()).ok_or(Why::Number(Kind::Unit))?;
         (x, xe, p)
     } else {
-        let (x, xe) = whole::<R>(rest)?;
+        let (x, xe) = plain::<R>(rest)?;
         let p = prefix_of::<U>(unit.trim()).ok_or(Why::Number(Kind::Unit))?;
         (x, xe, p)
     };

@@ -44,7 +44,9 @@ assert_eq!(t.expanded(&Fraction::int(2)), Some(Exact::int(14)));
 - Whole digits in parentheses count units of the value's last digit. `1600(7)` is $1600 \pm 7$, and `6.674 30(15)` is $6.674\,30 \pm 0.000\,15$.
 - Digits with a point are in the value's unit itself, the GUM's other form: `100.021 47(0.000 35) g`. A repetend or a fraction in parentheses is read the same way.
 - An exponent after the parentheses applies to both numbers: `6.674 30(15)e-11`.
-- Spaces may group the digits, as CODATA prints them. A plain space, a thin space and a narrow no-break space are all accepted.
+- Spaces may group the digits of the value and of the uncertainty inside the parentheses, as CODATA prints them. A plain space, a thin space and a narrow no-break space are all accepted. An exponent and an uncertainty after `±` are never grouped, so `1 ± 2 2 s` is refused rather than read as 22.
+- The parentheses follow the value's last digit. `1600 (7) s` is refused with an error that says so, and in `1600 y (NUBASE2020)` the parentheses belong to the unit, so it has no uncertainty.
+- A value has one exponent, in the value or after the parentheses, never both (`1e3(1)e3 s` is refused). Whole digits in parentheses are only digits (`1600(15e-1)` is refused).
 - A unit and its prefix follow, as [Exact](fractions.md#reading) reads them.
 
 `{}` writes the same form exactly and never rounds. When the uncertainty's last digit is below the value's, the value is padded with zeros: 1600.0 with $u = 1.5$ is written `1.6000(15) ks`, not `1.6(1.5) ks`. When the two have no common last digit (a repetend, or digits past 38 places), each is written as an `Exact` writes it, with the uncertainty's point: `333.[3](0.[3]) Hz`. Every text `{}` and `{:#}` write reads back to the same value.
