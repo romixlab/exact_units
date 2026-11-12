@@ -207,6 +207,18 @@ assert_eq!(Exact::<Ln2>::int(1).to_f64_in::<Ratio>(), Ok(core::f64::consts::LN_2
 
 A factor that is a fraction rounds exactly, as `to_rounded` does. A measured constant in the factor (μ₀, G, m_u) doesn't compile here: `convert_with` names its set first.
 
+The exponential has the same edge, on a count of $\ln 2$ or of $\ln 10$ only. $e^{q \ln 2}$ is $2^q$: for a whole $q$ an exact fraction, which `exp()` gives, and for any other $q$ irrational, as 2 is no perfect power, so `exp()` gives `None` there. `exp_rounded::<P, T>(rounding)` and `exp_f64()` give every $q$ certified, from $2^{f}$'s series on an interval ($q = k + f$, $0 < f < 1$) times $2^k$ exactly. A decay's $e^{-\lambda t}$ with $\lambda = \ln 2 / T_{1/2}$ is such a count, so what is left of a nuclide never goes through a float. `Exact<Ln10>` gives $10^q$ the same way. A plain ratio has no `exp`: its power is irrational for every $q$ but 0.
+
+```rust
+use exact_units::{Exact, Fixed, Rounding, prefix::Nano, units::{Ln2, Ratio}};
+
+// after 3 half-lives, exactly 1/8 is left; after 10 y of radium-226 (T½ = 1600 y), 2^(−1/160)
+assert_eq!(Exact::<Ln2>::int(-3).exp(), Some(Exact::<Ratio>::new(1, 8)));
+let q = Exact::<Ln2>::new(-1, 160);
+assert_eq!(q.exp(), None);
+assert_eq!(q.exp_rounded::<Nano, i64>(Rounding::Floor), Ok(Fixed::new(995_677_200)));
+```
+
 ## Printing
 
 `{}` picks an SI prefix: the largest power of 1000 that leaves at least 1 before the point. On a ratio it picks %, ppm or ppb: the largest that leaves at least 0.1. `{:#}` writes the unit itself, and `in_prefix(p)` the prefix you give.

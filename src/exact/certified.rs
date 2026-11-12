@@ -77,7 +77,7 @@ const fn factor<U: Unit, U2: Unit>(scale: Magnitude) -> Magnitude {
     clippy::panic,
     reason = "a compile error in const code (evaluated in const blocks), as documented"
 )]
-const fn bounds(m: Magnitude) -> Interval {
+pub(super) const fn bounds(m: Magnitude) -> Interval {
     match m.bounds() {
         Some(i) => i,
         None => panic!("a measured constant is left in the factor"),
@@ -100,13 +100,13 @@ fn top(t: Top) -> Interval {
 }
 
 /// `10^e` as an interval.
-fn pow10(e: i64) -> Interval {
+pub(super) fn pow10(e: i64) -> Interval {
     let p = Interval::exact(10).pow(e.unsigned_abs());
     if e < 0 { Interval::exact(1).div(p) } else { p }
 }
 
 /// `|x|` as an interval.
-fn magnitude_of(p: Parts) -> Interval {
+pub(super) fn magnitude_of(p: Parts) -> Interval {
     top(p.num).div(top(p.den)).mul(pow10(p.exp10))
 }
 
@@ -120,7 +120,7 @@ pub(crate) enum Dir {
 
 /// The direction on `|x|` of rounding `x` by `r`: `Floor` of a negative value is `Up` of its magnitude. A tie of the
 /// nearest modes is never decided here (it is a boundary: [decide] refuses it), so they are all one direction.
-const fn dir(r: Rounding, neg: bool) -> Dir {
+pub(super) const fn dir(r: Rounding, neg: bool) -> Dir {
     match r {
         Rounding::Floor if neg => Dir::Up,
         Rounding::Ceil if !neg => Dir::Up,
@@ -202,7 +202,7 @@ fn num_of(x: f64) -> (u128, i64) {
     clippy::arithmetic_side_effects,
     reason = "m below 2^53 and e from num_of: 2m + 1 and e - 1 are small"
 )]
-fn nearest_f64(x: Num) -> f64 {
+pub(super) fn nearest_f64(x: Num) -> f64 {
     let (a, b) = x.f64_around();
     if a.to_bits() == b.to_bits() {
         return a;
@@ -232,7 +232,10 @@ fn signed(k: u128, neg: bool) -> Option<i128> {
 }
 
 /// The `Fixed` of `k` steps (`k` of its sign), if it fits.
-fn fixed<U: Unit, P: FixedScale, T: Storage>(k: u128, neg: bool) -> Option<Fixed<U, P, T>> {
+pub(super) fn fixed<U: Unit, P: FixedScale, T: Storage>(
+    k: u128,
+    neg: bool,
+) -> Option<Fixed<U, P, T>> {
     T::from_int(signed(k, neg)?).and_then(Fixed::from_number)
 }
 

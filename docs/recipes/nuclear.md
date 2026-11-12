@@ -327,6 +327,7 @@ The coefficients are a fit, and every fit is a convention: which nuclides, which
 | An energy in [[eV]] to a mass in [[kg]] | the factor $e/c^2$, and the kilograms | | |
 | Atoms in a gram | yes, with the named set's $m_{\mathrm{u}}$ | $m_{\mathrm{u}}$ | |
 | Activity $A = \ln 2 \cdot N/T_{1/2}$ | yes, $\ln 2$ in the unit (`Ln2`); whole [[Bq]] by the certified `convert_rounded`; $\lambda = 1/\tau$ from a mean life | | $\lambda$ from a half-life alone (`decay_constant_f64`) |
+| What is left after $t$, $e^{-\lambda t} = 2^{-t/T_{1/2}}$ | yes for whole half-lives (`Exact<Ln2>::exp`, 1/8 after 3); otherwise certified by `exp_rounded` | | |
 | Reaction rate $\sigma \cdot \varphi \cdot N$ | yes | | |
 | [[Gy]] to [[Sv]] | ICRP 60's $w_{\mathrm{R}}$ | $w_{\mathrm{R}}$ named by its set (ICRP 103, ICRP 60) | ICRP 103 neutrons' $w_{\mathrm{R}}(E)$ |
 | Semi-empirical mass formula | volume, asymmetry | | $A^{1/3}$ |

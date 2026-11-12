@@ -27,6 +27,8 @@ mod dim;
 mod exact;
 #[cfg(not(kani))]
 mod exact_text;
+#[cfg(feature = "dimensionless")]
+mod exp;
 #[cfg(feature = "levels")]
 mod exposure;
 #[cfg(not(any(kani, fuzzing)))]

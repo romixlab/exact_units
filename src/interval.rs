@@ -404,6 +404,46 @@ impl Interval {
             hi: sum.hi.add(term.hi, true),
         }
     }
+
+    /// `e^x` for `0 < lo <= hi <= 1`: the Taylor series to 40 terms on both ends, each term rounded outward, the
+    /// last term taken once more on the upper end for the rest of the series, as [exp_frac](Self::exp_frac).
+    #[cfg(feature = "dimensionless")]
+    #[expect(clippy::arithmetic_side_effects, reason = "i <= TERMS, so i + 1 fits")]
+    pub(crate) const fn exp(self) -> Interval {
+        const TERMS: u128 = 40;
+        let one = Interval::exact(1);
+        let mut term = one;
+        let mut sum = one;
+        let mut i = 1;
+        while i <= TERMS {
+            term = term.mul(self).div(Interval::exact(i));
+            sum = sum.add(term);
+            i += 1;
+        }
+        Interval {
+            lo: sum.lo,
+            hi: sum.hi.add(term.hi, true),
+        }
+    }
+
+    /// `self · 2^k`, exactly.
+    #[cfg(feature = "dimensionless")]
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "callers pass |k| <= 2^40 (exp's far stand-in), far from i64's ends"
+    )]
+    pub(crate) const fn shift(self, k: i64) -> Interval {
+        Interval {
+            lo: Num {
+                m: self.lo.m,
+                e: self.lo.e + k,
+            },
+            hi: Num {
+                m: self.hi.m,
+                e: self.hi.e + k,
+            },
+        }
+    }
 }
 
 /// `a` against `b`, in a `const fn`.

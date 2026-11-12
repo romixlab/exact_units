@@ -71,6 +71,8 @@ mod bignum;
 mod certified;
 pub(crate) mod compare;
 mod decimal;
+#[cfg(feature = "dimensionless")]
+mod exp;
 mod fraction;
 mod num;
 mod rounded;
