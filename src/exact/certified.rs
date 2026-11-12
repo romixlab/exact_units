@@ -378,17 +378,17 @@ mod tests {
                         lo: eighths(lo),
                         hi: eighths(hi),
                     };
-                    let all: Vec<u128> = (lo..=hi).map(|n| round(n, d)).collect();
-                    let same = all.iter().all(|k| *k == all[0]);
+                    let first = round(lo, d);
+                    let same = (lo..=hi).all(|n| round(n, d) == first);
                     // a nearest tie inside, or at an end, is undecided: the true value could sit either side
                     let tie = d == Dir::Nearest && (lo..=hi).any(|n| n % 8 == 4);
                     match decide(i, d) {
                         Some(Ok(k)) => {
                             assert!(
                                 same && !tie,
-                                "{d:?} [{lo}, {hi}]/8 gave {k}, points {all:?}"
+                                "{d:?} [{lo}, {hi}]/8 gave {k}, the points don't all round to one"
                             );
-                            assert_eq!(k, all[0]);
+                            assert_eq!(k, first);
                         }
                         Some(Err((a, b))) => {
                             assert!(!same || tie, "{d:?} [{lo}, {hi}]/8 refused {a}, {b}");
