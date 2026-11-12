@@ -105,7 +105,7 @@ pub use tolerance::{OffTarget, Tolerance};
 /// lowest terms) chosen at run time. For values worked out on a host that no fixed scale holds: an STM32H7 PLL
 /// output is ref·(N + FRACN/8192)/(M·P), 519.999755859375 MHz for one, 80/3 MHz for a divider of 3.
 ///
-/// The value is in `U` itself, so there is no scale or storage in the type: `Exact<Hertz>` of 1000/3 is 333.(3) Hz.
+/// The value is in `U` itself, so there is no scale or storage in the type: `Exact<Hertz>` of 1000/3 is `333.[3] Hz`.
 /// Arithmetic is exact or refused: `+`, `-`, `*` and `/` give an `Option`, `None` on overflow and for a division by
 /// zero, never a rounded value (`?` chains them). A product or quotient of two has its unit as `Fixed`'s does
 /// ([Times], [Per]); [convert](Self::convert) names the unit it is.
@@ -124,14 +124,14 @@ pub use tolerance::{OffTarget, Tolerance};
 /// let p = (vco / 3).unwrap();
 /// assert_eq!(p.to_string(), "173.333251953125 MHz");
 /// assert!(p > LIMIT);
-/// // a third of 1000 Hz repeats: the repetend in parentheses, never cut
-/// assert_eq!((Exact::<Hertz>::int(1000) / 3).unwrap().to_string(), "333.(3) Hz");
+/// // a third of 1000 Hz repeats: the repetend in brackets, never cut
+/// assert_eq!((Exact::<Hertz>::int(1000) / 3).unwrap().to_string(), "333.[3] Hz");
 ///
 /// // Hz · s is a ratio, 1 / Hz a time: the period
 /// let t = Exact::<Second>::new(1, 1000);
 /// let cycles = (Exact::<Hertz>::int(48_000) * t).unwrap().convert::<Ratio>();
 /// assert_eq!(cycles, Some(Exact::int(48)));
-/// assert_eq!(hse.recip::<Second>().unwrap().to_string(), "41.(6) ns");
+/// assert_eq!(hse.recip::<Second>().unwrap().to_string(), "41.[6] ns");
 /// # }
 /// ```
 ///
@@ -153,8 +153,8 @@ pub use tolerance::{OffTarget, Tolerance};
 ///
 /// Shown exactly, with an SI prefix: `{}` picks the largest power of 1000 that leaves at least 1 before the point
 /// (a ratio: %, ppm or ppb, the largest that leaves 0.1), `{:#}` writes the unit itself, [in_prefix](Self::in_prefix)
-/// the prefix given. The number is the decimal when it ends, else the repetend in parentheses when it is at most
-/// 12 digits long (`333.(3) kHz`), else the fraction (`1000/7919 kHz`), as it is where the digits are more than text
+/// the prefix given. The number is the decimal when it ends, else the repetend in brackets when it is at most
+/// 12 digits long (`333.[3] kHz`), else the fraction (`1000/7919 kHz`), as it is where the digits are more than text
 /// reads back (38 significant ones). Text in any of these forms reads back
 /// (`parse`, `serde::with_unit`). A rounded number is [to_rounded](Self::to_rounded) or [to_f64](Self::to_f64), by
 /// name: a format's precision (`{:.3}`) changes nothing.
@@ -334,7 +334,7 @@ impl<U> Exact<U> {
         Self::from_fixed_as(f)
     }
 
-    /// This value written in the prefix `p`: `in_prefix(Prefix::Mega)` of 80/3 MHz is `26.(6) MHz`. Where the value
+    /// This value written in the prefix `p`: `in_prefix(Prefix::Mega)` of 80/3 MHz is `26.[6] MHz`. Where the value
     /// in that prefix doesn't fit `u128`, in the unit itself; a ratio in %, ‰, ppm or ppb, any other prefix as none
     /// (the forms text reads back).
     #[must_use]
@@ -356,7 +356,7 @@ impl<U> Exact<U> {
     ///
     /// let f = Exact::<Hertz>::new(80_000_000, 3);
     /// let big = f.widen();
-    /// assert_eq!(big.to_string(), "26.(6) MHz");
+    /// assert_eq!(big.to_string(), "26.[6] MHz");
     /// assert_eq!(big.narrow(), Some(f));
     /// # }
     /// ```

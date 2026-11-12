@@ -205,7 +205,7 @@ overflow policy, products and quotients, decimal literals, counted positions, ni
   `Fixed` across scales and every value of it (384-bit products, skipped where bit lengths alone prove the order: floats of any size, ±∞ past every `Exact`, NaN no
   order); a scale that isn't a fraction of `u128`s doesn't compile there. `const fn` constructors (`new_in::<Mega>(1375, 10)`), `from_scaled` / `from_prefix`,
   `from_fixed`, `to` exact or `None`, `to_rounded(Rounding)`, `to_f64`. Display: the decimal when it ends, a
-  repetend in parentheses up to 12 digits (`333.(3) kHz`), else the fraction, never cut, with an SI prefix picked or
+  repetend in brackets up to 12 digits (`333.[3] kHz`), else the fraction, never cut, with an SI prefix picked or
   given; `FromStr` reads every form back. serde (feature `serde`): the number as text or `(neg, num, den)`, a float
   refused; `serde::with_unit` takes an `Exact` field (`"79.99998046875 MHz"`). `no_std`, no alloc, host-side
   (48 bytes, `u128` library calls on Cortex-M): firmware gets `Fixed` consts. Properties `tests/props/exact.rs` (u128
@@ -783,6 +783,11 @@ the command line, databases, Arrow.
 - 💡 **IO-11 Values with a standard uncertainty** — as CODATA, AME2020 and NUBASE2020 print them (1600(7) y):
   exact as printed, first-order propagation, the `(7)` form in text; only a set's measured constants (μ₀, G, the
   masses) carry one today (`Measured`, `Resolved`). P2401#10nov-1911f.
+- ✅ **IO-14 A repetend in brackets** — `Exact`, `Fraction` and `BigFraction` write and read a repeating decimal as
+  `333.[3] kHz`, `0.1[6]`. Digits in parentheses after a number (`333.(3)`, `6.67430(15)`, `1600(7)`) are refused
+  with an error that names both readings, since CODATA and the GUM (§7.2.2) write a standard uncertainty that way
+  (IO-11). Tests: `tests/props/exact_text.rs` (`parentheses_read_two_ways`, the round trips), fuzz seed
+  `codata-paren`. Book: [Exact fractions](docs/maths/fractions.md). P2401#10nov-1442d.
 
 ## Dropped and superseded
 

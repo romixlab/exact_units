@@ -23,10 +23,23 @@ pub enum Kind {
     /// An exponent past what text may ask a [BigFraction](super::BigFraction) to work out
     /// (`MAX_TEXT_EXP`).
     Huge,
+    /// Digits in parentheses after a number (`0.1(6)`, `6.67430(15)`): a repetend in some texts, a standard
+    /// uncertainty in CODATA's notation. A repetend is written in brackets, `0.1[6]`.
+    Paren,
+}
+
+/// [Kind::Paren] in words.
+const PAREN: &str = "digits in parentheses after a number read two ways: a repeating decimal is written in brackets \
+    (0.1[6] is 1/6), and 6.67430(15) is a value with its standard uncertainty, which an exact number doesn't hold";
+
+/// Whether `rest`, the text after a number's digits, opens parentheses around a digit: [Kind::Paren].
+pub(crate) fn paren_after(rest: &str) -> bool {
+    rest.strip_prefix('(')
+        .is_some_and(|r| r.starts_with(|c: char| c.is_ascii_digit()))
 }
 
 /// The number at the start of `s`, exactly, and the text after it: a decimal (`1.5`, `-2e-3`, `1_000`), one with its
-/// repetend in parentheses (`333.(3)`), or a fraction of two decimals (`1000/3`, a digit right after the `/`). The
+/// repetend in brackets (`333.[3]`), or a fraction of two decimals (`1000/3`, a digit right after the `/`). The
 /// value is `x · 10^e`, the power kept apart so that a prefix after the number cancels with it before anything
 /// overflows (`21e-39 QHz` is `21e-9 Hz`, [scale]).
 pub(crate) fn number(s: &str) -> Result<(Fraction, i32, &str), Kind> {
@@ -42,6 +55,9 @@ pub(crate) fn number(s: &str) -> Result<(Fraction, i32, &str), Kind> {
             Kind::Form
         });
     };
+    if paren_after(rest) {
+        return Err(Kind::Paren);
+    }
     let x = Fraction::from_parts(dec.neg, dec.m, 1).ok_or(Kind::Fit)?;
     let over = rest
         .strip_prefix('/')
@@ -50,6 +66,9 @@ pub(crate) fn number(s: &str) -> Result<(Fraction, i32, &str), Kind> {
         return Ok((x, dec.e, rest));
     };
     let (den, rest) = Decimal::parse(over).ok_or(Kind::Fit)?;
+    if paren_after(rest) {
+        return Err(Kind::Paren);
+    }
     if den.m == 0 {
         return Err(Kind::Zero);
     }
@@ -95,11 +114,14 @@ fn repeating(s: &str) -> Option<Result<(Fraction, &str), Kind>> {
     }
     let (pre_from, pre_to) = run(i.saturating_add(1));
     i = pre_to;
-    if b.get(i) != Some(&b'(') {
+    if b.get(i) == Some(&b'(') {
+        return Some(Err(Kind::Paren));
+    }
+    if b.get(i) != Some(&b'[') {
         return None;
     }
     let (rep_from, rep_to) = run(i.saturating_add(1));
-    if rep_to == rep_from || b.get(rep_to) != Some(&b')') {
+    if rep_to == rep_from || b.get(rep_to) != Some(&b']') {
         return Some(Err(Kind::Form));
     }
     let rest = s.get(rep_to.saturating_add(1)..)?;
@@ -169,7 +191,8 @@ impl fmt::Display for ParseFractionError {
             Kind::Fit => "a number past what a fraction of u128s holds exactly",
             Kind::Zero => "a fraction over 0",
             Kind::Huge => HUGE,
-            Kind::Form | Kind::Unit => "not a number: 1.5, -2e-3, 333.(3) or 1000/3",
+            Kind::Paren => PAREN,
+            Kind::Form | Kind::Unit => "not a number: 1.5, -2e-3, 333.[3] or 1000/3",
         })
     }
 }
@@ -179,8 +202,9 @@ impl core::error::Error for ParseFractionError {}
 impl FromStr for Fraction {
     type Err = ParseFractionError;
 
-    /// A decimal (`1.5`, `-2e-3`, `1_000`), one with its repetend in parentheses (`333.(3)`), or a fraction
-    /// (`1000/3`), exactly; spaces around it are left out.
+    /// A decimal (`1.5`, `-2e-3`, `1_000`), one with its repetend in brackets (`333.[3]`), or a fraction
+    /// (`1000/3`), exactly; spaces around it are left out. Digits in parentheses after a number (`0.1(6)`,
+    /// `6.67430(15)`) are refused: they read two ways, a repetend or a standard uncertainty.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match number(s.trim()) {
             Ok((x, e, "")) => scale(x, 0, e).ok_or(ParseFractionError { kind: Kind::Fit }),
@@ -238,6 +262,7 @@ impl<U: Unit> fmt::Display for ParseExactError<U> {
             Kind::Fit => f.write_str("a number past what a fraction of u128s holds exactly"),
             Kind::Zero => f.write_str("a fraction over 0"),
             Kind::Huge => f.write_str(HUGE),
+            Kind::Paren => f.write_str(PAREN),
         }
     }
 }
@@ -248,7 +273,7 @@ impl<U: Unit, R: ExactNum> FromStr for Exact<U, R> {
     type Err = ParseExactError<U>;
 
     /// A number as [Fraction] reads it, then the unit with or without an SI or binary prefix, the space optional:
-    /// `24 MHz`, `79.99998046875 MHz`, `1000/3 kHz`, `333.(3)kHz`; on a ratio `%`, `‰`, `ppm`, `ppb` or nothing.
+    /// `24 MHz`, `79.99998046875 MHz`, `1000/3 kHz`, `333.[3]kHz`; on a ratio `%`, `‰`, `ppm`, `ppb` or nothing.
     /// The units and spellings `serde::with_unit` reads for a `Fixed` of `U`.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         read::<U, R>(s).map_err(ParseExactError::new)

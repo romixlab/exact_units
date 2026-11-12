@@ -17,7 +17,7 @@ let n = Fraction::int(173).checked_add(Fraction::new(2730, 8192)).unwrap();
 let vco = ((hse / 8).unwrap() * n).unwrap();
 assert_eq!(vco.to_string(), "519.999755859375 MHz");
 assert_eq!((vco / 3).unwrap().to_string(), "173.333251953125 MHz");
-assert_eq!(Exact::<Hertz>::new(80_000_000, 3).to_string(), "26.(6) MHz");
+assert_eq!(Exact::<Hertz>::new(80_000_000, 3).to_string(), "26.[6] MHz");
 ```
 
 ## Making one
@@ -62,7 +62,7 @@ use exact_units::{Exact, units::{Hertz, Ratio, Second}};
 let f = Exact::<Hertz>::int(48_000);
 let t = Exact::<Second>::new(1, 1000);
 assert_eq!((f * t).unwrap().convert::<Ratio>(), Some(Exact::int(48)));
-assert_eq!(f.recip::<Second>().unwrap().to_string(), "20.8(3) µs");
+assert_eq!(f.recip::<Second>().unwrap().to_string(), "20.8[3] µs");
 ```
 
 A quotient of one unit, [[Hz/Hz]] or [[V/V]], is a ratio of that quantity and not a plain `Ratio`, as for `Fixed`. `as_ratio()` is the named step, and `as_gain::<U>()` the one back:
@@ -74,7 +74,7 @@ let hclk = Exact::<Hertz>::new_in::<Mega>(199, 1);
 let ref_ck = Exact::<Hertz>::new_in::<Mega>(48, 10);
 // two ref_ck periods in hclk cycles
 let cycles = ((hclk * 2).unwrap() / ref_ck).unwrap().as_ratio();
-assert_eq!(cycles.to_string(), "82.91(6)");
+assert_eq!(cycles.to_string(), "82.91[6]");
 ```
 
 Units of other dimensions don't convert, as for `Fixed`:
@@ -198,16 +198,18 @@ This is how a planner hands its results to firmware: as `Fixed` constants, round
 The number is never cut. It is one of three forms:
 
 - **The decimal**, where it ends: `79.99998046875 MHz`.
-- **The repetend in parentheses**, where it repeats within 12 digits: `333.(3) kHz`, `0.(142857) Hz`.
+- **The repetend in brackets**, where it repeats within 12 digits: `333.[3] kHz`, `0.[142857] Hz`.
 - **The fraction**, where it repeats longer, or has more digits than text reads back (38 significant ones): `1000/7919 kHz`.
+
+The repetend goes in brackets, not in the parentheses some texts use, because parentheses after digits already mean something else in measurement data. CODATA writes G as `6.674 30(15)·10⁻¹¹`: 6.674 30 with a standard uncertainty of 0.000 15 in the last digits, the notation of the GUM (JCGM 100:2008, §7.2.2). Read as a repetend, the same text would be another number: 6.67430 followed by 15 repeating forever. So the reader refuses digits in parentheses after a number, whichever was meant, and the error says so.
 
 ```rust
 use exact_units::{Exact, Prefix, units::Hertz};
 
 let f = Exact::<Hertz>::new(1_000_000, 3);
-assert_eq!(f.to_string(), "333.(3) kHz");
-assert_eq!(format!("{f:#}"), "333333.(3) Hz");
-assert_eq!(f.in_prefix(Prefix::Mega).to_string(), "0.(3) MHz");
+assert_eq!(f.to_string(), "333.[3] kHz");
+assert_eq!(format!("{f:#}"), "333333.[3] Hz");
+assert_eq!(f.in_prefix(Prefix::Mega).to_string(), "0.[3] MHz");
 assert_eq!(Exact::<Hertz>::new(1_000_000, 7919).to_string(), "1000000/7919 Hz");
 ```
 
@@ -233,8 +235,11 @@ use exact_units::{Exact, units::Hertz};
 
 let f: Exact<Hertz> = "79.99998046875 MHz".parse().unwrap();
 assert_eq!(f, Exact::new(2_559_999_375, 32));
-assert_eq!("1000/3 kHz".parse::<Exact<Hertz>>(), "333.(3)kHz".parse());
+assert_eq!("1000/3 kHz".parse::<Exact<Hertz>>(), "333.[3]kHz".parse());
 assert!("24 MV".parse::<Exact<Hertz>>().is_err());
+// parentheses read two ways, a repetend or CODATA's uncertainty: refused
+assert!("333.(3) kHz".parse::<Exact<Hertz>>().is_err());
+assert!("6.67430(15)".parse::<exact_units::Fraction>().is_err());
 ```
 
 With the `serde` feature, a config field takes `#[serde(with = "exact_units::serde::with_unit")]`. A `clocks.toml` can then say `target = "79.99998046875 MHz"`, and it is read exactly. Plain serde writes the number alone in the unit itself, as text in a human-readable format and as `(negative, numerator, denominator, exponent)` in a binary one, the canonical form, which a read checks. A float is refused, as its digits were rounded by the format's parser before the crate sees them.

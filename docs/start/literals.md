@@ -324,7 +324,7 @@ An [`Exact`](../maths/fractions.md) compares with a `q!` literal exactly too, at
 # #[cfg(feature = "time")] {
 use exact_units::{Exact, q, units::Hertz};
 
-let pll = Exact::<Hertz>::new(80_000_000, 3); // 26.(6) MHz
+let pll = Exact::<Hertz>::new(80_000_000, 3); // 26.[6] MHz
 assert!(pll > q!(26.666666 MHz) && pll < q!(26.666667 MHz));
 assert!(q!(80 MHz) == (pll * 3).unwrap());
 # }

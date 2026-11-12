@@ -730,7 +730,7 @@ fn exact_as_its_number() {
     use exact_units::{Exact, Fraction};
 
     let f = Exact::<Hertz>::new(1_000_000, 3);
-    round_trip(&f, r#""333333.(3)""#, (false, 1u128, 3u128, 6i32));
+    round_trip(&f, r#""333333.[3]""#, (false, 1u128, 3u128, 6i32));
     round_trip(
         &Fraction::new(-7, 2),
         r#""-3.5""#,
@@ -796,7 +796,7 @@ fn big_fraction_as_its_number() {
 
     round_trip(
         &Exact::<Hertz, BigFraction>::new(1_000_000, 3),
-        r#""333333.(3)""#,
+        r#""333333.[3]""#,
         (false, Bytes(&[0x40, 0x42, 0x0f]), Bytes(&[3])),
     );
     round_trip(
@@ -877,7 +877,7 @@ fn with_unit_reads_an_exact_exactly() {
         ("24MHz", 24_000_000, 1),
         ("24e6 Hz", 24_000_000, 1),
         ("1000/3 kHz", 1_000_000, 3),
-        ("333.(3) kHz", 1_000_000, 3),
+        ("333.[3] kHz", 1_000_000, 3),
         ("0.5 kHz", 500, 1),
         ("1.5 mHz", 3, 2000),
     ] {

@@ -1,5 +1,5 @@
 //! serde of a [Fraction] and an [Exact] as the number alone, in the unit itself: in a human-readable format the
-//! text `{:#}` writes for the number (`"333.(3)"`, `"80000000"`, `"1000/7919"`), an integer read too; in a binary
+//! text `{:#}` writes for the number (`"333.[3]"`, `"80000000"`, `"1000/7919"`), an integer read too; in a binary
 //! one the quadruple `(negative, numerator, denominator, exponent)`, the canonical form ([Fraction::mantissa],
 //! [Fraction::exp10]).
 
@@ -47,7 +47,7 @@ impl Visitor<'_> for TextVisitor {
     type Value = Fraction;
 
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("an exact number as text (\"1.5\", \"333.(3)\", \"1000/3\") or an integer")
+        f.write_str("an exact number as text (\"1.5\", \"333.[3]\", \"1000/3\") or an integer")
     }
 
     fn visit_str<E: de::Error>(self, s: &str) -> Result<Fraction, E> {
@@ -108,7 +108,7 @@ impl<'de> Visitor<'de> for PartsVisitor {
     }
 }
 
-/// A [BigFraction](crate::BigFraction): in a human-readable format its text as [Fraction]'s (`"333.(3)"`,
+/// A [BigFraction](crate::BigFraction): in a human-readable format its text as [Fraction]'s (`"333.[3]"`,
 /// `"1/7919"`), an integer read too; in a binary one the triple `(negative, numerator, denominator)`, each integer
 /// its little-endian bytes without trailing zeros (0 none), in lowest terms: one value, one form.
 #[cfg(feature = "bignum")]
@@ -156,7 +156,7 @@ mod big {
         type Value = BigFraction;
 
         fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            f.write_str("an exact number as text (\"1.5\", \"333.(3)\", \"1000/3\") or an integer")
+            f.write_str("an exact number as text (\"1.5\", \"333.[3]\", \"1000/3\") or an integer")
         }
 
         fn visit_str<E: de::Error>(self, s: &str) -> Result<BigFraction, E> {

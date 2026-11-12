@@ -17,7 +17,7 @@
 //!   numbers, `(num, decimals)`.
 //!
 //! - [Exact](crate::Exact) and [Fraction](crate::Fraction): in a human-readable format the exact number as text, in
-//!   the unit itself (`"333.(3)"`, `"80000000"`, `"1000/7919"`; an integer reads too, a float is refused, its digits
+//!   the unit itself (`"333.[3]"`, `"80000000"`, `"1000/7919"`; an integer reads too, a float is refused, its digits
 //!   already rounded), in a binary one `(negative, numerator, denominator)` in lowest terms.
 //!
 //! Reading checks what construction checks and never builds a value that breaks it: a [Fixed] or an

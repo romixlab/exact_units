@@ -66,7 +66,7 @@ The API reference is on [docs.rs](https://docs.rs/exact_units).
 
 - **Exact or refused.** Scales are exact magnitudes (primes, π, ln 2, ln 10, roots), conversion factors are worked out at compile time, and a conversion that isn't exact returns `None` or doesn't compile.
 - **Zero cost.** `Fixed` is `#[repr(transparent)]` over its integer: the same bytes, and on Cortex-M the same instructions.
-- **Exact fractions at run time**: `Exact<Hertz>` of 80/3 MHz, worked out on a host, printed `26.(6) MHz`, read back from a config, compared with any `Fixed` exactly.
+- **Exact fractions at run time**: `Exact<Hertz>` of 80/3 MHz, worked out on a host, printed `26.[6] MHz`, read back from a config, compared with any `Fixed` exactly.
 - **Points and offsets**: °C against K, gauge pressure, register formulas, angles that wrap.
 - **Kinds and distinguished bases**: a V/V gain is not a duty cycle, samples are not bytes, rad/s is not Hz; any number of bases in one unit, exponents in halves (V/√Hz).
 - **Fixed point and levels**: Q15, Q31, binary angles, `fixed!(0.1)` and `db!(-3)` as compile-time constants.

@@ -79,7 +79,7 @@ $\lambda = c/f$ is exact since $c$ is: 299 792 458/2.4·10⁹ [[m]], a repeating
 use exact_units::{Exact, units::Meter};
 
 let lambda = Exact::<Meter>::new(299_792_458, 2_400_000_000);
-assert_eq!(lambda.to_string(), "124.9135241(6) mm");
+assert_eq!(lambda.to_string(), "124.9135241[6] mm");
 ```
 
 $4\pi d/\lambda = 4\pi d f/c$ is $\pi$ times a rational, an exact `Magnitude`. Doubling $d$ or $f$ multiplies it by exactly 2, so it adds exactly $20 \lg 2$ to the loss, the same 6.02 dB as a return loss of $|\Gamma| = 1/2$ ([Mismatch](mismatch.md)):

@@ -51,7 +51,7 @@
 //! ```
 //! # #[cfg(feature = "time")] {
 //! use exact_units::{Exact, q, units::Hertz};
-//! let f = Exact::<Hertz>::new(80_000_000, 3); // 26.(6) MHz
+//! let f = Exact::<Hertz>::new(80_000_000, 3); // 26.[6] MHz
 //! assert!(f > q!(26.666666 MHz));
 //! assert!(f < q!(26.666667 MHz));
 //! assert!(q!(80 MHz) == (f * 3).unwrap());

@@ -23,8 +23,8 @@
 //!
 //! A float storage takes the nearest float to the value, worked out in `f64`.
 //!
-//! An [Exact] field is written as `{}` writes it, with the prefix it picks: `"79.99998046875 MHz"`, `"333.(3) kHz"`,
-//! `"1000/7919 kHz"`. It reads what a `Fixed` of its unit reads, a repetend in parentheses and a fraction too
+//! An [Exact] field is written as `{}` writes it, with the prefix it picks: `"79.99998046875 MHz"`, `"333.[3] kHz"`,
+//! `"1000/7919 kHz"`. It reads what a `Fixed` of its unit reads, a repetend in brackets and a fraction too
 //! (`"1000/3 kHz"`), always exactly: there are no steps to miss and no storage to pass, so the refusals are another
 //! unit, not a number, and a number past what a fraction of `u128`s holds.
 //!
@@ -41,7 +41,7 @@
 //! let c: Clock = serde_json::from_str(r#"{ "target": "79.99998046875 MHz" }"#).unwrap();
 //! assert_eq!(c.target, Exact::new(2_559_999_375, 32));
 //! let c: Clock = serde_json::from_str(r#"{ "target": "80000/3 kHz" }"#).unwrap();
-//! assert_eq!(serde_json::to_string(&c).unwrap(), r#"{"target":"26.(6) MHz"}"#);
+//! assert_eq!(serde_json::to_string(&c).unwrap(), r#"{"target":"26.[6] MHz"}"#);
 //! let e = serde_json::from_str::<Clock>(r#"{ "target": "24 MV" }"#).err().unwrap();
 //! assert!(e.to_string().starts_with(r#""24 MV" is not in Hz (with or without an SI prefix)"#));
 //! # }

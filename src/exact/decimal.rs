@@ -1,5 +1,5 @@
-//! A [Fraction] written in decimal exactly: the digits when they end, the repetend in parentheses when they repeat
-//! with a short period (`333.(3)`), never a cut.
+//! A [Fraction] written in decimal exactly: the digits when they end, the repetend in brackets when they repeat
+//! with a short period (`333.[3]`), never a cut.
 
 use super::Fraction;
 use core::fmt;
@@ -204,9 +204,9 @@ impl fmt::Display for Expansion {
             let rep = self.rep.unwrap_or(self.len);
             digits(self.point, rep, f)?;
             if rep < self.len {
-                f.write_str("(")?;
+                f.write_str("[")?;
                 digits(rep, self.len, f)?;
-                f.write_str(")")?;
+                f.write_str("]")?;
             }
         }
         Ok(())
@@ -225,8 +225,8 @@ fn pre_period(mut den: u128) -> u32 {
 }
 
 impl fmt::Display for Fraction {
-    /// The exact decimal when it ends (`-2.5`), the repetend in parentheses when it repeats within 12 digits
-    /// (`0.(142857)`), else the fraction (`1/7919`). Every form reads back with `parse`.
+    /// The exact decimal when it ends (`-2.5`), the repetend in brackets when it repeats within 12 digits
+    /// (`0.[142857]`), else the fraction (`1/7919`). Every form reads back with `parse`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match Expansion::of(*self, 0) {
             Some(e) => write!(f, "{e}"),
@@ -263,15 +263,15 @@ mod tests {
         assert_eq!(show(0, 1, 0), "0");
         assert_eq!(show(5, 2, 0), "2.5");
         assert_eq!(show(-1, 8, 0), "-0.125");
-        assert_eq!(show(1, 3, 0), "0.(3)");
-        assert_eq!(show(1, 6, 0), "0.1(6)");
-        assert_eq!(show(1, 7, 0), "0.(142857)");
+        assert_eq!(show(1, 3, 0), "0.[3]");
+        assert_eq!(show(1, 6, 0), "0.1[6]");
+        assert_eq!(show(1, 7, 0), "0.[142857]");
         assert_eq!(show(1, 7919, 0), "-");
-        assert_eq!(show(1_000_000, 3, -3), "333.(3)");
-        assert_eq!(show(1, 3, 3), "333.(3)");
-        assert_eq!(show(50, 3, -2), "0.1(6)");
-        assert_eq!(show(10, 33, -1), "0.(03)");
-        assert_eq!(show(1, 3, -2), "0.00(3)");
+        assert_eq!(show(1_000_000, 3, -3), "333.[3]");
+        assert_eq!(show(1, 3, 3), "333.[3]");
+        assert_eq!(show(50, 3, -2), "0.1[6]");
+        assert_eq!(show(10, 33, -1), "0.[03]");
+        assert_eq!(show(1, 3, -2), "0.00[3]");
         assert_eq!(show(1500, 1, -3), "1.5");
         assert_eq!(show(1500, 1, 3), "1500000");
         assert_eq!(show(5, 100, 3), "50");

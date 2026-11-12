@@ -68,7 +68,7 @@ pub(crate) fn big_written(x: &BigFraction) {
         (1..=12u32).find(|p| (10u64.pow(*p).wrapping_sub(1)).checked_rem(d) == Some(0))
     });
     assert_eq!(
-        s.contains('('),
+        s.contains('['),
         !terminates && period.is_some(),
         "{x:?}: {s}"
     );
@@ -113,8 +113,8 @@ pub(crate) fn written(x: Fraction) {
     let terminates = den == 1;
     // a repetend only where the digits repeat, digits alone only where they end; the fraction where they repeat
     // with a long period or are more than text reads back
-    assert!(!(terminates && s.contains('(')), "{x:?}: {s}");
-    assert!(terminates || s.contains(['(', '/']), "{x:?}: {s}");
+    assert!(!(terminates && s.contains('[')), "{x:?}: {s}");
+    assert!(terminates || s.contains(['[', '/']), "{x:?}: {s}");
     exact(Exact::<Hertz>::of(x));
     exact(Exact::<Second>::of(x));
     exact(Exact::<Ratio>::of(x));
@@ -189,11 +189,14 @@ pub(crate) fn any_json(s: &str) {
 #[cfg(not(any(kani, fuzzing)))]
 mod tests {
     use super::super::strategy;
+    #[cfg(feature = "bignum")]
+    use super::BigFraction;
+    use super::{Display, Exact, Fraction, Second};
     use proptest::prelude::*;
 
     /// Text shaped like numbers with units: digits, points, repetends, fractions, exponents, prefixes and units.
     fn texty() -> impl Strategy<Value = String> {
-        "[-+]?[0-9_]{0,40}(\\.[0-9]{0,30})?(\\([0-9]{0,14}\\)?)?(/[0-9.e]{0,40})?([eE][-+]?[0-9]{1,3})? ?(|[kMGTmuµnpfa]|Ki|da|%|ppm|ppb|‰)(Hz|s|)"
+        "[-+]?[0-9_]{0,40}(\\.[0-9]{0,30})?([\\[(][0-9]{0,14}[\\])]?)?(/[0-9.e]{0,40})?([eE][-+]?[0-9]{1,3})? ?(|[kMGTmuµnpfa]|Ki|da|%|ppm|ppb|‰)(Hz|s|)"
     }
 
     proptest! {
@@ -207,7 +210,7 @@ mod tests {
         fn every_big_fraction_reads_back(x in strategy::fraction(), k in 0u32..=4) {
             // a Fraction's value, and one raised past 128 bits
             super::alike(x);
-            let b = exact_units::BigFraction::from(x);
+            let b = BigFraction::from(x);
             let mut p = b.clone();
             for _ in 0..k {
                 p = p.checked_mul(&b).expect("a product");
@@ -228,14 +231,52 @@ mod tests {
         }
     }
 
+    /// Digits in parentheses after a number are refused by name in every reader: `0.1(6)` would be 1/6 as a
+    /// repetend and 0.1 ± 0.6 in CODATA's notation, so it is neither; the repetend is written `0.1[6]`.
+    #[test]
+    fn parentheses_read_two_ways() {
+        let two_ways = |e: &dyn Display, s: &str| {
+            let text = e.to_string();
+            assert!(text.contains("read two ways"), "{s:?}: {text}");
+        };
+        for s in [
+            "0.1(6)",
+            "333.(3)",
+            ".(3)",
+            "6.67430(15)",
+            "6.67430(15)e-11",
+            "1600(7)",
+            "1000/3(4)",
+        ] {
+            match s.parse::<Fraction>() {
+                Ok(x) => panic!("{s:?} read as {x}"),
+                Err(e) => two_ways(&e, s),
+            }
+            let t = format!("{s} s");
+            match t.parse::<Exact<Second>>() {
+                Ok(x) => panic!("{t:?} read as {x}"),
+                Err(e) => two_ways(&e, &t),
+            }
+            #[cfg(feature = "bignum")]
+            match s.parse::<BigFraction>() {
+                Ok(x) => panic!("{s:?} read as {x}"),
+                Err(e) => two_ways(&e, s),
+            }
+        }
+        assert_eq!("0.1[6]".parse::<Fraction>(), Ok(Fraction::new(1, 6)));
+        assert_eq!(Fraction::new(1, 6).to_string(), "0.1[6]");
+        #[cfg(feature = "bignum")]
+        assert_eq!(BigFraction::new(1, 6).to_string(), "0.1[6]");
+    }
+
     #[test]
     fn hand_picked() {
         for s in [
             "79.99998046875 MHz",
             "1000/3 kHz",
-            "333.(3) kHz",
-            "-0.(142857) Hz",
-            ".(3) Hz",
+            "333.[3] kHz",
+            "-0.[142857] Hz",
+            ".[3] Hz",
             "1/7919",
             "5 ppm",
             "0.25 %",
@@ -244,8 +285,15 @@ mod tests {
             "340282366920938463463374607431768211455",
             "340282366920938463463374607431768211456",
             "1/0",
+            "1.[",
+            "1.[]",
+            // parentheses read two ways (a repetend, CODATA's uncertainty): refused
             "1.(",
             "1.()",
+            "333.(3) kHz",
+            "6.67430(15)e-11",
+            "1600(7) s",
+            "1000/3(4) Hz",
             // found by the properties: a prefix's power cancels with the exponent (10 Hz in TiHz, 21e-39 QHz), and
             // a repetend whose digits all count
             "1daHz",
@@ -254,7 +302,7 @@ mod tests {
             "118998767537150929290650271426213610191/37 Hz",
             // past what a Fraction reads, a BigFraction reads: digits past 38; a power past ±10⁴ it refuses
             "1/340282366920938463463374607431768211457",
-            "0.(000000000001)",
+            "0.[000000000001]",
             "1.000000000000000000000000000000000000000000000000001 Hz",
             "1e10000",
             "1e10001",

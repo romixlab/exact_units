@@ -129,12 +129,12 @@ macro_rules! api {
                 assert_eq!(f.clone().auto_prefix(), Prefix::Mega);
                 assert_eq!(
                     f.clone().in_prefix(Prefix::Kilo).to_string(),
-                    "26666.(6) kHz"
+                    "26666.[6] kHz"
                 );
-                assert_eq!(f.to_string(), "26.(6) MHz");
+                assert_eq!(f.to_string(), "26.[6] MHz");
                 assert_eq!(format!("{:#}", E::<Hertz>::new(1, 2)), "0.5 Hz");
                 assert_eq!(format!("{:?}", E::<Hertz>::int(2)), "Exact(2/1 Hz)");
-                assert_eq!("26.(6) MHz".parse::<E<Hertz>>(), Ok(E::new(80_000_000, 3)));
+                assert_eq!("26.[6] MHz".parse::<E<Hertz>>(), Ok(E::new(80_000_000, 3)));
                 assert!("1 m".parse::<E<Hertz>>().is_err());
                 let r = E::<Hertz>::new(1, 3).rounded(2, Rounding::NearestEven);
                 assert_eq!(r.to_string(), "333.33 mHz");
@@ -173,7 +173,7 @@ macro_rules! api {
             fn generic_code() {
                 assert_eq!(
                     period_text(&E::<Hertz>::int(3)).as_deref(),
-                    Some("333.(3) ms")
+                    Some("333.[3] ms")
                 );
             }
         }

@@ -29,7 +29,7 @@ use dashu_ratio::RBig;
 /// Its arithmetic gives the exact value, `None` only for a division by zero, so the `Option` API of [Fraction] reads
 /// the same. A [Fraction] widens to one always ([From]), and one narrows back where a `Fraction` holds it
 /// ([to_fraction](Self::to_fraction)). Text is [Fraction]'s grammar both ways: the decimal when it ends, the
-/// repetend in parentheses when it repeats within 12 digits, else `num/den`.
+/// repetend in brackets when it repeats within 12 digits, else `num/den`.
 ///
 /// ```
 /// use exact_units::{BigFraction, Fraction, dashu_int::ops::BitTest};
@@ -41,7 +41,7 @@ use dashu_ratio::RBig;
 /// }
 /// assert!(h.denom().bit_len() > 80 && h.to_fraction().is_some());
 /// let third = BigFraction::from(Fraction::new(1, 3));
-/// assert_eq!(third.to_string(), "0.(3)");
+/// assert_eq!(third.to_string(), "0.[3]");
 /// // 1/(2¹²⁸ + 1): a denominator past u128, free of 2s and 5s, so no Fraction holds it
 /// let past: BigFraction = "1/340282366920938463463374607431768211457".parse().unwrap();
 /// assert_eq!(past.to_fraction(), None);
@@ -395,7 +395,7 @@ impl fmt::Display for Decimal {
             write!(f, ".{}", self.pre)?;
         }
         if let Some(rep) = &self.rep {
-            write!(f, "({rep})")?;
+            write!(f, "[{rep}]")?;
         }
         Ok(())
     }
@@ -440,8 +440,8 @@ impl fmt::Display for NotAFraction {
 impl core::error::Error for NotAFraction {}
 
 impl fmt::Display for BigFraction {
-    /// The exact decimal when it ends (`-2.5`), the repetend in parentheses when it repeats within 12 digits
-    /// (`0.(142857)`), else the fraction (`1/7919`). Every form reads back with `parse`.
+    /// The exact decimal when it ends (`-2.5`), the repetend in brackets when it repeats within 12 digits
+    /// (`0.[142857]`), else the fraction (`1/7919`). Every form reads back with `parse`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.decimal() {
             Some(d) => write!(f, "{d}"),
@@ -461,8 +461,8 @@ impl fmt::Debug for BigFraction {
 impl FromStr for BigFraction {
     type Err = super::ParseFractionError;
 
-    /// [Fraction]'s grammar: a decimal (`1.5`, `-2e-3`, `1_000`), one with its repetend in parentheses
-    /// (`333.(3)`), or a fraction (`1000/3`), exactly, with any number of digits; an exponent past
+    /// [Fraction]'s grammar: a decimal (`1.5`, `-2e-3`, `1_000`), one with its repetend in brackets
+    /// (`333.[3]`), or a fraction (`1000/3`), exactly, with any number of digits; an exponent past
     /// [MAX_TEXT_EXP](BigFraction::MAX_TEXT_EXP) (`1e10001`) is refused.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let err = super::ParseFractionError::of;
@@ -569,12 +569,15 @@ fn text_exp(e: i64) -> Result<i32, Kind> {
 }
 
 /// The number at the start of `s` as `x · 10^e` and the text after it: the grammar of [Fraction]'s, digits of any
-/// length (a decimal, one with its repetend in parentheses, a fraction of two decimals).
+/// length (a decimal, one with its repetend in brackets, a fraction of two decimals).
 pub(crate) fn number(s: &str) -> Result<(BigFraction, i32, &str), Kind> {
     if let Some(r) = repeating(s) {
         return r.map(|(x, rest)| (x, 0, rest));
     }
     let (neg, m, e, rest) = decimal(s)?;
+    if super::text::paren_after(rest) {
+        return Err(Kind::Paren);
+    }
     let x = BigFraction::from_parts(neg, m, UBig::ONE).ok_or(Kind::Form)?;
     let over = rest
         .strip_prefix('/')
@@ -583,6 +586,9 @@ pub(crate) fn number(s: &str) -> Result<(BigFraction, i32, &str), Kind> {
         return Ok((x, text_exp(e)?, rest));
     };
     let (_, den, de, rest) = decimal(over)?;
+    if super::text::paren_after(rest) {
+        return Err(Kind::Paren);
+    }
     if den.is_zero() {
         return Err(Kind::Zero);
     }
@@ -611,11 +617,14 @@ fn repeating(s: &str) -> Option<Result<(BigFraction, &str), Kind>> {
     }
     let (pre_from, pre_to) = run(i + 1);
     i = pre_to;
-    if b.get(i) != Some(&b'(') {
+    if b.get(i) == Some(&b'(') {
+        return Some(Err(Kind::Paren));
+    }
+    if b.get(i) != Some(&b'[') {
         return None;
     }
     let (rep_from, rep_to) = run(i + 1);
-    if rep_to == rep_from || b.get(rep_to) != Some(&b')') {
+    if rep_to == rep_from || b.get(rep_to) != Some(&b']') {
         return Some(Err(Kind::Form));
     }
     let rest = s.get(rep_to + 1..)?;
@@ -774,9 +783,9 @@ mod tests {
         for (s, n, d) in [
             ("0", 0, 1),
             ("-2.5", -5, 2),
-            ("0.(3)", 1, 3),
-            ("0.1(6)", 1, 6),
-            ("0.(142857)", 1, 7),
+            ("0.[3]", 1, 3),
+            ("0.1[6]", 1, 6),
+            ("0.[142857]", 1, 7),
             ("1/7919", 1, 7919),
             ("-0.125", -1, 8),
             ("1500", 1500, 1),

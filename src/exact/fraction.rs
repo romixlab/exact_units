@@ -990,7 +990,7 @@ fraction! {
     /// assert!(Fraction::new(1, 3) < Fraction::new(1, 2));
     /// assert_eq!(Fraction::new(-6, 4), -Fraction::new(3, 2));
     /// assert_eq!(Fraction::int(1).checked_div(Fraction::ZERO), None);
-    /// assert_eq!(Fraction::new(1, 3).to_string(), "0.(3)");
+    /// assert_eq!(Fraction::new(1, 3).to_string(), "0.[3]");
     /// // 10⁻⁵⁰ is past u128 as 1/10⁵⁰, not as 1·10⁻⁵⁰
     /// let tiny = Fraction::pow10(-50);
     /// assert_eq!((tiny.mantissa(), tiny.exp10()), ((1, 1), -50));

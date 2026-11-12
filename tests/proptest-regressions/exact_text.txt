@@ -5,3 +5,5 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 1880d456b55ff2ab7d1a8e23e1bf5150ee1ec357217abc01ec891e58d0f18b27 # shrinks to x = 1e-2147483648/1
+cc 32a4cd3f8280510b61b6fdb623f7286ff0269ec0462a2909400ca7d9175631c4 # shrinks to x = 2560162054212786733/3
+cc dd12e599b3c0c57b6906d504b581d462f1f86d411de0ee3e6a52b4137e17c705 # shrinks to x = 1/11, k = 0

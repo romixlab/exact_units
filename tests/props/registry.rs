@@ -145,7 +145,7 @@ mod tests {
             any::<i32>().prop_map(|n| n.to_string()),
             (any::<i16>(), 0u32..6).prop_map(|(n, k)| format!("{n}.{}", "5".repeat(k as usize))),
             Just("1e3".to_owned()),
-            Just("333.(3)".to_owned()),
+            Just("333.[3]".to_owned()),
         ];
         (number, unit_text()).prop_map(|(n, u)| format!("{n} {u}"))
     }
