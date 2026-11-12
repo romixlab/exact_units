@@ -62,6 +62,19 @@ jobs:
       # without the wire format: plain Rust types only
       - run: cargo clippy --all-targets --no-default-features --features std -- -D warnings
 
+  check:
+    name: just check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          target: thumbv6m-none-eabi, thumbv7em-none-eabihf
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - run: just check
+
   doc:
     name: rustdoc
     runs-on: ubuntu-latest

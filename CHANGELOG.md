@@ -717,6 +717,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
 
 ### 🐛 Fixes
 
+- `defmt` alone, without `dimensionless`, builds again (found by su-dfu, wire_weaver's `mcu/` workspace, `just check-mcu`). The `defmt::Format` compile check added for `Niched`, `Null` and `Clipped` used `units::Ratio`, which needs `dimensionless`; it is gated on both features now. CI gains a `check` job that runs `just check`, so a feature set only the justfile knew about is built here too.
 - A `Fraction` written as `num/den` (`"1000/3 kHz"`, `{}`'s own form once the exponent needs a denominator) read back wrong, not refused, where the denominator's own trailing zeros push the outer exponent past `i32` (NUM-33, found by the fuzz target `exact_text`): `"1e-2147483648/1000 kHz"` is `Fraction::pow10(i32::MIN)` in kHz, and read back as `10^(i32::MIN + 3)`, three powers of ten off. The denominator's power of ten now folds into the mantissa the same way every other clamp to `Fraction`'s exponent range does, instead of staying apart to be subtracted in `i32`.
 - Text with a power of ten past `i32` is refused, not read as the nearest end (NUM-33): `"1e99999999999999"` was `10^i32::MAX`, and `"1e-2147483648"`, the text `{}` writes for `Fraction::pow10(i32::MIN)`, read back as `10^(i32::MIN + 1)`. The same for a `serde::with_unit` value whose prefix moves its exponent past `i32`.
 - One over a quantity of dimension other than one (`Per<Ratio, Ohm>`) was given the divisor's kind (a resistance of the dimension of S); it is derived now (UNIT-8).

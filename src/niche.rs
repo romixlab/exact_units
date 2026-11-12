@@ -957,7 +957,8 @@ use shrink_wrap::refused::{Refused, Rule};
 mod tests;
 
 /// `defmt::Format` is there for what a firmware logs (tests can't link with defmt, so the claim is a build one).
-#[cfg(feature = "defmt")]
+/// `Ratio` needs `dimensionless`, so the check needs it too (`just check`'s bare `defmt` run has neither).
+#[cfg(all(feature = "defmt", feature = "dimensionless"))]
 const _: () = {
     use crate::{Fixed, Range, prefix::One, units::Ratio};
 
