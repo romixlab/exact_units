@@ -13,7 +13,23 @@ success-output = "immediate"
 # fail to compile, but it succeeded"). One at a time, they never share it.
 [test-groups]
 trybuild = { max-threads = 1 }
+size-tools = { max-threads = 1 }
 
 [[profile.default.overrides]]
 filter = 'binary(compile_fail)'
 test-group = 'trybuild'
+
+# tests/curve_size.rs, scaled_size.rs and can_fd_size.rs each nest a from-scratch `cargo build` of their own
+# tools/* workspace (each already its own `[workspace]`, its own --target-dir and so its own bucket of
+# ~/.cargo/config.toml's global build-dir, not a directory the three share). The race is CPU oversubscription,
+# not a shared path: nextest runs the three as separate processes at the same time as everything else in the
+# suite (by default one per core), and each of their nested cargo builds *also* spawns its own -j <nproc> rustc
+# jobs for an LTO, codegen-units=1 cross build. Three of those nested builds running at once, each trying to use
+# every core, is the same class of overload book-math hit with trybuild (a background step falls behind under
+# the full suite's load and a second writer lands on state the first is still using); here it surfaces as cargo
+# failing to write an LTO bytecode file mid-build ("failed to write bytecode ... No such file or directory"). A
+# target dir per tool doesn't help, as they already have one each; serializing the three relative to each other
+# removes the oversubscription instead.
+[[profile.default.overrides]]
+filter = 'binary(curve_size) | binary(scaled_size) | binary(can_fd_size)'
+test-group = 'size-tools'
