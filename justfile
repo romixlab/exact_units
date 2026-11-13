@@ -66,6 +66,7 @@ lint:
     cargo clippy --manifest-path tools/can_fd_size/Cargo.toml --target thumbv7em-none-eabihf --target-dir target -- -D warnings
     cargo clippy --manifest-path tools/curve_size/Cargo.toml --target thumbv7em-none-eabihf --target-dir target -- -D warnings
     cargo clippy --manifest-path tools/scaled_size/Cargo.toml --target thumbv7em-none-eabihf --target-dir target -- -D warnings
+    cargo clippy --manifest-path tools/prefix_size/Cargo.toml --target thumbv7em-none-eabihf --target-dir target -- -D warnings
 
 # The fuzz crate builds (not run), so a gap like tests/props using num-bigint where fuzz/ has no such dependency
 # can't rot again. Needs a nightly toolchain and cargo-fuzz (`rustup toolchain install nightly`, `cargo install cargo-fuzz`).

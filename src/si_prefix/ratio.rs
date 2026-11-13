@@ -89,6 +89,14 @@ const fn ratio_of_parts(from: Prefix, to: Prefix) -> Option<PrefixRatio> {
     })
 }
 
+/// [Prefix::si_exp] of both prefixes, a table load each. Out of line: inlined, LLVM threads [Prefix::ratio_to]'s
+/// test of the result into each match before it would turn the match into a table, and at `opt-level` `s` or `z`
+/// the fast path becomes a jump table of a branch per prefix, 100 bytes and more, in every copy.
+#[inline(never)]
+const fn si_exps(a: Prefix, b: Prefix) -> [i8; 2] {
+    [a.si_exp(), b.si_exp()]
+}
+
 /// `2^n − 1` for `n` in 1..=32.
 #[expect(
     clippy::as_conversions,
@@ -110,10 +118,12 @@ impl Prefix {
         clippy::arithmetic_side_effects,
         reason = "an SI exponent is within ±30, so a difference of two is within ±60, an i8"
     )]
-    #[inline]
+    // out of line, 70 bytes or so on Cortex-M: copies inlined at each call site cost a firmware more flash than the
+    // call saves (tests/prefix_size.rs)
+    #[inline(never)]
     pub const fn ratio_to(self, to: Prefix) -> Option<PrefixRatio> {
         // two SI prefixes, the common case: the difference of their exponents, each one table load
-        let (e1, e2) = (self.si_exp(), to.si_exp());
+        let [e1, e2] = si_exps(self, to);
         if e1 != NOT_SI && e2 != NOT_SI {
             return Some(PrefixRatio {
                 pow10: e1 - e2,

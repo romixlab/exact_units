@@ -253,6 +253,11 @@ required-features = ["information", "std"]
 name = "curve_size"
 required-features = ["libm", "std"]
 
+# ww_si's integer scaling across run-time prefixes and a Fixed's, flash on thumbv7em: builds tools/prefix_size
+[[test]]
+name = "prefix_size"
+required-features = ["std"]
+
 # a count at a run-time time base (Ticks) to 90 kHz against a Fixed's, flash and routines on thumbv7em and
 # thumbv6m: builds tools/scaled_size
 [[test]]

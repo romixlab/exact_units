@@ -1,0 +1,30 @@
+# The integer scaling path across run-time prefixes (Prefix::ratio_to, PrefixRatio::requantize on u32, a power of 2's
+# ratio from Prefix::from_pow2) as ww_si's ToIn::of_value and scale_pow2 call it, and a Fixed conversion between two
+# compile-time prefixes on u32: a firmware image for a Cortex-M4F whose flash tests/prefix_size.rs pins. Not part of
+# the crate: a workspace of its own, never published.
+[package]
+name = "prefix_size"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "prefix"
+test = false
+bench = false
+
+[dependencies]
+exact_units = { path = "../..", default-features = false, features = ["time"] }
+
+# as a firmware's release build: small, whole-program
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+debug = false
+panic = "abort"
+
+[profile.dev]
+panic = "abort"

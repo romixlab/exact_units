@@ -355,7 +355,8 @@ impl Prefix {
     }
 
     /// [si_pow10](Self::si_pow10) with [NOT_SI] for none: a match of constants alone, which compiles to one table
-    /// load (a match of `Option`s is a jump table, a branch per prefix).
+    /// load where nothing branches on the result in the same function (a match of `Option`s is a jump table, a
+    /// branch per prefix; see `ratio::si_exps`).
     #[inline(always)]
     pub(crate) const fn si_exp(self) -> i8 {
         match self {
