@@ -219,6 +219,19 @@ assert_eq!(q.exp(), None);
 assert_eq!(q.exp_rounded::<Nano, i64>(Rounding::Floor), Ok(Fixed::new(995_677_200)));
 ```
 
+The logarithm is the same edge run backwards. An exact gain's level in stops, bels or decibels is a rational multiple of $\log_2$ or $\lg$ of it, the form picked by the gain's kind as for [decibels](../levels/decibels.md): $\log_2$ of a power ratio in stops, $20 \lg$ of a voltage ratio in dB. $\log_2$ of a fraction is a fraction only for a power of 2, and $\lg$ only for a power of 10, so `to_level::<L>()` is exact there and `None` everywhere else. `to_level_rounded::<L, P, T>(rounding)` gives every gain's level certified. It never takes a float's logarithm: the level is set against each rounding boundary $t$ by its inverse, the gain against $2^{t/c}$, which is the exponential above. A plain `Ratio` has no level form and doesn't compile, nor does a level in nepers, which is never exact but at a gain of 1.
+
+```rust
+# #[cfg(feature = "electrical")] {
+use exact_units::{Exact, Fixed, Rounding, prefix::Centi, units::{Decibel, Per, Volt, Watt}};
+
+assert_eq!(Exact::<Per<Watt, Watt>>::new(1, 1000).to_level::<Decibel>(), Some(Exact::int(-30)));
+let two = Exact::<Per<Volt, Volt>>::int(2); // 6.0205999.. dB
+assert_eq!(two.to_level::<Decibel>(), None);
+assert_eq!(two.to_level_rounded::<Decibel, Centi, i32>(Rounding::NearestEven), Ok(Fixed::new(602)));
+# }
+```
+
 ## Printing
 
 `{}` picks an SI prefix: the largest power of 1000 that leaves at least 1 before the point. On a ratio it picks %, ppm or ppb: the largest that leaves at least 0.1. `{:#}` writes the unit itself, and `in_prefix(p)` the prefix you give.

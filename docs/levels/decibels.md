@@ -234,7 +234,7 @@ With feature `levels` (in `quantities`), a level is a number of its own unit, no
   doesn't convert to [[m⁻¹]].
 - A loss sits on a second base. A loss and a gain don't convert into each other; `as_gain` and `as_loss` negate.
 - A level has no $10 \lg$ or $20 \lg$ in it. The kind of the gain picks the form at the edge: `to_level` and `to_gain`.
-- A logarithm is no exact number. `to_level` works it in `f64` and rounds it once by the `Rounding` you pass.
+- A logarithm is rarely an exact number. `Fixed::to_level` works it in `f64` and rounds it once by the `Rounding` you pass. An `Exact` gain's `to_level` is exact where the gain is a power of the level's base (100 W/W is 20 dB) and `to_level_rounded` certified everywhere else ([Exact fractions](../maths/fractions.md)).
 
 ```rust
 use exact_units::{Fixed, Rounding, fixed, prefix::{Centi, Micro, One}, q};
