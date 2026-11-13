@@ -102,9 +102,19 @@ pub struct Fixed<U, P, T: Storage, B: Bounds<T> = Unbounded> {
     _bounds: PhantomData<B>,
 }
 
-/// A count of `Of`s in a `T`, `Fixed<Of, One, T>`: `Count<Line, u32>` lines, `Count<Packet, u16>` packets. The
-/// bytes of the plain `T`.
-pub type Count<Of, T> = Fixed<Of, prefix::One, T>;
+/// A count of `Of`s in a `T`, `Fixed<Of, One, T, B>`: `Count<Line, u32>` lines, `Count<Packet, u16>` packets. The
+/// bytes of the plain `T`. `B` is [Unbounded] unless given; a limit known at compile time goes in the type:
+///
+/// ```
+/// use exact_units::{Count, Range, units::Item};
+///
+/// const MAX_WATCHES: u16 = 16;
+/// type Watches = Count<Item, u8, Range<1, { MAX_WATCHES as i64 }>>;
+/// assert!(Watches::try_new(16).is_ok());
+/// assert!(Watches::try_new(17).is_err());
+/// assert!(Watches::try_new(0).is_err());
+/// ```
+pub type Count<Of, T, B = Unbounded> = Fixed<Of, prefix::One, T, B>;
 
 /// Time in µs, `Fixed<Second, Micro, T>`.
 #[cfg(feature = "time")]
@@ -138,21 +148,22 @@ pub type Days<T> = Fixed<crate::units::Day, prefix::One, T>;
 #[cfg(feature = "time")]
 pub type Hz<T> = Fixed<crate::units::Hertz, prefix::One, T>;
 
-/// A size or a count of bytes, `Fixed<Byte, One, T>`.
+/// A size or a count of bytes, `Fixed<Byte, One, T, B>`, `B` [Unbounded] unless given: `Bytes<u8, Range<1, 64>>`
+/// is a length of 1 to 64 bytes.
 #[cfg(feature = "information")]
-pub type Bytes<T> = Fixed<crate::units::Byte, prefix::One, T>;
+pub type Bytes<T, B = Unbounded> = Fixed<crate::units::Byte, prefix::One, T, B>;
 
-/// A size in KiB (1024 bytes), `Fixed<Byte, Kibi, T>`.
+/// A size in KiB (1024 bytes), `Fixed<Byte, Kibi, T, B>`, `B` [Unbounded] unless given.
 #[cfg(feature = "information")]
-pub type Kibibytes<T> = Fixed<crate::units::Byte, prefix::Kibi, T>;
+pub type Kibibytes<T, B = Unbounded> = Fixed<crate::units::Byte, prefix::Kibi, T, B>;
 
-/// A size in MiB (2²⁰ bytes), `Fixed<Byte, Mebi, T>`.
+/// A size in MiB (2²⁰ bytes), `Fixed<Byte, Mebi, T, B>`, `B` [Unbounded] unless given.
 #[cfg(feature = "information")]
-pub type Mebibytes<T> = Fixed<crate::units::Byte, prefix::Mebi, T>;
+pub type Mebibytes<T, B = Unbounded> = Fixed<crate::units::Byte, prefix::Mebi, T, B>;
 
-/// A size in GiB (2³⁰ bytes), `Fixed<Byte, Gibi, T>`.
+/// A size in GiB (2³⁰ bytes), `Fixed<Byte, Gibi, T, B>`, `B` [Unbounded] unless given.
 #[cfg(feature = "information")]
-pub type Gibibytes<T> = Fixed<crate::units::Byte, prefix::Gibi, T>;
+pub type Gibibytes<T, B = Unbounded> = Fixed<crate::units::Byte, prefix::Gibi, T, B>;
 
 /// A 16-bit duty or fraction where 65535 is 1 (100 %): `Fixed<Ratio, Rational<1, 65535>, u16>`, the PWM duty of
 /// many timers.
