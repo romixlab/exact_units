@@ -41,7 +41,7 @@
 //! caller's named choice.
 
 use crate::codec::{CodeSpan, Codec, CodecDef, CodecShape};
-use crate::exact::Exact;
+use crate::exact::{Exact, Fraction};
 use crate::fixed::Fixed;
 use crate::fixed::prefix::Rational;
 #[cfg(any(feature = "std", feature = "libm"))]
@@ -139,17 +139,12 @@ pub fn exposure_time_f64(tv: Apex) -> f64 {
 /// ```
 #[must_use]
 pub fn sensitivity_value(s: u32) -> Option<Apex> {
-    // S / 3.125 = 8·S / 25
-    let num = u64::from(s).checked_mul(8)?;
-    if num % 25 != 0 {
-        return None;
-    }
-    let q = num / 25;
-    if !q.is_power_of_two() {
-        return None;
-    }
-    let stops = i16::try_from(q.trailing_zeros()).ok()?;
-    Some(Apex::new(stops.checked_mul(SIXTHS)?))
+    // S / 3.125 = 8·S / 25, a power of two or no exact Sv
+    let stops = crate::exact::whole_log_of(
+        &Fraction::new(i128::from(s), 25).checked_mul(Fraction::int(8))?,
+        true,
+    )?;
+    Some(Apex::new(i16::try_from(stops).ok()?.checked_mul(SIXTHS)?))
 }
 
 /// `v` in whole stops, `None` between them.

@@ -75,6 +75,8 @@ mod decimal;
 mod exp;
 mod first_order;
 mod fraction;
+#[cfg(feature = "levels")]
+mod log;
 mod num;
 mod rounded;
 mod steps;
@@ -98,6 +100,8 @@ pub use certified::{NearTie, Refused};
 use decimal::{Expansion, write_fraction};
 pub use first_order::{FirstOrder, MAX_SOURCES, Source};
 pub use fraction::{Fraction, Fraction8};
+#[cfg(feature = "levels")]
+pub(crate) use log::whole_log_of;
 pub use num::ExactNum;
 pub use rounded::Rounded;
 pub use steps::Crossing;

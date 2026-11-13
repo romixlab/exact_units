@@ -15,11 +15,11 @@ use core::cmp::Ordering;
 
 /// Past `2^20` the whole part puts the power far outside every storage and float: `2^(2^40)` (or its inverse)
 /// stands in for it, as a level in nepers does (`decibel::exact`).
-const FAR: i128 = 1 << 20;
+pub(super) const FAR: i128 = 1 << 20;
 
 /// The base of the power: 2 for a count of ln 2, 10 for a count of ln 10.
 #[derive(Copy, Clone)]
-enum Base {
+pub(super) enum Base {
     Two,
     Ten,
 }
@@ -61,7 +61,7 @@ impl Base {
     }
 
     /// `self^k` in `R`, exactly, if it fits.
-    fn exact<R: ExactNum>(self, k: i128) -> Option<R> {
+    pub(super) fn exact<R: ExactNum>(self, k: i128) -> Option<R> {
         let k = i32::try_from(k).ok()?;
         let (p2, p10) = match self {
             Base::Two => (k, 0),
@@ -72,7 +72,7 @@ impl Base {
 }
 
 /// `base^q` as a number or an interval.
-enum Power<R> {
+pub(super) enum Power<R> {
     /// Exactly this, `q` whole.
     Exact(R),
     /// Inside this interval, `q` not whole (or `base^q` past what `R` holds).
@@ -116,7 +116,7 @@ fn frac_of(p: Parts, k: i128) -> (Option<Num>, Num) {
 }
 
 /// `base^q`.
-fn power<R: ExactNum>(q: &R, base: Base) -> Power<R> {
+pub(super) fn power<R: ExactNum>(q: &R, base: Base) -> Power<R> {
     let Some(k) = q.round(Rounding::Floor) else {
         return Power::Bounds(far(!q.is_negative()));
     };

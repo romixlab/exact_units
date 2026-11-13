@@ -43,6 +43,8 @@ mod leap;
 #[cfg(feature = "levels")]
 mod level;
 mod literal;
+#[cfg(feature = "levels")]
+mod log;
 mod magnitude;
 mod masses;
 #[cfg(not(kani))]
