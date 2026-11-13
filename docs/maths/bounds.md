@@ -91,6 +91,9 @@ assert_eq!(e.to_string(), "13 B is out of {0..=8, 12, 16, 20, 24, 32, 48, 64} B 
 assert_eq!(Len::try_new_rounded(13, Rounding::Ceil).map(Len::get), Some(16));
 assert_eq!(Len::try_new_rounded(13, Rounding::Floor).map(Len::get), Some(12));
 assert_eq!(Len::try_new_rounded(65, Rounding::Ceil), None);
+
+// a value's place in the set, 0 the first: a table codec's code
+assert_eq!(Len::bounded(12).position(), 9);
 ```
 
 - `try_new`, `bounded`, a `fixed!` constant, serde and the wire refuse a value off the set. A run of consecutive values reads as its ends in the error, `0..=8`.
@@ -99,6 +102,7 @@ assert_eq!(Len::try_new_rounded(65, Rounding::Ceil), None);
 - `checked_add` and its kin are `None` for a result in a gap. `saturating_add` is a compile error: it stops at the ends of a range, and a gap has no end to stop at without a rounding.
 - A window around a set value ends on set values.
 - The set is a table of `T` in flash, 16 bytes for the CAN FD lengths in `u8`. `try_new` and `try_new_rounded` search it in `T` itself, no wider integer on the way: on a Cortex-M4F they take no more flash than the same written by hand on a `u8` and a table of 16 (`tests/can_fd_size.rs` builds both and compares).
+- `position()` is a value's place in the set, 0 the first, the code of a table codec such as CAN FD's DLC. The check and `position()` take the set's leading run of consecutive values (`0..=8` of the CAN FD lengths) by two compares, inline, so a length the compiler knows is below 9 folds to itself, as a `match` written by hand does. The values past the run take one binary search, without a loop for a set of up to 256 values, in a function of its own per set. A check and then `position()` for the same number share that one search: `Len::try_new(x)` followed by its DLC is one search, not two.
 - The crate ships the CAN FD set as `codec::CanFdLengths`, and the 4-bit code that carries it as a codec: [Codecs](../fixed_point/codecs.md#a-table-the-can-fd-dlc).
 
 A constant off the set doesn't build:

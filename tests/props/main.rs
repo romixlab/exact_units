@@ -50,6 +50,7 @@ mod nan;
 mod niche;
 mod no_panic;
 mod numeric;
+mod one_of;
 #[cfg(not(kani))]
 mod panics;
 mod point;

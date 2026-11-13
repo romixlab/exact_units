@@ -13,8 +13,6 @@ use shrink_wrap::prelude::*;
 pub(crate) use bounds::for_each_run;
 #[cfg(any(feature = "dimensionless", feature = "q"))]
 pub(crate) use bounds::set_inward;
-#[cfg(feature = "information")]
-pub(crate) use bounds::set_position;
 pub use bounds::{
     Bounds, Finite, MaybeNan, NanFree, OneOf, OutOfBounds, OutOfRange, Range, RangeDec, RangeU64,
     Saturating, Unbounded, Unlimited, ValueSet, Wrapping,

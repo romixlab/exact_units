@@ -1747,3 +1747,8 @@ pub(crate) mod rf {
         if strict { lhs < rhs } else { lhs <= rhs }
     }
 }
+
+/// The position of `x` in `set`, `None` where it isn't one of it: a walk from the first value, no search.
+pub(crate) fn set_position(set: &[i128], x: i128) -> Option<usize> {
+    set.iter().position(|&v| v == x)
+}

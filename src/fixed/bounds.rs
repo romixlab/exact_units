@@ -470,6 +470,21 @@ pub struct RangeDec<const MIN: i64, const MAX: i64, const EXP: i8>;
 ///
 /// let _ = Fixed::<Ratio, One, u16, OneOf<BulkSizes>>::try_new(32);
 /// ```
+///
+/// Values out of order, or one twice, don't build where the set is first used, a check as much as a constant:
+///
+/// ```compile_fail
+/// use exact_units::{Fixed, OneOf, ValueSet, prefix::One, units::Ratio};
+///
+/// #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+/// struct Shuffled;
+///
+/// impl ValueSet<u8> for Shuffled {
+///     const VALUES: &'static [u8] = &[8, 32, 16, 64];
+/// }
+///
+/// let _ = Fixed::<Ratio, One, u8, OneOf<Shuffled>>::try_new(32); // the values must be ascending
+/// ```
 pub trait ValueSet<T: Storage>:
     Copy + Default + core::fmt::Debug + PartialEq + Eq + core::hash::Hash + 'static
 {
@@ -483,6 +498,12 @@ pub trait ValueSet<T: Storage>:
 /// [bounded](super::Fixed::bounded), a `fixed!` constant, serde and the wire refuse every other value, and
 /// [OutOfRange] lists the set: `13 B is out of {0..=8, 12, 16, 20, 24, 32, 48, 64} B (Byte, u8)`. The check, and
 /// [try_new_rounded](super::Fixed::try_new_rounded), compare in the storage itself: no wider integer on the way.
+///
+/// The check takes the set's leading run of consecutive values (`0..=8` of CAN FD's lengths) by two compares,
+/// inline, and the values past it by one binary search, a function of its own per set that has no loop for a set of
+/// up to 256 values. A firmware pays what a `match` written by hand costs: a length the compiler knows is below 9
+/// folds to itself, and [position](super::Fixed::position), the value's place in the set (a table codec's code),
+/// right after the check for the same number shares its search, so a check and then a code are one search.
 ///
 /// [Bounds::MIN] and [Bounds::MAX] are the set's first and last value, so what proves from them alone (a conversion
 /// [into_rounded](super::Fixed::into_rounded) proves, a [Niched](crate::niche::Niched)'s room) sees the whole range
@@ -526,10 +547,77 @@ pub trait ValueSet<T: Storage>:
 pub struct OneOf<S>(PhantomData<S>);
 
 /// The position of `x` in `set` (ascending), `None` where it isn't one of it: a binary search in `T` itself.
-#[inline]
+#[inline(always)]
 pub(crate) fn set_position<T: Storage>(set: &[T], x: T) -> Option<usize> {
-    let at = set.partition_point(|v| *v < x);
+    let at = lower_bound(set, x);
     set.get(at).filter(|v| **v == x).map(|_| at)
+}
+
+/// How many values of `set` (ascending) are below `x`: a binary search without a loop for a set of up to 256
+/// values. A [OneOf]'s set is a constant, so each step's `size` is too: the steps a set doesn't need fold away, and
+/// what is left is straight-line code. Straight-line, two searches for the same `x` (a set check, then the position
+/// for a codec) are one to the optimiser, where two loops stay two; and at `opt-level = "s"` or `"z"` it unrolls no
+/// loop by itself.
+#[inline(always)]
+fn lower_bound<T: Storage>(set: &[T], x: T) -> usize {
+    let (mut base, mut size) = (0, set.len());
+    // 2^8 = 256 values in eight steps, written out: a loop the optimiser at `"s"` keeps; a longer set goes on in the
+    // loop below
+    (base, size) = halve(set, x, base, size);
+    (base, size) = halve(set, x, base, size);
+    (base, size) = halve(set, x, base, size);
+    (base, size) = halve(set, x, base, size);
+    (base, size) = halve(set, x, base, size);
+    (base, size) = halve(set, x, base, size);
+    (base, size) = halve(set, x, base, size);
+    (base, size) = halve(set, x, base, size);
+    while size > 1 {
+        (base, size) = halve(set, x, base, size);
+    }
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "base < set.len() where a value is at it: the sum is at most the length"
+    )]
+    if set.get(base).is_some_and(|v| *v < x) {
+        base + 1
+    } else {
+        base
+    }
+}
+
+/// One step of [lower_bound]: the values below `x` start before `base + size`, at or after `base`; the upper half's
+/// first value says which half they end in. Nothing where `size` is 1 or 0, the search done.
+#[inline(always)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "base + half < base + size <= set.len(), half <= size: neither overflows nor goes below zero"
+)]
+fn halve<T: Storage>(set: &[T], x: T, base: usize, size: usize) -> (usize, usize) {
+    if size <= 1 {
+        return (base, size);
+    }
+    let half = size / 2;
+    let base = if set.get(base + half).is_some_and(|v| *v < x) {
+        base + half
+    } else {
+        base
+    };
+    (base, size - half)
+}
+
+/// The position of a value in a [OneOf]'s set, per storage: the set's leading run of consecutive values (CAN FD's
+/// `0..=8`) by arithmetic, inline, so a value the optimiser knows to be in it (a length below 9) folds to its
+/// position, as a `match` written by hand does; the values past the run by one binary search ([lower_bound]), out of
+/// line and one function per set, so a set check and then a codec's position for the same value are one call.
+pub(crate) trait SetPosition<T> {
+    /// How many values the set's leading run has: 1 where the second value isn't the first plus one.
+    const RUN: usize;
+
+    /// The position of `x` in the set, `None` where it isn't one of it.
+    fn position(x: T) -> Option<usize>;
+
+    /// [position](Self::position) of an `x` outside the leading run.
+    fn past_run(x: T) -> Option<usize>;
 }
 
 /// The value of `set` (ascending) `x` rounds to by `r`, with its position: `x` itself where it is one, else the next
@@ -1012,8 +1100,68 @@ macro_rules! bounded {
             }
         }
 
+        impl<S: ValueSet<$ty>> SetPosition<$ty> for OneOf<S> {
+            // from SET, so a set that isn't ascending is a compile error here too
+            #[expect(
+                clippy::indexing_slicing,
+                reason = "a const item: n - 1 < n < set.len()"
+            )]
+            const RUN: usize = {
+                let set = match <Self as Bounds<$ty>>::SET {
+                    Some(set) => set,
+                    None => &[],
+                };
+                let mut n = 1;
+                // last + 1 doesn't overflow: a value follows it, so it is below the storage's greatest
+                while n < set.len() && {
+                    let $x = set[n - 1];
+                    let last = $get;
+                    let $x = set[n];
+                    $get == last + 1
+                } {
+                    n += 1;
+                }
+                n
+            };
+
+            #[inline(always)]
+            fn position(x: $ty) -> Option<usize> {
+                let set = <Self as Bounds<$ty>>::SET?;
+                let (run, rest) = set.split_at_checked(Self::RUN)?;
+                if let (Some(&first), Some(&last)) = (run.first(), run.last())
+                    && first <= x
+                    && x <= last
+                {
+                    // the run's values are consecutive: the distance from its first is the position, in the
+                    // storage's own width (abs_diff of a signed one is its unsigned twin, so no overflow)
+                    let first = {
+                        let $x = first;
+                        $get
+                    };
+                    let $x = x;
+                    return usize::try_from($get.abs_diff(first)).ok();
+                }
+                if rest.is_empty() {
+                    return None;
+                }
+                Self::past_run(x)
+            }
+
+            #[inline(never)]
+            fn past_run(x: $ty) -> Option<usize> {
+                let (_, rest) = <Self as Bounds<$ty>>::SET?.split_at_checked(Self::RUN)?;
+                set_position(rest, x)?.checked_add(Self::RUN)
+            }
+        }
+
         #[expect(clippy::as_conversions, reason = "const items: From is not const on stable; widens into i128")]
         impl<S: ValueSet<$ty>> Bounds<$ty> for OneOf<S> {
+            /// One of the set: the leading run by arithmetic, the rest by one binary search ([OneOf]).
+            #[inline(always)]
+            fn contains(x: $ty) -> bool {
+                <Self as SetPosition<$ty>>::position(x).is_some()
+            }
+
             const MIN: Option<$ty> = match Self::SET {
                 Some([first, ..]) => Some(*first),
                 _ => None,
@@ -1058,6 +1206,33 @@ macro_rules! bounded {
         }
 
         impl<U, P, S: ValueSet<$ty>> super::Fixed<U, P, $ty, OneOf<S>> {
+            /// The value's position in the set, 0 the first: `S::VALUES[v.position()]` is `v.get()`. A table codec's
+            /// code ([CanFdDlc](crate::codec::CanFdDlc)'s DLC is the position of the length) or an index into a
+            /// table of one entry per value. The set's leading run (`0..=8` of CAN FD's lengths) by arithmetic, the
+            /// values past it by a binary search that [try_new](super::Fixed::try_new)'s check, made just before for
+            /// the same number, shares: a check and then the position are one search.
+            ///
+            /// ```
+            /// use exact_units::{Fixed, OneOf, ValueSet, prefix::One, units::Ratio};
+            ///
+            /// #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+            /// struct Steps;
+            ///
+            /// impl ValueSet<u8> for Steps {
+            ///     const VALUES: &'static [u8] = &[1, 2, 3, 4, 8, 16];
+            /// }
+            ///
+            /// type Div = Fixed<Ratio, One, u8, OneOf<Steps>>;
+            /// assert_eq!(Div::bounded(3).position(), 2);
+            /// assert_eq!(Div::bounded(16).position(), 5);
+            /// ```
+            #[inline(always)]
+            #[must_use]
+            pub fn position(self) -> usize {
+                // a value of the set: every constructor checked it, so the position is always found
+                <OneOf<S> as SetPosition<$ty>>::position(self.get()).unwrap_or_default()
+            }
+
             /// `value` where it is one of the set, else the set's value `r` rounds it to:
             /// [Ceil](super::Rounding::Ceil) the next one up (a CAN FD payload of 13 bytes goes in a frame of 16),
             /// [Floor](super::Rounding::Floor) the next one down, [Truncate](super::Rounding::Truncate) the next one

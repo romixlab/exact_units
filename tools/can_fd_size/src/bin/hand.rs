@@ -28,6 +28,12 @@ fn dlc_of(len: u8) -> Option<u8> {
         .and_then(|i| u8::try_from(i).ok())
 }
 
+/// The DLC of `x` bytes, where a frame carries that many.
+#[inline(never)]
+fn dlc_of_bytes(x: u8) -> Option<u8> {
+    dlc_of(x)
+}
+
 /// The length a DLC read off the bus says.
 #[inline(never)]
 fn len_of(dlc: u8) -> Option<u8> {
@@ -40,6 +46,7 @@ pub extern "C" fn _start() -> ! {
     keep(len_exact, 13);
     keep(len_up, 13);
     keep(dlc_of, 12);
+    keep(dlc_of_bytes, 12);
     keep(len_of, 9);
     loop {
         core::hint::spin_loop();

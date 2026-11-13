@@ -42,7 +42,6 @@ use crate::fixed::Fixed;
 #[cfg(feature = "dimensionless")]
 use crate::fixed::prefix::Pow2;
 #[cfg(feature = "information")]
-use crate::fixed::set_position;
 #[cfg(feature = "information")]
 use crate::fixed::{OneOf, prefix::One};
 use crate::fixed::{OutOfBounds, Repr, Storage, ValueSet, nearest_entry};
@@ -1150,8 +1149,9 @@ impl ValueSet<u8> for CanFdLengths {
 /// ST's RM0468 Rev 3 (STM32H72x/73x reference manual), §61.4.1, Table 503 "DLC coding in FDCAN", p. 2510, and Linux's
 /// `can_fd_dlc2len` (`drivers/net/can/dev/length.c`) has the same. The first [CodecShape::Table] codec: its [DEF](Codec::DEF)
 /// carries the table for a client that has only the data. The typed path works in `u8` on the one table of 16
-/// bytes that is also [CanFdLengths]: a code's length is its entry, a length's code is its position (a binary
-/// search), so a firmware pays what a table written by hand costs. `tests/props/can_fd.rs` checks both paths
+/// bytes that is also [CanFdLengths]: a code's length is its entry, a length's code is its
+/// [position](crate::Fixed::position) (0..=8 as themselves, the rest by the binary search the length's own set
+/// check already made), so a firmware pays what a table written by hand costs. `tests/props/can_fd.rs` checks both paths
 /// agree on every code and every length, by every rounding.
 ///
 /// - [Raw](Codec::Raw) is `u8`, the field as a controller's register or a byte of a frame holds it: codes
@@ -1248,12 +1248,11 @@ impl Codec for CanFdDlc {
         Fixed::new_unchecked(len)
     }
 
-    /// The position of the length in the table: every `Linear` is one of it, so no rounding is ever needed and
-    /// `rounding` changes nothing (as [CodecDef::encode] gives for a length of the set).
+    /// The position of the length in the table ([Fixed::position]): every `Linear` is one of it, so no rounding is
+    /// ever needed and `rounding` changes nothing (as [CodecDef::encode] gives for a length of the set).
     #[inline]
     fn encode(value: Self::Linear, _rounding: Rounding) -> Option<u8> {
-        let code = set_position(&CAN_FD_DLC, value.get())?;
-        u8::try_from(code).ok()
+        u8::try_from(value.position()).ok()
     }
 }
 
