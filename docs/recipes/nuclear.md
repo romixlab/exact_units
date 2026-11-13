@@ -229,6 +229,30 @@ assert!(bq.get() > 36_576_000_000 && bq.get() < 36_577_000_000);
 
 A gram of radium is 0.988 [[Ci]]: the curie, fixed at $3.7 \cdot 10^{10}\,\unit{Bq}$, outlived the half-life it was measured with.
 
+### The half-life's uncertainty
+
+NUBASE2020 prints the half-life as `1.600` ky with `0.007` in the next column, a standard uncertainty. `Uncertain::from_columns` reads both as printed ([Uncertainty](../maths/uncertainty.md)). In a calculation the half-life is an input with a source, and $A = \ln 2 \cdot N/T_{1/2}$ is worked by [first-order propagation](../maths/uncertainty.md#propagation-first-order), exactly. $N$ and $\ln 2$ carry no uncertainty, so the half-life is the one source. Its contribution to $A$ is $\partial A/\partial T_{1/2} \cdot u(T_{1/2}) = -A \cdot u(T_{1/2})/T_{1/2}$, an exact number in $\ln 2$ per second, and the certified edge rounds it to whole becquerels as it rounds $A$:
+
+```rust
+use exact_units::{Exact, FirstOrder, Fraction, Prefix, Rounding, Source, Uncertain, prefix::One};
+use exact_units::quantities::Activity;
+use exact_units::units::{Becquerel, Ln2, Ratio, Second, TropicalYearNubase2020};
+
+let n = Exact::<Ratio>::new(2_664_365_000_000_000_000_000, 1); // rounded here for the page
+let nubase = Uncertain::<TropicalYearNubase2020>::from_columns("1.600", "0.007", Prefix::Kilo).unwrap();
+let t_half = nubase.convert::<Second>().unwrap().with_source(Source::new(1));
+let a = FirstOrder::exact(Exact::<Ln2>::int(1))
+    .checked_mul(&FirstOrder::exact(n)).unwrap()
+    .checked_div(&t_half).unwrap();
+// the one contribution is −A · 7/1600: A's relative uncertainty is T½'s, exactly
+let (_, c) = a.components().next().unwrap();
+assert_eq!(c.get().checked_div(a.value().get()), Some(Fraction::new(-7, 1600)));
+let u = (-c).as_quantity::<Activity>().convert_rounded::<Becquerel, One, u64>(Rounding::NearestEven).unwrap();
+assert!(u.get() > 160_000_000 && u.get() < 160_100_000); // u(A) = 0.16 GBq of 36.58 GBq
+```
+
+A gram of radium is $3.6577(160) \cdot 10^{10}$ [[Bq]], 0.9886(43) [[Ci]]: the 1.1 % it falls short of a curie is 2.6 standard uncertainties. With more than one source the combined $u_c$ is a square root, and `standard_uncertainty` rounds it by name.
+
 ## Counting reactions: barns
 
 A beam of neutrons through a target makes reactions at a rate $\sigma \cdot \varphi \cdot N$: the cross section, times the fluence rate, times the number of target nuclei. Cross sections are given in barns, $1\,\unit{b} = 10^{-28}\,\unit{m^2}$ (SI Brochure, 9th ed., Table 8), and `Barn` is the crate's own (feature `nuclear`). A fluence rate $\varphi$ in particles per [[cm²]] per second is the unit `PerSquareCentimeterSecond`, a `FluenceRate` (`PerSquareCentimeter` and `PerSquareMeter` measure a `Fluence` $\Phi$). The product is exact:
@@ -327,6 +351,7 @@ The coefficients are a fit, and every fit is a convention: which nuclides, which
 | An energy in [[eV]] to a mass in [[kg]] | the factor $e/c^2$, and the kilograms | | |
 | Atoms in a gram | yes, with the named set's $m_{\mathrm{u}}$ | $m_{\mathrm{u}}$ | |
 | Activity $A = \ln 2 \cdot N/T_{1/2}$ | yes, $\ln 2$ in the unit (`Ln2`); whole [[Bq]] by the certified `convert_rounded`; $\lambda = 1/\tau$ from a mean life | | $\lambda$ from a half-life alone (`decay_constant_f64`) |
+| $u(A)$ from $u(T_{1/2})$ | yes, by first-order propagation (`FirstOrder`); whole [[Bq]] by the certified `convert_rounded` | | |
 | What is left after $t$, $e^{-\lambda t} = 2^{-t/T_{1/2}}$ | yes for whole half-lives (`Exact<Ln2>::exp`, 1/8 after 3); otherwise certified by `exp_rounded` | | |
 | Reaction rate $\sigma \cdot \varphi \cdot N$ | yes | | |
 | [[Gy]] to [[Sv]] | ICRP 60's $w_{\mathrm{R}}$ | $w_{\mathrm{R}}$ named by its set (ICRP 103, ICRP 60) | ICRP 103 neutrons' $w_{\mathrm{R}}(E)$ |

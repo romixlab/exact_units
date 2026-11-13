@@ -8,18 +8,19 @@
 //! through a named set, `convert_with::<Codata2018, _>()`. ħ = c = 1 is exact (`systems::Natural`), so an energy in
 //! eV is a mass in kg with no measured constant at all.
 //!
-//! The activity of a gram of ²²⁶Ra needs the atoms in it, m/(A_r·m_u) (Avogadro cancels: the molar mass constant
-//! M_u = N_A·m_u is measured since 2019, CODATA 2018 and 2022 put it on either side of 1 g/mol), a half-life in
-//! NUBASE2020's year (365.2422 d, its §2.3) and
-//! ln 2, which stays exact in the unit (`units::Ln2`): A = ln 2 · N/T½ is exact, and the step to whole becquerels
-//! is the certified `convert_rounded`, the true value rounded or a refusal, never a float's. λ = ln 2/T½ alone is a
-//! decay constant, a float edge named `decay_constant_f64`; λ·N is an activity only by a named step. A cross section
-//! in barns times a fluence rate times a number of target nuclei is a reaction rate, which is neither a frequency (Hz)
-//! nor an activity (Bq); the activity it saturates to is the named step `saturation_activity`. An absorbed dose in
-//! Gy becomes an equivalent dose in Sv only through a radiation weighting factor from a named set (ICRP 103, 2007:
-//! protons 2; ICRP 60, 1991: protons 5), `equivalent_dose`, and the crate refuses the step without one. The
-//! semi-empirical mass formula ends the tour: its volume and asymmetry terms are exact, the
-//! surface, Coulomb and pairing terms need A^(1/3), a float edge by necessity.
+//! The activity of a gram of ²²⁶Ra needs the atoms in it, m/(A_r·m_u) (Avogadro cancels: the molar mass constant M_u =
+//! N_A·m_u is measured since 2019, CODATA 2018 and 2022 put it on either side of 1 g/mol), a half-life in NUBASE2020's
+//! year (365.2422 d, its §2.3) and ln 2, which stays exact in the unit (`units::Ln2`): A = ln 2 · N/T½ is exact, and
+//! the step to whole becquerels is the certified `convert_rounded`, the true value rounded or a refusal, never a
+//! float's. λ = ln 2/T½ alone is a decay constant, a float edge named `decay_constant_f64`. NUBASE2020's 1600(7) y is
+//! an `Uncertain`, and A's uncertainty from it is first-order propagation (`FirstOrder`), exact up to the certified
+//! edge; λ·N is an activity only by a named step. A cross section in barns times a fluence rate times a number of
+//! target nuclei is a reaction rate, which is neither a frequency (Hz) nor an activity (Bq); the activity it saturates
+//! to is the named step `saturation_activity`. An absorbed dose in Gy becomes an equivalent dose in Sv only through a
+//! radiation weighting factor from a named set (ICRP 103, 2007: protons 2; ICRP 60, 1991: protons 5),
+//! `equivalent_dose`, and the crate refuses the step without one. The semi-empirical mass formula ends the tour: its
+//! volume and asymmetry terms are exact, the surface, Coulomb and pairing terms need A^(1/3), a float edge by
+//! necessity.
 //!
 //! AME2020's values are written as it prints them, `exact!(8071.31806 keV)`: the literal `q!` reads, as an `Exact` of
 //! its unit, the prefix folded into the value exactly.
@@ -48,7 +49,7 @@ use exact_units::units::{
     Barn, Becquerel, Curie, Dalton, ElectronVolt, EquivalentDose, Gram, Gray, Joule, Ln2, Per,
     PerSquareCentimeterSecond, Ratio, Second, Speed, TropicalYearNubase2020,
 };
-use exact_units::{Exact, Fixed, Fraction, Prefix, Rounding, exact};
+use exact_units::{Exact, FirstOrder, Fixed, Fraction, Prefix, Rounding, Source, Uncertain, exact};
 
 /// An atomic mass from AME2020 in µu, as the ratio M/m_u it is: a mass spectrometer measures ratios of masses.
 const fn micro_u(num: i128, den: u128) -> Exact<Ratio> {
@@ -341,6 +342,42 @@ fn radium_activity() {
     println!("  A = {bq} = {micro_ci}");
     // the curie was once "a gram of radium"; with today's half-life a gram is 1.1 % short of it
     assert!(micro_ci.get() > 988_000 && micro_ci.get() < 989_000);
+
+    // T½'s uncertainty: NUBASE2020 prints 1.600 ky with 0.007 in the next column, a standard uncertainty (k = 1).
+    // The same A, now carried by first-order propagation (GUM eq. (10)), exact: N and ln 2 have none, T½ is the
+    // one source, so A's contribution from it is ∂A/∂T½ · u(T½) = −A · u(T½)/T½, an exact number in the same unit
+    let nubase =
+        Uncertain::<TropicalYearNubase2020>::from_columns("1.600", "0.007", Prefix::Kilo).unwrap();
+    println!("  T½ = {nubase:#}");
+    let t_half = nubase
+        .convert::<Second>()
+        .unwrap()
+        .with_source(Source::new(1));
+    let a = FirstOrder::exact(Exact::<Ln2>::int(1))
+        .checked_mul(&FirstOrder::exact(count))
+        .unwrap()
+        .checked_div(&t_half)
+        .unwrap();
+    // the value is the activity above, to the becquerel
+    let same = a.value().as_quantity::<Activity>();
+    assert_eq!(
+        same.convert_rounded::<Becquerel, One, u64>(Rounding::NearestEven),
+        Ok(bq)
+    );
+    // the one contribution, −A · 7/1600, in Ln2 per second: A's relative uncertainty is T½'s, 7/1600, exactly
+    // (`rel_variance` squares A's 38 digits, past a Fraction: a BigFraction holds it)
+    let (_, c) = a.components().next().unwrap();
+    assert_eq!(
+        c.get().checked_div(a.value().get()),
+        Some(Fraction::new(-7, 1600))
+    );
+    // to whole becquerels by the certified edge too
+    let u = (-c)
+        .as_quantity::<Activity>()
+        .convert_rounded::<Becquerel, One, u64>(Rounding::NearestEven)
+        .unwrap();
+    assert!(u.get() > 160_000_000 && u.get() < 160_100_000);
+    println!("  A = {bq} with u(A) = {u} (k = 1), all of it from T½");
 }
 
 fn reaction_rate() {
