@@ -39,6 +39,21 @@ let db = double.to_level::<Decibel, Rational<1, 10000>, i32>(Rounding::NearestEv
 assert_eq!(db.get(), 30103);
 ```
 
+An `Exact` ratio's level is exact wherever it can be, and correctly rounded everywhere else. $\log_2$ of a fraction is a fraction only for a power of two, so `to_level` gives the stops of such a ratio and `None` for any other. `to_level_rounded` rounds any ratio's level by a named rounding, decided against each rounding boundary in integers rather than by a float's logarithm. Here the label's 1/60 [[s]] is set against the value's 1/64 [[s]]:
+
+```rust
+use exact_units::{Exact, Fixed, Rounding, prefix::Milli};
+use exact_units::units::{Lux, Per, Second, Stop, Times};
+
+type Exposure = Times<Lux, Second>;
+let bright = Exact::<Per<Exposure, Exposure>>::int(1024);
+assert_eq!(bright.to_level::<Stop>(), Some(Exact::int(10)));
+// 1/60 s gives 64/60 of the light of 1/64 s: log2(16/15) = 0.0931.. stop, irrational
+let off = Exact::<Per<Exposure, Exposure>>::new(64, 60);
+assert_eq!(off.to_level::<Stop>(), None);
+assert_eq!(off.to_level_rounded::<Stop, Milli, i16>(Rounding::NearestEven), Ok(Fixed::new(93)));
+```
+
 This is why exposure is easy to keep exact. Halving the time, closing the aperture a stop or halving the ISO speed each change the light by exactly one stop, and the camera adds and subtracts whole numbers.
 
 ## Settings as whole numbers: APEX
@@ -120,13 +135,19 @@ $1/64\,\unit{s}$ shows as "1/60", and the label "11" decodes to Av 7, 42 sixths.
 
 ## ISO speed in stops
 
-The film speed joins the sum as Sv. Annex C gives $\mathrm{Sv} = \log_2(S/3.125)$, so ISO 100 is Sv 5 exactly, and every doubling of the ISO speed adds a stop. ISO 125 and 160 are labels for $100 \cdot 2^{1/3}$ and $100 \cdot 2^{2/3}$; 125 itself would be $\log_2 40$. `sensitivity_value` gives Sv exactly where it is a whole number of stops and refuses the rest:
+The film speed joins the sum as Sv. Annex C gives $\mathrm{Sv} = \log_2(S/3.125)$, so ISO 100 is Sv 5 exactly, and every doubling of the ISO speed adds a stop. ISO 125 and 160 are labels for $100 \cdot 2^{1/3}$ and $100 \cdot 2^{2/3}$; 125 itself would be $\log_2 40$. `sensitivity_value` gives Sv exactly where it is a whole number of stops and refuses the rest. Which sixth of a stop ISO 125 stands for is a rounding, and the caller names it:
 
 ```rust
 use exact_units::exposure::{Apex, sensitivity_value};
+use exact_units::units::{Lux, Per, Second, Stop, Times};
+use exact_units::{Exact, Rounding, prefix::Rational};
 
 assert_eq!(sensitivity_value(100), Some(Apex::new(30)));
 assert_eq!(sensitivity_value(125), None);
+// 125/3.125 = 40, log2 40 = 5.32 stops: the nearest sixth is Sv 5⅓, the third stop above ISO 100
+let ratio = Exact::<Per<Times<Lux, Second>, Times<Lux, Second>>>::int(40);
+let sv = ratio.to_level_rounded::<Stop, Rational<1, 6>, i16>(Rounding::NearestEven);
+assert_eq!(sv, Ok(Apex::new(32)));
 ```
 
 Which ISO speed is a second question. A camera may mark three different measurements with the same number: standard output sensitivity, recommended exposure index and ISO speed. Exif's tag 34864, SensitivityType (4.6.6.7.7), says which of ISO 12232's parameters a PhotographicSensitivity is:
@@ -160,7 +181,17 @@ let l: Exact<Nit> = k
 assert_eq!(l, Exact::int(128)); // 128 cd/m²
 ```
 
-The scene was 128 cd/[[m²]], exactly, under $K = 12.5$. With $K = 14$ the same settings meter 143.36 cd/[[m²]]. The camera's settings don't change with $K$; the luminance they stand for does.
+The scene was 128 cd/[[m²]], exactly, under $K = 12.5$. Its brightness value is $\mathrm{Bv} = \log_2(L/(N K))$ with Annex C's $N = 1/3.125$: $L/(NK) = 32$, a power of two, so `to_level` gives Bv 5 exactly, and $\mathrm{Bv} + \mathrm{Sv} = 5 + 5 = \mathrm{Ev}$ 10:
+
+```rust
+use exact_units::Exact;
+use exact_units::units::{Nit, Per, Stop};
+
+// L / (N·K) = 128 / (12.5 / 3.125) = 32, a ratio of luminances
+let bv = Exact::<Per<Nit, Nit>>::int(32).to_level::<Stop>();
+assert_eq!(bv, Some(Exact::int(5)));
+```
+ With $K = 14$ the same settings meter 143.36 cd/[[m²]]. The camera's settings don't change with $K$; the luminance they stand for does.
 
 ## EV, two ways
 
@@ -176,12 +207,12 @@ $$
 
 | Step | Exact | A named choice | Float edge |
 |---|---|---|---|
-| A ratio of light in stops | a power of two | | any other ratio |
+| A ratio of light in stops | a power of two | the rounding of any other (`to_level_rounded`) | `Fixed::to_level` |
 | APEX values from Exif's rationals | whole sixths of a stop | | |
 | $\mathrm{Ev} = \mathrm{Av} + \mathrm{Tv} = \mathrm{Bv} + \mathrm{Sv}$ | yes | | |
 | f-number $\sqrt{2}^{\mathrm{Av}}$, time $2^{-\mathrm{Tv}}$ | whole stops | | third stops |
 | A label (f/11, 1/125) and its value | decoding | the rounding back | |
-| Sv of an ISO speed | ISO 100, 200, 400, ... | which ISO speed (SensitivityType) | ISO 125, 160 |
+| Sv of an ISO speed | ISO 100, 200, 400, ... | which ISO speed (SensitivityType); the sixth ISO 125 rounds to | |
 | The meter equation | for whole stops | $K$ or $C$ | |
 | "EV" | | camera EV or LV at ISO 100 | |
 
@@ -205,7 +236,6 @@ Annex C writes $\mathrm{Bv} = \log_2(B/(N K))$ with $N$ and $K$ "constant", and 
 
 ### Where the crate falls short
 
-- There is no exact logarithm of an `Exact`. $\log_2$ of a rational is rational only for a power of two, which is the case APEX needs, and the example writes that helper itself.
 - `Codec::encode` past a table's end gives the end code under the nearest roundings (Av 11 rounds to f/32), while `Codec`'s docs say a value beyond every code's range is refused. `Floor` and `Ceil` refuse it.
 - No codec holds the third-stop labels, for want of a free source that lists them.
 - `Stop` has no loss twin, so `Loss<Stop>` doesn't exist. Av is the loss of light through the aperture, and the example uses a gain level in stops.

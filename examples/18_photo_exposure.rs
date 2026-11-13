@@ -31,7 +31,7 @@ use exact_units::exposure::{
     ApertureLabel, Apex, SensitivityType, ShutterLabel, apex_from_exif, exposure_time,
     exposure_time_f64, f_number, f_number_f64, sensitivity_value,
 };
-use exact_units::prefix::{One, Rational};
+use exact_units::prefix::{Milli, One, Rational};
 use exact_units::units::{Decibel, Lux, Nit, Per, Second, Stop, Times};
 use exact_units::{Exact, Fixed, Fraction, Magnitude, Rounding};
 
@@ -74,17 +74,6 @@ fn rational_le(bytes: [u8; 8]) -> (i64, i64) {
     )
 }
 
-/// The whole number of stops k of a ratio that is 2^k exactly, `None` for any other: log2 of a rational is rational
-/// only for a power of two. The crate has no exact logarithm of an `Exact`; this is the case APEX needs.
-fn whole_stops(x: Fraction) -> Option<i16> {
-    let (num, den) = (x.numer()?, x.denom()?);
-    if num.is_power_of_two() && den.is_power_of_two() {
-        i16::try_from(i64::from(num.trailing_zeros()) - i64::from(den.trailing_zeros())).ok()
-    } else {
-        None
-    }
-}
-
 /// 2^k as a fraction.
 fn pow2(k: i16) -> Fraction {
     Fraction::pow2(i32::from(k)).unwrap()
@@ -120,14 +109,15 @@ fn exif_sample() -> (Apex, Apex) {
         Some(&(1, 60))
     );
 
-    // 1/60 s against 1/64 s: the exposure ratio 64/60 in stops, 0.093, is a float edge (a log of a rational)
-    let off = Fixed::<Per<Exposure, Exposure>, One, f64>::bounded(64.0 / 60.0)
-        .to_level::<Stop, One, f64>(Rounding::NearestEven)
+    // 1/60 s against 1/64 s: the exposure ratio 64/60 in stops, log2(16/15) = 0.0931.., is irrational: no exact
+    // level, and the rounding to thousandths is named and correct, decided without a float
+    let off = Exact::<Per<Exposure, Exposure>>::new(64, 60);
+    assert_eq!(off.to_level::<Stop>(), None);
+    let off = off
+        .to_level_rounded::<Stop, Milli, i16>(Rounding::NearestEven)
         .unwrap();
-    println!(
-        "ExposureTime 1/60 s is {:.3} stop more light than Tv 6 (1/64 s)",
-        off.get()
-    );
+    assert_eq!(off, Fixed::new(93));
+    println!("ExposureTime 1/60 s is {off} more light than Tv 6 (1/64 s)");
 
     // 2. Ev = Av + Tv, exact in sixths of a stop
     let ev = CameraEv(av + tv);
@@ -166,8 +156,11 @@ fn meters(av: Apex, tv: Apex) {
                 .unwrap();
         // Bv = log2(L/(N·K)) with Annex C's N = 1/3.125 (Sv = log2(S·N)): the same Bv for either K
         let n_k = k.0.get().checked_mul(Fraction::new(8, 25)).unwrap();
-        let bv = whole_stops(l.get().checked_div(n_k).unwrap()).unwrap();
-        assert_eq!(Apex::new(bv * 6) + sv, ev.0); // Ev = Bv + Sv
+        // L/(N·K) = 32 cd/m² over 1 cd/m²: a ratio of luminances, a power of two, so its level in stops is exact
+        let ratio = Exact::<Per<Nit, Nit>>::of(l.get().checked_div(n_k).unwrap());
+        let bv: Apex = ratio.to_level::<Stop>().unwrap().to().unwrap();
+        assert_eq!(bv + sv, ev.0); // Ev = Bv + Sv
+        let bv = bv.get() / 6;
         println!(
             "{name} cd·s/m²: f/4 at 1/64 s, ISO 100 meters L = {} cd/m², Bv {bv}",
             l.get().to_f64()
@@ -255,8 +248,13 @@ fn third_stops() {
         "Tv 7⅓ is {:.6} s (marked 1/160)",
         exposure_time_f64(Apex::new(44))
     );
-    // ISO 125 and 160 are labels for 100·2^(1/3) and 100·2^(2/3): their Sv is no exact value, 125 is refused
+    // ISO 125 and 160 are labels for 100·2^(1/3) and 100·2^(2/3): their Sv is no exact value, 125 is refused;
+    // log2(125/3.125) = log2 40 = 5.32.. rounds to Sv 5⅓ by a named rounding, the third stop it labels
     assert_eq!(sensitivity_value(125), None);
+    let sv125 = Exact::<Per<Exposure, Exposure>>::int(40)
+        .to_level_rounded::<Stop, Rational<1, 6>, i16>(Rounding::NearestEven)
+        .unwrap();
+    assert_eq!(sv125, Apex::new(32));
     let sv_third = sensitivity_value(100).unwrap() + Apex::new(2);
     let iso_third = 3.125
         * Fixed::<Stop, Rational<1, 6>, i16>::new(sv_third.get())
