@@ -730,6 +730,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
 - `MagnitudeOf<U>` (NUM-47): a run-time `Magnitude` with its unit in the type; wire bytes are the magnitude's.
 - `Exact::rounded_at` and `rounded_to` (NUM-48): a value rounded to a power of ten, or to a clock's resolution.
 - Book: [Recipes: clocks](docs/recipes/clocks.md), a clock's rate, resolution, fitted maps and labels (NUM-46 to NUM-48).
+- Book: WireWeaver syntax highlighting in the Rust blocks, ww_lsp's highlighter served from the site (IO-18).
 
 ### 🐛 Fixes
 

@@ -1,5 +1,10 @@
-"""Puts KaTeX into docs/vendor/katex and IBM Plex Sans/Mono into docs/vendor/fonts, so the site serves its own
-copies and needs no CDN (no Google Fonts, either: zensical.toml turns that off).
+"""Puts KaTeX into docs/vendor/katex, IBM Plex Sans/Mono into docs/vendor/fonts and WireWeaver's syntax
+highlighter into docs/vendor/ww_highlight, so the site serves its own copies and needs no CDN (no Google Fonts,
+either: zensical.toml turns that off).
+
+The highlighter (`ww_highlight.js`, its CSS and the `ww_tokens.json` it reads) is owned by ww_lsp's
+`ww_highlight` crate and fetched from ww_lsp's repository at the commit WW_LSP_COMMIT, each file with its own
+sha256; the book keeps no copy of that code.
 
 Each release is pinned with a hash; the download is checked against it before anything is written. The fonts come
 from IBM's own released woff2 (the IBM/plex GitHub releases), unmodified apart from npm not publishing a hash for
@@ -72,6 +77,33 @@ FALLBACK_MINIM_URL = (
 FALLBACK_MINIM_SHA256 = "5a00cc5c87afe8ae4bbf0da86f47d63c4b79a957a282df34b4966428617238ea"
 FALLBACK_LICENSE_URL = "https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/LICENSE"
 FALLBACK_LICENSE_SHA256 = "f2095b08bed08b23a6fe26112fcd679a2bee3f002eef077eb05d215ed1051bd8"
+
+# WireWeaver syntax highlighting in the ```rust blocks, from ww_lsp's crates/ww_highlight/assets (a landed main
+# commit). ww_highlight.js reads ww_tokens.json beside itself, so the files share one directory.
+WW_LSP_COMMIT = "c23b587dcc04da48b6747b263a4943864ec49096"
+WW_LSP_RAW = f"https://raw.githubusercontent.com/romixlab/ww_lsp/{WW_LSP_COMMIT}"
+WW_HIGHLIGHT_FILES = (
+    (
+        "ww_highlight.js",
+        "crates/ww_highlight/assets/ww_highlight.js",
+        "746251dab562b357069dba79884d78968984a3262b8a94f246bf237a737c478b",
+    ),
+    (
+        "ww_highlight.css",
+        "crates/ww_highlight/assets/ww_highlight.css",
+        "caa000a7c5a480d5eaa36610f3ee682a4a4dab77804c67b66da861f1e36e46b5",
+    ),
+    (
+        "ww_tokens.json",
+        "crates/ww_highlight/assets/ww_tokens.json",
+        "78c92af1b679f24b12937de6b06e6cb2ffa000318cdacfdfeb4cb53c9d634635",
+    ),
+    (
+        "LICENSE",
+        "LICENSE",
+        "f5feca6d40696bbd7b6f306143c736230f8d67d558134be564de1ae9895fa403",
+    ),
+)
 
 # A timeout, a connection error and these statuses are worth retrying (a 503 from GitHub, a 429 from the font
 # subsetter); any other HTTP status is treated as permanent (a 404 means the pinned URL moved, not a glitch).
@@ -193,7 +225,19 @@ def fetch_fonts(docs: Path) -> None:
     stamp.write_text(want_stamp + "\n")
 
 
+def fetch_ww_highlight(docs: Path) -> None:
+    out = docs / "vendor" / "ww_highlight"
+    stamp = out / "VERSION"
+    if stamp.exists() and stamp.read_text().strip() == WW_LSP_COMMIT:
+        return
+    out.mkdir(parents=True, exist_ok=True)
+    for name, path, sha256 in WW_HIGHLIGHT_FILES:
+        (out / name).write_bytes(download(f"{WW_LSP_RAW}/{path}", "sha256", sha256))
+    stamp.write_text(WW_LSP_COMMIT + "\n")
+
+
 if __name__ == "__main__":
     docs_dir = Path(sys.argv[1] if len(sys.argv) > 1 else "docs")
     fetch(docs_dir)
     fetch_fonts(docs_dir)
+    fetch_ww_highlight(docs_dir)
