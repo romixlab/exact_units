@@ -663,6 +663,25 @@ pub fn requantize(
 }
 
 /// [requantize] with the factor worked out once, for a series of values.
+///
+/// An `i64` tick count by a ratio whose numerator fits 64 bits (a clock's rate or resolution, 60000/1001, 2⁻¹⁵) is
+/// one `i128` multiply and one division: `|x| · num` is below 2¹²⁷, so the intermediate never overflows, and only a
+/// result past the target is refused (or settled by `o`). A fitted slope a [Magnitude] can't hold is a
+/// [Ratio64](crate::Ratio64), which gives the same numbers.
+///
+/// ```
+/// use exact_units::{Magnitude, Overflow, Repr, Requantizer, Rounding, StorageKind};
+///
+/// // ticks of a 60000/1001 Hz clock in nanoseconds: 1001/60000 s · 10⁹
+/// let to_ns = Requantizer::new(
+///     &Magnitude::ratio(1001 * 1_000_000_000, 60_000),
+///     StorageKind::Int { bits: 64, signed: true },
+///     Rounding::Floor,
+///     Overflow::Checked,
+/// );
+/// assert_eq!(to_ns.apply(Repr::Int(3)), Some(Repr::Int(50_050_000)));
+/// assert_eq!(to_ns.apply(Repr::Int(i64::MAX.into())), None);
+/// ```
 #[derive(Copy, Clone, Debug)]
 pub struct Requantizer {
     exact: Exact,

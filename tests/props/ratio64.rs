@@ -2,15 +2,16 @@
 //! rationals, a product the exact product or `None` exactly where a reduced part passes `u64`, and the rescale of an
 //! `i64` the exact quotient `x · num / den` rounded as the mode promises, `None` exactly where it doesn't fit an `i64`
 //! (or, for `apply`, isn't whole). The reference is `i128` and `u128` arithmetic: `|x| · num` is below 2¹²⁷. A test
-//! walks every `i8` count at every ratio of parts up to 40 whole. Kani proves the rescale on `i8` counts and `u8`
-//! parts.
+//! walks every `i8` count at every ratio of parts up to 40 whole. `Requantizer` by the same fraction as a `Magnitude`
+//! gives the same numbers (X1: an `i64` tick count in an `i128` intermediate). Kani proves the rescale on `i8` counts
+//! and `u8` parts.
 #![expect(
     clippy::arithmetic_side_effects,
     reason = "a test computes with the values it chose, which fit; an overflow fails the test"
 )]
 
 use super::reference::{MODES, assert_rounded, round_div};
-use exact_units::{Ratio64, Rounding};
+use exact_units::{Magnitude, Overflow, Ratio64, Repr, Requantizer, Rounding, StorageKind};
 
 /// The greatest common divisor by Euclid, `gcd(0, 0) = 0`.
 fn gcd(mut a: u128, mut b: u128) -> u128 {
@@ -60,6 +61,21 @@ pub(crate) fn applies(num: u64, den: u64, x: i64, r: Rounding) {
     assert_eq!(s.apply(x), exact, "{x} · {s} exactly");
 }
 
+/// A [Requantizer] by the same fraction as a [Magnitude], into an `i64` and checked, gives the same number as
+/// [Ratio64::apply_rounded]: an `i64` count by a ratio of `u64` parts is exact in its `i128` intermediate.
+pub(crate) fn requantizes_alike(num: u64, den: u64, x: i64, r: Rounding) {
+    let (Some(s), Ok(m)) = (Ratio64::new(num, den), Magnitude::checked_ratio(num, den)) else {
+        return;
+    };
+    let to = StorageKind::Int {
+        bits: 64,
+        signed: true,
+    };
+    let got = Requantizer::new(&m, to, r, Overflow::Checked).apply(Repr::Int(i128::from(x)));
+    let want = s.apply_rounded(x, r).map(|q| Repr::Int(i128::from(q)));
+    assert_eq!(got, want, "{x} · {s} by {r:?}");
+}
+
 /// `a · b` is the exact product in lowest terms, `None` exactly where a part of it passes `u64`; `a / b` is
 /// `a · (1/b)`; the order is that of the cross products.
 pub(crate) fn combines(a: Ratio64, b: Ratio64) {
@@ -86,7 +102,7 @@ pub(crate) fn combines(a: Ratio64, b: Ratio64) {
 #[cfg(not(any(kani, fuzzing)))]
 mod tests {
     use super::super::strategy;
-    use super::{MODES, applies, combines, constructs};
+    use super::{MODES, applies, combines, constructs, requantizes_alike};
     use exact_units::{Magnitude, Ratio64, Rounding};
     use proptest::prelude::*;
     use proptest::sample::select;
@@ -120,6 +136,11 @@ mod tests {
         }
 
         #[test]
+        fn requantizer_alike(n in part(), d in part(), x in strategy::i64(), r in strategy::mode()) {
+            requantizes_alike(n, d, x, r);
+        }
+
+        #[test]
         fn two_ratios(a in ratio(), b in ratio()) {
             combines(a, b);
         }
@@ -148,6 +169,9 @@ mod tests {
                 applies(1_000_000_007, 999_999_931, x, r);
                 applies(999_999_931, 1_000_000_007, x, r);
                 applies(u64::MAX, u64::MAX - 1, x, r);
+                requantizes_alike(1_000_000_007, 999_999_931, x, r);
+                requantizes_alike(u64::MAX, u64::MAX - 1, x, r);
+                requantizes_alike(60_000, 1001, x, r);
             }
         }
         assert_eq!(up.apply_rounded(i64::MAX, Rounding::Floor), None);

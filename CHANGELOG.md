@@ -726,6 +726,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
 - `examples/15_nuclear` and the book's Nuclear recipe carry ²²⁶Ra's half-life as NUBASE2020 prints it, 1600(7) y, an `Uncertain` read by `from_columns`, into the activity of a gram by first-order propagation (`FirstOrder`): u(A) is the half-life's one contribution, −A·7/1600 exactly, rounded to whole becquerels by the certified edge, 0.16 GBq of 36.58 GBq (P2401#10nov-1443c). The recipe's table gains the row.
 - Book: [Exact fractions](docs/maths/fractions.md) shows an exact gain's level beside the exponential, the logarithm as the same certified edge run backwards; [Decibels](docs/levels/decibels.md) points at it, and `docs/start/exact.md`'s shortfall on logarithms in `f64` names `Fixed::to_level` and the certified `Exact` path (NUM-43, P2401#10nov-1443c).
 - `Ratio64` (NUM-46): a positive reduced `u64` fraction rescaling an `i64` exactly or by a named rounding, for fitted clock slopes.
+- `Requantizer` docs (NUM-46): an `i64` tick count by a ratio of `u64` parts is exact in one `i128` intermediate.
 
 ### 🐛 Fixes
 
