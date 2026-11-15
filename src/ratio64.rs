@@ -124,7 +124,7 @@ impl Ratio64 {
     ///
     /// let a = Ratio64::new(1001, 1000).unwrap();
     /// assert_eq!(a.checked_mul(Ratio64::new(1000, 1001).unwrap()), Some(Ratio64::ONE));
-    /// let big = Ratio64::new(u64::MAX, 3).unwrap();
+    /// let big = Ratio64::new(u64::MAX - 1, 3).unwrap();
     /// assert_eq!(big.checked_mul(Ratio64::int(2).unwrap()), None);
     /// ```
     #[must_use]
