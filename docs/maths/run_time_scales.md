@@ -162,6 +162,26 @@ A `Modulo` origin has a period that is a compile-time number of its unit. At a r
 
 Where the set of time bases is known when the firmware is built, a `Fixed` per base still does the job at no cost. The [video time recipe](../recipes/video_time.md) shows both.
 
+## Fitted slopes
+
+A clock map fitted between two crystals has a slope such as $1000000007/999999931$. Its parts are primes past $2^{32}$, so neither a `RunScale` nor a `Magnitude` holds it. A `Ratio64` is a positive fraction of two `u64`s in lowest terms, one form per value. `apply` rescales an `i64` count exactly or refuses, and `apply_rounded` takes a named rounding:
+
+```rust
+use exact_units::{Ratio64, Rounding};
+
+let slope = Ratio64::new(1_000_000_007, 999_999_931).unwrap();
+assert_eq!(slope.apply(999_999_931), Some(1_000_000_007));
+// 10⁹ ticks are 1000000076.0000057.. ticks of the other clock
+assert_eq!(slope.apply(1_000_000_000), None);
+assert_eq!(slope.apply_rounded(1_000_000_000, Rounding::Floor), Some(1_000_000_076));
+// past i64 it is refused, never wrapped
+assert_eq!(slope.apply_rounded(i64::MAX, Rounding::Floor), None);
+```
+
+The rescale is one `i128` multiply and one divide. $|x| \cdot \mathrm{num}$ is below $2^{63} \cdot 2^{64} = 2^{127}$, so the intermediate never overflows. Only a result past `i64` is refused. Composing two slopes with `checked_mul` gives `None` where a part of the reduced product passes `u64`; the caller then fits the composed map again. A `Ratio64` goes on the wire as its two parts in `UVlq64`, canonical only, and in serde as `{ num, den }`.
+
+A slope that a `Magnitude` holds converts both ways (`Ratio64::of_magnitude`, `to_magnitude`). For an `i64` count by a `Magnitude` itself, `Requantizer` does the same work: a ratio whose numerator fits 64 bits multiplies an `i64` in `i128` without overflow.
+
 ## Cost on a microcontroller
 
 `tests/scaled_size.rs` builds three images at a firmware's release profile. Each converts one count to 90 [[kHz]] ticks by a named rounding:

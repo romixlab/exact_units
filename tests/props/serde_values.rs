@@ -62,6 +62,24 @@ where
     }
 }
 
+/// A fitted slope (NUM-46) read from `{ num, den }`: any fraction of nonzero parts reads as itself in lowest terms,
+/// in JSON and in postcard, a part of 0 is refused, and a slope is written as its own parts.
+#[cfg(not(kani))]
+pub(crate) fn ratio64(num: u64, den: u64) {
+    use exact_units::Ratio64;
+    let json = format!(r#"{{"num":{num},"den":{den}}}"#);
+    let want = Ratio64::new(num, den);
+    assert_eq!(serde_json::from_str::<Ratio64>(&json).ok(), want, "{json}");
+    let mut buf = [0u8; 64];
+    let n = postcard::to_slice(&(num, den), &mut buf).unwrap().len();
+    assert_eq!(postcard::from_bytes::<Ratio64>(&buf[..n]).ok(), want);
+    let Some(r) = want else { return };
+    let (n, d) = r.parts();
+    let text = serde_json::to_string(&r).unwrap();
+    assert_eq!(text, format!(r#"{{"num":{n},"den":{d}}}"#));
+    assert_eq!(serde_json::from_str::<Ratio64>(&text).unwrap(), r);
+}
+
 /// A run-time scale (NUM-42) read from `{ num, den, pow2 }`: any fraction of nonzero parts reads as its exact value,
 /// in JSON and in postcard, or is refused exactly where it has no form; a scale and a `Scaled` read back as
 /// themselves, and a fraction that fits `u64` is written as it is (`pow2` 0).
@@ -254,6 +272,11 @@ mod tests {
     use proptest::prelude::*;
 
     proptest! {
+        #[test]
+        fn ratios(num in prop_oneof![any::<u64>(), 0..=100u64], den in prop_oneof![any::<u64>(), 0..=100u64, Just(999_999_931u64)]) {
+            super::ratio64(num, den);
+        }
+
         #[test]
         fn run_scales(num in prop_oneof![any::<u64>(), 0..=100u64, Just(120_000u64)], den in prop_oneof![any::<u64>(), 0..=100u64, Just(60_000u64)], pow2: i8, x: i32) {
             super::run_scale(num, den, pow2, x);

@@ -96,6 +96,7 @@ pub mod quantities;
 pub mod quantity;
 #[cfg(feature = "radiation")]
 pub mod radiation;
+mod ratio64;
 pub mod registry;
 mod scaled;
 #[cfg(feature = "serde")]
@@ -174,6 +175,7 @@ pub use point::{
 pub use quantity::{Character, LevelForm, QuantityDef, QuantityExpr, QuantityRef, QuantitySpec};
 #[cfg(all(feature = "std", feature = "shrink_wrap"))]
 pub use quantity::{QuantityDefOwned, QuantityRefOwned};
+pub use ratio64::Ratio64;
 pub use registry::Registry;
 #[cfg(feature = "time")]
 pub use scaled::Ticks;

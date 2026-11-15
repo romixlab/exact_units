@@ -1,5 +1,5 @@
 //! Values built from the fuzzer's data (`arbitrary`): numbers, a series of rows, magnitudes from their parts,
-//! prefixes, dimensions canonical or not, unit trees and run-time scales, each encoded within its bound and decoded to itself.
+//! prefixes, dimensions canonical or not, unit trees, run-time scales and fitted slopes, each encoded within its bound and decoded to itself.
 #![no_main]
 
 #[path = "props.rs"]
@@ -16,6 +16,7 @@ enum Input {
     Dim(Vec<i8>, Vec<(String, i8)>),
     Unit(Expr),
     RunScale(u32, u32, i8, i64),
+    Ratio64(u64, u64),
 }
 
 libfuzzer_sys::fuzz_target!(|input: Input| match input {
@@ -26,4 +27,5 @@ libfuzzer_sys::fuzz_target!(|input: Input| match input {
     Input::Dim(exps, bases) => wire::dim(&exps, &bases),
     Input::Unit(e) => wire::si_expr(&e),
     Input::RunScale(n, d, e, x) => wire::run_scale(n, d, e, x),
+    Input::Ratio64(n, d) => wire::ratio64(n, d),
 });

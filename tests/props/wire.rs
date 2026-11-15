@@ -16,8 +16,8 @@ use exact_units::prefix::{Centi, Milli, One};
 use exact_units::units::{Kelvin, Ratio, Sample, Second, Volt};
 use exact_units::{
     BaseExp, CompactError, Complex, Dim, DimWire, Exp, Fixed, FullScaleBits, Index, IndexFrom1,
-    Magnitude, Offset, Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, RunScale, SIExpr,
-    SIExprOwned, Scaled, Seq, Symbols, UnitDef, UnitDefOwned, UnitTable, tree,
+    Magnitude, Offset, Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, Ratio64, RunScale,
+    SIExpr, SIExprOwned, Scaled, Seq, Symbols, UnitDef, UnitDefOwned, UnitTable, tree,
 };
 use shrink_wrap::max_size::MaxSize;
 use shrink_wrap::prelude::*;
@@ -169,6 +169,44 @@ pub(crate) fn run_scale(num: u32, den: u32, pow2: i8, x: i64) {
     assert!(back.same_repr(&v));
     let low = u32::from_le_bytes(x.to_le_bytes()[..4].try_into().expect("four bytes"));
     round_trip(&Point::<DeviceBoot, Scaled<Second, u32>>::at(low, s));
+}
+
+/// The parts of a [Ratio64] as they go on the wire, canonical or not.
+#[derive_shrink_wrap(borrowed, final_structure, derive(Clone, Copy, Debug, PartialEq))]
+pub(crate) struct RatioParts {
+    /// The numerator.
+    #[wire(UVlq64)]
+    num: u64,
+    /// The denominator.
+    #[wire(UVlq64)]
+    den: u64,
+}
+
+/// A fitted slope from its parts (NUM-46): the bytes of `num` and `den` decode exactly where they are the canonical
+/// form [Ratio64::new] makes of them, and a slope encodes to the bytes of its own parts.
+#[expect(clippy::expect_used, reason = "a property fails by panicking")]
+pub(crate) fn ratio64(num: u64, den: u64) {
+    let mut buf = vec![0u8; BUF];
+    let bytes = RatioParts { num, den }
+        .to_ww_bytes(&mut buf)
+        .expect("encodes")
+        .to_vec();
+    let canonical = Ratio64::new(num, den).filter(|r| r.parts() == (num, den));
+    assert_eq!(
+        Ratio64::from_ww_bytes(&bytes).ok(),
+        canonical,
+        "{num}/{den}"
+    );
+    let Some(r) = Ratio64::new(num, den) else {
+        return;
+    };
+    let (n, d) = r.parts();
+    let want = RatioParts { num: n, den: d }
+        .to_ww_bytes(&mut buf)
+        .expect("encodes")
+        .to_vec();
+    assert_eq!(r.to_ww_bytes(&mut buf).expect("encodes"), &want[..]);
+    round_trip(&r);
 }
 
 /// A `Series` of rows with `Fixed` fields round-trips and fits `Series::max_bytes`.
@@ -726,6 +764,11 @@ mod tests {
         #[test]
         fn run_scales(num in prop_oneof![any::<u32>(), 0..=64u32], den in prop_oneof![any::<u32>(), 0..=64u32, Just(90_000u32)], pow2: i8, x: i64) {
             super::run_scale(num, den, pow2, x);
+        }
+
+        #[test]
+        fn ratios(num in prop_oneof![any::<u64>(), 0..=64u64], den in prop_oneof![any::<u64>(), 0..=64u64, Just(999_999_931u64)]) {
+            super::ratio64(num, den);
         }
 
         #[test]

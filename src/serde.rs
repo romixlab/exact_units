@@ -31,6 +31,7 @@
 //!   then 0), so a config reads `{ "num": 1001, "den": 60000, "pow2": 0 }`; `pow2` may be left out. Reading takes any
 //!   fraction of nonzero parts and reduces it exactly, or refuses one that has no form (a part past `u32` after its
 //!   factors of two). [Scaled](crate::Scaled): `{ value, scale }`; a point of one its `Scaled`.
+//! - [Ratio64](crate::Ratio64): `{ num, den }`; reading takes any fraction of nonzero `u64` parts and reduces it.
 //!
 //! [with_unit] is the human form for a field: `"1.5 ms"`, read back exactly into the field's scale and storage.
 //!
@@ -231,6 +232,29 @@ mod run_scale {
                         "not a run-time scale: a part of 0, an odd part past u32 or an exponent of 2 past ±127",
                     )
                 })
+        }
+    }
+
+    /// A [Ratio64](crate::Ratio64) as serde writes it.
+    #[derive(::serde::Serialize, ::serde::Deserialize)]
+    #[serde(rename = "Ratio64")]
+    struct RatioParts {
+        num: u64,
+        den: u64,
+    }
+
+    impl Serialize for crate::Ratio64 {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            let (num, den) = self.parts();
+            RatioParts { num, den }.serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for crate::Ratio64 {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            let RatioParts { num, den } = RatioParts::deserialize(deserializer)?;
+            crate::Ratio64::new(num, den)
+                .ok_or_else(|| de::Error::custom("not a positive fraction: a part of 0"))
         }
     }
 
