@@ -188,7 +188,7 @@ impl<'de, U> serde::Deserialize<'de> for MagnitudeOf<U> {
 #[cfg(all(test, feature = "time", feature = "counting", feature = "angle"))]
 mod tests {
     use super::MagnitudeOf;
-    use crate::units::{Degree, Hertz, Per, Radian, Second, Tick};
+    use crate::units::{Hertz, Per, Second, Tick};
     use crate::{Exact, Magnitude, Ratio64};
 
     type Rate = MagnitudeOf<Per<Tick, Second>>;
@@ -214,8 +214,10 @@ mod tests {
         assert_eq!(Rate::from(rate.magnitude()), rate);
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn writes_what_has_no_fraction() {
+        use crate::units::{Degree, Radian};
         let deg = MagnitudeOf::<Degree>::new(Magnitude::ratio(1, 1));
         let rad = deg.convert::<Radian>().unwrap();
         assert_eq!(rad.to_exact(), None);
