@@ -9,6 +9,7 @@ target/
 /docs/vendor/
 /docs/assets/logo/
 /overrides/partials/stamp.html
+/docs/javascripts/book-stamp-age.js
 __pycache__/
 /.pytest_cache/
 # cargo-mutants output (`just mutants`)

@@ -661,8 +661,8 @@
   font-size: 0.9em;
 }
 
-/* The build stamp under the copyright (overrides/partials/copyright.html, docs_ext/eu_docs_ext/stamp.py) */
-.md-copyright .eu-stamp {
+/* The build stamp under the copyright (overrides/partials/copyright.html, book_stamp) */
+.md-copyright .book-stamp {
   margin-top: 0.2em;
   font-family: var(--md-code-font-family);
   font-size: 0.9em;
