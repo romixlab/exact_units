@@ -802,6 +802,7 @@ the command line, databases, Arrow.
   with an error that names both readings, since CODATA and the GUM (§7.2.2) write a standard uncertainty that way
   (IO-11). Tests: `tests/props/exact_text.rs` (`parentheses_read_two_ways`, the round trips), fuzz seed
   `codata-paren`. Book: [Exact fractions](docs/maths/fractions.md). P2401#10nov-1442d.
+- ✅ **IO-17 types-by-name: tables of the type names for tools that read source** — `origins::ALL` (every origin as an `OriginDef`, `Angle` once per unit), `types::ALIASES` (every alias of a `Fixed` or `Complex`, `Millis` to `Admittance`, as an `AliasDef`: its unit, scale, storage and bounds read from the type, its parameters in order (`U`, `P`, `T`, `B`), a part a use must give as `None`), `types::WRAPPERS` (`Fixed`, `Point`, `Index`, ...) and `types::UNIT_FORMS` (`Per`, `Times`, `Sqrt`, `Of`, `Phase`). With `units::ALL` and `Prefix::ALL` a language server or a docs highlighter lists no names of its own (ww_lsp HINT-9). Tests: `src/types/tests.rs` scans the declaring files, so an alias, wrapper or origin left out of a table fails. P2401#15nov-1004.
 
 ## Dropped and superseded
 

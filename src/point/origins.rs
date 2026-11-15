@@ -290,3 +290,40 @@ mod angle {
 
 #[cfg(feature = "angle")]
 pub use angle::*;
+
+/// Every origin this crate declares that is enabled, as data: what a tool that sees an origin only by its name in
+/// source looks it up in. [Angle] is here once per unit, each named `"Angle"`, told apart by its unit.
+pub static ALL: &[crate::OriginDef] = &[
+    #[cfg(feature = "time")]
+    <UnixEpoch as crate::Origin>::DEF,
+    #[cfg(feature = "time")]
+    <NtpEpoch as crate::Origin>::DEF,
+    #[cfg(feature = "time")]
+    <TaiEpoch1958 as crate::Origin>::DEF,
+    #[cfg(feature = "time")]
+    <GpsEpoch as crate::Origin>::DEF,
+    #[cfg(feature = "time")]
+    <PtpEpoch as crate::Origin>::DEF,
+    #[cfg(feature = "time")]
+    <DeviceBoot as crate::Origin>::DEF,
+    #[cfg(feature = "thermal")]
+    <AbsoluteZero as crate::Origin>::DEF,
+    #[cfg(feature = "thermal")]
+    <Celsius as crate::Origin>::DEF,
+    #[cfg(feature = "thermal")]
+    <Rankine as crate::Origin>::DEF,
+    #[cfg(feature = "thermal")]
+    <Fahrenheit as crate::Origin>::DEF,
+    #[cfg(feature = "mechanical")]
+    <Vacuum as crate::Origin>::DEF,
+    #[cfg(feature = "mechanical")]
+    <Gauge as crate::Origin>::DEF,
+    #[cfg(feature = "mechanical")]
+    <AboveStandardAtmosphere as crate::Origin>::DEF,
+    #[cfg(feature = "angle")]
+    <Angle<crate::units::Turn> as crate::Origin>::DEF,
+    #[cfg(feature = "angle")]
+    <Angle<crate::units::Degree> as crate::Origin>::DEF,
+    #[cfg(feature = "angle")]
+    <Angle<crate::units::Radian> as crate::Origin>::DEF,
+];
