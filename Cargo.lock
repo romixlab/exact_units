@@ -428,7 +428,7 @@ dependencies = [
 [[package]]
 name = "shrink_wrap"
 version = "0.2.0"
-source = "git+https://github.com/vhrdtech/wire_weaver#5d6f72da1ebd85bdcc2e8b156914a4228c67054f"
+source = "git+https://github.com/vhrdtech/wire_weaver#aeab5c43ba45c244188b55c399beebb3b8fec06e"
 dependencies = [
  "defmt",
  "either",
@@ -440,7 +440,7 @@ dependencies = [
 [[package]]
 name = "shrink_wrap_derive"
 version = "0.2.0"
-source = "git+https://github.com/vhrdtech/wire_weaver#5d6f72da1ebd85bdcc2e8b156914a4228c67054f"
+source = "git+https://github.com/vhrdtech/wire_weaver#aeab5c43ba45c244188b55c399beebb3b8fec06e"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
