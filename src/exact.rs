@@ -420,7 +420,7 @@ const fn factor_with<C: Constants, U: Unit, U2: Unit>() -> Fraction {
 }
 
 /// The magnitude from `U` to `U2`: same dimension and kind, no offset, both exact, else a compile error.
-const fn magnitude<U: Unit, U2: Unit>() -> Magnitude {
+pub(crate) const fn magnitude<U: Unit, U2: Unit>() -> Magnitude {
     if !U::DIM.same_typed(U2::DIM) {
         crate::conv_error::dim_mismatch::<U, U2>("an Exact");
     }
@@ -433,19 +433,24 @@ const fn magnitude<U: Unit, U2: Unit>() -> Magnitude {
     from.div(to)
 }
 
+/// `1 / (U · U2)` as a magnitude: `U2`'s dimension the reciprocal of `U`'s and both exact, else a compile error.
+pub(crate) const fn recip_magnitude<U: Unit, U2: Unit>() -> Magnitude {
+    if !<Times<U, U2>>::DIM.is_one_typed() {
+        crate::conv_error::recip_mismatch::<U, U2>();
+    }
+    let (Some(a), Some(b)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
+        crate::conv_error::no_exact_factor::<U, U2>("a reciprocal")
+    };
+    a.mul(b).recip()
+}
+
 /// `1 / (U · U2)`: the factor of a reciprocal from `U` into `U2`, whose dimension is the reciprocal of `U`'s.
 #[expect(
     clippy::panic,
     reason = "a compile error in const code (evaluated in const blocks), as documented"
 )]
 const fn recip_factor<U: Unit, U2: Unit>() -> Fraction {
-    if !<Times<U, U2>>::DIM.is_one_typed() {
-        crate::conv_error::recip_mismatch::<U, U2>();
-    }
-    let (Some(a), Some(b)) = (U::EXPR.magnitude(), U2::EXPR.magnitude()) else {
-        crate::conv_error::no_exact_factor::<U, U2>("an Exact's recip")
-    };
-    match Fraction::from_magnitude(&a.mul(b).recip()) {
+    match Fraction::from_magnitude(&recip_magnitude::<U, U2>()) {
         Some(f) => f,
         None => panic!("the factor between these units is not a fraction of u128s (π, a root)"),
     }

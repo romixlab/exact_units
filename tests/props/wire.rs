@@ -16,8 +16,8 @@ use exact_units::prefix::{Centi, Milli, One};
 use exact_units::units::{Kelvin, Ratio, Sample, Second, Volt};
 use exact_units::{
     BaseExp, CompactError, Complex, Dim, DimWire, Exp, Fixed, FullScaleBits, Index, IndexFrom1,
-    Magnitude, Offset, Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, Ratio64, RunScale,
-    SIExpr, SIExprOwned, Scaled, Seq, Symbols, UnitDef, UnitDefOwned, UnitTable, tree,
+    Magnitude, MagnitudeOf, Offset, Point, Pow2Exp, Pow10Exp, Prefix, PrimePower, Range, Ratio64,
+    RunScale, SIExpr, SIExprOwned, Scaled, Seq, Symbols, UnitDef, UnitDefOwned, UnitTable, tree,
 };
 use shrink_wrap::max_size::MaxSize;
 use shrink_wrap::prelude::*;
@@ -265,6 +265,49 @@ pub(crate) fn magnitude(pow10: i8, pow2: i8, irr: [i8; 6], primes: &[(u64, i8)])
     for neg in [false, true] {
         round_trip(&Offset::new(neg, m));
     }
+    same_bytes_as_magnitude(m);
+}
+
+/// A [MagnitudeOf] has exactly its magnitude's bytes, and the magnitude's bytes read as it (NUM-47): a field
+/// declared as a plain `Magnitude` and one declared with its unit read each other.
+#[expect(clippy::expect_used, reason = "a property fails by panicking")]
+fn same_bytes_as_magnitude(m: Magnitude) {
+    let (mut a, mut b) = (vec![0u8; BUF], vec![0u8; BUF]);
+    let typed = MagnitudeOf::<Second>::new(m);
+    let bytes = m.to_ww_bytes(&mut a).expect("encodes");
+    assert_eq!(typed.to_ww_bytes(&mut b).expect("encodes"), bytes);
+    assert_eq!(
+        MagnitudeOf::<Second>::from_ww_bytes(bytes).ok(),
+        Some(typed)
+    );
+    round_trip(&typed);
+}
+
+/// The clock of NUM-47's example: a 60000/1001 tick/s rate and a 1/32768 s resolution round-trip in the
+/// magnitude's bytes and print exactly.
+#[test]
+fn clock_rate_and_resolution() {
+    use exact_units::units::{Per, Tick};
+    let rate = MagnitudeOf::<Per<Tick, Second>>::new(Magnitude::ratio(60_000, 1001));
+    let resolution = MagnitudeOf::<Second>::new(Magnitude::ratio(1, 32_768));
+    let mut buf = vec![0u8; BUF];
+    let bytes = rate.to_ww_bytes(&mut buf).expect("encodes").to_vec();
+    assert_eq!(bytes.len(), 17);
+    assert_eq!(
+        MagnitudeOf::<Per<Tick, Second>>::from_ww_bytes(&bytes).ok(),
+        Some(rate)
+    );
+    let bytes = resolution.to_ww_bytes(&mut buf).expect("encodes").to_vec();
+    assert_eq!(bytes, [0x00, 0x80, 0xe2, 0x00, 0x00, 0x00]);
+    assert_eq!(
+        MagnitudeOf::<Second>::from_ww_bytes(&bytes).ok(),
+        Some(resolution)
+    );
+    same_bytes_as_magnitude(rate.magnitude());
+    same_bytes_as_magnitude(resolution.magnitude());
+    assert_eq!(rate.to_string(), "59.[940059] tick/s");
+    assert_eq!(format!("{resolution:#}"), "0.000030517578125 s");
+    assert_eq!(resolution.to_string(), "30.517578125 µs");
 }
 
 /// A prefix by a variant number and a parameter: each round-trips within its `MAX_SIZE`. `Unknown(tag)` with the tag of

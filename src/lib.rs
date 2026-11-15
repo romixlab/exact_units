@@ -165,7 +165,9 @@ pub use fixed::{Days, Hours, Hz, Micros, Millis, Minutes, Nanos, Secs};
 pub use fixed::{Duty16, Percent, Permille, Ppb, Ppm, Q15, Q31, UQ16_16};
 #[cfg(feature = "counting")]
 pub use index::{Index, IndexFrom1, Seq};
-pub use magnitude::{MAX_FACTORS, Magnitude, MagnitudeError, MagnitudeRest, PrimePower, Symbols};
+pub use magnitude::{
+    MAX_FACTORS, Magnitude, MagnitudeError, MagnitudeOf, MagnitudeRest, PrimePower, Symbols,
+};
 pub use notation::Notation;
 pub use point::{
     AmbientPressure, Linear, Modulo, Modulus, Offset, Origin, OriginDef, Point, PointArith,

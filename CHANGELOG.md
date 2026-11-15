@@ -727,6 +727,7 @@ firmware that only needs units in its types builds without it; the bytes don't d
 - Book: [Exact fractions](docs/maths/fractions.md) shows an exact gain's level beside the exponential, the logarithm as the same certified edge run backwards; [Decibels](docs/levels/decibels.md) points at it, and `docs/start/exact.md`'s shortfall on logarithms in `f64` names `Fixed::to_level` and the certified `Exact` path (NUM-43, P2401#10nov-1443c).
 - `Ratio64` (NUM-46): a positive reduced `u64` fraction rescaling an `i64` exactly or by a named rounding, for fitted clock slopes.
 - `Requantizer` docs (NUM-46): an `i64` tick count by a ratio of `u64` parts is exact in one `i128` intermediate.
+- `MagnitudeOf<U>` (NUM-47): a run-time `Magnitude` with its unit in the type; wire bytes are the magnitude's.
 
 ### 🐛 Fixes
 
