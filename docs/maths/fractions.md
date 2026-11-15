@@ -267,6 +267,16 @@ assert_eq!(shown.to_string(), "8794.5555 keV");
 assert_eq!(format!("{:e}", b_per_a.rounded(3, Rounding::NearestEven)), "8.795e6 eV");
 ```
 
+`rounded_at(k, mode)` rounds to a whole number of $10^k$ of the unit instead, the same step in every prefix: a ruler's label at a zoom level. `rounded_to(resolution, mode)` picks `k` from a clock's resolution, so a timestamp shows the digits its clock resolves and no finer ([Recipes: clocks](../recipes/clocks.md)).
+
+```rust
+use exact_units::{Exact, Rounding, units::Second};
+
+let t = Exact::<Second>::new(12_345_678, 1_000_000_000);
+assert_eq!(t.rounded_at(-6, Rounding::NearestEven).to_string(), "12.346 ms");
+assert_eq!(format!("{:#}", t.rounded_at(-6, Rounding::NearestEven)), "0.012346 s");
+```
+
 ## Reading
 
 Every form above reads back, with the units and prefixes `serde::with_unit` reads for a `Fixed`. The space before the unit is optional, and an exponent works too (`24e6 Hz`). Text that isn't a number with its unit, another unit, and a number past what a `Fraction` holds are refused. A fraction whose mantissa has its power of ten is written with it on the numerator (`3e-40/7`), and reads back.

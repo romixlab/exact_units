@@ -728,6 +728,8 @@ firmware that only needs units in its types builds without it; the bytes don't d
 - `Ratio64` (NUM-46): a positive reduced `u64` fraction rescaling an `i64` exactly or by a named rounding, for fitted clock slopes.
 - `Requantizer` docs (NUM-46): an `i64` tick count by a ratio of `u64` parts is exact in one `i128` intermediate.
 - `MagnitudeOf<U>` (NUM-47): a run-time `Magnitude` with its unit in the type; wire bytes are the magnitude's.
+- `Exact::rounded_at` and `rounded_to` (NUM-48): a value rounded to a power of ten, or to a clock's resolution.
+- Book: [Recipes: clocks](docs/recipes/clocks.md), a clock's rate, resolution, fitted maps and labels (NUM-46 to NUM-48).
 
 ### 🐛 Fixes
 

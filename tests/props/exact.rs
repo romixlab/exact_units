@@ -482,6 +482,69 @@ pub(crate) mod big {
         assert_eq!(got, Some(want), "{text} of {num}/{den} {r:?}");
     }
 
+    /// `x.rounded_at(k, r)` of `num/den` Hz is `n · 10^k` Hz with `n` the reference's `round(x / 10^k)`, whatever
+    /// writes it: `{:#}` with `-k` digits after the point (or `n` and `k` zeros), `{}` in the prefix it picks and
+    /// `{:e}` read back as that value. `rounded_to` a resolution in `[10^k, 10^(k+1))` is `rounded_at(k)`.
+    pub(crate) fn rounded_at(num: i32, den: u32, k: i8, r: Rounding, res: (u8, u8)) {
+        use exact_units::{Magnitude, MagnitudeOf};
+        if den == 0 {
+            return;
+        }
+        let x = Exact::<Hertz>::new(i128::from(num), u128::from(den));
+        let (top, bottom) = if k <= 0 {
+            (
+                i128::from(num) * 10i128.pow(u32::from(k.unsigned_abs())),
+                i128::from(den),
+            )
+        } else {
+            (
+                i128::from(num),
+                i128::from(den) * 10i128.pow(u32::from(k.unsigned_abs())),
+            )
+        };
+        let n = reference::round_div(top, bottom, r);
+        let value = Exact::<Hertz>::of(
+            Fraction::int(n)
+                .checked_mul(Fraction::pow10(i32::from(k)))
+                .expect("fits"),
+        );
+        let sign = if n < 0 { "-" } else { "" };
+        let want = if k < 0 {
+            let places = usize::from(k.unsigned_abs());
+            let digits = format!("{:0>width$}", n.unsigned_abs(), width = places + 1);
+            let (whole, frac) = digits.split_at(digits.len() - places);
+            format!("{sign}{whole}.{frac} Hz")
+        } else if n == 0 {
+            "0 Hz".to_owned()
+        } else {
+            format!(
+                "{sign}{}{} Hz",
+                n.unsigned_abs(),
+                "0".repeat(usize::from(k.unsigned_abs()))
+            )
+        };
+        let at = x.rounded_at(i32::from(k), r);
+        assert_eq!(format!("{at:#}"), want, "{num}/{den} at 10^{k} {r:?}");
+        for text in [at.to_string(), format!("{at:e}"), format!("{at:E}")] {
+            let back: Exact<Hertz> = text.parse().expect("reads back");
+            assert_eq!(back, value, "{text} of {num}/{den} at 10^{k} {r:?}");
+        }
+        // a resolution of a/b · 10^k with 1 <= a/b < 10
+        let (a, b) = (u64::from(res.0.max(1)), u64::from(res.1.max(1)));
+        if a < b || a >= 10 * b {
+            return;
+        }
+        let m = Magnitude::ratio(a, b).mul(Magnitude::pow10(k));
+        let to = x
+            .rounded_to(MagnitudeOf::new(m), r)
+            .expect("a fraction's decade");
+        assert_eq!(
+            format!("{to:#}"),
+            want,
+            "{num}/{den} to {a}/{b}·10^{k} {r:?}"
+        );
+    }
+
     /// `to_f64` is the float nearest the fraction, a tie to the even one, ±∞ from half a step past `f64::MAX`;
     /// `from_f64` of a finite one is that float exactly.
     pub(crate) fn nearest_f64(a: Fraction) {
@@ -748,6 +811,13 @@ mod tests {
             num in any::<i32>(), den in any::<u32>(), places in 0u8..=6, r in strategy::mode(),
         ) {
             big::rounded(num, den, places, r);
+        }
+
+        #[test]
+        fn rounded_at_as_the_reference(
+            num in any::<i32>(), den in any::<u32>(), k in -12i8..=6, r in strategy::mode(), res: (u8, u8),
+        ) {
+            big::rounded_at(num, den, k, r, res);
         }
 
         #[test]
