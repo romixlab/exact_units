@@ -40,7 +40,7 @@ exact_units = { path = "..", features = ["shrink_wrap"] }
 libfuzzer-sys = "0.4"
 serde = "1.0"
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
-shrink_wrap = { version = "0.2.0", git = "https://github.com/vhrdtech/wire_weaver", default-features = false, features = ["std"] }
+shrink_wrap = { version = "0.2.0", git = "https://github.com/romixlab/shrink_wrap", default-features = false, features = ["std"] }
 
 [lints.rust]
 # cfg(kani) and cfg(fuzzing) pick what of tests/props is compiled in. The feature values are exact_units' unit
