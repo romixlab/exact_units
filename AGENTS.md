@@ -12,8 +12,8 @@ repository root is a workspace of the two). `README.md` lists the features; the 
 firmware picks.
 
 The optional `shrink_wrap` feature adds WireWeaver's wire format (`#[derive_shrink_wrap]` on the types, `SIExpr`,
-`Fixed` over `UNib32`). shrink_wrap comes from the wire_weaver repository by git until its 0.2 is on crates.io;
-wire_weaver `[patch]`es that source to its own path, so its builds have one shrink_wrap. Wire bytes of these types
+`Fixed` over `UNib32`). shrink_wrap comes from its own repository (romixlab/shrink_wrap) by git until its 0.2 is
+on crates.io; wire_weaver takes it from there too, so its builds have one shrink_wrap. Wire bytes of these types
 are part of WireWeaver's conformance corpus: a change to a derive attribute here is a wire change there, check its
 `docs/evolution/rules.md` first. wire_weaver's crate walker reads this crate's source (the `cfg_attr(feature =
 "shrink_wrap", derive_shrink_wrap(..))` attributes and the `unit!` / `scale!` / `origin!` lines), so keep that shape.
