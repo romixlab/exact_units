@@ -2,6 +2,7 @@
 
 ### 🚀 Features
 
+- API snapshots live in `api_snapshots/`, saved by `ww api save`; `just lint` runs `just api-check`.
 - Book footer: the build's age from the reader's clock, coarser as it grows (`spl book stamp` replaces `eu_docs_ext.stamp`).
 - `origins::ALL`, `types::ALIASES`, `types::WRAPPERS` and `types::UNIT_FORMS`: the origin, alias and wrapper names as tables (IO-17).
 - `Count<Of, T, B = Unbounded>`, `Bytes<T, B = Unbounded>`, `Kibibytes`, `Mebibytes` and `Gibibytes` take an optional bounds parameter (P2401#13nov-0531), so a limit known at compile time is part of a count's type: `Count<Item, u8, Range<1, { MAX_WATCHES as i64 }>>`, `Bytes<u8, Range<1, 64>>`. The two-parameter forms are the same types as before. Doctest on `Count`: the bound refuses 0 and one past the const.

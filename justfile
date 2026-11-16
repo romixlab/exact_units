@@ -67,6 +67,11 @@ lint:
     cargo clippy --manifest-path tools/curve_size/Cargo.toml --target thumbv7em-none-eabihf --target-dir target -- -D warnings
     cargo clippy --manifest-path tools/scaled_size/Cargo.toml --target thumbv7em-none-eabihf --target-dir target -- -D warnings
     cargo clippy --manifest-path tools/prefix_size/Cargo.toml --target thumbv7em-none-eabihf --target-dir target -- -D warnings
+    @if command -v ww >/dev/null; then just api-check; else echo "ww not installed: api-check skipped"; fi
+
+# The API snapshot of api_snapshots/ matches this source (wire_weaver's `ww`; saved by `ww api save .`)
+api-check:
+    ww api check . --require-current
 
 # The fuzz crate builds (not run), so a gap like tests/props using num-bigint where fuzz/ has no such dependency
 # can't rot again. Needs a nightly toolchain and cargo-fuzz (`rustup toolchain install nightly`, `cargo install cargo-fuzz`).
