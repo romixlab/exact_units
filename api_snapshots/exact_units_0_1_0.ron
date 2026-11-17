@@ -1,7 +1,7 @@
 // exact_units 0.1.0 traits and types, saved by `ww api save`.
 // Do not edit, bump the crate version and save a new snapshot instead.
-// shrink_wrap sha256: 974176d28d0fa764c1e34c6123ce47738ac2dfa03fe526b09b2e3924dc337e49
-(magic: 2837124336, ww_self_version: (major: 0, minor: 3, patch: 0), root: (docs: [
+// shrink_wrap sha256: 4a17602ac1eeabd1cd21fd28ca7537e6b171e2f94472f69664873dc79068274b
+(magic: 2837124336, ww_self_version: (major: 0, minor: 4, patch: 0), root: (docs: [
     "Units of measure fixed at compile time, exact: a number with its unit, scale and storage in the type, on the wire",
     "exactly the number.",
     "",
