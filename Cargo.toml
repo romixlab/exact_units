@@ -379,6 +379,7 @@ required-features = [
 ]
 
 [profile.dev]
+debug = false
 split-debuginfo = "unpacked"
 
 # the exact references of the tests (BigRational) run a hundred times faster optimised
