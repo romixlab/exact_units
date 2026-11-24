@@ -124,12 +124,12 @@ docs-search: docs-build
     EU_SITE=site uv run --group dev pytest -q docs_ext/tests/test_search.py
 
 # What the book needs beside its pages, none of it in git: the footer's build stamp and age script
-# (spl book stamp), KaTeX (pinned, hash-checked), the logo, the plots the crate computes (tools/book_plots).
+# (vz stamp, vhrd_zensical pinned in pyproject.toml), KaTeX (pinned, hash-checked), the logo, the plots the crate computes (tools/book_plots).
 # KaTeX and the fonts come through a local, content-addressed cache (eu_docs_ext.vendor, EU_VENDOR_CACHE), so a
 # warm cache needs no network and a flaky npm/GitHub/font-subsetter fetch is retried instead of failing the
 # build outright.
 docs-prep:
-    spl book stamp overrides/partials/stamp.html docs/javascripts/book-stamp-age.js
+    uv run vz stamp
     uv run python -m eu_docs_ext.vendor docs
     mkdir -p docs/assets/logo
     cp assets/logo/*.svg docs/assets/logo/

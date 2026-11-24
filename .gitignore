@@ -8,8 +8,8 @@ target/
 /docs/plots/
 /docs/vendor/
 /docs/assets/logo/
-/overrides/partials/stamp.html
-/docs/javascripts/book-stamp-age.js
+/overrides/partials/vz-stamp.html
+/docs/javascripts/vz-stamp-age.js
 __pycache__/
 /.pytest_cache/
 # cargo-mutants output (`just mutants`)
