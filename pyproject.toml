@@ -5,8 +5,7 @@ name = "exact-units-book"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-  "zensical==0.0.74",
-  "vhrd-zensical @ git+https://github.com/vhrdtech/vhrd_zensical@v0.1.0",
+  "vhrd-zensical[zensical]==0.2.0",
 ]
 
 [build-system]
@@ -18,7 +17,3 @@ packages = ["docs_ext/eu_docs_ext"]
 
 [dependency-groups]
 dev = ["pytest>=8"]
-
-# The kit is pinned by git tag (vhrd_zensical), a direct reference
-[tool.hatch.metadata]
-allow-direct-references = true
