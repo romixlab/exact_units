@@ -1,3 +1,9 @@
+# `just jobs=N <recipe>` caps build and test parallelism for that run; unset leaves CARGO_BUILD_JOBS and
+# NEXTEST_TEST_THREADS as inherited, or at cargo's default (the CPU count)
+jobs := ""
+export CARGO_BUILD_JOBS := if jobs != "" { jobs } else { env_var_or_default('CARGO_BUILD_JOBS', num_cpus()) }
+export NEXTEST_TEST_THREADS := if jobs != "" { jobs } else { env_var_or_default('NEXTEST_TEST_THREADS', 'num-cpus') }
+
 # List all available targets
 default:
     @just --list
